@@ -2,6 +2,20 @@
 
 本指南適用於 `trade-alerts` 共用套件，以及已整合該套件的 Seykota BTCUSDT 專案。實際發送測試訊息需要使用者自己的 LINE／Telegram 憑證；目前工作環境未設定任何通知憑證，因此本次只能完成 mock 與 dry-run 驗證，不能代替你的帳號發送真實訊息。
 
+## 手機使用者先看：目前狀況與分工
+
+你不需要在手機上執行 `cd`、`cp`、`chmod`、`curl` 或 Python 指令。這些是給部署環境使用的命令，後續由我或部署流程處理。你目前只需要在手機完成帳號申請與取得下列資料，再回覆每一項是否完成；**不要把 token 貼到對話中**。
+
+| 項目 | 你在手機上要完成的事情 | 是否屬於秘密 |
+|---|---|---|
+| LINE Channel access token | 在 LINE Developers Console 複製 Messaging API channel access token | 是，不能傳給我 |
+| LINE_To | 取得自己的 LINE user ID；程式可將它填入 `LINE_TO` 或 `LINE_RECIPIENT_ID` | 是，建議不要公開 |
+| Telegram Bot Username | 在 BotFather 建立 bot 時設定，以 `bot` 結尾 | 否，但不要與 token 混淆 |
+| Telegram Bot Token | BotFather 建立 bot 後提供的 token | 是，不能傳給我 |
+| Telegram Chat ID | 你對 bot 傳訊息後取得的目的聊天室 ID | 不是密碼，但仍不建議公開 |
+
+完成四項申請後，請只回覆「LINE token 已取得、LINE user ID 已取得、Telegram username 已取得、Telegram token 已取得」等狀態，不要貼實際內容。由於 Telegram 要傳送訊息，除了你列出的四項外，系統還需要 `TELEGRAM_CHAT_ID`；我會在下一步協助用手機友善方式取得它。
+
 ## 一、先建立本機設定檔
 
 在策略專案目錄建立未加入 Git 的 `.env`。可以從範例複製：
@@ -14,7 +28,7 @@ chmod 600 .env
 
 確認 `.gitignore` 已排除 `.env`，並且不要把 token 貼到對話、截圖或 GitHub。共用套件使用以下設定：
 
-```dotenv
+```
 ALERTS_ENABLED=true
 ALERTS_SYSTEM=seykota-btc_usdt
 ALERTS_RETRY_ATTEMPTS=3
@@ -28,7 +42,7 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 ```
 
-`LINE_RECIPIENT_ID` 可以是個人 user ID、群組 ID 或多人聊天室 ID。舊設定名稱 `LINE_TO` 也可被共用套件讀取；Seykota 舊版的 `NOTIFICATIONS_ENABLED` 仍可相容，但新部署應優先使用 `ALERTS_ENABLED`。
+`LINE_RECIPIENT_ID` 可以是個人 user ID、群組 ID 或多人聊天室 ID。你所說的 `LINE_To` 對應到環境變數 `LINE_TO`；共用套件同時接受 `LINE_TO` 與 `LINE_RECIPIENT_ID`，但新部署文件統一使用 `LINE_RECIPIENT_ID`。Seykota 舊版的 `NOTIFICATIONS_ENABLED` 仍可相容，但新部署應優先使用 `ALERTS_ENABLED`。
 
 ## 二、設定 LINE Messaging API
 
@@ -53,14 +67,20 @@ LINE 官方說明 channel access token 是授權 Messaging API 呼叫的 opaque 
 最簡單的個人測試方式是：
 
 1. 在 LINE Developers Console 的 channel **Basic settings** 找到 **Your user ID**，將該值填入 `LINE_RECIPIENT_ID`。
-2. 確認你的 LINE 帳號已將該 Official Account 加為好友；否則 push message 通常不會送達。
-3. 若使用群組，先把 Official Account 加入群組，再透過 webhook 取得群組 ID；不要使用顯示名稱或 LINE 登入帳號名稱代替 ID。
+
+1. 確認你的 LINE 帳號已將該 Official Account 加為好友；否則 push message 通常不會送達。
+
+1. 若使用群組，先把 Official Account 加入群組，再透過 webhook 取得群組 ID；不要使用顯示名稱或 LINE 登入帳號名稱代替 ID。
 
 LINE 官方文件指出，user ID 不是使用者的顯示名稱或可搜尋 LINE ID；它是由 LINE Platform 發出的識別字串，通常形如 `U` 加上 32 個十六進位字元。[3]
 
+### 4. 手機上如何取得並記錄 LINE_To
+
+如果使用手機瀏覽器，開啟 [LINE Developers Console](https://developers.line.biz/console/)，登入後依序選擇 Provider、Messaging API channel、**Basic settings**，尋找 **Your user ID**。這串以 `U` 開頭的字串就是個人 `LINE_To`。如果手機版畫面沒有顯示，請在瀏覽器選單開啟「桌面版網站」再查看。先暫存在手機的密碼管理器或安全筆記，不要貼到聊天視窗。
+
 ### 5. 填入 LINE 設定
 
-```dotenv
+```
 ALERTS_ENABLED=true
 LINE_CHANNEL_ACCESS_TOKEN=填入你的 channel access token
 LINE_RECIPIENT_ID=填入你的 LINE user ID
@@ -70,17 +90,19 @@ LINE_RECIPIENT_ID=填入你的 LINE user ID
 
 ## 三、設定 Telegram Bot API
 
-### 1. 建立 bot 與取得 token
+### 1. 用手機建立 Telegram bot、取得 username 與 token
 
-在 Telegram 搜尋官方帳號 [@BotFather](https://t.me/BotFather)，按下 Start，執行 `/newbot`，依指示設定 bot 顯示名稱與 username。完成後 BotFather 會提供 bot token，格式通常類似 `123456789:AA...`。將它填入 `TELEGRAM_BOT_TOKEN`。
+在 Telegram 搜尋官方帳號 [@BotFather](https://t.me/BotFather)，按下 Start，執行 `/newbot`，依指示設定 bot 顯示名稱與 username。完成後 BotFather 會提供 bot token，格式通常類似 `123456789:AA...`。Bot username 是你在建立過程中設定、通常以 `bot` 結尾的名稱；token 是 BotFather 另外產生的長字串。將 username 記錄為辨識資料，將 token 填入 `TELEGRAM_BOT_TOKEN`，兩者不要混用。
 
-不要把 bot token 放在 URL、Git commit、公開 issue 或截圖中。Telegram 官方 Bot API 所有請求都使用 `https://api.telegram.org/bot<token>/METHOD_NAME` 的 HTTPS 格式。[4]
+不要把 bot token 放在 URL、Git commit、公開 issue 或截圖中。Telegram 官方 Bot API 所有請求都使用 `https://api.telegram.org/bot<token>/METHOD_NAME` 的 HTTPS 格式 。[4]
 
 ### 2. 取得個人 chat ID
 
 1. 開啟你剛建立的 bot 對話。
-2. 按 Start，或傳送一則測試文字，例如 `hello`。
-3. 在本機執行以下命令，把 `<BOT_TOKEN>` 替換成 token。請勿把含真實 token 的命令貼到公共地方。
+
+1. 按 Start，或傳送一則測試文字，例如 `hello`。
+
+1. 在本機執行以下命令，把 `<BOT_TOKEN>` 替換成 token。請勿把含真實 token 的命令貼到公共地方。
 
 ```bash
 curl -sS "https://api.telegram.org/bot<BOT_TOKEN>/getUpdates"
@@ -92,7 +114,7 @@ curl -sS "https://api.telegram.org/bot<BOT_TOKEN>/getUpdates"
 {"message":{"chat":{"id":123456789,"type":"private"}}}
 ```
 
-將 `chat.id` 的數字填入 `TELEGRAM_CHAT_ID`。如果回傳 `result: []`，先回到 bot 對話傳一則新訊息，再重新執行 `getUpdates`。如果 bot 設定過 webhook，`getUpdates` 可能不可用；這時要先移除 webhook，或使用 Telegram API 的 webhook 管理方式處理。
+將 `chat.id` 的數字填入 `TELEGRAM_CHAT_ID` 。如果回傳 `result: []`，先回到 bot 對話傳一則新訊息，再重新執行 `getUpdates`。如果 bot 設定過 webhook，`getUpdates` 可能不可用；這時要先移除 webhook，或使用 Telegram API 的 webhook 管理方式處理。
 
 ### 3. 取得群組 chat ID
 
@@ -100,7 +122,7 @@ curl -sS "https://api.telegram.org/bot<BOT_TOKEN>/getUpdates"
 
 ### 4. 填入 Telegram 設定
 
-```dotenv
+```
 ALERTS_ENABLED=true
 TELEGRAM_BOT_TOKEN=填入你的 bot token
 TELEGRAM_CHAT_ID=填入你的 chat ID
@@ -173,7 +195,7 @@ ALERTS_ENABLED=0 NOTIFICATIONS_ENABLED=0 seykota-bot notify-test
 ## 六、常見錯誤
 
 | 症狀 | 可能原因 | 處理方式 |
-|---|---|---|
+| --- | --- | --- |
 | LINE 回傳 401／403 | token 錯誤、過期或 channel 不匹配 | 重新確認 channel，必要時撤銷並重新發行 token |
 | LINE 回傳 400 | recipient ID 錯誤或訊息格式不合法 | 使用 Basic settings 的 user ID，確認不是顯示名稱 |
 | LINE 沒收到訊息但 API 成功 | Official Account 未加好友、帳號方案或推送權限問題 | 先加好友並確認 channel 對應的 Official Account |
@@ -197,6 +219,10 @@ git status --short
 ## References
 
 [1]: https://developers.line.biz/en/docs/messaging-api/getting-started/ "LINE Developers — Get started with the Messaging API"
+
 [2]: https://developers.line.biz/en/docs/basics/channel-access-token/ "LINE Developers — Channel access token"
+
 [3]: https://developers.line.biz/en/docs/messaging-api/getting-user-ids/ "LINE Developers — Get user IDs"
+
 [4]: https://core.telegram.org/bots/api "Telegram Bot API"
+
