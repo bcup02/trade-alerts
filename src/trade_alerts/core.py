@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Protocol
@@ -75,6 +76,21 @@ class AlertDispatcher:
                 channel.send(text, timeout=getattr(channel, "policy", RetryPolicy()).timeout_seconds)
             except Exception:
                 log.exception("alert channel failed: %s", getattr(channel, "name", "unknown"))
+
+    def publish_contract(self, envelope: Mapping[str, Any]) -> None:
+        """Publish a v1 contract envelope through the existing text channels."""
+        required = ("schema_version", "event_type", "project_id", "message")
+        missing = [key for key in required if not envelope.get(key)]
+        if missing:
+            raise ValueError(f"contract envelope missing required fields: {', '.join(missing)}")
+        data = dict(envelope.get("data") or {})
+        data.update({"schema_version": envelope["schema_version"], "project_id": envelope["project_id"], "execution_mode": envelope.get("execution_mode", "DRY_RUN")})
+        self.publish(
+            str(envelope["event_type"]),
+            str(envelope["message"]),
+            critical=str(envelope.get("severity", "INFO")) == "CRITICAL",
+            fields=data,
+        )
 
     def test(self) -> None:
         self.publish("TEST", "通知渠道測試成功。")

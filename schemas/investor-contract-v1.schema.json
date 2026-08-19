@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bcup02/trade-alerts/blob/main/schemas/investor-contract-v1.schema.json",
+  "title": "Trade Alerts Investor Contract v1",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/event" },
+    { "$ref": "#/$defs/portfolioSnapshot" },
+    { "$ref": "#/$defs/closedTrade" }
+  ],
+  "$defs": {
+    "version": { "type": "string", "const": "1.0" },
+    "mode": { "type": "string", "enum": ["DRY_RUN", "PAPER", "LIVE"] },
+    "severity": { "type": "string", "enum": ["INFO", "WARNING", "CRITICAL"] },
+    "event": {
+      "type": "object",
+      "required": ["schema_version", "event_id", "event_type", "project_id", "project_name", "occurred_at", "execution_mode", "severity", "message"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/version" },
+        "event_id": { "type": "string", "minLength": 1 },
+        "event_type": { "type": "string", "minLength": 1 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "project_name": { "type": "string", "minLength": 1 },
+        "occurred_at": { "type": "string", "format": "date-time" },
+        "execution_mode": { "$ref": "#/$defs/mode" },
+        "severity": { "$ref": "#/$defs/severity" },
+        "message": { "type": "string" },
+        "data": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "performanceWindow": {
+      "type": "object",
+      "required": ["realized_pnl", "total_pnl", "trade_count", "win_count", "loss_count", "calculated_from"],
+      "properties": {
+        "realized_pnl": { "type": ["number", "null"] },
+        "unrealized_pnl_change": { "type": ["number", "null"] },
+        "total_pnl": { "type": ["number", "null"] },
+        "trade_count": { "type": ["integer", "null"], "minimum": 0 },
+        "win_count": { "type": ["integer", "null"], "minimum": 0 },
+        "loss_count": { "type": ["integer", "null"], "minimum": 0 },
+        "calculated_from": { "type": ["string", "null"], "format": "date-time" }
+      },
+      "additionalProperties": true
+    },
+    "position": {
+      "type": "object",
+      "required": ["symbol", "side", "opened_at"],
+      "properties": {
+        "trade_id": { "type": ["string", "null"] },
+        "symbol": { "type": "string" },
+        "side": { "type": "string", "enum": ["long", "short", "unknown"] },
+        "quantity": { "type": ["number", "null"] },
+        "contracts": { "type": ["number", "integer", "null"] },
+        "entry_price": { "type": ["number", "null"] },
+        "mark_price": { "type": ["number", "null"] },
+        "stop_price": { "type": ["number", "null"] },
+        "unrealized_pnl": { "type": ["number", "null"] },
+        "opened_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": true
+    },
+    "protectiveOrder": {
+      "type": "object",
+      "required": ["order_type", "status"],
+      "properties": {
+        "order_type": { "type": "string", "enum": ["exchange_stop", "strategy_stop", "trailing_stop", "unknown"] },
+        "side": { "type": ["string", "null"] },
+        "stop_price": { "type": ["number", "null"] },
+        "quantity": { "type": ["number", "null"] },
+        "contracts": { "type": ["number", "integer", "null"] },
+        "status": { "type": "string", "enum": ["active", "triggered", "cancelled", "missing", "unknown"] }
+      },
+      "additionalProperties": true
+    },
+    "portfolioSnapshot": {
+      "type": "object",
+      "required": ["schema_version", "project_id", "project_name", "execution_mode", "status", "as_of", "last_update_at", "equity", "realized_pnl_total", "open_position", "protective_orders", "performance", "data_quality"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/version" },
+        "project_id": { "type": "string" },
+        "project_name": { "type": "string" },
+        "execution_mode": { "$ref": "#/$defs/mode" },
+        "status": { "type": "string", "enum": ["HEALTHY", "FLAT", "OPEN", "SAFE_HALT", "STALE", "ERROR"] },
+        "as_of": { "type": "string", "format": "date-time" },
+        "last_update_at": { "type": ["string", "null"], "format": "date-time" },
+        "equity": { "type": ["number", "null"] },
+        "unrealized_pnl": { "type": ["number", "null"] },
+        "realized_pnl_total": { "type": ["number", "null"] },
+        "open_position": { "anyOf": [{ "$ref": "#/$defs/position" }, { "type": "null" }] },
+        "protective_orders": { "type": "array", "items": { "$ref": "#/$defs/protectiveOrder" } },
+        "performance": {
+          "type": "object",
+          "required": ["7d", "30d", "ytd", "1y"],
+          "properties": {
+            "7d": { "$ref": "#/$defs/performanceWindow" },
+            "30d": { "$ref": "#/$defs/performanceWindow" },
+            "ytd": { "$ref": "#/$defs/performanceWindow" },
+            "1y": { "$ref": "#/$defs/performanceWindow" }
+          },
+          "additionalProperties": true
+        },
+        "data_quality": {
+          "type": "object",
+          "required": ["complete", "missing_fields"],
+          "properties": {
+            "complete": { "type": "boolean" },
+            "stale": { "type": "boolean" },
+            "missing_fields": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "closedTrade": {
+      "type": "object",
+      "required": ["schema_version", "project_id", "execution_mode", "trade_id", "symbol", "side", "opened_at", "closed_at", "realized_pnl", "close_reason"],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/version" },
+        "project_id": { "type": "string" },
+        "execution_mode": { "$ref": "#/$defs/mode" },
+        "trade_id": { "type": "string" },
+        "symbol": { "type": "string" },
+        "side": { "type": "string", "enum": ["long", "short", "unknown"] },
+        "opened_at": { "type": "string", "format": "date-time" },
+        "closed_at": { "type": "string", "format": "date-time" },
+        "entry_price": { "type": ["number", "null"] },
+        "exit_price": { "type": ["number", "null"] },
+        "quantity": { "type": ["number", "null"] },
+        "contracts": { "type": ["number", "integer", "null"] },
+        "realized_pnl": { "type": ["number", "null"] },
+        "fees": { "type": ["number", "null"] },
+        "close_reason": { "type": "string" },
+        "legs": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": true
+    }
+  }
+}

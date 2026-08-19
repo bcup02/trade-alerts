@@ -50,6 +50,12 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
 
 跨專案只應依賴以下名稱：`AlertEvent`、`AlertDispatcher`、`RetryPolicy`、`LineMessagingChannel`、`TelegramChannel` 與 `dispatcher_from_env`。策略事件建議使用一致名稱，例如 `ENTRY`、`ADD`、`EXIT`、`ENTRY_SKIPPED`、`SAFE_HALT`、`HEALTHY` 與 `ERROR`，並把 symbol、方向、數量、價格、止損與錯誤代碼放入 `fields`。
 
+## 投資人整合契約 v1
+
+跨專案的公開契約位於 [`docs/investor-contract-v1.md`](docs/investor-contract-v1.md)，machine-readable JSON Schema 位於 [`schemas/investor-contract-v1.schema.json`](schemas/investor-contract-v1.schema.json)。第一版同時支援事件推播、唯讀投資人狀態快照、保護單描述、已平倉交易與 `7d`／`30d`／`ytd`／`1y` 績效窗口。
+
+既有專案不必一次重構：可以繼續呼叫 `publish()`，先把 `schema_version=1.0`、`project_id` 與 `execution_mode=DRY_RUN` 放入 `fields`；新版則使用 `contract_event()` 與 `AlertDispatcher.publish_contract()`。接收端對未知選填欄位採忽略但保留原始資料的策略，對缺失損益使用 `null` 與 `data_quality.missing_fields`，不得推算或偽造數值。
+
 ## 驗證
 
 ```bash
