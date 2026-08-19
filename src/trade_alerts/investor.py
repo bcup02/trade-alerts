@@ -66,7 +66,44 @@ def _mode_label(mode: Any) -> str:
 
 
 def _side_label(side: Any) -> str:
-    return {"long": "看漲／買進方向", "short": "看跌／放空方向"}.get(str(side), "未提供")
+    return {"long": "看漲／買進", "short": "看跌／放空"}.get(str(side), "方向未提供")
+
+
+def _status_label(status: Any) -> str:
+    return {
+        "HEALTHY": "系統正常",
+        "FLAT": "目前無持倉",
+        "OPEN": "目前持有部位",
+        "SAFE_HALT": "安全暫停，等待人工處理",
+        "STALE": "資料可能過期",
+        "ERROR": "系統發生錯誤，請檢查",
+    }.get(str(status), "狀態未提供")
+
+
+def _protection_status_label(status: Any) -> str:
+    return {
+        "active": "啟用中",
+        "triggered": "已觸發",
+        "cancelled": "已取消",
+        "missing": "未確認／未建立",
+        "unknown": "狀態未確認",
+    }.get(str(status), "狀態未提供")
+
+
+def _field_label(field: Any) -> str:
+    return {
+        "equity": "帳戶權益",
+        "mark_price": "最新標記價",
+        "unrealized_pnl": "未實現損益",
+        "last_update_at": "最近更新時間",
+    }.get(str(field), str(field))
+
+
+def _record_type_label(record_type: Any) -> str:
+    return {
+        "strategy": "策略交易",
+        "maintenance_verification": "維護驗證交易（非策略訊號）",
+    }.get(str(record_type), "已平倉紀錄")
 
 
 def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
@@ -77,7 +114,7 @@ def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
         f"專案：{snapshot.get('project_name', snapshot.get('project_id', '未提供'))}",
         f"執行方式：{_mode_label(snapshot.get('execution_mode'))}",
         f"資料時間：{taipei_time(snapshot.get('as_of'))}（台北時間）",
-        f"策略狀態：{snapshot.get('status', '未提供')}",
+        f"策略狀態：{_status_label(snapshot.get('status'))}",
         f"策略權益：{_money(snapshot.get('equity'))}",
         f"累計已實現損益：{_money(snapshot.get('realized_pnl_total'))}",
     ]
@@ -103,11 +140,11 @@ def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
                 callback = f"｜回撤設定：{float(stop['callback_pct']) * 100:.2f}%"
             except (TypeError, ValueError):
                 callback = ""
-            lines.append(f"保護機制：{order_type}{callback}｜狀態：{stop.get('status', '未提供')}")
+            lines.append(f"保護機制：{order_type}{callback}｜狀態：{_protection_status_label(stop.get('status'))}")
             if stop.get("reference_stop_price") is not None:
                 lines.append(f"策略參考停損點：{stop.get('reference_stop_price')}（非固定交易所觸發價）")
         else:
-            lines.append(f"保護機制：{order_type}｜觸發價：{stop.get('stop_price', '資料未建立')}｜狀態：{stop.get('status', '未提供')}")
+            lines.append(f"保護機制：{order_type}｜觸發價：{stop.get('stop_price', '資料未建立')}｜狀態：{_protection_status_label(stop.get('status'))}")
         if stop.get("description"):
             lines.append(f"保護說明：{stop['description']}")
     else:
@@ -117,7 +154,7 @@ def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
     if not data_quality.get("complete", True):
         missing = data_quality.get("missing_fields") or []
         if missing:
-            lines.append(f"資料限制：目前未建立 {', '.join(str(field) for field in missing)}。")
+            lines.append(f"資料限制：目前未建立 {', '.join(_field_label(field) for field in missing)}。")
         if data_quality.get("stale"):
             lines.append("資料提醒：最近快照可能已過期，請等待下一次策略工作流程完成後再查詢。")
 
@@ -133,18 +170,37 @@ def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _contracts(value: Any) -> str:
+    if value is None:
+        return "資料未建立"
+    try:
+        return f"{float(value):g} 張"
+    except (TypeError, ValueError):
+        return f"{value} 張"
+
+
 def render_closed_trades(records: list[dict[str, Any]], *, project_name: str) -> str:
-    """Render at most ten v1 closed-trade records in Taiwan local time."""
-    lines = [f"{project_name}｜交易紀錄", "以下為策略／模擬交易紀錄，並非保證成交或投資建議。", ""]
+    """Render at most ten closed trades as compact, mobile-readable cards."""
+    lines = [f"{project_name}｜交易紀錄", "以下為已平倉紀錄，並非保證成交或投資建議。"]
     if not records:
-        lines.append("目前尚無可列示的已平倉交易紀錄。")
+        lines.extend(["", "目前尚無可列示的已平倉交易紀錄。"])
         return "\n".join(lines)
-    for trade in records[-10:]:
+
+    for index, trade in enumerate(reversed(records[-10:]), start=1):
+        record_type = trade.get("record_type")
         lines.extend([
-            f"{taipei_time(trade.get('closed_at'))}｜{_side_label(trade.get('side'))}｜{trade.get('symbol', '未提供')}",
-            f"進場 {trade.get('entry_price', '資料未建立')}｜平倉 {trade.get('exit_price', '資料未建立')}｜{trade.get('contracts', '資料未建立')} 張",
-            f"已實現損益：{_money(trade.get('realized_pnl'))}｜費用：{_money(trade.get('fees'))}｜原因：{trade.get('close_reason', '未提供')}",
+            "",
+            "────────────",
+            f"#{index}｜{trade.get('symbol', '標的未提供')}｜{_side_label(trade.get('side'))}",
+            f"平倉時間：{taipei_time(trade.get('closed_at'))}（台北時間）",
+            f"進場／平倉：{trade.get('entry_price', '資料未建立')} → {trade.get('exit_price', '資料未建立')}",
+            f"部位數量：{_contracts(trade.get('contracts', trade.get('quantity')))}",
+            f"已實現損益：{_money(trade.get('realized_pnl'))}",
+            f"交易費用：{_money(trade.get('fees'))}",
+            f"結束原因：{trade.get('close_reason', '原因未提供')}",
         ])
+        if record_type:
+            lines.append(f"紀錄類型：{_record_type_label(record_type)}")
     return "\n".join(lines)
 
 

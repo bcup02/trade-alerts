@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from trade_alerts.investor import InvestorQueryController, render_portfolio_snapshot
+from trade_alerts.investor import InvestorQueryController, render_closed_trades, render_portfolio_snapshot
 
 
 @dataclass
@@ -47,7 +47,7 @@ class FakeProvider:
 def test_portfolio_render_uses_taipei_time_and_v1_fields():
     text = render_portfolio_snapshot(FakeProvider().portfolio_snapshot())
     assert "2026-08-19 16:00" in text
-    assert "策略停損規則｜觸發價：63250｜狀態：active" in text
+    assert "策略停損規則｜觸發價：63250｜狀態：啟用中" in text
     assert "7 天：1.5000 USDT" in text
 
 
@@ -120,7 +120,37 @@ def test_portfolio_render_explains_exchange_trailing_stop_without_inventing_fixe
 
     text = render_portfolio_snapshot(snapshot)
 
-    assert "交易所追蹤停損｜回撤設定：5.00%｜狀態：active" in text
+    assert "交易所追蹤停損｜回撤設定：5.00%｜狀態：啟用中" in text
     assert "策略參考停損點：63250（非固定交易所觸發價）" in text
     assert "MEXC 原生追蹤停損委託" in text
-    assert "資料限制：目前未建立 equity, mark_price。" in text
+    assert "資料限制：目前未建立 帳戶權益, 最新標記價。" in text
+
+
+def test_portfolio_render_translates_internal_status_and_data_field_codes():
+    snapshot = FakeProvider().portfolio_snapshot()
+    snapshot["status"] = "SAFE_HALT"
+    snapshot["data_quality"] = {"complete": False, "stale": False, "missing_fields": ["equity", "mark_price"]}
+
+    text = render_portfolio_snapshot(snapshot)
+
+    assert "策略狀態：安全暫停，等待人工處理" in text
+    assert "SAFE_HALT" not in text
+    assert "資料限制：目前未建立 帳戶權益, 最新標記價。" in text
+
+
+def test_closed_trade_render_uses_mobile_cards_and_maintenance_label():
+    text = render_closed_trades([
+        {
+            "symbol": "XRP_USDT", "side": "long", "opened_at": "2026-08-19T11:00:00Z",
+            "closed_at": "2026-08-19T12:00:00Z", "entry_price": 1.0049, "exit_price": 1.0048,
+            "contracts": 5, "realized_pnl": -0.0085, "fees": 0.0080,
+            "close_reason": "受限實盤維護驗證（非策略訊號）", "record_type": "maintenance_verification",
+        }
+    ], project_name="MEXC 4H Momentum Trailing Stop")
+
+    assert "#1｜XRP_USDT｜看漲／買進" in text
+    assert "平倉時間：2026-08-19 20:00（台北時間）" in text
+    assert "進場／平倉：1.0049 → 1.0048" in text
+    assert "部位數量：5 張" in text
+    assert "已實現損益：-0.0085 USDT" in text
+    assert "紀錄類型：維護驗證交易（非策略訊號）" in text
