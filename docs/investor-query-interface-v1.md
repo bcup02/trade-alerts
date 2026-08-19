@@ -6,16 +6,16 @@
 
 | 指令 | 行為 |
 |---|---|
-| `查看投資摘要`／`投資摘要` | 單一 provider 時直接顯示 v1 投資摘要；多 provider 時顯示專案選單。 |
-| `查看交易紀錄` | 顯示 provider 專案選單。 |
+| `查看投資摘要`／`投資摘要`／`查看告警狀態` | **一律**顯示 provider 專案選單。 |
+| `查看交易紀錄` | **一律**顯示 provider 專案選單。 |
 | `<provider.trade_command>` | 顯示該 provider 最近十筆已平倉交易。 |
-| `<provider.portfolio_command>` | 多專案情境下顯示該 provider 的投資摘要。 |
+| `<provider.portfolio_command>` | 顯示該 provider 的投資摘要。 |
 
 任何其他輸入都會回傳未處理結果，必須由宿主原有的安全白名單處理；不得因此轉交 shell、交易控制或設定修改入口。
 
 ## Provider 契約
 
-每個 provider 必須有穩定的 `project_id`、`project_name`、`portfolio_command`、`trade_command`，並實作兩個**唯讀**方法：`portfolio_snapshot()` 回傳 v1 snapshot object，`closed_trades()` 回傳 v1 closed-trade objects。LINE／Telegram 宿主應先完成各自的使用者身分驗證，才呼叫控制器。
+每個 provider 必須有穩定的 `project_id`、`project_name`、`portfolio_command`、`trade_command`，並實作兩個**唯讀**方法：`portfolio_snapshot()` 回傳 v1 snapshot object，`closed_trades()` 回傳 v1 closed-trade objects。即使目前僅註冊一個 provider，控制器仍先顯示選單；這使日後新增專案時不需要改變投資人的操作習慣。LINE／Telegram 宿主應先完成各自的使用者身分驗證，才呼叫控制器。
 
 所有機器資料時間仍是 UTC ISO 8601；共用文字渲染器會統一轉為台北時間（UTC+8）`年-月-日 時:分`。`strategy_extensions` 保持選用，未知欄位不得造成查詢失敗。
 

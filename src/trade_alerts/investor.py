@@ -12,7 +12,7 @@ from typing import Any, Protocol
 from zoneinfo import ZoneInfo
 
 TAIPEI = ZoneInfo("Asia/Taipei")
-PORTFOLIO_COMMANDS = frozenset({"查看投資摘要", "投資摘要"})
+PORTFOLIO_COMMANDS = frozenset({"查看投資摘要", "投資摘要", "查看告警狀態", "告警狀態"})
 TRADE_LIST_COMMANDS = frozenset({"查看交易紀錄"})
 
 
@@ -153,11 +153,8 @@ class InvestorQueryController:
         return None
 
     def _portfolio_response(self) -> QueryResult:
-        providers = list(self._providers.values())
-        if len(providers) == 1:
-            return QueryResult(render_portfolio_snapshot(providers[0].portfolio_snapshot()))
         lines = ["投資摘要查詢", "", "請選擇專案："]
-        lines.extend(f"• {provider.project_name}：輸入「{provider.portfolio_command}」" for provider in providers)
+        lines.extend(f"• {provider.project_name}：輸入「{provider.portfolio_command}」" for provider in self._providers.values())
         return QueryResult("\n".join(lines))
 
     def _trade_menu_response(self) -> QueryResult:

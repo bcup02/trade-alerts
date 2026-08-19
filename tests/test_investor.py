@@ -49,11 +49,22 @@ def test_portfolio_render_uses_taipei_time_and_v1_fields():
 def test_controller_accepts_only_whitelisted_query_commands():
     controller = InvestorQueryController([FakeProvider()])
     assert controller.handle("systemctl stop bot") is None
-    assert controller.handle("查看投資摘要").text.startswith("投資摘要")
+    portfolio_menu = controller.handle("查看投資摘要").text
+    assert "投資摘要查詢" in portfolio_menu
+    assert "查看 Demo 投資摘要" in portfolio_menu
+    assert "查看 Demo 投資摘要" in controller.handle("查看告警狀態").text
     assert "交易紀錄查詢" in controller.handle("查看交易紀錄").text
+    summary = controller.handle("查看 Demo 投資摘要")
+    assert "策略權益：201.5000 USDT" in summary.text
     response = controller.handle("查看 Demo 交易紀錄")
     assert "2026-08-19 16:00" in response.text
     assert "已實現損益：1.0000 USDT" in response.text
+
+
+def test_single_project_summary_still_requires_project_selection():
+    text = InvestorQueryController([FakeProvider()]).handle("投資摘要").text
+    assert "投資摘要查詢" in text
+    assert "查看 Demo 投資摘要" in text
 
 
 def test_multi_project_summary_returns_project_selection():
