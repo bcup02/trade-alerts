@@ -45,9 +45,15 @@ def contract_event(
     message: str,
     data: Mapping[str, Any] | None = None,
     occurred_at: datetime | None = None,
+    presentation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a v1 event while leaving transport and trading decisions untouched."""
-    return ContractEvent(
+    """Build a v1 event while leaving transport and trading decisions untouched.
+
+    ``presentation`` is an optional, backward-compatible extension for a
+    channel-specific investor view. Machine-readable timestamps and data remain
+    in the canonical v1 fields.
+    """
+    envelope = ContractEvent(
         event_id=event_id,
         event_type=event_type,
         project_id=project_id,
@@ -58,6 +64,9 @@ def contract_event(
         message=message,
         data=dict(data or {}),
     ).to_dict()
+    if presentation is not None:
+        envelope["presentation"] = dict(presentation)
+    return envelope
 
 
 def adapt_legacy_event(

@@ -46,3 +46,35 @@ def test_channel_failure_isolated():
     good = RecordingChannel()
     AlertDispatcher([Broken(), good]).publish("TEST", "still delivered")
     assert len(good.messages) == 1
+
+
+def test_contract_mobile_presentation_hides_internal_metadata():
+    channel = RecordingChannel()
+    dispatcher = AlertDispatcher([channel], system="test")
+
+    dispatcher.publish_contract(
+        {
+            "schema_version": "1.0",
+            "event_id": "event-1",
+            "event_type": "POSITION_OPENED",
+            "project_id": "private-project-id",
+            "project_name": "Private Project",
+            "occurred_at": "2026-08-19T18:25:05Z",
+            "execution_mode": "LIVE",
+            "severity": "INFO",
+            "message": "Machine-readable fallback.",
+            "data": {"trade_id": "secret-internal-id", "ledger_event_type": "trade_open"},
+            "presentation": {
+                "format": "investor_mobile_v1",
+                "text": "【MEXC 4H Momentum Trailing Stop】\n開倉通知\n\n標的：MUBARAK_USDT",
+            },
+        }
+    )
+
+    text = channel.messages[0][0]
+    assert text == "【MEXC 4H Momentum Trailing Stop】\n開倉通知\n\n標的：MUBARAK_USDT"
+    assert "trade_id" not in text
+    assert "private-project-id" not in text
+    assert "ledger_event_type" not in text
+    assert "POSITION_OPENED" not in text
+    assert "UTC:" not in text

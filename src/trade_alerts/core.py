@@ -55,6 +55,29 @@ class AlertDispatcher:
         self.channels = channels or []
         self.system = system
 
+    def _send_text(self, text: str) -> None:
+        for channel in self.channels:
+            try:
+                channel.send(text, timeout=getattr(channel, "policy", RetryPolicy()).timeout_seconds)
+            except Exception:
+                log.exception("alert channel failed: %s", getattr(channel, "name", "unknown"))
+
+    @staticmethod
+    def _investor_mobile_text(envelope: Mapping[str, Any]) -> str | None:
+        """Return explicitly supplied investor text without exposing envelope metadata.
+
+        ``presentation`` is an optional v1-compatible extension. It is used only
+        for phone channels; all regular envelope data remains available to other
+        integrations and read-only investor queries.
+        """
+        presentation = envelope.get("presentation")
+        if not isinstance(presentation, Mapping):
+            return None
+        if presentation.get("format") != "investor_mobile_v1":
+            return None
+        text = presentation.get("text")
+        return text.strip() if isinstance(text, str) and text.strip() else None
+
     def publish(
         self,
         event: str | AlertEvent,
@@ -70,19 +93,23 @@ class AlertDispatcher:
             fields=fields or {},
             system=self.system,
         )
-        text = alert.render()
-        for channel in self.channels:
-            try:
-                channel.send(text, timeout=getattr(channel, "policy", RetryPolicy()).timeout_seconds)
-            except Exception:
-                log.exception("alert channel failed: %s", getattr(channel, "name", "unknown"))
+        self._send_text(alert.render())
 
     def publish_contract(self, envelope: Mapping[str, Any]) -> None:
-        """Publish a v1 contract envelope through the existing text channels."""
+        """Publish a v1 envelope through existing text channels.
+
+        Legacy and ordinary v1 events retain the diagnostic rendering. Producers
+        may opt into ``presentation.format=investor_mobile_v1`` to send a curated
+        investor message instead of raw machine metadata.
+        """
         required = ("schema_version", "event_type", "project_id", "message")
         missing = [key for key in required if not envelope.get(key)]
         if missing:
             raise ValueError(f"contract envelope missing required fields: {', '.join(missing)}")
+        investor_text = self._investor_mobile_text(envelope)
+        if investor_text:
+            self._send_text(investor_text)
+            return
         data = dict(envelope.get("data") or {})
         data.update({"schema_version": envelope["schema_version"], "project_id": envelope["project_id"], "execution_mode": envelope.get("execution_mode", "DRY_RUN")})
         self.publish(

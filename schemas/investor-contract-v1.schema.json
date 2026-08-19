@@ -25,7 +25,15 @@
         "execution_mode": { "$ref": "#/$defs/mode" },
         "severity": { "$ref": "#/$defs/severity" },
         "message": { "type": "string" },
-        "data": { "type": "object", "additionalProperties": true }
+        "data": { "type": "object", "additionalProperties": true },
+        "presentation": {
+          "type": "object",
+          "properties": {
+            "format": { "type": "string" },
+            "text": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
       },
       "additionalProperties": true
     },

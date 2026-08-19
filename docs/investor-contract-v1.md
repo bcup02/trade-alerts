@@ -30,6 +30,9 @@
 | `severity` | enum | 是 | `INFO`、`WARNING`、`CRITICAL`。 |
 | `message` | string | 是 | 人類可讀摘要，不得包含 token 或密碼。 |
 | `data` | object | 否 | 事件特有的結構化欄位。 |
+| `presentation` | object | 否 | 供手機渠道使用的選填呈現擴充；不改變 `data` 的機器可讀語意。 |
+
+若事件提供 `presentation.format = investor_mobile_v1` 與非空的 `presentation.text`，LINE／Telegram 必須直接顯示該文字，不可另行附加 `event_type`、`event_id`、`trade_id`、`order_id`、`schema_version`、`project_id`、`ledger_event_type`、原始錯誤內容或其他內部欄位。文字必須使用投資人語言與 **Asia/Taipei（UTC+8）** 的 `年-月-日 時:分` 格式；未使用此選填擴充的舊事件維持既有呈現，以確保漸進遷移與向下相容。
 
 標準 `event_type` 包括 `SYSTEM_HEALTH`, `ENTRY`, `ADD`, `EXIT`, `PROTECTIVE_ORDER_UPDATED`, `ENTRY_SKIPPED`, `PNL_UPDATE`, `SAFE_HALT`, `ERROR` 與 `TEST`。策略可以使用專案前綴的特有事件，但必須保留通用 envelope。
 
