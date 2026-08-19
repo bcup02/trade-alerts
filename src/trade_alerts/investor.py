@@ -97,10 +97,29 @@ def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
     protective_orders = snapshot.get("protective_orders") or []
     if protective_orders:
         stop = protective_orders[0]
-        order_type = {"exchange_stop": "交易所停損單", "strategy_stop": "策略停損規則", "trailing_stop": "追蹤停損"}.get(stop.get("order_type"), "保護機制")
-        lines.append(f"保護機制：{order_type}｜觸發價：{stop.get('stop_price', '資料未建立')}｜狀態：{stop.get('status', '未提供')}")
+        order_type = {"exchange_stop": "交易所停損單", "strategy_stop": "策略停損規則", "trailing_stop": "交易所追蹤停損"}.get(stop.get("order_type"), "保護機制")
+        if stop.get("order_type") == "trailing_stop" and stop.get("callback_pct") is not None:
+            try:
+                callback = f"｜回撤設定：{float(stop['callback_pct']) * 100:.2f}%"
+            except (TypeError, ValueError):
+                callback = ""
+            lines.append(f"保護機制：{order_type}{callback}｜狀態：{stop.get('status', '未提供')}")
+            if stop.get("reference_stop_price") is not None:
+                lines.append(f"策略參考停損點：{stop.get('reference_stop_price')}（非固定交易所觸發價）")
+        else:
+            lines.append(f"保護機制：{order_type}｜觸發價：{stop.get('stop_price', '資料未建立')}｜狀態：{stop.get('status', '未提供')}")
+        if stop.get("description"):
+            lines.append(f"保護說明：{stop['description']}")
     else:
         lines.append("保護機制：目前沒有啟用中的保護單或策略停損。")
+
+    data_quality = snapshot.get("data_quality") or {}
+    if not data_quality.get("complete", True):
+        missing = data_quality.get("missing_fields") or []
+        if missing:
+            lines.append(f"資料限制：目前未建立 {', '.join(str(field) for field in missing)}。")
+        if data_quality.get("stale"):
+            lines.append("資料提醒：最近快照可能已過期，請等待下一次策略工作流程完成後再查詢。")
 
     performance = snapshot.get("performance") or {}
     lines.extend(["", "績效（USDT）"])

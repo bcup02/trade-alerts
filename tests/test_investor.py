@@ -104,3 +104,23 @@ def test_project_action_options_and_resolution_are_fixed_and_whitelisted():
     assert provider.project_id == "demo-btc"
     assert action == "resume"
     assert controller.resolve_project_action("任意指令") is None
+
+
+def test_portfolio_render_explains_exchange_trailing_stop_without_inventing_fixed_trigger():
+    snapshot = FakeProvider().portfolio_snapshot()
+    snapshot["execution_mode"] = "LIVE"
+    snapshot["protective_orders"] = [{
+        "order_type": "trailing_stop",
+        "status": "active",
+        "callback_pct": 0.05,
+        "reference_stop_price": 63250,
+        "description": "MEXC 原生追蹤停損委託；交易所依回撤百分比持續計算。",
+    }]
+    snapshot["data_quality"] = {"complete": False, "stale": False, "missing_fields": ["equity", "mark_price"]}
+
+    text = render_portfolio_snapshot(snapshot)
+
+    assert "交易所追蹤停損｜回撤設定：5.00%｜狀態：active" in text
+    assert "策略參考停損點：63250（非固定交易所觸發價）" in text
+    assert "MEXC 原生追蹤停損委託" in text
+    assert "資料限制：目前未建立 equity, mark_price。" in text
