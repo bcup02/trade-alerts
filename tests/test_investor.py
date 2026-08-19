@@ -63,7 +63,8 @@ def test_controller_accepts_only_whitelisted_query_commands():
     assert "策略權益：201.5000 USDT" in summary.text
     response = controller.handle("查看 Demo 交易紀錄")
     assert "2026-08-19 16:00" in response.text
-    assert "損益 1.0000｜費 0.0300" in response.text
+    assert "手續費：0.0300 USDT" in response.text
+    assert "已實現損益：1.0000 USDT" in response.text
 
 
 def test_single_project_summary_still_requires_project_selection():
@@ -148,9 +149,13 @@ def test_closed_trade_render_uses_mobile_cards_and_maintenance_label():
         }
     ], project_name="MEXC 4H Momentum Trailing Stop")
 
-    assert "#1 XRP_USDT｜看漲／買進" in text
-    assert "2026-08-19 20:00" in text
-    assert "1.0049 → 1.0048｜5 張" in text
-    assert "損益 -0.0085｜費 0.0080" in text
-    assert "維護驗證（非策略）" in text
-    assert "結束原因：" not in text
+    assert "最近 5 筆交易紀錄如下：" in text
+    assert "#1 XRP_USDT｜看漲（UTC+8）" in text
+    assert "買進：2026-08-19 19:00" in text
+    assert "平倉：2026-08-19 20:00" in text
+    assert "部位：5 張" in text
+    assert "進場：1.0049" in text
+    assert "出場：1.0048" in text
+    assert "手續費：0.0080 USDT" in text
+    assert "已實現損益：-0.0085 USDT" in text
+    assert "結束原因：驗證交易（非策略）" in text

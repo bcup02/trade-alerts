@@ -102,8 +102,16 @@ def _field_label(field: Any) -> str:
 def _record_type_label(record_type: Any) -> str:
     return {
         "strategy": "策略交易",
-        "maintenance_verification": "維護驗證（非策略）",
+        "maintenance_verification": "驗證交易（非策略）",
     }.get(str(record_type), "已平倉紀錄")
+
+
+def _trade_direction_label(side: Any) -> str:
+    return {"long": "看漲", "short": "看跌"}.get(str(side), "方向未提供")
+
+
+def _entry_label(side: Any) -> str:
+    return {"long": "買進", "short": "放空"}.get(str(side), "開倉")
 
 
 def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
@@ -180,25 +188,28 @@ def _contracts(value: Any) -> str:
 
 
 def render_closed_trades(records: list[dict[str, Any]], *, project_name: str) -> str:
-    """Render at most ten closed trades in a compact phone-first layout."""
-    lines = [project_name, "已平倉紀錄（USDT｜台北時間）", "僅供查閱，非投資建議。"]
+    """Render the five most recent closed trades in the investor-approved layout."""
+    lines = [project_name, "", "最近 5 筆交易紀錄如下："]
     if not records:
         lines.extend(["", "目前尚無可列示的已平倉交易紀錄。"])
         return "\n".join(lines)
 
-    for index, trade in enumerate(reversed(records[-10:]), start=1):
+    for index, trade in enumerate(reversed(records[-5:]), start=1):
+        side = trade.get("side")
         record_type = trade.get("record_type")
+        reason = _record_type_label(record_type) if record_type == "maintenance_verification" else trade.get("close_reason", "原因未提供")
         lines.extend([
             "",
-            f"#{index} {trade.get('symbol', '標的未提供')}｜{_side_label(trade.get('side'))}",
-            taipei_time(trade.get('closed_at')),
-            f"{trade.get('entry_price', '資料未建立')} → {trade.get('exit_price', '資料未建立')}｜{_contracts(trade.get('contracts', trade.get('quantity')))}",
-            f"損益 {_money(trade.get('realized_pnl')).replace(' USDT', '')}｜費 {_money(trade.get('fees')).replace(' USDT', '')}",
+            f"#{index} {trade.get('symbol', '標的未提供')}｜{_trade_direction_label(side)}（UTC+8）",
+            f"{_entry_label(side)}：{taipei_time(trade.get('opened_at'))}",
+            f"平倉：{taipei_time(trade.get('closed_at'))}",
+            f"部位：{_contracts(trade.get('contracts', trade.get('quantity')))}",
+            f"進場：{trade.get('entry_price', '資料未建立')}",
+            f"出場：{trade.get('exit_price', '資料未建立')}",
+            f"手續費：{_money(trade.get('fees'))}",
+            f"已實現損益：{_money(trade.get('realized_pnl'))}",
+            f"結束原因：{reason}",
         ])
-        if record_type == "maintenance_verification":
-            lines.append(_record_type_label(record_type))
-        else:
-            lines.append(f"原因：{trade.get('close_reason', '原因未提供')}")
     return "\n".join(lines)
 
 
