@@ -152,12 +152,24 @@ class InvestorQueryController:
             return QueryResult(render_closed_trades(provider.closed_trades(), project_name=provider.project_name))
         return None
 
+    def project_options(self, command: str) -> list[tuple[str, str]]:
+        """Return fixed (label, command) pairs for a project-selection command.
+
+        Channel adapters use this method to build clickable choices from the same
+        whitelist that the text controller uses. Unknown commands expose no options.
+        """
+        if command in PORTFOLIO_COMMANDS:
+            return [(provider.project_name, provider.portfolio_command) for provider in self._providers.values()]
+        if command in TRADE_LIST_COMMANDS:
+            return [(provider.project_name, provider.trade_command) for provider in self._providers.values()]
+        return []
+
     def _portfolio_response(self) -> QueryResult:
         lines = ["投資摘要查詢", "", "請選擇專案："]
-        lines.extend(f"• {provider.project_name}：輸入「{provider.portfolio_command}」" for provider in self._providers.values())
+        lines.extend(f"• {label}：輸入「{provider_command}」" for label, provider_command in self.project_options("查看投資摘要"))
         return QueryResult("\n".join(lines))
 
     def _trade_menu_response(self) -> QueryResult:
         lines = ["交易紀錄查詢", "", "請選擇專案："]
-        lines.extend(f"• {provider.project_name}：輸入「{provider.trade_command}」" for provider in self._providers.values())
+        lines.extend(f"• {label}：輸入「{provider_command}」" for label, provider_command in self.project_options("查看交易紀錄"))
         return QueryResult("\n".join(lines))
