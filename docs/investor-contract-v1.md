@@ -59,6 +59,10 @@
 
 每個 `performance` 窗口至少包含 `realized_pnl`、`unrealized_pnl_change`（若可計算）、`total_pnl`、`trade_count`、`win_count`、`loss_count`、`calculated_from`。`ytd` 依 UTC 年初起算；若資料不足，仍回傳欄位但以 `null` 表示，並在 `data_quality.missing_fields` 說明原因。
 
+### 策略專屬可選擴充
+
+策略可在 `strategy_extensions.<strategy_id>` 放入不適用於其他專案的唯讀資料；接收端必須容忍未知 extension，其他專案可完全省略。Seykota 使用 `strategy_extensions.seykota` 提供 `protective_stop`（含 `trigger_price`、`status`、`exchange_order`）、`pyramiding`（含 `current_position_add_count` 與 `current_position_total_legs`）及 `loss_streak`（含 `consecutive_closed_losses` 與 `data_complete`）。`loss_streak` 只計算最新一串已平倉且 `realized_pnl < 0` 的模擬交易；只要舊歷史缺少已實現損益，結果必須為 `null` 並標記資料不完整，而不得當成零筆連虧。
+
 ## 5. 已平倉交易紀錄
 
 查詢交易紀錄回傳 `closed_trades` 陣列及 `next_cursor`（可選）。每筆至少包含 `trade_id`、`symbol`、`side`、`opened_at`、`closed_at`、`entry_price`、`exit_price`、`quantity` 或 `contracts`、`realized_pnl`、`fees`（若可用）、`close_reason` 與 `execution_mode`。同一 `trade_id` 的加碼應以 `legs` 或 `adds` 保存，不得讓一次交易被重複計入績效。
