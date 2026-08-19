@@ -23,6 +23,7 @@ class InvestorProvider(Protocol):
     project_name: str
     portfolio_command: str
     trade_command: str
+    action_commands: dict[str, str]
 
     def portfolio_snapshot(self) -> dict[str, Any]:
         ...
@@ -137,6 +138,14 @@ class InvestorQueryController:
         self._providers = {provider.project_id: provider for provider in providers}
         self._portfolio_commands = {provider.portfolio_command: provider for provider in providers}
         self._trade_commands = {provider.trade_command: provider for provider in providers}
+        self._action_commands: dict[str, tuple[InvestorProvider, str]] = {}
+        for provider in providers:
+            for action, command in provider.action_commands.items():
+                if action not in {"status", "pause", "resume"}:
+                    raise ValueError(f"unsupported project action: {action}")
+                if command in self._action_commands:
+                    raise ValueError(f"duplicate project action command: {command}")
+                self._action_commands[command] = (provider, action)
 
     def handle(self, command: str) -> QueryResult | None:
         command = command.strip()
@@ -151,6 +160,18 @@ class InvestorQueryController:
         if provider:
             return QueryResult(render_closed_trades(provider.closed_trades(), project_name=provider.project_name))
         return None
+
+    def project_action_options(self, action: str) -> list[tuple[str, str]]:
+        """Return fixed provider-specific commands for one approved action type."""
+        return [
+            (provider.project_name, command)
+            for command, (provider, provider_action) in self._action_commands.items()
+            if provider_action == action
+        ]
+
+    def resolve_project_action(self, command: str) -> tuple[InvestorProvider, str] | None:
+        """Resolve a provider-specific action command without executing it."""
+        return self._action_commands.get(command)
 
     def previous_menu_command(self, command: str) -> str | None:
         """Return the parent menu command for a provider-specific query."""
@@ -174,10 +195,10 @@ class InvestorQueryController:
 
     def _portfolio_response(self) -> QueryResult:
         lines = ["投資摘要查詢", "", "請選擇專案："]
-        lines.extend(f"• {label}：輸入「{provider_command}」" for label, provider_command in self.project_options("查看投資摘要"))
+        lines.extend(f"• {label}" for label, _provider_command in self.project_options("查看投資摘要"))
         return QueryResult("\n".join(lines))
 
     def _trade_menu_response(self) -> QueryResult:
         lines = ["交易紀錄查詢", "", "請選擇專案："]
-        lines.extend(f"• {label}：輸入「{provider_command}」" for label, provider_command in self.project_options("查看交易紀錄"))
+        lines.extend(f"• {label}" for label, _provider_command in self.project_options("查看交易紀錄"))
         return QueryResult("\n".join(lines))

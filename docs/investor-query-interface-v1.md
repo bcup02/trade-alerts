@@ -28,3 +28,9 @@ Seykota 提供 `SeykotaInvestorProvider`，只容許兩個固定管理動作：`
 ## 階層式導航
 
 渠道介面應將 `InvestorQueryController.project_options()` 產生的選項作為第二層專案選單，並在該選單提供固定的 `返回上一層` → `功能選單` 動作。對 `<provider.portfolio_command>` 與 `<provider.trade_command>` 的結果畫面，應以 `previous_menu_command()` 取得父層命令，提供 `返回上一層` 按鈕。返回動作只能使用控制器回傳的固定白名單命令，不得由使用者文字拼接 shell、檔案或交易控制命令。
+
+## 專案狀態與 DRY_RUN 控制選擇
+
+當渠道提供系統狀態、暫停策略或恢復模擬運轉時，應先以 `project_action_options("status"|"pause"|"resume")` 顯示可支援該能力的專案。選擇後，宿主才可將 `resolve_project_action()` 的固定 action 映射到該專案既有受控入口。`pause` 與 `resume` 必須仍由宿主執行既有的二次確認與 DRY_RUN 檢查；本函式庫不執行控制動作，也不接受使用者自訂 action。
+
+專案選擇文字應只列出專案名稱；實際命令應由 LINE／Telegram 的按鈕傳遞，避免要求投資人輸入內部指令。

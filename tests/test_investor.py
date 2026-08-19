@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from trade_alerts.investor import InvestorQueryController, render_portfolio_snapshot
 
@@ -9,6 +9,11 @@ class FakeProvider:
     project_name: str = "Demo BTC 策略"
     portfolio_command: str = "查看 Demo 投資摘要"
     trade_command: str = "查看 Demo 交易紀錄"
+    action_commands: dict[str, str] = field(default_factory=lambda: {
+        "status": "查看 Demo 系統狀態",
+        "pause": "暫停 Demo 策略",
+        "resume": "恢復 Demo 模擬運轉",
+    })
 
     def portfolio_snapshot(self):
         return {
@@ -51,8 +56,8 @@ def test_controller_accepts_only_whitelisted_query_commands():
     assert controller.handle("systemctl stop bot") is None
     portfolio_menu = controller.handle("查看投資摘要").text
     assert "投資摘要查詢" in portfolio_menu
-    assert "查看 Demo 投資摘要" in portfolio_menu
-    assert "查看 Demo 投資摘要" in controller.handle("查看告警狀態").text
+    assert "Demo BTC 策略" in portfolio_menu
+    assert "Demo BTC 策略" in controller.handle("查看告警狀態").text
     assert "交易紀錄查詢" in controller.handle("查看交易紀錄").text
     summary = controller.handle("查看 Demo 投資摘要")
     assert "策略權益：201.5000 USDT" in summary.text
@@ -64,14 +69,17 @@ def test_controller_accepts_only_whitelisted_query_commands():
 def test_single_project_summary_still_requires_project_selection():
     text = InvestorQueryController([FakeProvider()]).handle("投資摘要").text
     assert "投資摘要查詢" in text
-    assert "查看 Demo 投資摘要" in text
+    assert "Demo BTC 策略" in text
 
 
 def test_multi_project_summary_returns_project_selection():
-    other = FakeProvider(project_id="other", project_name="Other 策略", portfolio_command="查看 Other 投資摘要", trade_command="查看 Other 交易紀錄")
+    other = FakeProvider(
+        project_id="other", project_name="Other 策略", portfolio_command="查看 Other 投資摘要", trade_command="查看 Other 交易紀錄",
+        action_commands={"status": "查看 Other 系統狀態", "pause": "暫停 Other 策略", "resume": "恢復 Other 模擬運轉"},
+    )
     text = InvestorQueryController([FakeProvider(), other]).handle("查看投資摘要").text
-    assert "查看 Demo 投資摘要" in text
-    assert "查看 Other 投資摘要" in text
+    assert "Demo BTC 策略" in text
+    assert "Other 策略" in text
 
 
 def test_project_options_expose_provider_commands_for_both_query_menus():
@@ -86,3 +94,13 @@ def test_provider_queries_resolve_their_parent_menu():
     assert controller.previous_menu_command("查看 Demo 投資摘要") == "查看投資摘要"
     assert controller.previous_menu_command("查看 Demo 交易紀錄") == "查看交易紀錄"
     assert controller.previous_menu_command("查看投資摘要") is None
+
+
+def test_project_action_options_and_resolution_are_fixed_and_whitelisted():
+    controller = InvestorQueryController([FakeProvider()])
+    assert controller.project_action_options("status") == [("Demo BTC 策略", "查看 Demo 系統狀態")]
+    assert controller.project_action_options("pause") == [("Demo BTC 策略", "暫停 Demo 策略")]
+    provider, action = controller.resolve_project_action("恢復 Demo 模擬運轉")
+    assert provider.project_id == "demo-btc"
+    assert action == "resume"
+    assert controller.resolve_project_action("任意指令") is None
