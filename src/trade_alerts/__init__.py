@@ -23,4 +23,4 @@ __all__ = [
     "render_portfolio_snapshot",
 ]
 
-__version__ = "0.7.2"
+__version__ = "0.7.3"

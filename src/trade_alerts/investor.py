@@ -102,7 +102,7 @@ def _field_label(field: Any) -> str:
 def _record_type_label(record_type: Any) -> str:
     return {
         "strategy": "策略交易",
-        "maintenance_verification": "維護驗證交易（非策略訊號）",
+        "maintenance_verification": "維護驗證（非策略）",
     }.get(str(record_type), "已平倉紀錄")
 
 
@@ -180,8 +180,8 @@ def _contracts(value: Any) -> str:
 
 
 def render_closed_trades(records: list[dict[str, Any]], *, project_name: str) -> str:
-    """Render at most ten closed trades as compact, mobile-readable cards."""
-    lines = [f"{project_name}｜交易紀錄", "以下為已平倉紀錄，並非保證成交或投資建議。"]
+    """Render at most ten closed trades in a compact phone-first layout."""
+    lines = [project_name, "已平倉紀錄（USDT｜台北時間）", "僅供查閱，非投資建議。"]
     if not records:
         lines.extend(["", "目前尚無可列示的已平倉交易紀錄。"])
         return "\n".join(lines)
@@ -190,17 +190,15 @@ def render_closed_trades(records: list[dict[str, Any]], *, project_name: str) ->
         record_type = trade.get("record_type")
         lines.extend([
             "",
-            "────────────",
-            f"#{index}｜{trade.get('symbol', '標的未提供')}｜{_side_label(trade.get('side'))}",
-            f"平倉時間：{taipei_time(trade.get('closed_at'))}（台北時間）",
-            f"進場／平倉：{trade.get('entry_price', '資料未建立')} → {trade.get('exit_price', '資料未建立')}",
-            f"部位數量：{_contracts(trade.get('contracts', trade.get('quantity')))}",
-            f"已實現損益：{_money(trade.get('realized_pnl'))}",
-            f"交易費用：{_money(trade.get('fees'))}",
-            f"結束原因：{trade.get('close_reason', '原因未提供')}",
+            f"#{index} {trade.get('symbol', '標的未提供')}｜{_side_label(trade.get('side'))}",
+            taipei_time(trade.get('closed_at')),
+            f"{trade.get('entry_price', '資料未建立')} → {trade.get('exit_price', '資料未建立')}｜{_contracts(trade.get('contracts', trade.get('quantity')))}",
+            f"損益 {_money(trade.get('realized_pnl')).replace(' USDT', '')}｜費 {_money(trade.get('fees')).replace(' USDT', '')}",
         ])
-        if record_type:
-            lines.append(f"紀錄類型：{_record_type_label(record_type)}")
+        if record_type == "maintenance_verification":
+            lines.append(_record_type_label(record_type))
+        else:
+            lines.append(f"原因：{trade.get('close_reason', '原因未提供')}")
     return "\n".join(lines)
 
 
