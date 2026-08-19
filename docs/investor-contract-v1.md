@@ -1,6 +1,6 @@
 # Trade Alerts 投資人整合契約 v1
 
-**狀態：第一版草案。** 本文件是跨交易專案的公開資料契約；它描述事件推播與投資人查詢所需的資料，不包含任何交易所憑證、聊天平台秘密或下單指令。所有時間一律使用 ISO 8601 UTC，例如 `2026-08-19T08:00:00Z`。
+**狀態：第一版草案。** 本文件是跨交易專案的公開資料契約；它描述事件推播與投資人查詢所需的資料，不包含任何交易所憑證、聊天平台秘密或下單指令。JSON 的機器時間欄位使用 ISO 8601 UTC，例如 `2026-08-19T08:00:00Z`，以利跨專案排序與計算；LINE／Telegram 面向投資人的文字畫面則必須轉為 **Asia/Taipei（UTC+8）**，格式為 `年-月-日 時:分`，例如 `2026-08-19 16:00`。
 
 ## 1. 設計目標與安全界線
 
@@ -65,10 +65,10 @@
 
 ## 6. 查詢命令對映
 
-LINE／Telegram 介面應提供唯讀命令，名稱可由各專案本地化，但語意固定：`系統狀態` 對映 `status`，`查看投資摘要` 對映 `portfolio_snapshot`，`查看交易紀錄` 對映 `closed_trades`，並新增可選的 `查看損益` 對映 `performance`。所有查詢都必須使用白名單路由與專案 adapter，不得把使用者輸入當作 shell 或檔案路徑執行。
+LINE／Telegram 介面應提供唯讀命令，名稱可由各專案本地化，但語意固定：`系統狀態` 對映 `status`，`查看投資摘要` 對映 `portfolio_snapshot`，`查看交易紀錄` 對映 `closed_trades`，並新增可選的 `查看損益` 對映 `performance`。所有查詢都必須使用白名單路由與專案 adapter，不得把使用者輸入當作 shell 或檔案路徑執行。文字渲染必須從相同的 `portfolio_snapshot`／`closed_trades` adapter 取得資料，並以 `Asia/Taipei` 顯示人類可讀時間，不可由 LINE 與 Telegram 各自重新解析 state。
 
 ## 7. Seykota v1 對映原則
 
-Seykota 現有 `BotState` 的 `mode` 對映 `execution_mode`，`status` 對映快照 `status`，`position` 對映 `open_position`，`audit.position_opened`、`position_added`、`position_closed` 對映交易歷程。現有 `equity` 可對映帳面權益，但在尚未保存逐筆 realized PnL、fees、mark price 與保護單狀態前，相關欄位必須標為缺失，不得由事件文字推算。
+Seykota 的 `BotState.mode` 對映 `execution_mode`，`status` 對映快照 `status`，`position` 對映 `open_position`，`closed_trades` 是逐筆已平倉模擬交易帳本，`equity_history` 是績效窗口的權益基準。新 DRY_RUN 交易會保存 `trade_id`、開／平倉時間、加碼 legs、費用、滑價與已實現損益；開倉持倉會保存最後標記價、策略內部停損與未實現損益。既有歷史 audit 若缺少這些資料，adapter 仍可唯讀顯示，但必須以 `null` 與 `data_quality.missing_fields` 標示，絕不可從文字或缺漏欄位倒推損益。
 
-因此第一階段 adapter 可以完整支援狀態、開倉、策略內部停損與事件通知；7D、30D、YTD、1Y 和逐筆已平倉損益須在資料模型補齊後才宣稱完整支援。
+因此 Seykota adapter 現已支援狀態、開倉、策略內部停損、事件通知、逐筆已平倉損益、累計損益與四個績效窗口。窗口在沒有完整歷史權益基準時會明確標示資料不足；新建的模擬交易與每根已收盤 K 線的權益快照會逐步補齊歷史資料。
