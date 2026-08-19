@@ -79,3 +79,10 @@ def test_project_options_expose_provider_commands_for_both_query_menus():
     assert controller.project_options("查看投資摘要") == [("Demo BTC 策略", "查看 Demo 投資摘要")]
     assert controller.project_options("查看交易紀錄") == [("Demo BTC 策略", "查看 Demo 交易紀錄")]
     assert controller.project_options("未定義命令") == []
+
+
+def test_provider_queries_resolve_their_parent_menu():
+    controller = InvestorQueryController([FakeProvider()])
+    assert controller.previous_menu_command("查看 Demo 投資摘要") == "查看投資摘要"
+    assert controller.previous_menu_command("查看 Demo 交易紀錄") == "查看交易紀錄"
+    assert controller.previous_menu_command("查看投資摘要") is None

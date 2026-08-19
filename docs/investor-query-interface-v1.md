@@ -24,3 +24,7 @@
 Seykota 提供 `SeykotaInvestorProvider`，只容許兩個固定管理動作：`portfolio-json` 與 `trades-json`。這兩個動作均在既有 `require_dry_run` 檢查後，透過 `seykota_bot.investor` 從同一份 v1 adapter 讀取資料。它們不載入秘密、不回傳秘密、不提交訂單，且不提供任何寫入／控制 action。
 
 > 交易專案應把 provider 資料來源限制在本機唯讀 state 或受控 API。通知渠道與策略核心的例外不得用查詢失敗來繞過風控或改變交易決策。
+
+## 階層式導航
+
+渠道介面應將 `InvestorQueryController.project_options()` 產生的選項作為第二層專案選單，並在該選單提供固定的 `返回上一層` → `功能選單` 動作。對 `<provider.portfolio_command>` 與 `<provider.trade_command>` 的結果畫面，應以 `previous_menu_command()` 取得父層命令，提供 `返回上一層` 按鈕。返回動作只能使用控制器回傳的固定白名單命令，不得由使用者文字拼接 shell、檔案或交易控制命令。

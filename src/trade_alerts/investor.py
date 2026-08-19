@@ -152,6 +152,14 @@ class InvestorQueryController:
             return QueryResult(render_closed_trades(provider.closed_trades(), project_name=provider.project_name))
         return None
 
+    def previous_menu_command(self, command: str) -> str | None:
+        """Return the parent menu command for a provider-specific query."""
+        if command in self._portfolio_commands:
+            return "查看投資摘要"
+        if command in self._trade_commands:
+            return "查看交易紀錄"
+        return None
+
     def project_options(self, command: str) -> list[tuple[str, str]]:
         """Return fixed (label, command) pairs for a project-selection command.
 
