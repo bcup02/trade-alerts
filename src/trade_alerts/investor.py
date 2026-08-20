@@ -114,6 +114,20 @@ def _entry_label(side: Any) -> str:
     return {"long": "買進", "short": "放空"}.get(str(side), "開倉")
 
 
+def _execution_quality_lines(value: Any) -> list[str]:
+    """Render an optional, evidence-based execution-quality result."""
+    if not isinstance(value, dict):
+        return []
+    label = value.get("investor_label")
+    if not isinstance(label, str) or not label.strip():
+        return []
+    lines = [f"執行品質：{label.strip()}"]
+    summary = value.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        lines.append(f"品質說明：{summary.strip()}")
+    return lines
+
+
 def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
     """Render a v1 portfolio snapshot into one channel-neutral text response."""
     lines = [
@@ -212,6 +226,7 @@ def render_closed_trades(records: list[dict[str, Any]], *, project_name: str) ->
             f"手續費：{_money(trade.get('fees'))}",
             f"已實現損益：{_money(trade.get('realized_pnl'))}",
             f"結束原因：{reason}",
+            *_execution_quality_lines(trade.get("execution_quality")),
         ])
     return "\n".join(lines)
 

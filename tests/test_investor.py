@@ -173,3 +173,21 @@ def test_closed_trade_render_uses_mobile_cards_and_maintenance_label():
     assert "手續費：0.0080 USDT" in text
     assert "已實現損益：-0.0085 USDT" in text
     assert "結束原因：驗證交易（非策略）" in text
+
+
+def test_closed_trade_render_includes_optional_execution_quality():
+    text = render_closed_trades([
+        {
+            "symbol": "BOME_USDT", "side": "long", "opened_at": "2026-08-20T09:59:57Z",
+            "closed_at": "2026-08-20T10:21:24Z", "entry_price": 0.001191,
+            "exit_price": 0.0011818, "contracts": 5, "realized_pnl": -0.0554912,
+            "fees": 0.0094912, "close_reason": "交易所原生追蹤停損成交",
+            "execution_quality": {
+                "investor_label": "正常完成（事後核對）",
+                "summary": "交易所成交已明確對應原生追蹤停損；帳本已補齊完整資料。",
+            },
+        }
+    ], project_name="MEXC 4H Momentum Trailing Stop")
+
+    assert "執行品質：正常完成（事後核對）" in text
+    assert "品質說明：交易所成交已明確對應原生追蹤停損；帳本已補齊完整資料。" in text
