@@ -127,6 +127,20 @@ def test_portfolio_render_explains_exchange_trailing_stop_without_inventing_fixe
     assert "資料限制：目前未建立 帳戶權益, 最新標記價。" in text
 
 
+def test_portfolio_render_shows_optional_data_quality_summary():
+    snapshot = FakeProvider().portfolio_snapshot()
+    snapshot["data_quality"] = {
+        "complete": False,
+        "stale": False,
+        "missing_fields": ["equity"],
+        "summary": "本摘要只讀取策略快照，不連線交易所即時帳戶資料。",
+    }
+
+    text = render_portfolio_snapshot(snapshot)
+
+    assert "資料說明：本摘要只讀取策略快照，不連線交易所即時帳戶資料。" in text
+
+
 def test_portfolio_render_translates_internal_status_and_data_field_codes():
     snapshot = FakeProvider().portfolio_snapshot()
     snapshot["status"] = "SAFE_HALT"

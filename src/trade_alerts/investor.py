@@ -163,6 +163,9 @@ def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
         missing = data_quality.get("missing_fields") or []
         if missing:
             lines.append(f"資料限制：目前未建立 {', '.join(_field_label(field) for field in missing)}。")
+        summary = data_quality.get("summary")
+        if isinstance(summary, str) and summary.strip():
+            lines.append(f"資料說明：{summary.strip()}")
         if data_quality.get("stale"):
             lines.append("資料提醒：最近快照可能已過期，請等待下一次策略工作流程完成後再查詢。")
 
