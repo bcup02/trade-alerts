@@ -57,6 +57,13 @@ def _money(value: Any) -> str:
     return "資料未建立" if value is None else f"{float(value):.4f} USDT"
 
 
+def _margin_return(value: Any) -> str:
+    try:
+        return f"{float(value) * 100:+.2f}%" if value is not None else "資料未建立"
+    except (TypeError, ValueError):
+        return "資料未建立"
+
+
 def _mode_label(mode: Any) -> str:
     return {
         "DRY_RUN": "模擬演練（不使用真實資金、不會送出交易所訂單）",
@@ -121,10 +128,10 @@ def _execution_quality_lines(value: Any) -> list[str]:
     label = value.get("investor_label")
     if not isinstance(label, str) or not label.strip():
         return []
-    lines = [f"執行品質：{label.strip()}"]
+    lines = [f"交易性質：{label.strip()}"]
     summary = value.get("summary")
-    if isinstance(summary, str) and summary.strip():
-        lines.append(f"品質說明：{summary.strip()}")
+    if value.get("status") == "ABNORMAL" and isinstance(summary, str) and summary.strip():
+        lines.append(f"備註：{summary.strip()}")
     return lines
 
 
@@ -225,6 +232,7 @@ def render_closed_trades(records: list[dict[str, Any]], *, project_name: str) ->
             f"出場：{trade.get('exit_price', '資料未建立')}",
             f"手續費：{_money(trade.get('fees'))}",
             f"已實現損益：{_money(trade.get('realized_pnl'))}",
+            f"保證金報酬率：{_margin_return(trade.get('return_on_margin'))}",
             f"結束原因：{reason}",
             *_execution_quality_lines(trade.get("execution_quality")),
         ])

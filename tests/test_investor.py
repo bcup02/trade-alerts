@@ -182,13 +182,35 @@ def test_closed_trade_render_includes_optional_execution_quality():
             "symbol": "BOME_USDT", "side": "long", "opened_at": "2026-08-20T09:59:57Z",
             "closed_at": "2026-08-20T10:21:24Z", "entry_price": 0.001191,
             "exit_price": 0.0011818, "contracts": 5, "realized_pnl": -0.0554912,
-            "fees": 0.0094912, "close_reason": "交易所原生追蹤停損成交",
+            "fees": 0.0094912, "return_on_margin": -0.027955264483627205,
+            "close_reason": "追蹤停損出場",
             "execution_quality": {
-                "investor_label": "正常完成（事後核對）",
+                "status": "NORMAL_RECONCILED",
+                "investor_label": "正常交易",
                 "summary": "交易所成交已明確對應原生追蹤停損；帳本已補齊完整資料。",
             },
         }
     ], project_name="MEXC 4H Momentum Trailing Stop")
 
-    assert "執行品質：正常完成（事後核對）" in text
-    assert "品質說明：交易所成交已明確對應原生追蹤停損；帳本已補齊完整資料。" in text
+    assert "保證金報酬率：-2.80%" in text
+    assert "結束原因：追蹤停損出場" in text
+    assert "交易性質：正常交易" in text
+    assert "備註：" not in text
+
+
+def test_closed_trade_render_shows_note_only_for_abnormal_trade():
+    text = render_closed_trades([
+        {
+            "symbol": "TEST_USDT", "side": "long", "opened_at": "2026-08-20T09:00:00Z",
+            "closed_at": "2026-08-20T10:00:00Z", "entry_price": 1.0, "exit_price": 0.9,
+            "contracts": 1, "realized_pnl": -1.0, "return_on_margin": -0.1, "fees": 0.01,
+            "close_reason": "平倉委託失敗後補核",
+            "execution_quality": {
+                "status": "ABNORMAL", "investor_label": "異常交易",
+                "summary": "帳本記錄此筆交易的保護或平倉委託失敗，需要檢視交易所結果與程式紀錄。",
+            },
+        }
+    ], project_name="Demo")
+
+    assert "交易性質：異常交易" in text
+    assert "備註：帳本記錄此筆交易的保護或平倉委託失敗" in text
