@@ -206,7 +206,7 @@ def _contracts(value: Any) -> str:
 
 def render_closed_trades(records: list[dict[str, Any]], *, project_name: str) -> str:
     """Render the five most recent closed trades in the investor-approved layout."""
-    lines = [project_name, "", "最近 5 筆交易紀錄如下："]
+    lines = [project_name, "", "台北時間（UTC+8）", "最近 5 筆交易紀錄如下："]
     if not records:
         lines.extend(["", "目前尚無可列示的已平倉交易紀錄。"])
         return "\n".join(lines)
@@ -217,7 +217,7 @@ def render_closed_trades(records: list[dict[str, Any]], *, project_name: str) ->
         reason = _record_type_label(record_type) if record_type == "maintenance_verification" else trade.get("close_reason", "原因未提供")
         lines.extend([
             "",
-            f"#{index} {trade.get('symbol', '標的未提供')}｜{_trade_direction_label(side)}（UTC+8）",
+            f"#{index} {trade.get('symbol', '標的未提供')}｜{_trade_direction_label(side)}",
             f"{_entry_label(side)}：{taipei_time(trade.get('opened_at'))}",
             f"平倉：{taipei_time(trade.get('closed_at'))}",
             f"部位：{_contracts(trade.get('contracts', trade.get('quantity')))}",

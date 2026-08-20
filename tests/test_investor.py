@@ -163,8 +163,9 @@ def test_closed_trade_render_uses_mobile_cards_and_maintenance_label():
         }
     ], project_name="MEXC 4H Momentum Trailing Stop")
 
-    assert "最近 5 筆交易紀錄如下：" in text
-    assert "#1 XRP_USDT｜看漲（UTC+8）" in text
+    assert "台北時間（UTC+8）\n最近 5 筆交易紀錄如下：" in text
+    assert "#1 XRP_USDT｜看漲" in text
+    assert text.count("UTC+8") == 1
     assert "買進：2026-08-19 19:00" in text
     assert "平倉：2026-08-19 20:00" in text
     assert "部位：5 張" in text
