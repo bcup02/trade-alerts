@@ -66,7 +66,7 @@ def _margin_return(value: Any) -> str:
 
 def _mode_label(mode: Any) -> str:
     return {
-        "DRY_RUN": "模擬演練（不使用真實資金、不會送出交易所訂單）",
+        "DRY_RUN": "模擬投資",
         "PAPER": "模擬盤",
         "LIVE": "實盤",
     }.get(str(mode), str(mode or "未提供"))
@@ -161,7 +161,7 @@ def render_portfolio_snapshot(snapshot: dict[str, Any], *, debug: bool = False) 
         "",
         f"專案：{snapshot.get('project_name', snapshot.get('project_id', '未提供'))}",
         f"執行方式：{_mode_label(snapshot.get('execution_mode'))}",
-        f"資料時間：{taipei_time(snapshot.get('as_of'))}（台北時間）",
+        f"資料時間：{taipei_time(snapshot.get('as_of'))}",
         f"策略運行狀態：{_status_label(snapshot.get('runtime_status', snapshot.get('status')))}",
     ]
     if snapshot.get("equity") is not None:
@@ -173,7 +173,7 @@ def render_portfolio_snapshot(snapshot: dict[str, Any], *, debug: bool = False) 
             "目前部位：有持倉。",
             f"方向：{_side_label(position.get('side'))}",
             f"進場價：{position.get('entry_price', '資料未建立')}",
-            f"開倉時間：{taipei_time(position.get('opened_at'))}（台北時間）",
+            f"開倉時間：{taipei_time(position.get('opened_at'))}",
         ])
         if position.get("mark_price") is not None:
             lines.append(f"最新標記價：{position.get('mark_price')}")

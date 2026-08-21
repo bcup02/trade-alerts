@@ -46,7 +46,10 @@ class FakeProvider:
 
 def test_portfolio_render_uses_taipei_time_and_v1_fields():
     text = render_portfolio_snapshot(FakeProvider().portfolio_snapshot())
-    assert "2026-08-19 16:00" in text
+    assert "資料時間：2026-08-19 16:00" in text
+    assert "開倉時間：2026-08-19 08:00" in text
+    assert "執行方式：模擬投資" in text
+    assert "（台北時間）" not in text
     assert "策略停損規則｜觸發價：63250｜狀態：啟用中" in text
     assert "7 天：1.5000 USDT" in text
 
