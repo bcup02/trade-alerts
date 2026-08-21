@@ -60,7 +60,8 @@ def test_controller_accepts_only_whitelisted_query_commands():
     assert "Demo BTC 策略" in controller.handle("查看告警狀態").text
     assert "交易紀錄查詢" in controller.handle("查看交易紀錄").text
     summary = controller.handle("查看 Demo 投資摘要")
-    assert "策略權益：201.5000 USDT" in summary.text
+    assert "帳戶總權益：201.5000 USDT" in summary.text
+    assert "策略運行狀態：" in summary.text
     response = controller.handle("查看 Demo 交易紀錄")
     assert "2026-08-19 16:00" in response.text
     assert "手續費：0.0300 USDT" in response.text
@@ -124,10 +125,11 @@ def test_portfolio_render_explains_exchange_trailing_stop_without_inventing_fixe
     assert "交易所追蹤停損｜回撤設定：5.00%｜狀態：啟用中" in text
     assert "策略參考停損點：63250（非固定交易所觸發價）" in text
     assert "MEXC 原生追蹤停損委託" in text
-    assert "資料限制：目前未建立 帳戶權益, 最新標記價。" in text
+    assert "資料限制：" not in text
+    assert "資料說明：" not in text
 
 
-def test_portfolio_render_shows_optional_data_quality_summary():
+def test_portfolio_render_hides_internal_data_quality_summary():
     snapshot = FakeProvider().portfolio_snapshot()
     snapshot["data_quality"] = {
         "complete": False,
@@ -138,7 +140,8 @@ def test_portfolio_render_shows_optional_data_quality_summary():
 
     text = render_portfolio_snapshot(snapshot)
 
-    assert "資料說明：本摘要只讀取策略快照，不連線交易所即時帳戶資料。" in text
+    assert "資料說明：" not in text
+    assert "資料限制：" not in text
 
 
 def test_portfolio_render_translates_internal_status_and_data_field_codes():
@@ -148,9 +151,10 @@ def test_portfolio_render_translates_internal_status_and_data_field_codes():
 
     text = render_portfolio_snapshot(snapshot)
 
-    assert "策略狀態：安全暫停，等待人工處理" in text
+    assert "策略運行狀態：安全暫停，等待人工處理" in text
     assert "SAFE_HALT" not in text
-    assert "資料限制：目前未建立 帳戶權益, 最新標記價。" in text
+    assert "資料限制：" not in text
+    assert "資料說明：" not in text
 
 
 def test_closed_trade_render_uses_mobile_cards_and_maintenance_label():
@@ -214,3 +218,21 @@ def test_closed_trade_render_shows_note_only_for_abnormal_trade():
 
     assert "交易性質：異常交易" in text
     assert "備註：帳本記錄此筆交易的保護或平倉委託失敗" in text
+
+
+def test_portfolio_render_uses_runtime_status_and_hides_unavailable_equity():
+    snapshot = FakeProvider().portfolio_snapshot()
+    snapshot.update({
+        "runtime_status": "HEALTHY",
+        "position_status": "FLAT",
+        "equity": None,
+        "open_position": None,
+        "data_quality": {"complete": False, "stale": False, "missing_fields": ["equity"]},
+    })
+
+    text = render_portfolio_snapshot(snapshot)
+
+    assert "策略運行狀態：系統正常" in text
+    assert "目前部位：沒有持倉。" in text
+    assert "帳戶總權益：" not in text
+    assert "資料限制：" not in text

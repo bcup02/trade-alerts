@@ -143,20 +143,23 @@ def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
         f"專案：{snapshot.get('project_name', snapshot.get('project_id', '未提供'))}",
         f"執行方式：{_mode_label(snapshot.get('execution_mode'))}",
         f"資料時間：{taipei_time(snapshot.get('as_of'))}（台北時間）",
-        f"策略狀態：{_status_label(snapshot.get('status'))}",
-        f"策略權益：{_money(snapshot.get('equity'))}",
-        f"累計已實現損益：{_money(snapshot.get('realized_pnl_total'))}",
+        f"策略運行狀態：{_status_label(snapshot.get('runtime_status', snapshot.get('status')))}",
     ]
+    if snapshot.get("equity") is not None:
+        lines.append(f"帳戶總權益：{_money(snapshot.get('equity'))}")
+    lines.append(f"累計已實現損益：{_money(snapshot.get('realized_pnl_total'))}")
     position = snapshot.get("open_position")
     if position:
         lines.extend([
             "目前部位：有持倉。",
             f"方向：{_side_label(position.get('side'))}",
             f"進場價：{position.get('entry_price', '資料未建立')}",
-            f"最新標記價：{position.get('mark_price', '資料未建立')}",
-            f"未實現損益：{_money(position.get('unrealized_pnl'))}",
             f"開倉時間：{taipei_time(position.get('opened_at'))}（台北時間）",
         ])
+        if position.get("mark_price") is not None:
+            lines.append(f"最新標記價：{position.get('mark_price')}")
+        if position.get("unrealized_pnl") is not None:
+            lines.append(f"未實現損益：{_money(position.get('unrealized_pnl'))}")
     else:
         lines.append("目前部位：沒有持倉。")
 
@@ -178,17 +181,6 @@ def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
             lines.append(f"保護說明：{stop['description']}")
     else:
         lines.append("保護機制：目前沒有啟用中的保護單或策略停損。")
-
-    data_quality = snapshot.get("data_quality") or {}
-    if not data_quality.get("complete", True):
-        missing = data_quality.get("missing_fields") or []
-        if missing:
-            lines.append(f"資料限制：目前未建立 {', '.join(_field_label(field) for field in missing)}。")
-        summary = data_quality.get("summary")
-        if isinstance(summary, str) and summary.strip():
-            lines.append(f"資料說明：{summary.strip()}")
-        if data_quality.get("stale"):
-            lines.append("資料提醒：最近快照可能已過期，請等待下一次策略工作流程完成後再查詢。")
 
     performance = snapshot.get("performance") or {}
     lines.extend(["", "績效（USDT）"])
