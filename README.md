@@ -6,13 +6,19 @@
 
 ## 安裝
 
-目前套件 repository 為私有，其他私有策略專案可以使用 Git 安裝：
+目前套件 repository 為私有，其他私有策略專案可以使用 Git 安裝。**部署時必須釘選已驗證的版本標籤，不可使用 `@main`**，以避免未經測試的更新或本機舊副本造成版本落差：
 
 ```bash
-pip install "trade-alerts @ git+https://github.com/bcup02/trade-alerts.git@main"
+pip install "trade-alerts @ git+https://github.com/bcup02/trade-alerts.git@v0.8.1"
 ```
 
 未來若建立內部 Python package registry，可在不改變 import API 的情況下切換安裝來源。
+
+## 版本同步與部署
+
+`trade-alerts` 是多個交易專案的共用相依。**發布新版本不代表更新完成**；受影響的消費專案必須同步更新釘選版本、部署並驗證實際已安裝版本。
+
+完整的專案清單、發布順序、各專案部署入口與交接紀錄模板，請從首頁手冊開始：[`docs/consumer-release-runbook.md`](docs/consumer-release-runbook.md)。所有新的消費專案都必須先登錄於該手冊，才可宣告整合或發布完成。
 
 ## 最小使用方式
 
