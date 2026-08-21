@@ -236,3 +236,33 @@ def test_portfolio_render_uses_runtime_status_and_hides_unavailable_equity():
     assert "目前部位：沒有持倉。" in text
     assert "帳戶總權益：" not in text
     assert "資料限制：" not in text
+
+
+def test_portfolio_debug_mode_appends_nonsecret_diagnostics_only_when_enabled():
+    snapshot = FakeProvider().portfolio_snapshot()
+    snapshot.update({
+        "runtime_status": "HEALTHY",
+        "last_update_at": "2026-08-19T08:00:00Z",
+        "data_quality": {
+            "complete": False, "stale": False, "missing_fields": ["equity"],
+            "summary": "本摘要只讀取已保存的快照。",
+        },
+    })
+
+    normal = render_portfolio_snapshot(snapshot)
+    debug = render_portfolio_snapshot(snapshot, debug=True)
+
+    assert "------Debug模式------" not in normal
+    assert "資料限制：" not in normal
+    assert "------Debug模式------" in debug
+    assert "內部運行代碼：HEALTHY" in debug
+    assert "資料限制：目前未建立 帳戶權益。" in debug
+    assert "資料說明：本摘要只讀取已保存的快照。" in debug
+
+
+def test_trade_debug_mode_appends_sources_and_handles_empty_records():
+    text = render_closed_trades([], project_name="Demo", debug=True)
+
+    assert "目前尚無可列示" in text
+    assert "------Debug模式------" in text
+    assert "讀取已平倉紀錄：0 筆" in text

@@ -135,7 +135,26 @@ def _execution_quality_lines(value: Any) -> list[str]:
     return lines
 
 
-def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
+def _portfolio_debug_lines(snapshot: dict[str, Any]) -> list[str]:
+    """Return non-secret diagnostic fields for an explicitly enabled Debug view."""
+    data_quality = snapshot.get("data_quality") if isinstance(snapshot.get("data_quality"), dict) else {}
+    lines = ["", "------Debug模式------"]
+    lines.append(f"契約版本：{snapshot.get('schema_version', '未提供')}")
+    lines.append(f"內部運行代碼：{snapshot.get('runtime_status', snapshot.get('status', '未提供'))}")
+    if snapshot.get("last_update_at"):
+        lines.append(f"策略最近更新：{taipei_time(snapshot.get('last_update_at'))}")
+    if snapshot.get("equity_captured_at"):
+        lines.append(f"權益快照時間：{taipei_time(snapshot.get('equity_captured_at'))}")
+    missing = data_quality.get("missing_fields") or []
+    if missing:
+        lines.append(f"資料限制：目前未建立 {', '.join(_field_label(field) for field in missing)}。")
+    summary = data_quality.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        lines.append(f"資料說明：{summary.strip()}")
+    return lines
+
+
+def render_portfolio_snapshot(snapshot: dict[str, Any], *, debug: bool = False) -> str:
     """Render a v1 portfolio snapshot into one channel-neutral text response."""
     lines = [
         "投資摘要",
@@ -191,6 +210,8 @@ def render_portfolio_snapshot(snapshot: dict[str, Any]) -> str:
             lines.append(f"{label}：資料不足。")
         else:
             lines.append(f"{label}：{_money(total)}｜已平倉 {window.get('trade_count', 0)} 筆（勝 {window.get('win_count', 0)}／負 {window.get('loss_count', 0)}）")
+    if debug:
+        lines.extend(_portfolio_debug_lines(snapshot))
     return "\n".join(lines)
 
 
@@ -203,11 +224,25 @@ def _contracts(value: Any) -> str:
         return f"{value} 張"
 
 
-def render_closed_trades(records: list[dict[str, Any]], *, project_name: str) -> str:
+def _trade_debug_lines(records: list[dict[str, Any]]) -> list[str]:
+    lines = ["", "------Debug模式------", f"讀取已平倉紀錄：{len(records)} 筆"]
+    for index, trade in enumerate(records[:5], start=1):
+        trade_id = trade.get("trade_id") or "未提供"
+        sources = [str(leg.get("source")) for leg in trade.get("legs", []) if isinstance(leg, dict) and leg.get("source")]
+        quality = trade.get("execution_quality") if isinstance(trade.get("execution_quality"), dict) else {}
+        lines.append(
+            f"#{index}：trade_id={trade_id}｜帳本來源={','.join(sources) or '未提供'}｜品質代碼={quality.get('status', '未提供')}"
+        )
+    return lines
+
+
+def render_closed_trades(records: list[dict[str, Any]], *, project_name: str, debug: bool = False) -> str:
     """Render the five most recent closed trades in the investor-approved layout."""
     lines = [project_name, "", "台北時間（UTC+8）", "最近 5 筆交易紀錄如下："]
     if not records:
         lines.extend(["", "目前尚無可列示的已平倉交易紀錄。"])
+        if debug:
+            lines.extend(_trade_debug_lines(records))
         return "\n".join(lines)
 
     for index, trade in enumerate(reversed(records[-5:]), start=1):
@@ -228,6 +263,8 @@ def render_closed_trades(records: list[dict[str, Any]], *, project_name: str) ->
             f"結束原因：{reason}",
             *_execution_quality_lines(trade.get("execution_quality")),
         ])
+    if debug:
+        lines.extend(_trade_debug_lines(records))
     return "\n".join(lines)
 
 
@@ -249,7 +286,7 @@ class InvestorQueryController:
                     raise ValueError(f"duplicate project action command: {command}")
                 self._action_commands[command] = (provider, action)
 
-    def handle(self, command: str) -> QueryResult | None:
+    def handle(self, command: str, *, debug: bool = False) -> QueryResult | None:
         command = command.strip()
         if command in PORTFOLIO_COMMANDS:
             return self._portfolio_response()
@@ -257,11 +294,16 @@ class InvestorQueryController:
             return self._trade_menu_response()
         provider = self._portfolio_commands.get(command)
         if provider:
-            return QueryResult(render_portfolio_snapshot(provider.portfolio_snapshot()))
+            return QueryResult(render_portfolio_snapshot(provider.portfolio_snapshot(), debug=debug))
         provider = self._trade_commands.get(command)
         if provider:
-            return QueryResult(render_closed_trades(provider.closed_trades(), project_name=provider.project_name))
+            return QueryResult(render_closed_trades(provider.closed_trades(), project_name=provider.project_name, debug=debug))
         return None
+
+    def is_project_query(self, command: str) -> bool:
+        """Return whether a command reads one fixed project's investor data."""
+        command = command.strip()
+        return command in self._portfolio_commands or command in self._trade_commands
 
     def project_action_options(self, action: str) -> list[tuple[str, str]]:
         """Return fixed provider-specific commands for one approved action type."""
