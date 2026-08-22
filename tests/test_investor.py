@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from trade_alerts.investor import InvestorQueryController, render_closed_trades, render_portfolio_snapshot
+from trade_alerts.investor import InvestorPresentation, InvestorQueryController, PortfolioPresentation, render_closed_trades, render_portfolio_snapshot
 
 
 @dataclass
@@ -269,3 +269,45 @@ def test_trade_debug_mode_appends_sources_and_handles_empty_records():
     assert "目前尚無可列示" in text
     assert "------Debug模式------" in text
     assert "讀取已平倉紀錄：0 筆" in text
+
+
+def test_portfolio_presentation_changes_only_display_text_and_supports_blank_lines():
+    snapshot = FakeProvider().portfolio_snapshot()
+    presentation = PortfolioPresentation(
+        heading="自訂投資摘要",
+        project="策略名稱：{value}",
+        execution_mode="",
+        data_time="資料更新於：{value}",
+        runtime_status="",
+        equity="",
+        realized_pnl="累計：{value}",
+        position_open="",
+        position_absent="目前沒有部位",
+        protection_absent="",
+        performance_heading="",
+        performance_with_data="{period} 損益 {total}",
+        performance_missing="",
+    )
+    text = render_portfolio_snapshot(snapshot, presentation=presentation)
+    assert "自訂投資摘要" in text
+    assert "策略名稱：Demo BTC 策略" in text
+    assert "執行方式：" not in text
+    assert "累計：1.5000 USDT" in text
+    assert "7 天 損益 1.5000 USDT" in text
+
+
+def test_controller_presentation_keeps_fixed_commands_while_project_menu_text_is_custom():
+    presentation = InvestorPresentation(
+        portfolio_query_title="閱讀資產摘要",
+        portfolio_query_prompt="請選策略",
+        portfolio_project_label=lambda provider: f"項目：{provider.project_name}",
+        portfolio=PortfolioPresentation(heading="自訂摘要"),
+    )
+    controller = InvestorQueryController([FakeProvider()], presentation_provider=lambda: presentation)
+    assert controller.handle("任意指令") is None
+    menu = controller.handle("查看投資摘要").text
+    assert "閱讀資產摘要" in menu
+    assert "請選策略" in menu
+    assert "項目：Demo BTC 策略" in menu
+    detail = controller.handle("查看 Demo 投資摘要").text
+    assert detail.startswith("自訂摘要")

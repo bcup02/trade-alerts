@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 from zoneinfo import ZoneInfo
 
 TAIPEI = ZoneInfo("Asia/Taipei")
@@ -36,6 +36,59 @@ class InvestorProvider(Protocol):
 class QueryResult:
     text: str
     handled: bool = True
+
+
+@dataclass(frozen=True)
+class PortfolioPresentation:
+    """Display-only labels for a v1 portfolio snapshot.
+
+    All commands, provider identifiers, query routing, and source data remain
+    outside this dataclass. Empty labels deliberately hide only that rendered
+    line, allowing a host application's TOML content pack to control layout.
+    """
+
+    heading: str = "投資摘要"
+    project: str = "專案：{value}"
+    execution_mode: str = "執行方式：{value}"
+    data_time: str = "資料時間：{value}"
+    runtime_status: str = "策略運行狀態：{value}"
+    equity: str = "帳戶總權益：{value}"
+    realized_pnl: str = "累計已實現損益：{value}"
+    position_open: str = "目前部位：有持倉。"
+    position_absent: str = "目前部位：沒有持倉。"
+    position_direction: str = "方向：{value}"
+    position_entry_price: str = "進場價：{value}"
+    position_opened_at: str = "開倉時間：{value}"
+    position_mark_price: str = "最新標記價：{value}"
+    position_unrealized_pnl: str = "未實現損益：{value}"
+    protection_trailing: str = "保護機制：{value}{callback}｜狀態：{status}"
+    protection_trailing_reference: str = "策略參考停損點：{value}（非固定交易所觸發價）"
+    protection_standard: str = "保護機制：{type}｜觸發價：{value}｜狀態：{status}"
+    protection_description: str = "保護說明：{value}"
+    protection_absent: str = "保護機制：目前沒有啟用中的保護單或策略停損。"
+    performance_heading: str = "績效（USDT）"
+    performance_with_data: str = "{period}：{total}｜已平倉 {trade_count} 筆（勝 {win_count}／負 {loss_count}）"
+    performance_missing: str = "{period}：資料不足。"
+
+
+@dataclass(frozen=True)
+class InvestorPresentation:
+    """Display-only presentation for fixed investor query commands."""
+
+    portfolio_query_title: str = "投資摘要查詢"
+    portfolio_query_prompt: str = "請選擇專案："
+    portfolio_project_label: Callable[[InvestorProvider], str] | None = None
+    portfolio: PortfolioPresentation = PortfolioPresentation()
+
+
+def _present(template: str, **values: Any) -> str:
+    """Return one optional display line without altering source data or commands."""
+    if not isinstance(template, str) or not template.strip():
+        return ""
+    try:
+        return template.format(**values)
+    except KeyError as exc:
+        raise ValueError(f"presentation template has unknown field: {exc.args[0]}") from exc
 
 
 def _parse_time(value: Any) -> datetime | None:
@@ -154,33 +207,41 @@ def _portfolio_debug_lines(snapshot: dict[str, Any]) -> list[str]:
     return lines
 
 
-def render_portfolio_snapshot(snapshot: dict[str, Any], *, debug: bool = False) -> str:
-    """Render a v1 portfolio snapshot into one channel-neutral text response."""
-    lines = [
-        "投資摘要",
-        "",
-        f"專案：{snapshot.get('project_name', snapshot.get('project_id', '未提供'))}",
-        f"執行方式：{_mode_label(snapshot.get('execution_mode'))}",
-        f"資料時間：{taipei_time(snapshot.get('as_of'))}",
-        f"策略運行狀態：{_status_label(snapshot.get('runtime_status', snapshot.get('status')))}",
-    ]
+def render_portfolio_snapshot(
+    snapshot: dict[str, Any], *, debug: bool = False, presentation: PortfolioPresentation | None = None
+) -> str:
+    """Render a v1 portfolio snapshot using fixed data and optional display labels."""
+    display = presentation or PortfolioPresentation()
+    lines: list[str] = []
+
+    def add(template: str, **values: Any) -> None:
+        rendered = _present(template, **values)
+        if rendered.strip():
+            lines.append(rendered)
+
+    add(display.heading)
+    if lines:
+        lines.append("")
+    add(display.project, value=snapshot.get("project_name", snapshot.get("project_id", "未提供")))
+    add(display.execution_mode, value=_mode_label(snapshot.get("execution_mode")))
+    add(display.data_time, value=taipei_time(snapshot.get("as_of")))
+    add(display.runtime_status, value=_status_label(snapshot.get("runtime_status", snapshot.get("status"))))
     if snapshot.get("equity") is not None:
-        lines.append(f"帳戶總權益：{_money(snapshot.get('equity'))}")
-    lines.append(f"累計已實現損益：{_money(snapshot.get('realized_pnl_total'))}")
+        add(display.equity, value=_money(snapshot.get("equity")))
+    add(display.realized_pnl, value=_money(snapshot.get("realized_pnl_total")))
+
     position = snapshot.get("open_position")
     if position:
-        lines.extend([
-            "目前部位：有持倉。",
-            f"方向：{_side_label(position.get('side'))}",
-            f"進場價：{position.get('entry_price', '資料未建立')}",
-            f"開倉時間：{taipei_time(position.get('opened_at'))}",
-        ])
+        add(display.position_open)
+        add(display.position_direction, value=_side_label(position.get("side")))
+        add(display.position_entry_price, value=position.get("entry_price", "資料未建立"))
+        add(display.position_opened_at, value=taipei_time(position.get("opened_at")))
         if position.get("mark_price") is not None:
-            lines.append(f"最新標記價：{position.get('mark_price')}")
+            add(display.position_mark_price, value=position.get("mark_price"))
         if position.get("unrealized_pnl") is not None:
-            lines.append(f"未實現損益：{_money(position.get('unrealized_pnl'))}")
+            add(display.position_unrealized_pnl, value=_money(position.get("unrealized_pnl")))
     else:
-        lines.append("目前部位：沒有持倉。")
+        add(display.position_absent)
 
     protective_orders = snapshot.get("protective_orders") or []
     if protective_orders:
@@ -191,25 +252,37 @@ def render_portfolio_snapshot(snapshot: dict[str, Any], *, debug: bool = False) 
                 callback = f"｜回撤設定：{float(stop['callback_pct']) * 100:.2f}%"
             except (TypeError, ValueError):
                 callback = ""
-            lines.append(f"保護機制：{order_type}{callback}｜狀態：{_protection_status_label(stop.get('status'))}")
+            add(display.protection_trailing, value=order_type, callback=callback, status=_protection_status_label(stop.get("status")))
             if stop.get("reference_stop_price") is not None:
-                lines.append(f"策略參考停損點：{stop.get('reference_stop_price')}（非固定交易所觸發價）")
+                add(display.protection_trailing_reference, value=stop.get("reference_stop_price"))
         else:
-            lines.append(f"保護機制：{order_type}｜觸發價：{stop.get('stop_price', '資料未建立')}｜狀態：{_protection_status_label(stop.get('status'))}")
+            add(
+                display.protection_standard,
+                type=order_type,
+                value=stop.get("stop_price", "資料未建立"),
+                status=_protection_status_label(stop.get("status")),
+            )
         if stop.get("description"):
-            lines.append(f"保護說明：{stop['description']}")
+            add(display.protection_description, value=stop["description"])
     else:
-        lines.append("保護機制：目前沒有啟用中的保護單或策略停損。")
+        add(display.protection_absent)
 
     performance = snapshot.get("performance") or {}
-    lines.extend(["", "績效（USDT）"])
+    add(display.performance_heading)
     for label, key in [("7 天", "7d"), ("30 天", "30d"), ("今年", "ytd"), ("1 年", "1y")]:
         window = performance.get(key, {})
         total = window.get("total_pnl")
         if total is None:
-            lines.append(f"{label}：資料不足。")
+            add(display.performance_missing, period=label)
         else:
-            lines.append(f"{label}：{_money(total)}｜已平倉 {window.get('trade_count', 0)} 筆（勝 {window.get('win_count', 0)}／負 {window.get('loss_count', 0)}）")
+            add(
+                display.performance_with_data,
+                period=label,
+                total=_money(total),
+                trade_count=window.get("trade_count", 0),
+                win_count=window.get("win_count", 0),
+                loss_count=window.get("loss_count", 0),
+            )
     if debug:
         lines.extend(_portfolio_debug_lines(snapshot))
     return "\n".join(lines)
@@ -271,9 +344,15 @@ def render_closed_trades(records: list[dict[str, Any]], *, project_name: str, de
 class InvestorQueryController:
     """Whitelist-only router for two investor query commands and project choices."""
 
-    def __init__(self, providers: list[InvestorProvider]):
+    def __init__(
+        self,
+        providers: list[InvestorProvider],
+        *,
+        presentation_provider: Callable[[], InvestorPresentation] | None = None,
+    ):
         if not providers:
             raise ValueError("at least one investor provider is required")
+        self._presentation_provider = presentation_provider
         self._providers = {provider.project_id: provider for provider in providers}
         self._portfolio_commands = {provider.portfolio_command: provider for provider in providers}
         self._trade_commands = {provider.trade_command: provider for provider in providers}
@@ -286,15 +365,22 @@ class InvestorQueryController:
                     raise ValueError(f"duplicate project action command: {command}")
                 self._action_commands[command] = (provider, action)
 
+    def _presentation(self) -> InvestorPresentation:
+        presentation = self._presentation_provider() if self._presentation_provider else InvestorPresentation()
+        if not isinstance(presentation, InvestorPresentation):
+            raise TypeError("presentation_provider must return InvestorPresentation")
+        return presentation
+
     def handle(self, command: str, *, debug: bool = False) -> QueryResult | None:
         command = command.strip()
+        presentation = self._presentation()
         if command in PORTFOLIO_COMMANDS:
-            return self._portfolio_response()
+            return self._portfolio_response(presentation)
         if command in TRADE_LIST_COMMANDS:
             return self._trade_menu_response()
         provider = self._portfolio_commands.get(command)
         if provider:
-            return QueryResult(render_portfolio_snapshot(provider.portfolio_snapshot(), debug=debug))
+            return QueryResult(render_portfolio_snapshot(provider.portfolio_snapshot(), debug=debug, presentation=presentation.portfolio))
         provider = self._trade_commands.get(command)
         if provider:
             return QueryResult(render_closed_trades(provider.closed_trades(), project_name=provider.project_name, debug=debug))
@@ -337,10 +423,13 @@ class InvestorQueryController:
             return [(provider.project_name, provider.trade_command) for provider in self._providers.values()]
         return []
 
-    def _portfolio_response(self) -> QueryResult:
-        lines = ["投資摘要查詢", "", "請選擇專案："]
-        lines.extend(f"• {label}" for label, _provider_command in self.project_options("查看投資摘要"))
-        return QueryResult("\n".join(lines))
+    def _portfolio_response(self, presentation: InvestorPresentation) -> QueryResult:
+        lines = [_present(presentation.portfolio_query_title), _present(presentation.portfolio_query_prompt)]
+        for provider in self._providers.values():
+            label = presentation.portfolio_project_label(provider) if presentation.portfolio_project_label else provider.project_name
+            if isinstance(label, str) and label.strip():
+                lines.append(label)
+        return QueryResult("\n".join(line for line in lines if line.strip()))
 
     def _trade_menu_response(self) -> QueryResult:
         lines = ["交易紀錄查詢", "", "請選擇專案："]
