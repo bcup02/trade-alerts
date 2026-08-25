@@ -131,6 +131,13 @@ def test_projection_number_normalisation_is_cross_runtime_stable():
     assert normalise_projection({"volume": 15.0, "price": 0.3404}) == {"volume": "15", "price": "0.3404"}
 
 
+def test_projection_signed_zero_has_one_canonical_digest():
+    negative = normalise_projection({"gross_pnl": -0.0, "net_pnl": -0.0})
+    positive = normalise_projection({"gross_pnl": 0.0, "net_pnl": 0.0})
+    assert negative == positive == {"gross_pnl": "0", "net_pnl": "0"}
+    assert sha256_digest(negative) == sha256_digest(positive)
+
+
 def test_readonly_comparison_classifies_each_prohibited_or_pending_state():
     payload_digest = sha256_digest(normalise_projection(PROJECTION))
     assert comparison_for(trade_id="a" * 32, local_payload_digest=payload_digest, google_payload_digests=[]).classification == ProjectionClassification.PENDING_SYNC

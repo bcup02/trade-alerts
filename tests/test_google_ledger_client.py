@@ -65,6 +65,38 @@ def test_receiver_success_and_rejection_are_terminal_outbox_states(tmp_path):
     assert [row["status"] for row in rows] == ["PENDING", "REJECTED"]
 
 
+def test_sender_rejects_non_projection_action_without_outbox(tmp_path):
+    provenance, payload = _payload()
+    result = submit_projection_v2(
+        endpoint="https://example.test/receiver", payload={**payload, "action": "quarantine_v2"},
+        provenance=provenance, outbox_path=tmp_path / "outbox.jsonl",
+    )
+    assert not result.ok and result.error_code == "action_not_allowed"
+    assert not (tmp_path / "outbox.jsonl").exists()
+
+
+def test_redirect_is_limited_to_https_allowed_hosts(tmp_path):
+    provenance, payload = _payload()
+    calls = []
+    blocked = submit_projection_v2(
+        endpoint="https://example.test/receiver", payload=payload, provenance=provenance,
+        outbox_path=tmp_path / "blocked.jsonl",
+        post=lambda *args, **kwargs: _Response({}, 302, {"Location": "http://example.test/insecure"}),
+        get=lambda location, **kwargs: calls.append(location) or _Response({"ok": True, "row": 2}), sleep=lambda _: None, attempts=1,
+    )
+    assert not blocked.ok and blocked.status == "TRANSPORT_FAILED"
+    assert calls == []
+
+    allowed = submit_projection_v2(
+        endpoint="https://script.google.com/macros/s/example/exec", payload=payload, provenance=provenance,
+        outbox_path=tmp_path / "allowed.jsonl",
+        post=lambda *args, **kwargs: _Response({}, 302, {"Location": "https://script.googleusercontent.com/macros/echo"}),
+        get=lambda location, **kwargs: calls.append(location) or _Response({"ok": True, "row": 2}), sleep=lambda _: None,
+    )
+    assert allowed.ok
+    assert calls == ["https://script.googleusercontent.com/macros/echo"]
+
+
 def test_transport_failure_is_bounded_and_never_falls_back(tmp_path):
     provenance, payload = _payload()
     calls = []

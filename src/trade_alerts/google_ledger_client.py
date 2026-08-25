@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from urllib.parse import urlparse
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -15,6 +16,9 @@ import requests
 
 from .ledger_integrity import LedgerProvenance
 from .provenance_outbox import append_outbox_record
+
+
+_PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "update_close_v2"})
 
 
 @dataclass(frozen=True)
@@ -39,10 +43,26 @@ class ReconciliationInventoryRead:
     error_code: str | None
 
 
+def _permitted_redirect(endpoint: str, location: str) -> str:
+    """Accept only HTTPS redirects to the same host or Apps Script content host."""
+    origin = urlparse(endpoint)
+    target = urlparse(location)
+    if origin.scheme != "https" or target.scheme != "https" or not origin.hostname or not target.hostname:
+        raise ValueError("receiver_redirect_not_allowed")
+    allowed_hosts = {origin.hostname.lower()}
+    # Apps Script web apps normally redirect script.google.com to the official
+    # script.googleusercontent.com response host; no arbitrary host is allowed.
+    if origin.hostname.lower() == "script.google.com":
+        allowed_hosts.add("script.googleusercontent.com")
+    if target.hostname.lower() not in allowed_hosts or target.username or target.password:
+        raise ValueError("receiver_redirect_not_allowed")
+    return location
+
+
 def _post_json(*, endpoint: str, payload: Mapping[str, Any], post: Callable[..., Any], get: Callable[..., Any]) -> Any:
     response = post(endpoint, json=dict(payload), timeout=15, allow_redirects=False)
     if response.status_code in (301, 302, 303) and response.headers.get("Location"):
-        response = get(response.headers["Location"], timeout=15)
+        response = get(_permitted_redirect(endpoint, response.headers["Location"]), timeout=15)
     response.raise_for_status()
     result = response.json()
     if not isinstance(result, dict):
@@ -116,6 +136,8 @@ def submit_projection_v2(
     terminal CONFIRMED/REJECTED/TRANSPORT_FAILED record afterwards.
     """
     action = payload.get("action") if isinstance(payload.get("action"), str) else "unknown"
+    if action not in _PROJECTION_SUBMISSION_ACTIONS:
+        return ProjectionSubmission(False, "REJECTED", None, "action_not_allowed")
     append_outbox_record(outbox_path, provenance=provenance, action=action, status="PENDING")
     if not isinstance(endpoint, str) or not endpoint.startswith("https://"):
         append_outbox_record(outbox_path, provenance=provenance, action=action, status="REJECTED", error_code="endpoint_not_configured")

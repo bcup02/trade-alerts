@@ -96,6 +96,10 @@ def _projection_value(value: Any) -> Any:
     if isinstance(value, float):
         if not math.isfinite(value):
             raise LedgerIntegrityError("projection contains non-finite number")
+        # IEEE-754 has a signed zero, but financial projections do not: both
+        # spellings must bind to exactly the same canonical digest.
+        if value == 0:
+            return "0"
         return format(value, ".15f").rstrip("0").rstrip(".") or "0"
     if isinstance(value, list):
         return [_projection_value(item) for item in value]
