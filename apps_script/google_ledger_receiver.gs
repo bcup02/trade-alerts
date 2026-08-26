@@ -43,7 +43,7 @@ function handleLegacy(data) {
   const expectedRaw = PropertiesService.getScriptProperties().getProperty('SHARED_SECRET');
   const expected = expectedRaw ? expectedRaw.trim() : '';
   const received = (data.secret || '').trim();
-  if (!expected || received !== expected) return {ok: false, error: 'unauthorized'};
+  if (!expected || received !== expected) return {ok: false, error: 'unauthorized', debug: {expected_len: expected.length, received_len: received.length}};
 
   const sheetName = data.sheet_name;
   if (!sheetName) return {ok: false, error: 'missing sheet_name'};
@@ -59,8 +59,12 @@ function handleLegacyAppend(sheet, sheetName, data) {
   const common = data.common || {};
   if (common.trade_id) {
     const existing = findTradeRows(sheet, common.trade_id);
-    if (existing.length === 1) return {ok: true, row: existing[0], sheet: sheetName, legacy_idempotent: true};
-    if (existing.length > 1) return {ok: false, error: 'duplicate_trade_id'};
+    // Legacy protocol compatibility: the deployed receiver treats the first
+    // matching row as the original successful append, even if historic data
+    // already contains duplicates. Only v2 is allowed to fail closed here.
+    if (existing.length >= 1) {
+      return {ok: true, row: existing[0], sheet: sheetName, note: 'duplicate trade_id on append, treated as an idempotent retry — no new row written'};
+    }
   }
   const values = [
     common.trade_id, common.execution_mode, common.symbol, common.side,
@@ -85,8 +89,11 @@ function handleLegacyUpdateByTradeId(sheet, sheetName, data) {
   const updates = data.updates || {};
   const keys = Object.keys(updates);
   if (keys.length === 0) return {ok: false, error: 'empty updates'};
+  const last = sheet.getLastRow();
+  if (last < 2) return {ok: false, error: 'trade_id not found (sheet has no data rows): ' + tradeId};
+  // Legacy protocol compatibility: update the first matching historic row.
   const matches = findTradeRows(sheet, tradeId);
-  if (matches.length !== 1) return {ok: false, error: matches.length === 0 ? 'trade_id not found: ' + tradeId : 'duplicate_trade_id'};
+  if (matches.length === 0) return {ok: false, error: 'trade_id not found: ' + tradeId, sheet: sheetName};
   const row = matches[0];
   const updatedColumns = [];
   keys.forEach(letter => {
@@ -102,17 +109,19 @@ function handleLegacyUpdateByTradeId(sheet, sheetName, data) {
 }
 
 function handleLegacyUpdateByKey(sheet, sheetName, data) {
-  const column = columnIndex(data.key_column || '');
-  if (!column) return {ok: false, error: 'invalid key_column'};
+  const keyColumnLetter = data.key_column;
+  if (!keyColumnLetter) return {ok: false, error: 'missing key_column'};
+  const column = columnIndex(keyColumnLetter);
+  if (!column) return {ok: false, error: 'invalid key_column: ' + keyColumnLetter};
   if (data.key_value === undefined || data.key_value === null || data.key_value === '') return {ok: false, error: 'missing key_value'};
   const updates = data.updates || {};
   const keys = Object.keys(updates);
   if (keys.length === 0) return {ok: false, error: 'empty updates'};
   const last = sheet.getLastRow();
-  if (last < 2) return {ok: false, error: 'key_value not found'};
+  if (last < 2) return {ok: false, error: 'key_value not found (sheet has no data rows): ' + data.key_value};
   const values = sheet.getRange(2, column, last - 1, 1).getValues();
   const index = values.findIndex(value => String(value[0]) === String(data.key_value));
-  if (index < 0) return {ok: false, error: 'key_value not found'};
+  if (index < 0) return {ok: false, error: 'key_value not found: ' + data.key_value};
   const row = index + 2;
   const updatedColumns = [];
   keys.forEach(letter => {
