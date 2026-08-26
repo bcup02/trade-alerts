@@ -10,11 +10,22 @@ from .reconciliation import (
 )
 from .investor import InvestorPresentation, InvestorProvider, InvestorQueryController, PortfolioPresentation, QueryResult, render_closed_trades, render_portfolio_snapshot, taipei_time
 from .provenance_outbox import append_outbox_record
+from .projection_outbox import (
+    ProjectionDispatch,
+    ProjectionDispatchResult,
+    ProjectionIntent,
+    RebuiltProjection,
+    dispatch_next_projection,
+    enqueue_projection_intent,
+    outstanding_projection_intents,
+    record_projection_dispatch,
+)
 from .google_ledger_reconciliation import ReconciliationFinding, classify_projection_inventory
 from .google_ledger_client import (
     ProjectionAuditRead,
     ProjectionSubmission,
     ReconciliationInventoryRead,
+    deliver_projection_v2,
     read_projection_audit_v2,
     read_reconciliation_inventory_v2,
     submit_projection_v2,
@@ -61,11 +72,20 @@ __all__ = [
     "render_portfolio_snapshot",
     "taipei_time",
     "append_outbox_record",
+    "ProjectionDispatch",
+    "ProjectionDispatchResult",
+    "ProjectionIntent",
+    "RebuiltProjection",
+    "dispatch_next_projection",
+    "enqueue_projection_intent",
+    "outstanding_projection_intents",
+    "record_projection_dispatch",
     "ReconciliationFinding",
     "classify_projection_inventory",
     "ProjectionAuditRead",
     "ProjectionSubmission",
     "ReconciliationInventoryRead",
+    "deliver_projection_v2",
     "read_projection_audit_v2",
     "read_reconciliation_inventory_v2",
     "submit_projection_v2",
@@ -85,4 +105,4 @@ __all__ = [
     "verify_signed_request",
 ]
 
-__version__ = "0.9.1"
+__version__ = "0.10.0"

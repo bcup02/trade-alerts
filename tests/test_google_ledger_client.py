@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from trade_alerts.google_ledger_client import read_reconciliation_inventory_v2, submit_projection_v2
+from trade_alerts.google_ledger_client import deliver_projection_v2, read_reconciliation_inventory_v2, submit_projection_v2
 from trade_alerts.ledger_integrity import build_provenance, signed_reconciliation_request, signed_request
 
 
@@ -46,6 +46,16 @@ def test_missing_endpoint_fails_closed_and_records_no_secret(tmp_path):
     text = (tmp_path / "outbox.jsonl").read_text(encoding="utf-8")
     assert "test-secret" not in text
     assert "signature" not in text
+
+
+def test_pure_delivery_writes_no_legacy_outbox_record(tmp_path):
+    _provenance, payload = _payload()
+    result = deliver_projection_v2(
+        endpoint="https://example.test/receiver", payload=payload,
+        post=lambda *args, **kwargs: _Response({"ok": True, "row": 3}), sleep=lambda _: None,
+    )
+    assert result.ok and result.receiver_row == 3
+    assert not list(tmp_path.iterdir())
 
 
 def test_receiver_success_and_rejection_are_terminal_outbox_states(tmp_path):

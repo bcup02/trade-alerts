@@ -118,6 +118,41 @@ def read_reconciliation_inventory_v2(
     return ReconciliationInventoryRead(True, tuple(dict(row) for row in items), None)
 
 
+def deliver_projection_v2(
+    *,
+    endpoint: str | None,
+    payload: Mapping[str, Any],
+    post: Callable[..., Any] = requests.post,
+    get: Callable[..., Any] = requests.get,
+    sleep: Callable[[float], None] = time.sleep,
+    attempts: int = 3,
+) -> ProjectionSubmission:
+    """Deliver one signed payload without writing a local outbox record.
+
+    This function is for a strategy-owned durable outbox worker. It accepts
+    only fixed v2 projection actions and never uses a legacy or arbitrary
+    endpoint fallback.
+    """
+    action = payload.get("action") if isinstance(payload.get("action"), str) else "unknown"
+    if action not in _PROJECTION_SUBMISSION_ACTIONS:
+        return ProjectionSubmission(False, "REJECTED", None, "action_not_allowed")
+    if not isinstance(endpoint, str) or not endpoint.startswith("https://"):
+        return ProjectionSubmission(False, "REJECTED", None, "endpoint_not_configured")
+    for attempt in range(max(1, attempts)):
+        try:
+            result = _post_json(endpoint=endpoint, payload=payload, post=post, get=get)
+            if not isinstance(result, dict) or not result.get("ok"):
+                return ProjectionSubmission(False, "REJECTED", None, str(result.get("error") if isinstance(result, dict) else "receiver_invalid_response"))
+            row = result.get("row")
+            if not isinstance(row, int) or row < 2:
+                return ProjectionSubmission(False, "REJECTED", None, "receiver_row_invalid")
+            return ProjectionSubmission(True, "CONFIRMED", row, None)
+        except Exception:
+            if attempt + 1 < max(1, attempts):
+                sleep(min(2 ** attempt, 4))
+    return ProjectionSubmission(False, "TRANSPORT_FAILED", None, "transport_failed")
+
+
 def submit_projection_v2(
     *,
     endpoint: str | None,
@@ -129,36 +164,18 @@ def submit_projection_v2(
     sleep: Callable[[float], None] = time.sleep,
     attempts: int = 3,
 ) -> ProjectionSubmission:
-    """Submit one already-signed payload with bounded transport retries.
-
-    No caller-provided free-form endpoint fallback is accepted. The function
-    writes a non-secret PENDING outbox record before network activity and a
-    terminal CONFIRMED/REJECTED/TRANSPORT_FAILED record afterwards.
-    """
+    """Backward-compatible direct submit with the existing provenance lifecycle."""
     action = payload.get("action") if isinstance(payload.get("action"), str) else "unknown"
     if action not in _PROJECTION_SUBMISSION_ACTIONS:
         return ProjectionSubmission(False, "REJECTED", None, "action_not_allowed")
     append_outbox_record(outbox_path, provenance=provenance, action=action, status="PENDING")
-    if not isinstance(endpoint, str) or not endpoint.startswith("https://"):
-        append_outbox_record(outbox_path, provenance=provenance, action=action, status="REJECTED", error_code="endpoint_not_configured")
-        return ProjectionSubmission(False, "REJECTED", None, "endpoint_not_configured")
-    last_transport_error = "transport_failed"
-    for attempt in range(max(1, attempts)):
-        try:
-            result = _post_json(endpoint=endpoint, payload=payload, post=post, get=get)
-            if not isinstance(result, dict) or not result.get("ok"):
-                error_code = str(result.get("error") if isinstance(result, dict) else "receiver_invalid_response")
-                append_outbox_record(outbox_path, provenance=provenance, action=action, status="REJECTED", error_code=error_code)
-                return ProjectionSubmission(False, "REJECTED", None, error_code)
-            row = result.get("row")
-            if not isinstance(row, int) or row < 2:
-                append_outbox_record(outbox_path, provenance=provenance, action=action, status="REJECTED", error_code="receiver_row_invalid")
-                return ProjectionSubmission(False, "REJECTED", None, "receiver_row_invalid")
-            append_outbox_record(outbox_path, provenance=provenance, action=action, status="CONFIRMED", receiver_row=row)
-            return ProjectionSubmission(True, "CONFIRMED", row, None)
-        except Exception:
-            last_transport_error = "transport_failed"
-            if attempt + 1 < max(1, attempts):
-                sleep(min(2 ** attempt, 4))
-    append_outbox_record(outbox_path, provenance=provenance, action=action, status="TRANSPORT_FAILED", error_code=last_transport_error)
-    return ProjectionSubmission(False, "TRANSPORT_FAILED", None, last_transport_error)
+    result = deliver_projection_v2(endpoint=endpoint, payload=payload, post=post, get=get, sleep=sleep, attempts=attempts)
+    append_outbox_record(
+        outbox_path,
+        provenance=provenance,
+        action=action,
+        status=result.status,
+        receiver_row=result.receiver_row,
+        error_code=result.error_code,
+    )
+    return result
