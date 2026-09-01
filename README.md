@@ -64,10 +64,15 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
 
 LINE／Telegram 的共用唯讀查詢控制器位於 `InvestorQueryController`，詳細的 provider 與安全邊界請見 [`docs/investor-query-interface-v1.md`](docs/investor-query-interface-v1.md)。它只支援 `查看投資摘要`、`查看交易紀錄` 與 provider 固定指令；身分驗證、webhook 驗章與任何策略控制必須留在宿主專案。
 
+## 共用 Google Apps Script
+
+`apps_script/google_ledger_receiver.gs` 是綁在「AI自動程式交易紀錄」試算表上的**共用 Apps Script Web App 的權威源**（一個部署服所有專案分頁，靠 payload 的 `sheet_name` 選分頁）。它同時處理 legacy 協定（`SHARED_SECRET` + `append` / `update_by_trade_id` / `update_by_key` / `list_by_sheet` 唯讀）與 `google-ledger-projection-v2`（per-source HMAC + provenance）。欄位 schema、部署步驟、`list_by_sheet` 契約與呼叫端轉址告警都在該檔檔頭。`apps_script/google_ledger_receiver_v2.gs` 是 v2-only 的參考源，非部署對象。**部署（貼進 Apps Script 編輯器 → 管理部署作業 → 新版本）是手動、需另行核准的動作，不在版本標籤的自動範圍內。**
+
 ## 驗證
 
 ```bash
 python -m pytest -q
+for f in tests/*_node_test.js; do node "$f"; done
 ```
 
 ## References
