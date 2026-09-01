@@ -1,0 +1,465 @@
+diff --git a/.github/pytest-summary.py b/.github/pytest-summary.py
+new file mode 100644
+index 0000000..67da71e
+--- /dev/null
++++ b/.github/pytest-summary.py
+@@ -0,0 +1,83 @@
++#!/usr/bin/env python3
++"""Render pytest's JUnit XML as a short Markdown summary.
++
++Writes ``pytest-summary.md`` (picked up by the PR-comment step) and appends the
++same block to ``$GITHUB_STEP_SUMMARY``.  Never raises into CI: a missing or
++unparseable report just produces a note so the comment step still has content.
++"""
++from __future__ import annotations
++
++import os
++import pathlib
++import xml.etree.ElementTree as ET
++from collections import Counter
++
++REPORT = pathlib.Path("pytest.xml")
++OUT = pathlib.Path("pytest-summary.md")
++
++
++def _module_key(classname: str) -> str:
++    """`tests.test_bot.TestX` -> `tests.test_bot`; leave bare modules alone."""
++    key = classname or "?"
++    if "." in key and key.rsplit(".", 1)[1][:1].isupper():
++        key = key.rsplit(".", 1)[0]
++    return key
++
++
++def render() -> str:
++    if not REPORT.is_file():
++        return "⚠️ no `pytest.xml` — pytest did not get far enough to report."
++    try:
++        root = ET.parse(REPORT).getroot()
++    except ET.ParseError as exc:
++        return f"⚠️ could not parse `pytest.xml`: {exc}"
++
++    suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
++    if not suites:
++        return "⚠️ `pytest.xml` contained no <testsuite>."
++
++    total = failures = errors = skipped = 0
++    duration = 0.0
++    per_module: Counter[str] = Counter()
++    for suite in suites:
++        total += int(suite.get("tests", "0"))
++        failures += int(suite.get("failures", "0"))
++        errors += int(suite.get("errors", "0"))
++        skipped += int(suite.get("skipped", "0"))
++        duration += float(suite.get("time", "0") or 0)
++        for case in suite.iter("testcase"):
++            per_module[_module_key(case.get("classname", ""))] += 1
++
++    passed = total - failures - errors - skipped
++    headline = f"**{passed} passed**"
++    for label, count in (("skipped", skipped), ("failed", failures), ("errored", errors)):
++        if count:
++            headline += f", {count} {label}"
++    verdict = "✅ green" if failures == 0 and errors == 0 else "❌ not green"
++
++    rows = "\n".join(f"| `{mod}` | {n} |" for mod, n in sorted(per_module.items()))
++    return "\n".join(
++        [
++            f"### pytest — {headline}",
++            "",
++            f"{verdict} · {total} collected · {duration:.1f}s",
++            "",
++            "| module | tests |",
++            "| --- | --: |",
++            rows,
++        ]
++    )
++
++
++def main() -> None:
++    body = render()
++    OUT.write_text(body + "\n", encoding="utf-8")
++    step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
++    if step_summary:
++        with open(step_summary, "a", encoding="utf-8") as handle:
++            handle.write(body + "\n")
++    print(body)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+new file mode 100644
+index 0000000..6d2371d
+--- /dev/null
++++ b/.github/workflows/ci.yml
+@@ -0,0 +1,54 @@
++name: ci
++
++on:
++  pull_request:
++    branches: [main]
++  push:
++    branches: [main]
++
++jobs:
++  pytest:
++    runs-on: ubuntu-latest
++    permissions:
++      contents: read
++      pull-requests: write
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-python@v5
++        with:
++          python-version: "3.11"
++      - uses: actions/setup-node@v4
++        with:
++          node-version: "20"
++      - run: python -m pip install --upgrade pip
++      - run: pip install -e ".[test]"
++      - run: pytest -q -ra --junit-xml=pytest.xml
++      - name: apps_script node tests
++        run: |
++          for f in tests/*_node_test.js; do
++            echo "== $f =="
++            node "$f"
++          done
++      - name: test summary
++        if: always()
++        run: python .github/pytest-summary.py
++      - name: comment test summary on PR
++        if: always() && github.event_name == 'pull_request'
++        uses: actions/github-script@v7
++        with:
++          script: |
++            const fs = require('fs');
++            const marker = '<!-- pytest-summary -->';
++            let body;
++            try { body = fs.readFileSync('pytest-summary.md', 'utf8'); }
++            catch { body = '⚠️ no pytest summary file produced.'; }
++            body = marker + '\n' + body;
++            const { owner, repo } = context.repo;
++            const issue_number = context.issue.number;
++            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
++            const mine = comments.find(c => c.body && c.body.includes(marker));
++            if (mine) {
++              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
++            } else {
++              await github.rest.issues.createComment({ owner, repo, issue_number, body });
++            }
+diff --git a/README.md b/README.md
+index 92f35d4..ff3a09e 100644
+--- a/README.md
++++ b/README.md
+@@ -64,10 +64,15 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
+ 
+ LINE／Telegram 的共用唯讀查詢控制器位於 `InvestorQueryController`，詳細的 provider 與安全邊界請見 [`docs/investor-query-interface-v1.md`](docs/investor-query-interface-v1.md)。它只支援 `查看投資摘要`、`查看交易紀錄` 與 provider 固定指令；身分驗證、webhook 驗章與任何策略控制必須留在宿主專案。
+ 
++## 共用 Google Apps Script
++
++`apps_script/google_ledger_receiver.gs` 是綁在「AI自動程式交易紀錄」試算表上的**共用 Apps Script Web App 的權威源**（一個部署服所有專案分頁，靠 payload 的 `sheet_name` 選分頁）。它同時處理 legacy 協定（`SHARED_SECRET` + `append` / `update_by_trade_id` / `update_by_key` / `list_by_sheet` 唯讀）與 `google-ledger-projection-v2`（per-source HMAC + provenance）。欄位 schema、部署步驟、`list_by_sheet` 契約與呼叫端轉址告警都在該檔檔頭。`apps_script/google_ledger_receiver_v2.gs` 是 v2-only 的參考源，非部署對象。**部署（貼進 Apps Script 編輯器 → 管理部署作業 → 新版本）是手動、需另行核准的動作，不在版本標籤的自動範圍內。**
++
+ ## 驗證
+ 
+ ```bash
+ python -m pytest -q
++for f in tests/*_node_test.js; do node "$f"; done
+ ```
+ 
+ ## References
+diff --git a/apps_script/google_ledger_receiver.gs b/apps_script/google_ledger_receiver.gs
+index 2331bae..704f7ff 100644
+--- a/apps_script/google_ledger_receiver.gs
++++ b/apps_script/google_ledger_receiver.gs
+@@ -1,14 +1,59 @@
+ /**
+  * Unified Google ledger receiver — reference source only.
+  *
+- * One existing Apps Script Web App endpoint serves two explicitly separated
+- * protocols during migration:
+- *   1. legacy payloads without schema_version, preserving current consumers;
+- *   2. google-ledger-projection-v2, using per-source HMAC and provenance.
++ * This is the CANONICAL source for the shared Apps Script Web App bound to the
++ * "AI自動程式交易紀錄" spreadsheet. One deployment serves every project tab
++ * (my-crypto-bot / ed-seykota / MarkMinervini / mexc-4h-momentum-trailing-stop);
++ * the payload's sheet_name picks the tab. It handles two explicitly separated
++ * protocols:
++ *   1. legacy payloads without schema_version — SHARED_SECRET + append /
++ *      update_by_trade_id / update_by_key / list_by_sheet (read-only);
++ *   2. google-ledger-projection-v2 — per-source HMAC + provenance.
+  *
+  * Deployment, Script Properties, source registration, and any Google data
+- * mutation require separate explicit approval. No actual secret belongs in
+- * this source file, Git, command lines, logs, or an outbox.
++ * mutation require separate explicit approval. No actual secret belongs in this
++ * source file, Git, command lines, logs, or an outbox.
++ *
++ * --- Legacy A~U column schema (all tabs share it) ---
++ * A trade_id | B execution_mode | C symbol | D side | E entry_time |
++ * F exit_time | G entry_price | H exit_price | I volume | J leverage |
++ * K entry_fee | L exit_fee | M gross_pnl | N net_pnl | O return_on_margin |
++ * P source | Q entry_order_id | R exit_order_id | S stop_plan_order_id |
++ * T exit_anomaly | U notes
++ * (2026-08-22: T and U were swapped across all tabs — T was notes, now it is
++ * exit_anomaly. update_by_trade_id locates by column letter, not by semantics,
++ * so callers just send the right letters.)
++ * A cell value that is a purely-numeric string of 16+ digits (order ids) is
++ * forced to text format so Sheets does not lose precision.
++ *
++ * --- Redeploy (manual, whole-endpoint) ---
++ * Paste this whole file into the spreadsheet's Apps Script editor (Extensions ->
++ * Apps Script) -> Manage deployments -> edit -> new version. The Web App URL is
++ * unchanged. Affects all tabs. Script Properties: SHARED_SECRET (legacy) and
++ * GOOGLE_LEDGER_V2_SOURCES (v2 registry) are unchanged.
++ *
++ * --- Caller transport caveat (legacy) ---
++ * An Apps Script Web App answers a POST with a 302 to
++ * script.googleusercontent.com/...; the redirect target is occasionally flaky
++ * (404 / empty body) even on a healthy deployment. Legacy callers should follow
++ * the redirect manually (POST with allow_redirects=False, then GET Location) AND
++ * add a bounded exponential-backoff retry. Sheet sync is best-effort: a failure
++ * is logged, never blocks trading.
++ *
++ * --- list_by_sheet contract (2026-08-31) ---
++ * Read-only. Request:
++ *   {"secret":"...", "sheet_name":"...", "action":"list_by_sheet",
++ *    "trade_ids":["abc","def"]}   // trade_ids optional
++ * Response:
++ *   {"ok":true, "sheet":"...", "header":[<row 1>...],
++ *    "rows":[{"row":14, "values":[<A>,<B>,...]}, ...], "row_count":N}
++ * trade_ids: omit the key (or pass a non-array) -> no filter, all data rows;
++ * a non-empty array -> only rows whose column-A value is in it; an EMPTY array
++ * -> the empty set (rows:[], row_count:0; ok:true, not an error). No data rows
++ * (header only / blank) -> rows:[], row_count:0.
++ * Date-formatted cells come back as ISO 8601 UTC strings (getValues() -> JS Date
++ * -> Date.toJSON() via JSON.stringify), not sheet-local text or a timestamp; the
++ * caller parses + converts, the script does not normalize.
+  */
+ 
+ const V2_SCHEMA = 'google-ledger-projection-v2';
+@@ -52,9 +97,35 @@ function handleLegacy(data) {
+ 
+   if (data.action === 'update_by_trade_id') return handleLegacyUpdateByTradeId(sheet, sheetName, data);
+   if (data.action === 'update_by_key') return handleLegacyUpdateByKey(sheet, sheetName, data);
++  if (data.action === 'list_by_sheet') return handleLegacyListBySheet(sheet, sheetName, data);
+   return handleLegacyAppend(sheet, sheetName, data);
+ }
+ 
++// Read-only: return a tab's data rows so a three-way reconcile tool can compare
++// the local JSONL ledger against the sheet. No writes, no new rows, no cell or
++// format changes. Auth is the SHARED_SECRET check already done in handleLegacy.
++// See the list_by_sheet contract in the file header.
++function handleLegacyListBySheet(sheet, sheetName, data) {
++  const lastRow = sheet.getLastRow();
++  const lastCol = sheet.getLastColumn();
++  if (lastRow < 2 || lastCol < 1) return {ok: true, sheet: sheetName, header: [], rows: [], row_count: 0};
++  const header = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
++  const dataValues = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
++  let tradeIdFilter = null;
++  if (Array.isArray(data.trade_ids)) {
++    tradeIdFilter = {};
++    data.trade_ids.forEach(id => { tradeIdFilter[String(id)] = true; });
++  }
++  const rows = [];
++  for (let i = 0; i < dataValues.length; i++) {
++    // Column A is stringified before comparison, matching the rest of this
++    // endpoint's "do not trust the cell type" stance.
++    if (tradeIdFilter && !tradeIdFilter[String(dataValues[i][0])]) continue;
++    rows.push({row: i + 2, values: dataValues[i]});
++  }
++  return {ok: true, sheet: sheetName, header: header, rows: rows, row_count: rows.length};
++}
++
+ function handleLegacyAppend(sheet, sheetName, data) {
+   const common = data.common || {};
+   if (common.trade_id) {
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 48cff40..245d050 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -44,3 +44,31 @@ trade-alerts：vX.Y.Z（commit <sha>）
+ 服務/工作流程驗證：<結果>
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單
+ ```
++
++## 發布紀錄
++
++```text
++trade-alerts：v0.11.0
++變更摘要：apps_script/google_ledger_receiver.gs 新增 legacy 唯讀 action list_by_sheet
++          （回 header + 資料列，可選 trade_ids 過濾），供各專案 google_reconcile.py
++          做「本地帳本 ↔ Google 表」三方對帳；共用 Apps Script Web App 的唯讀權威源
++          正式定位在本 repo 的 apps_script/（原本唯一副本在 columnbb/my-crypto-bot
++          的 sheets_sync_apps_script.gs，位置屬歷史偶然）。首次加入 CI（.github/
++          workflows/ci.yml：pytest + node apps_script 測試 + sticky 摘要）。
++受影響消費專案：
++  - columnbb/my-crypto-bot：把本地 sheets_sync_apps_script.gs 換成指向本 repo 的
++    pointer；文件參照改指 apps_script/google_ledger_receiver.gs。
++  - vivoy2027game/mexc-4h-momentum-trailing-stop：文件參照改指同上。
++  - bcup02/ed-seykota-systematic-trend-following、columnbb/MarkMinervini-cryptio-bot：
++    無 .gs 副本、無需動作。
++部署入口：list_by_sheet 對現有部署的 legacy 行為為純新增、且與部署中的
++          sheets_sync_apps_script.gs 逐欄等價，故 v0.11.0 本身「不需要」重新發布
++          Apps Script。維護者可在方便時把 google_ledger_receiver.gs 貼進「AI自動
++          程式交易紀錄」的 Apps Script 編輯器 → 管理部署作業 → 新版本（同一端點
++          之後也會吃 v2），此動作需另行核准、非本次發布的完成條件。
++版本驗證：消費專案的 pyproject pin 不需 bump（.gs 是手動貼上、非 import）；
++          v0.11.0 只是給 .gs 一個版本座標。
++服務/工作流程驗證：trade-alerts pytest + node 測試全綠；下一輪各專案
++          *-reconcile-fetch timer 的 google_reconcile_status.json 仍 RECONCILED。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index 20cef26..f566917 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.10.0"
++version = "0.11.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/tests/apps_script_legacy_list_by_sheet_node_test.js b/tests/apps_script_legacy_list_by_sheet_node_test.js
+new file mode 100644
+index 0000000..e102718
+--- /dev/null
++++ b/tests/apps_script_legacy_list_by_sheet_node_test.js
+@@ -0,0 +1,135 @@
++const assert = require('assert');
++const fs = require('fs');
++const vm = require('vm');
++
++const legacySecret = 'legacy-test-secret';
++const sheets = new Map();
++
++// Minimal Sheet stub: getLastRow / getLastColumn / getRange().getValues() /
++// setValue / setValues / getCell().setNumberFormat / appendRow. `rows` is a
++// 2-D array (row 0 = header).
++function createSheet(name, rows) {
++  const sheet = {
++    name,
++    rows,
++    getLastRow() { return this.rows.length; },
++    getLastColumn() { return this.rows.reduce((max, r) => Math.max(max, r.length), 0); },
++    getRange(row, column, height = 1, width = 1) {
++      const target = this;
++      return {
++        getValues() {
++          return target.rows.slice(row - 1, row - 1 + height).map(current => {
++            const copy = current.slice(column - 1, column - 1 + width);
++            while (copy.length < width) copy.push('');
++            return copy;
++          });
++        },
++        setValue(value) {
++          while (target.rows.length < row) target.rows.push([]);
++          while (target.rows[row - 1].length < column) target.rows[row - 1].push('');
++          target.rows[row - 1][column - 1] = value;
++        },
++        setValues(values) {
++          values.forEach((valuesRow, rowOffset) => {
++            while (target.rows.length < row + rowOffset) target.rows.push([]);
++            valuesRow.forEach((value, columnOffset) => {
++              while (target.rows[row + rowOffset - 1].length < column + columnOffset) target.rows[row + rowOffset - 1].push('');
++              target.rows[row + rowOffset - 1][column + columnOffset - 1] = value;
++            });
++          });
++        },
++        getCell() { return { setNumberFormat() {}, setValue() {} }; },
++        setNumberFormat() {},
++      };
++    },
++    appendRow(values) { this.rows.push(values); },
++  };
++  sheets.set(name, sheet);
++  return sheet;
++}
++
++const HEADER = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time', 'exit_time',
++  'entry_price', 'exit_price', 'volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl',
++  'net_pnl', 'return_on_margin', 'source', 'entry_order_id', 'exit_order_id',
++  'stop_plan_order_id', 'exit_anomaly', 'notes'];
++
++const tab = createSheet('my-crypto-bot', [
++  HEADER.slice(),
++  ['t-1', 'LIVE', 'BTC_USDT', 'long', '2026-08-09 18:29:37', '', 65191, 65196, 1, 3],
++  ['t-2', 'LIVE', 'BTC_USDT', 'short', '2026-08-09 18:41:45', '', 65195.9, 65194.2, 1, 3],
++  ['t-3', 'LIVE', 'BTC_USDT', 'short', '2026-08-09 18:45:42', '', 65194.1, 65188.1, 1, 3],
++]);
++createSheet('empty-tab', [HEADER.slice()]);
++
++const context = {
++  console, Date, JSON, Math, Object, String, Array, Number, Set, isNaN, isFinite,
++  PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k === 'SHARED_SECRET' ? legacySecret : null) }) },
++  Utilities: {
++    Charset: { UTF_8: 'UTF_8' }, DigestAlgorithm: { SHA_256: 'SHA_256' },
++    computeHmacSha256Signature: () => [], computeDigest: () => [],
++  },
++  SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: name => sheets.get(name) || null, insertSheet: name => createSheet(name, []) }) },
++  ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: text => ({ text, setMimeType() { return this; } }) },
++};
++vm.createContext(context);
++vm.runInContext(fs.readFileSync('apps_script/google_ledger_receiver.gs', 'utf8'), context, { filename: 'google_ledger_receiver.gs' });
++
++const route = payload => JSON.parse(JSON.stringify(context.routeRequest(payload)));
++const call = (over = {}) => route(Object.assign({ secret: legacySecret, sheet_name: 'my-crypto-bot', action: 'list_by_sheet' }, over));
++
++// --- auth ---
++assert.deepEqual(route({ secret: 'wrong', sheet_name: 'my-crypto-bot', action: 'list_by_sheet' }),
++  { ok: false, error: 'unauthorized', debug: { expected_len: legacySecret.length, received_len: 5 } });
++assert.deepEqual(route({ secret: legacySecret, action: 'list_by_sheet' }), { ok: false, error: 'missing sheet_name' });
++assert.deepEqual(call({ sheet_name: 'nope' }), { ok: false, error: 'sheet not found: nope' });
++
++// --- no filter -> header + every data row, 1-based sheet row numbers ---
++const all = call();
++assert.equal(all.ok, true);
++assert.equal(all.sheet, 'my-crypto-bot');
++assert.deepEqual(all.header, HEADER);
++assert.equal(all.row_count, 3);
++assert.deepEqual(all.rows.map(r => r.row), [2, 3, 4]);
++assert.equal(all.rows[0].values[0], 't-1');
++assert.equal(all.rows[0].values.length, HEADER.length); // padded to lastCol
++assert.equal(all.rows[2].values[0], 't-3');
++
++// --- non-array trade_ids -> treated as "no filter" ---
++assert.equal(call({ trade_ids: 'not-an-array' }).row_count, 3);
++assert.equal(call({ trade_ids: null }).row_count, 3);
++
++// --- non-empty trade_ids -> only matching column-A rows ---
++const filtered = call({ trade_ids: ['t-3', 't-1', 'missing'] });
++assert.equal(filtered.row_count, 2);
++assert.deepEqual(filtered.rows.map(r => r.values[0]).sort(), ['t-1', 't-3']);
++assert.deepEqual(filtered.rows.map(r => r.row).sort(), [2, 4]);
++
++// --- EMPTY array -> the empty set (ok:true, not an error) ---
++const none = call({ trade_ids: [] });
++assert.deepEqual(none, { ok: true, sheet: 'my-crypto-bot', header: HEADER, rows: [], row_count: 0 });
++
++// --- header-only tab -> rows:[], row_count:0 ---
++assert.deepEqual(call({ sheet_name: 'empty-tab' }),
++  { ok: true, sheet: 'empty-tab', header: [], rows: [], row_count: 0 });
++
++// --- regression: append / update_by_trade_id / update_by_key still work, and
++//     list_by_sheet never wrote anything ---
++const before = JSON.stringify(tab.rows);
++const appended = route({ secret: legacySecret, sheet_name: 'my-crypto-bot', common: { trade_id: 't-4', execution_mode: 'LIVE', symbol: 'BTC_USDT' } });
++assert.deepEqual(appended, { ok: true, row: 5, sheet: 'my-crypto-bot' });
++const upd = route({ secret: legacySecret, sheet_name: 'my-crypto-bot', action: 'update_by_trade_id', trade_id: 't-4', updates: { N: '1.23' } });
++assert.deepEqual(upd, { ok: true, row: 5, sheet: 'my-crypto-bot', updated_columns: ['N'] });
++assert.equal(tab.rows[4][13], '1.23');
++const acct = createSheet('帳戶餘額總表', [['id', 'project'], ['', 'my-crypto-bot']]);
++const keyUpd = route({ secret: legacySecret, sheet_name: '帳戶餘額總表', action: 'update_by_key', key_column: 'B', key_value: 'my-crypto-bot', updates: { G: '0.5' } });
++assert.deepEqual(keyUpd, { ok: true, row: 2, sheet: '帳戶餘額總表', updated_columns: ['G'] });
++assert.equal(acct.rows[1][6], '0.5');
++// list_by_sheet did not mutate the first 4 rows
++assert.equal(JSON.stringify(tab.rows.slice(0, 4)), before);
++
++// --- doPost wraps it in a JSON text output ---
++const wrapped = context.doPost({ postData: { contents: JSON.stringify({ secret: legacySecret, sheet_name: 'my-crypto-bot', action: 'list_by_sheet', trade_ids: ['t-2'] }) } });
++assert.equal(JSON.parse(wrapped.text).row_count, 1);
++assert.equal(JSON.parse(wrapped.text).rows[0].values[0], 't-2');
++
++console.log('apps_script_legacy_list_by_sheet_node_test: passed');
