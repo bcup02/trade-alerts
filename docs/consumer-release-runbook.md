@@ -72,3 +72,42 @@ trade-alerts：v0.11.0
           *-reconcile-fetch timer 的 google_reconcile_status.json 仍 RECONCILED。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.12.0
+變更摘要：新增純函式模組 src/trade_alerts/ledger_reconcile.py —— 把
+          mexc-4h-momentum-trailing-stop 與 my-crypto-bot 逐字複製的對帳邏輯
+          （reconcile_shared.py / reconcile_compare.py / google_reconcile.py 的
+          primitives + 兩層 compare()）抽成單一權威源。匯出：
+          - IO/parse helpers：read_ledger / read_json / atomic_write / parse_iso /
+            utc_now_iso / to_float / to_number / env_int / env_float
+          - 事件分類：is_paper_event（含 live_close_estimate_is_real 參數，
+            對應 my-crypto 的 LIVE-估計平倉 carve-out）/ recorded_order_ids /
+            unsettled_pending_markers
+          - 第 1 層 exchange_ledger_compare()（本地帳本 ↔ 交易所，回
+            ledger_status.json）
+          - 第 2 層 fold_ledger_trades() + sheet_ledger_compare()（本地帳本 ↔
+            Google 表，回 google_reconcile_status.json）+ fetch_sheet_rows()
+          各專案差異以參數注入：is_paper / norm_symbol（norm_symbol_plain vs
+          norm_symbol_ccxt）/ open_event_types / include_pending_markers。
+          純新增，不動任何既有 trade-alerts 模組或行為。順帶修正
+          src/trade_alerts/__init__.py 陳舊的 __version__ = "0.10.0"（pyproject
+          當時已是 0.11.0）。新增 tests/test_ledger_reconcile.py（33 測試）。
+受影響消費專案：
+  - vivoy2027game/mexc-4h-momentum-trailing-stop：reconcile_shared.py /
+    reconcile_compare.py / google_reconcile.py 改成薄 adapter，import 本模組；
+    pin bump 至 v0.12.0（pyproject + deploy/install_systemd.sh）。
+  - columnbb/my-crypto-bot：reconcile_compare.py / google_reconcile.py 同上；
+    pin bump 至 v0.12.0（deploy/install_systemd.sh + .github/workflows/ci.yml）。
+  - bcup02/ed-seykota-systematic-trend-following：不在 L2 範圍（無本地帳本、
+    verdict 恆 UNKNOWN、未依賴 trade-alerts），保留自有 reconcile/compare.py。
+  - columnbb/MarkMinervini-cryptio-bot：無對帳程式、無需動作。
+部署入口：本次為 Python 套件純新增，不影響現有部署的行為。消費專案各自 bump
+          pin 後走自己的 governance PR → Perplexity → merge-pr.sh → 從 operations
+          跑 install_systemd.sh 重新部署，驗證 *-reconcile-fetch timer 仍綠。
+版本驗證：pip show trade-alerts == 0.12.0；trade_alerts.__version__ == "0.12.0"。
+服務/工作流程驗證：trade-alerts pytest（87）+ node 測試全綠。消費專案 adapter
+          PR 合併部署後，三軸 reconcile 狀態不變（momentum/my-crypto 的
+          ledger_status.json 與 google_reconcile_status.json 仍 RECONCILED）。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```
