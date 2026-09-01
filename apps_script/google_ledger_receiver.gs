@@ -1,14 +1,59 @@
 /**
  * Unified Google ledger receiver — reference source only.
  *
- * One existing Apps Script Web App endpoint serves two explicitly separated
- * protocols during migration:
- *   1. legacy payloads without schema_version, preserving current consumers;
- *   2. google-ledger-projection-v2, using per-source HMAC and provenance.
+ * This is the CANONICAL source for the shared Apps Script Web App bound to the
+ * "AI自動程式交易紀錄" spreadsheet. One deployment serves every project tab
+ * (my-crypto-bot / ed-seykota / MarkMinervini / mexc-4h-momentum-trailing-stop);
+ * the payload's sheet_name picks the tab. It handles two explicitly separated
+ * protocols:
+ *   1. legacy payloads without schema_version — SHARED_SECRET + append /
+ *      update_by_trade_id / update_by_key / list_by_sheet (read-only);
+ *   2. google-ledger-projection-v2 — per-source HMAC + provenance.
  *
  * Deployment, Script Properties, source registration, and any Google data
- * mutation require separate explicit approval. No actual secret belongs in
- * this source file, Git, command lines, logs, or an outbox.
+ * mutation require separate explicit approval. No actual secret belongs in this
+ * source file, Git, command lines, logs, or an outbox.
+ *
+ * --- Legacy A~U column schema (all tabs share it) ---
+ * A trade_id | B execution_mode | C symbol | D side | E entry_time |
+ * F exit_time | G entry_price | H exit_price | I volume | J leverage |
+ * K entry_fee | L exit_fee | M gross_pnl | N net_pnl | O return_on_margin |
+ * P source | Q entry_order_id | R exit_order_id | S stop_plan_order_id |
+ * T exit_anomaly | U notes
+ * (2026-08-22: T and U were swapped across all tabs — T was notes, now it is
+ * exit_anomaly. update_by_trade_id locates by column letter, not by semantics,
+ * so callers just send the right letters.)
+ * A cell value that is a purely-numeric string of 16+ digits (order ids) is
+ * forced to text format so Sheets does not lose precision.
+ *
+ * --- Redeploy (manual, whole-endpoint) ---
+ * Paste this whole file into the spreadsheet's Apps Script editor (Extensions ->
+ * Apps Script) -> Manage deployments -> edit -> new version. The Web App URL is
+ * unchanged. Affects all tabs. Script Properties: SHARED_SECRET (legacy) and
+ * GOOGLE_LEDGER_V2_SOURCES (v2 registry) are unchanged.
+ *
+ * --- Caller transport caveat (legacy) ---
+ * An Apps Script Web App answers a POST with a 302 to
+ * script.googleusercontent.com/...; the redirect target is occasionally flaky
+ * (404 / empty body) even on a healthy deployment. Legacy callers should follow
+ * the redirect manually (POST with allow_redirects=False, then GET Location) AND
+ * add a bounded exponential-backoff retry. Sheet sync is best-effort: a failure
+ * is logged, never blocks trading.
+ *
+ * --- list_by_sheet contract (2026-08-31) ---
+ * Read-only. Request:
+ *   {"secret":"...", "sheet_name":"...", "action":"list_by_sheet",
+ *    "trade_ids":["abc","def"]}   // trade_ids optional
+ * Response:
+ *   {"ok":true, "sheet":"...", "header":[<row 1>...],
+ *    "rows":[{"row":14, "values":[<A>,<B>,...]}, ...], "row_count":N}
+ * trade_ids: omit the key (or pass a non-array) -> no filter, all data rows;
+ * a non-empty array -> only rows whose column-A value is in it; an EMPTY array
+ * -> the empty set (rows:[], row_count:0; ok:true, not an error). No data rows
+ * (header only / blank) -> rows:[], row_count:0.
+ * Date-formatted cells come back as ISO 8601 UTC strings (getValues() -> JS Date
+ * -> Date.toJSON() via JSON.stringify), not sheet-local text or a timestamp; the
+ * caller parses + converts, the script does not normalize.
  */
 
 const V2_SCHEMA = 'google-ledger-projection-v2';
@@ -52,7 +97,33 @@ function handleLegacy(data) {
 
   if (data.action === 'update_by_trade_id') return handleLegacyUpdateByTradeId(sheet, sheetName, data);
   if (data.action === 'update_by_key') return handleLegacyUpdateByKey(sheet, sheetName, data);
+  if (data.action === 'list_by_sheet') return handleLegacyListBySheet(sheet, sheetName, data);
   return handleLegacyAppend(sheet, sheetName, data);
+}
+
+// Read-only: return a tab's data rows so a three-way reconcile tool can compare
+// the local JSONL ledger against the sheet. No writes, no new rows, no cell or
+// format changes. Auth is the SHARED_SECRET check already done in handleLegacy.
+// See the list_by_sheet contract in the file header.
+function handleLegacyListBySheet(sheet, sheetName, data) {
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return {ok: true, sheet: sheetName, header: [], rows: [], row_count: 0};
+  const header = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const dataValues = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  let tradeIdFilter = null;
+  if (Array.isArray(data.trade_ids)) {
+    tradeIdFilter = {};
+    data.trade_ids.forEach(id => { tradeIdFilter[String(id)] = true; });
+  }
+  const rows = [];
+  for (let i = 0; i < dataValues.length; i++) {
+    // Column A is stringified before comparison, matching the rest of this
+    // endpoint's "do not trust the cell type" stance.
+    if (tradeIdFilter && !tradeIdFilter[String(dataValues[i][0])]) continue;
+    rows.push({row: i + 2, values: dataValues[i]});
+  }
+  return {ok: true, sheet: sheetName, header: header, rows: rows, row_count: rows.length};
 }
 
 function handleLegacyAppend(sheet, sheetName, data) {

@@ -44,3 +44,31 @@ trade-alerts：vX.Y.Z（commit <sha>）
 服務/工作流程驗證：<結果>
 交易安全：未啟用實盤、未下單、未修改秘密或保護單
 ```
+
+## 發布紀錄
+
+```text
+trade-alerts：v0.11.0
+變更摘要：apps_script/google_ledger_receiver.gs 新增 legacy 唯讀 action list_by_sheet
+          （回 header + 資料列，可選 trade_ids 過濾），供各專案 google_reconcile.py
+          做「本地帳本 ↔ Google 表」三方對帳；共用 Apps Script Web App 的唯讀權威源
+          正式定位在本 repo 的 apps_script/（原本唯一副本在 columnbb/my-crypto-bot
+          的 sheets_sync_apps_script.gs，位置屬歷史偶然）。首次加入 CI（.github/
+          workflows/ci.yml：pytest + node apps_script 測試 + sticky 摘要）。
+受影響消費專案：
+  - columnbb/my-crypto-bot：把本地 sheets_sync_apps_script.gs 換成指向本 repo 的
+    pointer；文件參照改指 apps_script/google_ledger_receiver.gs。
+  - vivoy2027game/mexc-4h-momentum-trailing-stop：文件參照改指同上。
+  - bcup02/ed-seykota-systematic-trend-following、columnbb/MarkMinervini-cryptio-bot：
+    無 .gs 副本、無需動作。
+部署入口：list_by_sheet 對現有部署的 legacy 行為為純新增、且與部署中的
+          sheets_sync_apps_script.gs 逐欄等價，故 v0.11.0 本身「不需要」重新發布
+          Apps Script。維護者可在方便時把 google_ledger_receiver.gs 貼進「AI自動
+          程式交易紀錄」的 Apps Script 編輯器 → 管理部署作業 → 新版本（同一端點
+          之後也會吃 v2），此動作需另行核准、非本次發布的完成條件。
+版本驗證：消費專案的 pyproject pin 不需 bump（.gs 是手動貼上、非 import）；
+          v0.11.0 只是給 .gs 一個版本座標。
+服務/工作流程驗證：trade-alerts pytest + node 測試全綠；下一輪各專案
+          *-reconcile-fetch timer 的 google_reconcile_status.json 仍 RECONCILED。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```
