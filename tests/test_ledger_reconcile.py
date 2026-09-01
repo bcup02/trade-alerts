@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 import pytest
 
+from trade_alerts import ledger_reconcile as lr
 from trade_alerts.ledger_reconcile import (
     CLOSE_MARKERS,
     RECONCILE_SOURCE_SCHEMA,
     atomic_write,
     exchange_ledger_compare,
+    fetch_sheet_rows,
     fold_ledger_trades,
     is_paper_event,
     norm_symbol_ccxt,
@@ -413,3 +416,85 @@ def test_sheet_compare_skips_paper_mode_rows_for_ledger_missing():
 
 def test_close_markers_constant_exposed():
     assert "position_reconciled_closed" in CLOSE_MARKERS
+
+
+# --------------------------------------------------------------------------- #
+# fetch_sheet_rows -- transport
+# --------------------------------------------------------------------------- #
+
+class _Resp:
+    def __init__(self, *, status_code=200, text="", headers=None):
+        self.status_code = status_code
+        self.text = text
+        self.headers = headers or {}
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+    def json(self):
+        return json.loads(self.text)
+
+
+_OK_BODY = json.dumps({"ok": True, "rows": [{"row": 14, "values": ["t1", "LIVE"]}]})
+
+
+def test_fetch_missing_config(monkeypatch):
+    monkeypatch.delenv("SHEETS_SYNC_URL", raising=False)
+    monkeypatch.delenv("SHEETS_SYNC_SECRET", raising=False)
+    rows, err = fetch_sheet_rows(sheet_name="S")
+    assert rows is None and "not configured" in err
+
+
+def test_fetch_success(monkeypatch):
+    monkeypatch.setattr(lr.requests, "post", lambda *a, **k: _Resp(text=_OK_BODY))
+    rows, err = fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s")
+    assert err is None
+    assert rows == [{"row": 14, "values": ["t1", "LIVE"]}]
+
+
+def test_fetch_follows_302(monkeypatch):
+    monkeypatch.setattr(lr.requests, "post", lambda *a, **k: _Resp(
+        status_code=302, headers={"Location": "https://x/echo"}))
+    monkeypatch.setattr(lr.requests, "get", lambda *a, **k: _Resp(text=_OK_BODY))
+    rows, err = fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s")
+    assert err is None and rows[0]["row"] == 14
+
+
+def test_fetch_receiver_error_is_terminal(monkeypatch):
+    calls = []
+
+    def _post(*a, **k):
+        calls.append(1)
+        return _Resp(text=json.dumps({"ok": False, "error": "unauthorized"}))
+
+    monkeypatch.setattr(lr.requests, "post", _post)
+    rows, err = fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s",
+                                 sleep=lambda _s: None)
+    assert rows is None and "unauthorized" in err
+    assert len(calls) == 1  # a receiver rejection is not retried
+
+
+def test_fetch_retries_then_succeeds(monkeypatch):
+    seq = [_Resp(status_code=500, text="boom"), _Resp(text=_OK_BODY)]
+    monkeypatch.setattr(lr.requests, "post", lambda *a, **k: seq.pop(0))
+    rows, err = fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s",
+                                 sleep=lambda _s: None)
+    assert err is None and rows[0]["row"] == 14
+
+
+def test_fetch_exhausts_retries(monkeypatch):
+    def _boom(*a, **k):
+        raise ConnectionError("down")
+
+    monkeypatch.setattr(lr.requests, "post", _boom)
+    rows, err = fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s",
+                                 attempts=2, sleep=lambda _s: None)
+    assert rows is None and "ConnectionError" in err
+
+
+def test_fetch_empty_body_exhausts(monkeypatch):
+    monkeypatch.setattr(lr.requests, "post", lambda *a, **k: _Resp(text="   "))
+    rows, err = fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s",
+                                 attempts=2, sleep=lambda _s: None)
+    assert rows is None and err == "empty response body"

@@ -28,9 +28,9 @@ knobs:
     backfill) as an open.
 
 Pure stdlib apart from :func:`fetch_sheet_rows` (which uses ``requests``, already
-a dependency).  No secrets live here; the sheet URL / secret come from the
-caller or the environment.  Detection only -- nothing in here writes a ledger,
-places an order, or pushes anywhere.
+a hard dependency of this package).  No secrets live here; the sheet URL /
+secret come from the caller or the environment.  Detection only -- nothing in
+here writes a ledger, places an order, or pushes anywhere.
 """
 from __future__ import annotations
 
@@ -44,6 +44,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+import requests
+
 log = logging.getLogger("trade_alerts.ledger_reconcile")
 
 # --------------------------------------------------------------------------- #
@@ -54,7 +56,9 @@ log = logging.getLogger("trade_alerts.ledger_reconcile")
 RECONCILE_SOURCE_SCHEMA = "reconcile-source/v1"
 
 #: ``source`` values written by a DRY_RUN paper path -- never a real fill.
-DRY_RUN_SOURCES = frozenset({"dry_run", "dry_run_signal", "dry_run_simulated"})
+#: Byte-for-byte the set both consumers use today
+#: (momentum ``reconcile_shared.DRY_RUN_SOURCES`` / my-crypto ``_DRY_RUN_SOURCES``).
+DRY_RUN_SOURCES = frozenset({"dry_run_signal", "dry_run_simulated"})
 
 #: Settlement markers the strategy / a settler append once a missing position's
 #: fate is known.  Treated as "this position is closed".
@@ -483,8 +487,6 @@ def fetch_sheet_rows(
     ``(None, error)``.  ``url`` / ``secret`` default to ``SHEETS_SYNC_URL`` /
     ``SHEETS_SYNC_SECRET`` in the environment.
     """
-    import requests  # local import: keeps the pure-stdlib helpers import-light
-
     sleep = sleep or time.sleep
     url = url if url is not None else os.getenv("SHEETS_SYNC_URL")
     secret = secret if secret is not None else os.getenv("SHEETS_SYNC_SECRET")
