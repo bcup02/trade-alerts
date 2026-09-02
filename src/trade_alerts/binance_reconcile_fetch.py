@@ -74,7 +74,12 @@ class BinanceReconcileParams:
     #: position rows (ledger-form symbols) that returns the native symbols to
     #: query (momentum: the open positions' symbols unioned with a static env
     #: list, resolved only after positions are fetched).  An empty result is
-    #: not an error -- it yields no fills.
+    #: not an error -- it yields no fills.  A callable's own exception is *not*
+    #: caught -- it propagates out of ``fetch`` / ``run`` (which otherwise never
+    #: raise).  That is deliberate: the callable is the adapter's own code, so a
+    #: bug there should fail loudly rather than be swallowed like a flaky
+    #: exchange call; an adapter that wants fail-safe behaviour must try/except
+    #: inside its own callable.
     query_symbols: Sequence[str] | Callable[[list[dict[str, Any]]], Sequence[str]] = field(default_factory=tuple)
     lookback_hours: int = 168
     #: Passed to ``position_information`` / ``open_orders`` / ``open_algo_orders``.
@@ -128,7 +133,8 @@ def _resolve_query_symbols(
     """The native symbols to pull a fill window for.  A callable
     ``query_symbols`` is given the normalized position rows (so momentum can
     union the open positions' symbols with its static env list); a plain
-    sequence is used as-is (seykota)."""
+    sequence is used as-is (seykota).  Not wrapped in ``_section`` -- a
+    callable that raises propagates (see ``query_symbols`` on the params)."""
     qs = params.query_symbols
     resolved = qs(positions or []) if callable(qs) else qs
     return list(resolved)
