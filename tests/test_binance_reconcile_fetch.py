@@ -42,6 +42,8 @@ class _FakeClient:
 
     def position_information(self, symbol):
         self.calls.append(("position_information", symbol))
+        if "positions_raises" in self._o:
+            raise RuntimeError("boom positions")
         return self._o.get("positions", [
             {"symbol": "GPSUSDT", "positionAmt": "12", "entryPrice": "1.95",
              "markPrice": "2.0", "unRealizedProfit": "0.6", "leverage": "3",
@@ -187,6 +189,36 @@ def test_fetch_empty_query_symbols_is_not_an_error():
     doc = fetch(_momentum_params(_FakeClient(), query_symbols=[]), now=_NOW)
     assert doc["fills"] == [] and doc["symbols_queried"] == []
     assert doc["fetch_status"]["complete"] is True
+
+
+def test_fetch_query_symbols_callable_sees_position_rows():
+    seen: list = []
+
+    def _derive(positions):
+        seen.append(positions)
+        # union the open positions' symbols (ledger form -> native) with a
+        # static extra symbol -- momentum's pattern
+        return sorted({p["symbol"].replace("_", "") for p in positions} | {"ZROUSDT"})
+
+    doc = fetch(_momentum_params(_FakeClient(), query_symbols=_derive), now=_NOW)
+
+    # the callable was handed the normalized (ledger-form) position rows
+    assert seen and seen[0][0]["symbol"] == "GPS_USDT"
+    # fills were pulled for the union, reported in ledger form and sorted
+    assert doc["symbols_queried"] == ["GPS_USDT", "ZRO_USDT"]
+    assert {f["symbol"] for f in doc["fills"]} <= {"GPS_USDT", "ZRO_USDT"}
+
+
+def test_fetch_query_symbols_callable_gets_empty_list_when_positions_fail():
+    calls: list = []
+
+    def _derive(positions):
+        calls.append(positions)
+        return [p["symbol"].replace("_", "") for p in positions] or ["FALLBACKUSDT"]
+
+    doc = fetch(_momentum_params(_FakeClient(positions_raises=True), query_symbols=_derive), now=_NOW)
+    assert calls == [[]]  # positions section failed -> callable sees []
+    assert doc["symbols_queried"] == ["FALLBACK_USDT"]
 
 
 # --------------------------------------------------------------------------- #

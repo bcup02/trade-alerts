@@ -155,3 +155,23 @@ trade-alerts：v0.13.0
           ledger_status.json 與 google_reconcile_status.json 仍 RECONCILED。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.13.1
+變更摘要：binance_reconcile_fetch — `BinanceReconcileParams.query_symbols` 除了
+          固定序列，現在也接受 callable(position_rows) -> Sequence[str]。momentum
+          的對帳需要「fills 視窗 = 目前開倉部位的 symbol ∪ 靜態 RECONCILE_SYMBOLS
+          env」，而部位要 fetch 完才知道；callable 在 positions section 之後被呼叫、
+          收到正規化（ledger 形式）的部位列。seykota 仍傳固定 `[symbol]`，行為不變。
+          positions section 失敗時 callable 收到 []（靜態 env 仍納入）。
+          純向後相容擴充（list 照舊）。+2 測試（112）。
+受影響消費專案：
+  - vivoy2027game/mexc-4h-momentum-trailing-stop：PR-3 的 adapter 用 callable 形式；
+    pin 直接鎖 v0.13.1。
+  - bcup02/ed-seykota-systematic-trend-following：無需動作（PR-2 已鎖 v0.13.0、用
+    固定序列；可在下次順帶把 pin 提到 v0.13.1，非必要）。
+部署入口：Python 套件純擴充。
+版本驗證：pip show trade-alerts == 0.13.1；trade_alerts.__version__ == "0.13.1"。
+服務/工作流程驗證：trade-alerts pytest（112）+ node 測試全綠。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```
