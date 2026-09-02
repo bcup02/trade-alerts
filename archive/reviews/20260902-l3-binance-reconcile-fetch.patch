@@ -1,0 +1,668 @@
+From 0be6e20f9a2d988ef655addf6c659f15c1502e31 Mon Sep 17 00:00:00 2001
+From: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date: Wed, 2 Sep 2026 09:07:49 +0800
+Subject: [PATCH] feat: binance_reconcile_fetch -- shared read-only Binance
+ reconcile-source fetcher (v0.13.0) (#5)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Task 3 L3.  ed-seykota and mexc-4h-momentum each carry a near-byte-identical
+read-only Binance USDⓈ-M reconcile-source fetcher (balance / positionRisk /
+userTrades / openOrders / openAlgoOrders -> reconcile-source/v1).  Extract the
+shared core to a single authoritative module.
+
+src/trade_alerts/binance_reconcile_fetch.py (new, pure):
+  * does NOT import binance_trading_toolkit -- the caller builds the client
+    (toolkit BinanceFuturesClient or any object with the same read surface)
+    and passes it in; credential resolution / mainnet detection / EXCHANGE
+    dispatch stay in each repo's credential layer.
+  * BinanceReconcileParams injects per-repo differences: query_symbols
+    (Binance-native, userTrades is per-symbol), scope_symbol (None = every
+    symbol for momentum, the symbol string for seykota), doc_symbol,
+    to_ledger_symbol (identity vs momentum_ledger_symbol GPSUSDT->GPS_USDT),
+    lookback_hours.
+  * fetch() always emits symbols_queried + fills_possibly_truncated (a
+    harmless superset for the single-symbol consumer; exchange_ledger_compare
+    ignores unknown keys).
+  * _order_rows carries the T1-6 PR #41 algo field fix (orderType /
+    createTime) -- seykota gains it too.
+  * run() reuses ledger_reconcile.atomic_write; never raises.
+
+Pure addition -- no existing module or behavior changes.  Exports
+BinanceReconcileParams + momentum_ledger_symbol from the package;
+fetch/run stay on the submodule (matches the ledger_reconcile import style).
+tests/test_binance_reconcile_fetch.py: 16 tests (fake client).  Suite 94 -> 110.
+pyproject + __init__.__version__ -> 0.13.0; release runbook note + consumer table.
+
+Co-authored-by: bcup02 <columnbb@gmail.com>
+Co-authored-by: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ docs/consumer-release-runbook.md            |  48 +++-
+ pyproject.toml                              |   2 +-
+ src/trade_alerts/__init__.py                |   5 +-
+ src/trade_alerts/binance_reconcile_fetch.py | 258 ++++++++++++++++++++
+ tests/test_binance_reconcile_fetch.py       | 243 ++++++++++++++++++
+ 5 files changed, 552 insertions(+), 4 deletions(-)
+ create mode 100644 src/trade_alerts/binance_reconcile_fetch.py
+ create mode 100644 tests/test_binance_reconcile_fetch.py
+
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 304d85c..0e6bfbd 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -10,8 +10,8 @@
+ |---|---|---|---|---|
+ | `columnbb/my-crypto-bot` | 尚待 v1 契約遷移 | 尚未建立部署相依 | 實作整合時必須在本表補上版本釘選與部署命令 | 契約測試、DRY_RUN 查詢 |
+ | `columnbb/MarkMinervini-cryptio-bot` | 尚待 v1 契約遷移 | 尚未建立部署相依 | 實作整合時必須在本表補上版本釘選與部署命令 | 契約測試、模擬查詢 |
+-| `bcup02/ed-seykota-systematic-trend-following` | 已整合投資人查詢與通知 | `master` 的 `pyproject.toml` 釘選版本；WSL `/opt/.../.admin-venv` | 更新釘選版本、測試後執行 `deploy/update_remote_admin.sh` | 已安裝版本、三項服務 `active`、LINE/Telegram 查詢 |
+-| `vivoy2027game/mexc-4h-momentum-trailing-stop` | 已整合通知與唯讀投資人快照 | GitHub Actions 執行環境；Seykota 管理端另同步唯讀快照 | 更新工作流程相依後，以安全方式驗證一次工作流程與快照 | 不變更下單邏輯；確認快照與查詢格式 |
++| `bcup02/ed-seykota-systematic-trend-following` | 已整合投資人查詢與通知；L3 起 `src/seykota_bot/reconcile/binance_fetch.py` 消費 `trade_alerts.binance_reconcile_fetch` | `pyproject.toml` + `requirements.lock` 釘選版本；WSL `/opt/ed-seykota-systematic-trend-following/.venv`（非 editable）| 更新釘選版本、測試後重建 `/opt` venv 並重啟 `seykota-bot` + `seykota-reconcile-fetch.timer` | 已安裝版本；`audit/exchange_state.json` `schema_version=reconcile-source/v1`、`seykota-reconcile-compare` 仍 `UNKNOWN` |
++| `vivoy2027game/mexc-4h-momentum-trailing-stop` | 已整合通知、唯讀投資人快照、`ledger_reconcile`（L2）；L3 起 `src/binance_fetch.py` 消費 `trade_alerts.binance_reconcile_fetch` | GitHub Actions 執行環境 + WSL `/opt/mexc-4h-momentum-trailing-stop/.venv`（`deploy/install_systemd.sh`）| 更新 `pyproject.toml` + `deploy/install_systemd.sh` + workflow 釘選後，從 `operations` 跑 `install_systemd.sh` 重新部署 | 不變更下單邏輯；`mexc-momentum-reconcile-fetch` timer 仍 `RECONCILED` exit 0、快照續發 |
+ 
+ ## 標準發布流程
+ 
+@@ -111,3 +111,47 @@ trade-alerts：v0.12.0
+           ledger_status.json 與 google_reconcile_status.json 仍 RECONCILED）。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.13.0
++變更摘要：新增純函式模組 src/trade_alerts/binance_reconcile_fetch.py —— 把
++          ed-seykota 與 mexc-4h-momentum-trailing-stop 各自一份、幾乎逐位元相同的
++          唯讀 Binance USDⓈ-M reconcile-source fetcher（balance / positionRisk /
++          userTrades / openOrders / openAlgoOrders → reconcile-source/v1 文件）
++          抽成單一權威源。任務 3 L3。
++          - 不 import binance_trading_toolkit：client（toolkit BinanceFuturesClient
++            或同介面物件）由呼叫端注入，測試用 fake。憑證解析 / mainnet 判定 /
++            EXCHANGE 分流留在各 repo 的憑證層。
++          - BinanceReconcileParams dataclass 注入 per-repo 差異：query_symbols
++            （Binance 原生形式，userTrades 逐 symbol）/ scope_symbol（
++            position_information·open_orders·open_algo_orders 的範圍；momentum=None
++            全部、seykota=其 symbol）/ doc_symbol / to_ledger_symbol（identity vs
++            momentum_ledger_symbol 的 GPSUSDT→GPS_USDT）/ lookback_hours。
++          - fetch() 一律輸出 symbols_queried + fills_possibly_truncated（seykota
++            文件多這兩欄＝無害超集，exchange_ledger_compare 忽略未知鍵）。
++          - _order_rows 帶 T1-6 PR #41 的 algo 欄位修正（orderType / createTime）
++            —— seykota 順帶受惠。
++          - run() 重用 ledger_reconcile.atomic_write，永不 raise。
++          純新增，不動任何既有模組或行為。新增 tests/test_binance_reconcile_fetch.py。
++受影響消費專案：
++  - bcup02/ed-seykota-systematic-trend-following：src/seykota_bot/reconcile/
++    binance_fetch.py 縮成薄 adapter（單 symbol、state key = mode、
++    settings.credentials_for）；pyproject.toml + requirements.lock 新增
++    trade-alerts@v0.13.0 相依（此前完全未依賴 trade-alerts）。
++  - vivoy2027game/mexc-4h-momentum-trailing-stop：src/binance_fetch.py 縮成薄
++    adapter（多 symbol、state key = execution_mode、binance_credentials）；同時
++    還原 src/reconcile_mexc_fetch.py（T1-5 刪除）+ 新增 src/reconcile_fetch.py
++    dispatcher（依 EXCHANGE 選 Binance / MEXC fetcher），修好切回 EXCHANGE=mexc
++    時對帳 fetcher 仍打 Binance 的缺口；pin bump 至 v0.13.0（pyproject +
++    deploy/install_systemd.sh + .github/workflows/*.yml）。
++  - columnbb/my-crypto-bot：不動（其 reconcile_mexc_fetch.py 是 ccxt 單 symbol、
++    單一消費者、不同 client stack，不強抽）。
++  - columnbb/MarkMinervini-cryptio-bot：無對帳程式、無需動作。
++部署入口：Python 套件純新增。消費專案各自 bump pin 後走 governance PR →
++          Perplexity → 合併 → 重新部署，驗證 *-reconcile-fetch timer 仍綠。
++版本驗證：pip show trade-alerts == 0.13.0；trade_alerts.__version__ == "0.13.0"。
++服務/工作流程驗證：trade-alerts pytest（110）+ node 測試全綠。消費專案 adapter
++          PR 合併部署後，seykota reconcile 仍 UNKNOWN（無帳本，預期）、momentum
++          ledger_status.json 與 google_reconcile_status.json 仍 RECONCILED。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index 0b6ac72..2b2b7cb 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.12.0"
++version = "0.13.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index cacfa97..7b35157 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -46,6 +46,7 @@ from .ledger_integrity import (
+     signed_request,
+     verify_signed_request,
+ )
++from .binance_reconcile_fetch import BinanceReconcileParams, momentum_ledger_symbol
+ from .ledger_reconcile import (
+     CLOSE_MARKERS,
+     DRY_RUN_SOURCES,
+@@ -108,6 +109,8 @@ __all__ = [
+     "enqueue_projection_intent",
+     "outstanding_projection_intents",
+     "record_projection_dispatch",
++    "BinanceReconcileParams",
++    "momentum_ledger_symbol",
+     "ReconciliationFinding",
+     "classify_projection_inventory",
+     "ProjectionAuditRead",
+@@ -159,4 +162,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.12.0"
++__version__ = "0.13.0"
+diff --git a/src/trade_alerts/binance_reconcile_fetch.py b/src/trade_alerts/binance_reconcile_fetch.py
+new file mode 100644
+index 0000000..cf7a2b1
+--- /dev/null
++++ b/src/trade_alerts/binance_reconcile_fetch.py
+@@ -0,0 +1,258 @@
++"""Shared read-only Binance USDⓈ-M futures reconcile-source fetcher.
++
++Pure transform + IO.  This module does **not** import
++``binance_trading_toolkit`` or any credential layer.  The caller resolves the
++credential pair / execution mode / the symbol set, builds a
++``BinanceFuturesClient`` (or any object exposing the same read-only methods),
++and passes a :class:`BinanceReconcileParams`.
++
++Consumers:
++  * ``ed-seykota`` -- single symbol (``BTCUSDT``), ledger symbol == native.
++  * ``mexc-4h-momentum`` -- multi symbol, ledger symbol is the underscore form
++    (``GPSUSDT`` -> ``GPS_USDT``); ``user_trades`` is pulled per symbol because
++    Binance's endpoint has no all-symbols variant.
++
++Each exchange section is fetched in its own ``try``/``except``; a failure is
++recorded in ``fetch_status.errors`` and the document is still returned /
++written.  :func:`run` never raises.
++
++The written document is ``reconcile-source/v1`` -- the same schema
++``trade_alerts.ledger_reconcile.exchange_ledger_compare`` consumes.  It always
++carries ``symbols_queried`` and ``fills_possibly_truncated`` (a harmless
++superset for the single-symbol consumer; the comparator ignores unknown keys).
++"""
++from __future__ import annotations
++
++import logging
++from dataclasses import dataclass, field
++from datetime import datetime, timezone
++from pathlib import Path
++from typing import Any, Callable, Sequence
++
++from .ledger_reconcile import atomic_write, to_number, utc_now_iso
++
++log = logging.getLogger("trade_alerts.binance_reconcile_fetch")
++
++SCHEMA_VERSION = "reconcile-source/v1"
++EXCHANGE = "binance-usdm-futures"
++_QUOTE = "USDT"
++
++
++def _identity(symbol: str) -> str:
++    return symbol
++
++
++def momentum_ledger_symbol(symbol: str | None) -> str | None:
++    """``GPSUSDT`` -> ``GPS_USDT``; anything already underscored, or not a
++    ``*USDT`` symbol, is returned unchanged.  The momentum adapter passes this
++    as ``to_ledger_symbol`` so ``reconcile_compare``'s ``norm_symbol_plain``
++    lines the fetched rows up with the ledger."""
++    if not symbol:
++        return symbol
++    if symbol.endswith(_QUOTE) and not symbol.endswith("_" + _QUOTE):
++        return f"{symbol[: -len(_QUOTE)]}_{_QUOTE}"
++    return symbol
++
++
++@dataclass
++class BinanceReconcileParams:
++    """Everything the shared fetcher needs, resolved by the per-repo adapter."""
++
++    #: Object with the toolkit ``BinanceFuturesClient`` read surface:
++    #: ``sync_server_time(*, force)`` / ``account_balance()`` /
++    #: ``position_information(symbol_or_None)`` /
++    #: ``user_trades(symbol, *, start_time_ms, limit)`` /
++    #: ``open_orders(symbol_or_None)`` / ``open_algo_orders(symbol_or_None)``.
++    client: Any
++    account_scope: str
++    execution_mode: str
++    environment: str  # "mainnet" | "testnet"
++    base_url: str
++    #: Binance-native symbols (``BTCUSDT`` / ``GPSUSDT``) to pull a fill window
++    #: for.  An empty set is not an error -- it yields no fills.
++    query_symbols: Sequence[str] = field(default_factory=tuple)
++    lookback_hours: int = 168
++    #: Passed to ``position_information`` / ``open_orders`` / ``open_algo_orders``.
++    #: ``None`` = every symbol (momentum); a symbol string scopes them (seykota).
++    scope_symbol: str | None = None
++    #: The document's top-level ``"symbol"`` field.
++    doc_symbol: str | None = None
++    #: Binance-native symbol -> ledger symbol.  Identity for seykota.
++    to_ledger_symbol: Callable[[str | None], str | None] = _identity
++    user_trades_limit: int = 1000
++
++
++def _balance_block(client: Any) -> dict[str, Any]:
++    for row in client.account_balance():
++        if row.get("asset") == "USDT":
++            return {
++                "asset": "USDT",
++                "wallet_balance": to_number(row.get("balance")),
++                "available_balance": to_number(row.get("availableBalance")),
++                "unrealized_pnl": to_number(row.get("crossUnPnl")),
++                "update_time_ms": row.get("updateTime"),
++            }
++    return {"asset": "USDT", "wallet_balance": None, "available_balance": None,
++            "unrealized_pnl": None, "update_time_ms": None}
++
++
++def _position_rows(client: Any, params: BinanceReconcileParams) -> list[dict[str, Any]]:
++    rows: list[dict[str, Any]] = []
++    for p in client.position_information(params.scope_symbol):
++        amt = to_number(p.get("positionAmt")) or 0.0
++        if amt == 0.0:
++            continue
++        rows.append({
++            "symbol": params.to_ledger_symbol(p.get("symbol")),
++            "side": "long" if amt > 0 else "short",
++            "quantity": abs(amt),
++            "entry_price": to_number(p.get("entryPrice")),
++            "mark_price": to_number(p.get("markPrice")),
++            "unrealized_pnl": to_number(p.get("unRealizedProfit")),
++            "leverage": to_number(p.get("leverage")),
++            "margin_type": p.get("marginType"),
++            "position_side": p.get("positionSide"),
++            "update_time_ms": p.get("updateTime"),
++        })
++    return rows
++
++
++def _fill_rows(
++    client: Any, params: BinanceReconcileParams, since_ms: int,
++) -> tuple[list[dict[str, Any]], bool]:
++    """``user_trades`` for each native symbol in ``params.query_symbols``
++    (Binance's endpoint is per-symbol).  ``truncated`` is set when any symbol
++    comes back at the page limit."""
++    limit = params.user_trades_limit
++    rows: list[dict[str, Any]] = []
++    truncated = False
++    for native in params.query_symbols:
++        trades = client.user_trades(native, start_time_ms=since_ms, limit=limit)
++        truncated = truncated or len(trades) >= limit
++        for t in trades:
++            rows.append({
++                "trade_id": t.get("id"),
++                "order_id": t.get("orderId"),
++                "symbol": params.to_ledger_symbol(t.get("symbol")) or params.to_ledger_symbol(native),
++                "side": (t.get("side") or "").lower() or None,
++                "price": to_number(t.get("price")),
++                "quantity": to_number(t.get("qty")),
++                "quote_quantity": to_number(t.get("quoteQty")),
++                "realized_pnl": to_number(t.get("realizedPnl")),
++                "commission": to_number(t.get("commission")),
++                "commission_asset": t.get("commissionAsset"),
++                "is_maker": t.get("maker"),
++                "position_side": t.get("positionSide"),
++                "time_ms": t.get("time"),
++            })
++    rows.sort(key=lambda r: (r["time_ms"] or 0, r["trade_id"] or 0))
++    return rows, truncated
++
++
++def _order_rows(client: Any, params: BinanceReconcileParams) -> list[dict[str, Any]]:
++    out: list[dict[str, Any]] = []
++    for kind, getter in (("order", client.open_orders), ("algo", client.open_algo_orders)):
++        for o in getter(params.scope_symbol):
++            out.append({
++                "kind": kind,
++                "order_id": o.get("orderId") or o.get("algoId"),
++                "client_id": o.get("clientOrderId") or o.get("clientAlgoId"),
++                "symbol": params.to_ledger_symbol(o.get("symbol")),
++                # An algo row's type is ``orderType`` (verified on demo-fapi
++                # 2026-09-02); ``type`` is the plain-order field, ``algoType``
++                # is only the CONDITIONAL/... family.
++                "type": o.get("type") or o.get("orderType") or o.get("algoType"),
++                "side": (o.get("side") or "").lower() or None,
++                "price": to_number(o.get("price")),
++                "stop_price": to_number(o.get("stopPrice") or o.get("triggerPrice") or o.get("activatePrice")),
++                "quantity": to_number(o.get("origQty") or o.get("quantity")),
++                "reduce_only": o.get("reduceOnly"),
++                "close_position": o.get("closePosition"),
++                "status": o.get("status") or o.get("algoStatus"),
++                "update_time_ms": o.get("updateTime") or o.get("createTime") or o.get("bookTime"),
++            })
++    return out
++
++
++def fetch(params: BinanceReconcileParams, *, now: datetime | None = None) -> dict[str, Any]:
++    """Build the ``reconcile-source/v1`` document.  Each exchange section is
++    isolated: a failing call is logged into ``fetch_status.errors`` and the
++    rest of the document is still returned."""
++    now = now or datetime.now(timezone.utc)
++    lookback_hours = max(1, int(params.lookback_hours))
++    since_ms = int(now.timestamp() * 1000) - lookback_hours * 3600 * 1000
++
++    errors: list[dict[str, str]] = []
++
++    def _section(name: str, thunk):
++        try:
++            return thunk()
++        except Exception as exc:  # noqa: BLE001 - contained by design
++            log.warning("reconcile_fetch_section_failed section=%s error=%s: %s",
++                        name, type(exc).__name__, exc)
++            errors.append({"section": name, "error_type": type(exc).__name__, "error": str(exc)[:300]})
++            return None
++
++    client = params.client
++    if client is None:
++        # The adapter's credential resolution / client build failed and it
++        # passed ``client=None`` rather than raise.  Record it and emit an
++        # otherwise-empty document so the comparator downgrades to UNKNOWN.
++        errors.append({"section": "client", "error_type": "ClientUnavailable",
++                       "error": "adapter passed client=None"})
++        server_time = balance = positions = orders = None
++        fills, truncated = None, False
++    else:
++        server_time = _section("server_time", lambda: client.sync_server_time(force=True))
++        balance = _section("balance", lambda: _balance_block(client))
++        positions = _section("positions", lambda: _position_rows(client, params))
++        orders = _section("open_orders", lambda: _order_rows(client, params))
++        fill_result = _section("fills", lambda: _fill_rows(client, params, since_ms))
++        fills, truncated = fill_result if fill_result is not None else (None, False)
++
++    symbols_queried = [params.to_ledger_symbol(s) for s in params.query_symbols]
++
++    document = {
++        "schema_version": SCHEMA_VERSION,
++        "exchange": EXCHANGE,
++        "environment": params.environment,
++        "base_url": params.base_url,
++        "account_scope": params.account_scope,
++        "execution_mode": params.execution_mode,
++        "symbol": params.doc_symbol,
++        "symbols_queried": symbols_queried,
++        "fetched_at": utc_now_iso(now),
++        "exchange_server_time_ms": (server_time or {}).get("serverTime") if isinstance(server_time, dict) else None,
++        "lookback": {"since_ms": since_ms, "hours": lookback_hours},
++        "balance": balance,
++        "positions": positions if positions is not None else [],
++        "fills": fills if fills is not None else [],
++        "fills_possibly_truncated": truncated,
++        "open_orders": orders if orders is not None else [],
++        "fetch_status": {"complete": not errors, "errors": errors},
++    }
++    return document
++
++
++def run(
++    params: BinanceReconcileParams, out_path: str | Path, *, now: datetime | None = None,
++) -> dict[str, Any]:
++    """Fetch and atomically write ``out_path`` (0644).  Never raises: a write
++    failure is logged and reflected in the returned document's
++    ``fetch_status``."""
++    document = fetch(params, now=now)
++    try:
++        atomic_write(Path(out_path), document)
++        written = True
++    except OSError as exc:
++        log.warning("reconcile_source_write_failed error=%s", type(exc).__name__)
++        document["fetch_status"]["complete"] = False
++        document["fetch_status"]["errors"].append({"section": "write", "error_type": type(exc).__name__})
++        written = False
++    log.info(
++        "reconcile_source_fetch environment=%s execution_mode=%s complete=%s fills=%d positions=%d truncated=%s written=%s",
++        document["environment"], document["execution_mode"], document["fetch_status"]["complete"],
++        len(document["fills"]), len(document["positions"]),
++        document["fills_possibly_truncated"], written,
++    )
++    return document
+diff --git a/tests/test_binance_reconcile_fetch.py b/tests/test_binance_reconcile_fetch.py
+new file mode 100644
+index 0000000..6caaf67
+--- /dev/null
++++ b/tests/test_binance_reconcile_fetch.py
+@@ -0,0 +1,243 @@
++"""Shared read-only Binance reconcile-source fetcher core (L3).
++
++No network -- the toolkit client is faked.  These pin the row normalization,
++the ledger-symbol hook (identity vs momentum underscore form), per-section
++isolation, the always-present ``symbols_queried`` / ``fills_possibly_truncated``
++fields, that ``run()`` never raises, and that the document is shaped for
++``exchange_ledger_compare``.
++"""
++from __future__ import annotations
++
++import json
++from datetime import datetime, timezone
++
++import pytest
++
++from trade_alerts import BinanceReconcileParams, momentum_ledger_symbol
++from trade_alerts.binance_reconcile_fetch import fetch, run
++from trade_alerts.ledger_reconcile import exchange_ledger_compare
++
++_NOW = datetime(2026, 9, 2, 12, 0, 0, tzinfo=timezone.utc)
++_NOW_MS = int(_NOW.timestamp() * 1000)
++
++
++class _FakeClient:
++    def __init__(self, **overrides):
++        self._o = overrides
++        self.calls: list[tuple] = []
++
++    def sync_server_time(self, *, force=False):
++        self.calls.append(("sync_server_time", force))
++        return {"serverTime": _NOW_MS - 3}
++
++    def account_balance(self):
++        self.calls.append(("account_balance",))
++        if "balance_raises" in self._o:
++            raise RuntimeError("boom balance")
++        return self._o.get("balance", [
++            {"asset": "BTC", "balance": "1"},
++            {"asset": "USDT", "balance": "500.25", "availableBalance": "480.10",
++             "crossUnPnl": "1.20", "updateTime": _NOW_MS - 10},
++        ])
++
++    def position_information(self, symbol):
++        self.calls.append(("position_information", symbol))
++        return self._o.get("positions", [
++            {"symbol": "GPSUSDT", "positionAmt": "12", "entryPrice": "1.95",
++             "markPrice": "2.0", "unRealizedProfit": "0.6", "leverage": "3",
++             "marginType": "isolated", "positionSide": "BOTH", "updateTime": _NOW_MS - 20},
++            {"symbol": "ZEROUSDT", "positionAmt": "0", "entryPrice": "0"},  # flat -> skipped
++        ])
++
++    def user_trades(self, symbol, *, start_time_ms=None, limit=1000):
++        self.calls.append(("user_trades", symbol, start_time_ms, limit))
++        return self._o.get("trades", {}).get(symbol, [
++            {"id": 71, "orderId": 555, "symbol": symbol, "side": "BUY", "price": "1.95",
++             "qty": "12", "quoteQty": "23.4", "realizedPnl": "0", "commission": "0.0094",
++             "commissionAsset": "USDT", "maker": False, "positionSide": "BOTH", "time": _NOW_MS - 22},
++        ])
++
++    def open_orders(self, symbol):
++        self.calls.append(("open_orders", symbol))
++        return self._o.get("open_orders", [
++            {"orderId": 900, "clientOrderId": "x", "symbol": "GPSUSDT", "type": "LIMIT",
++             "side": "SELL", "price": "3.0", "origQty": "1", "reduceOnly": True,
++             "status": "NEW", "updateTime": _NOW_MS - 5},
++        ])
++
++    def open_algo_orders(self, symbol):
++        self.calls.append(("open_algo_orders", symbol))
++        return self._o.get("open_algo_orders", [
++            # exact demo-fapi shape (2026-09-02): orderType / createTime
++            {"algoId": 555, "clientAlgoId": "trail", "symbol": "GPSUSDT",
++             "algoType": "CONDITIONAL", "orderType": "TRAILING_STOP_MARKET", "side": "SELL",
++             "triggerPrice": "1.85", "activatePrice": "1.90", "callbackRate": "5.0",
++             "quantity": "12", "reduceOnly": True, "closePosition": False,
++             "algoStatus": "NEW", "createTime": _NOW_MS - 21, "updateTime": _NOW_MS - 20},
++        ])
++
++
++def _momentum_params(client, **kw):
++    kw = {
++        "client": client,
++        "account_scope": "mexc-4h-momentum",
++        "execution_mode": "DEMO",
++        "environment": "testnet",
++        "base_url": "https://demo-fapi.binance.com",
++        "query_symbols": ["GPSUSDT"],
++        "scope_symbol": None,
++        "doc_symbol": None,
++        "to_ledger_symbol": momentum_ledger_symbol,
++        **kw,
++    }
++    return BinanceReconcileParams(**kw)
++
++
++def _seykota_params(client, **kw):
++    kw = {
++        "client": client,
++        "account_scope": "seykota-btcusdt-4h",
++        "execution_mode": "DEMO",
++        "environment": "testnet",
++        "base_url": "https://demo-fapi.binance.com",
++        "query_symbols": ["BTCUSDT"],
++        "scope_symbol": "BTCUSDT",
++        "doc_symbol": "BTCUSDT",
++        **kw,
++    }
++    return BinanceReconcileParams(**kw)
++
++
++# --------------------------------------------------------------------------- #
++# symbol helper
++# --------------------------------------------------------------------------- #
++@pytest.mark.parametrize(("binance", "ledger"), [
++    ("GPSUSDT", "GPS_USDT"), ("1000PEPEUSDT", "1000PEPE_USDT"),
++    ("GPS_USDT", "GPS_USDT"), ("", ""), (None, None),
++])
++def test_momentum_ledger_symbol(binance, ledger):
++    assert momentum_ledger_symbol(binance) == ledger
++
++
++# --------------------------------------------------------------------------- #
++# fetch() -- momentum (multi symbol, underscore ledger form)
++# --------------------------------------------------------------------------- #
++def test_fetch_momentum_normalisation():
++    doc = fetch(_momentum_params(_FakeClient()), now=_NOW)
++
++    assert doc["schema_version"] == "reconcile-source/v1"
++    assert doc["exchange"] == "binance-usdm-futures"
++    assert doc["environment"] == "testnet" and doc["execution_mode"] == "DEMO"
++    assert doc["account_scope"] == "mexc-4h-momentum"
++    assert doc["symbol"] is None
++    assert doc["fetch_status"]["complete"] is True
++
++    assert doc["balance"] == {
++        "asset": "USDT", "wallet_balance": 500.25, "available_balance": 480.10,
++        "unrealized_pnl": 1.20, "update_time_ms": _NOW_MS - 10,
++    }
++    assert [p["symbol"] for p in doc["positions"]] == ["GPS_USDT"]  # flat dropped, underscored
++    assert doc["positions"][0]["side"] == "long" and doc["positions"][0]["quantity"] == 12.0
++    assert doc["symbols_queried"] == ["GPS_USDT"]
++    assert [f["symbol"] for f in doc["fills"]] == ["GPS_USDT"]
++    assert doc["fills"][0]["order_id"] == 555 and doc["fills"][0]["side"] == "buy"
++    assert {o["symbol"] for o in doc["open_orders"]} == {"GPS_USDT"}
++    algo = next(o for o in doc["open_orders"] if o["kind"] == "algo")
++    assert algo["type"] == "TRAILING_STOP_MARKET"   # from orderType, not algoType
++    assert algo["update_time_ms"] == _NOW_MS - 20    # from updateTime/createTime
++    assert doc["fills_possibly_truncated"] is False
++
++
++def test_fetch_scope_symbol_passed_through():
++    client = _FakeClient()
++    fetch(_seykota_params(client), now=_NOW)
++    assert ("position_information", "BTCUSDT") in client.calls
++    assert ("open_orders", "BTCUSDT") in client.calls
++    assert ("open_algo_orders", "BTCUSDT") in client.calls
++
++    client = _FakeClient()
++    fetch(_momentum_params(client), now=_NOW)
++    assert ("position_information", None) in client.calls
++
++
++def test_fetch_seykota_identity_symbol_and_doc_symbol():
++    doc = fetch(_seykota_params(_FakeClient()), now=_NOW)
++    assert doc["symbol"] == "BTCUSDT"
++    assert doc["account_scope"] == "seykota-btcusdt-4h"
++    assert doc["symbols_queried"] == ["BTCUSDT"]  # identity, not underscored
++
++
++def test_fetch_lookback_window():
++    client = _FakeClient()
++    fetch(_momentum_params(client, lookback_hours=24), now=_NOW)
++    call = next(c for c in client.calls if c[0] == "user_trades")
++    assert call[2] == _NOW_MS - 24 * 3600 * 1000
++
++
++def test_fetch_fills_truncation_flag():
++    many = {"GPSUSDT": [
++        {"id": i, "orderId": i, "symbol": "GPSUSDT", "side": "BUY", "qty": "1",
++         "price": "1", "time": _NOW_MS - i} for i in range(1000)
++    ]}
++    doc = fetch(_momentum_params(_FakeClient(trades=many)), now=_NOW)
++    assert doc["fills_possibly_truncated"] is True
++
++
++def test_fetch_empty_query_symbols_is_not_an_error():
++    doc = fetch(_momentum_params(_FakeClient(), query_symbols=[]), now=_NOW)
++    assert doc["fills"] == [] and doc["symbols_queried"] == []
++    assert doc["fetch_status"]["complete"] is True
++
++
++# --------------------------------------------------------------------------- #
++# fetch() -- isolation / degraded input
++# --------------------------------------------------------------------------- #
++def test_fetch_section_isolation():
++    doc = fetch(_momentum_params(_FakeClient(balance_raises=True)), now=_NOW)
++    assert doc["fetch_status"]["complete"] is False
++    assert [e["section"] for e in doc["fetch_status"]["errors"]] == ["balance"]
++    assert doc["positions"] and doc["fills"]  # the rest still populated
++
++
++def test_fetch_none_client_is_a_client_section_error():
++    doc = fetch(_momentum_params(None), now=_NOW)
++    assert doc["fetch_status"]["complete"] is False
++    assert doc["fetch_status"]["errors"][0]["section"] == "client"
++    assert doc["positions"] == [] and doc["fills"] == []
++    assert doc["symbols_queried"] == ["GPS_USDT"]  # still reported
++
++
++def test_fetch_is_exchange_ledger_compare_compatible():
++    doc = fetch(_momentum_params(_FakeClient()), now=_NOW)
++    # no local ledger -> UNKNOWN, but the comparator must accept the snapshot
++    verdict = exchange_ledger_compare(
++        exchange_state=doc, ledger_events=[], now=_NOW,
++        is_paper=lambda e: False, norm_symbol=lambda s: s,
++        open_event_types={"trade_open"},
++    )
++    assert verdict["value"] in {"UNKNOWN", "RECONCILED", "PENDING", "DIVERGED"}
++    assert "no valid reconcile-source snapshot" not in verdict["note"]
++
++
++# --------------------------------------------------------------------------- #
++# run()
++# --------------------------------------------------------------------------- #
++def test_run_writes_atomically_and_never_raises(tmp_path):
++    out = tmp_path / "audit" / "exchange_state.json"
++    doc = run(_momentum_params(_FakeClient()), out, now=_NOW)
++    written = json.loads(out.read_text(encoding="utf-8"))
++    assert written == doc
++    assert written["schema_version"] == "reconcile-source/v1"
++    assert (out.stat().st_mode & 0o777) == 0o644
++
++
++def test_run_reports_write_failure_without_raising(tmp_path, monkeypatch):
++    from trade_alerts import binance_reconcile_fetch as mod
++
++    def _boom(path, document):
++        raise OSError("read-only fs")
++
++    monkeypatch.setattr(mod, "atomic_write", _boom)
++    doc = run(_momentum_params(_FakeClient()), tmp_path / "x.json", now=_NOW)
++    assert doc["fetch_status"]["complete"] is False
++    assert any(e["section"] == "write" for e in doc["fetch_status"]["errors"])
+-- 
+2.43.0
+
