@@ -10,8 +10,8 @@
 |---|---|---|---|---|
 | `columnbb/my-crypto-bot` | 尚待 v1 契約遷移 | 尚未建立部署相依 | 實作整合時必須在本表補上版本釘選與部署命令 | 契約測試、DRY_RUN 查詢 |
 | `columnbb/MarkMinervini-cryptio-bot` | 尚待 v1 契約遷移 | 尚未建立部署相依 | 實作整合時必須在本表補上版本釘選與部署命令 | 契約測試、模擬查詢 |
-| `bcup02/ed-seykota-systematic-trend-following` | 已整合投資人查詢與通知 | `master` 的 `pyproject.toml` 釘選版本；WSL `/opt/.../.admin-venv` | 更新釘選版本、測試後執行 `deploy/update_remote_admin.sh` | 已安裝版本、三項服務 `active`、LINE/Telegram 查詢 |
-| `vivoy2027game/mexc-4h-momentum-trailing-stop` | 已整合通知與唯讀投資人快照 | GitHub Actions 執行環境；Seykota 管理端另同步唯讀快照 | 更新工作流程相依後，以安全方式驗證一次工作流程與快照 | 不變更下單邏輯；確認快照與查詢格式 |
+| `bcup02/ed-seykota-systematic-trend-following` | 已整合投資人查詢與通知；L3 起 `src/seykota_bot/reconcile/binance_fetch.py` 消費 `trade_alerts.binance_reconcile_fetch` | `pyproject.toml` + `requirements.lock` 釘選版本；WSL `/opt/ed-seykota-systematic-trend-following/.venv`（非 editable）| 更新釘選版本、測試後重建 `/opt` venv 並重啟 `seykota-bot` + `seykota-reconcile-fetch.timer` | 已安裝版本；`audit/exchange_state.json` `schema_version=reconcile-source/v1`、`seykota-reconcile-compare` 仍 `UNKNOWN` |
+| `vivoy2027game/mexc-4h-momentum-trailing-stop` | 已整合通知、唯讀投資人快照、`ledger_reconcile`（L2）；L3 起 `src/binance_fetch.py` 消費 `trade_alerts.binance_reconcile_fetch` | GitHub Actions 執行環境 + WSL `/opt/mexc-4h-momentum-trailing-stop/.venv`（`deploy/install_systemd.sh`）| 更新 `pyproject.toml` + `deploy/install_systemd.sh` + workflow 釘選後，從 `operations` 跑 `install_systemd.sh` 重新部署 | 不變更下單邏輯；`mexc-momentum-reconcile-fetch` timer 仍 `RECONCILED` exit 0、快照續發 |
 
 ## 標準發布流程
 
@@ -109,5 +109,49 @@ trade-alerts：v0.12.0
 服務/工作流程驗證：trade-alerts pytest（87）+ node 測試全綠。消費專案 adapter
           PR 合併部署後，三軸 reconcile 狀態不變（momentum/my-crypto 的
           ledger_status.json 與 google_reconcile_status.json 仍 RECONCILED）。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```
+
+```text
+trade-alerts：v0.13.0
+變更摘要：新增純函式模組 src/trade_alerts/binance_reconcile_fetch.py —— 把
+          ed-seykota 與 mexc-4h-momentum-trailing-stop 各自一份、幾乎逐位元相同的
+          唯讀 Binance USDⓈ-M reconcile-source fetcher（balance / positionRisk /
+          userTrades / openOrders / openAlgoOrders → reconcile-source/v1 文件）
+          抽成單一權威源。任務 3 L3。
+          - 不 import binance_trading_toolkit：client（toolkit BinanceFuturesClient
+            或同介面物件）由呼叫端注入，測試用 fake。憑證解析 / mainnet 判定 /
+            EXCHANGE 分流留在各 repo 的憑證層。
+          - BinanceReconcileParams dataclass 注入 per-repo 差異：query_symbols
+            （Binance 原生形式，userTrades 逐 symbol）/ scope_symbol（
+            position_information·open_orders·open_algo_orders 的範圍；momentum=None
+            全部、seykota=其 symbol）/ doc_symbol / to_ledger_symbol（identity vs
+            momentum_ledger_symbol 的 GPSUSDT→GPS_USDT）/ lookback_hours。
+          - fetch() 一律輸出 symbols_queried + fills_possibly_truncated（seykota
+            文件多這兩欄＝無害超集，exchange_ledger_compare 忽略未知鍵）。
+          - _order_rows 帶 T1-6 PR #41 的 algo 欄位修正（orderType / createTime）
+            —— seykota 順帶受惠。
+          - run() 重用 ledger_reconcile.atomic_write，永不 raise。
+          純新增，不動任何既有模組或行為。新增 tests/test_binance_reconcile_fetch.py。
+受影響消費專案：
+  - bcup02/ed-seykota-systematic-trend-following：src/seykota_bot/reconcile/
+    binance_fetch.py 縮成薄 adapter（單 symbol、state key = mode、
+    settings.credentials_for）；pyproject.toml + requirements.lock 新增
+    trade-alerts@v0.13.0 相依（此前完全未依賴 trade-alerts）。
+  - vivoy2027game/mexc-4h-momentum-trailing-stop：src/binance_fetch.py 縮成薄
+    adapter（多 symbol、state key = execution_mode、binance_credentials）；同時
+    還原 src/reconcile_mexc_fetch.py（T1-5 刪除）+ 新增 src/reconcile_fetch.py
+    dispatcher（依 EXCHANGE 選 Binance / MEXC fetcher），修好切回 EXCHANGE=mexc
+    時對帳 fetcher 仍打 Binance 的缺口；pin bump 至 v0.13.0（pyproject +
+    deploy/install_systemd.sh + .github/workflows/*.yml）。
+  - columnbb/my-crypto-bot：不動（其 reconcile_mexc_fetch.py 是 ccxt 單 symbol、
+    單一消費者、不同 client stack，不強抽）。
+  - columnbb/MarkMinervini-cryptio-bot：無對帳程式、無需動作。
+部署入口：Python 套件純新增。消費專案各自 bump pin 後走 governance PR →
+          Perplexity → 合併 → 重新部署，驗證 *-reconcile-fetch timer 仍綠。
+版本驗證：pip show trade-alerts == 0.13.0；trade_alerts.__version__ == "0.13.0"。
+服務/工作流程驗證：trade-alerts pytest（110）+ node 測試全綠。消費專案 adapter
+          PR 合併部署後，seykota reconcile 仍 UNKNOWN（無帳本，預期）、momentum
+          ledger_status.json 與 google_reconcile_status.json 仍 RECONCILED。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```

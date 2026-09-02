@@ -46,6 +46,7 @@ from .ledger_integrity import (
     signed_request,
     verify_signed_request,
 )
+from .binance_reconcile_fetch import BinanceReconcileParams, momentum_ledger_symbol
 from .ledger_reconcile import (
     CLOSE_MARKERS,
     DRY_RUN_SOURCES,
@@ -108,6 +109,8 @@ __all__ = [
     "enqueue_projection_intent",
     "outstanding_projection_intents",
     "record_projection_dispatch",
+    "BinanceReconcileParams",
+    "momentum_ledger_symbol",
     "ReconciliationFinding",
     "classify_projection_inventory",
     "ProjectionAuditRead",
@@ -159,4 +162,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.12.0"
+__version__ = "0.13.0"
