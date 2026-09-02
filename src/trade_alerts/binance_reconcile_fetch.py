@@ -69,8 +69,13 @@ class BinanceReconcileParams:
     environment: str  # "mainnet" | "testnet"
     base_url: str
     #: Binance-native symbols (``BTCUSDT`` / ``GPSUSDT``) to pull a fill window
-    #: for.  An empty set is not an error -- it yields no fills.
-    query_symbols: Sequence[str] = field(default_factory=tuple)
+    #: for -- ``user_trades`` has no all-symbols variant.  Either a fixed
+    #: sequence (seykota: its one symbol) or a callable given the normalized
+    #: position rows (ledger-form symbols) that returns the native symbols to
+    #: query (momentum: the open positions' symbols unioned with a static env
+    #: list, resolved only after positions are fetched).  An empty result is
+    #: not an error -- it yields no fills.
+    query_symbols: Sequence[str] | Callable[[list[dict[str, Any]]], Sequence[str]] = field(default_factory=tuple)
     lookback_hours: int = 168
     #: Passed to ``position_information`` / ``open_orders`` / ``open_algo_orders``.
     #: ``None`` = every symbol (momentum); a symbol string scopes them (seykota).
@@ -117,16 +122,28 @@ def _position_rows(client: Any, params: BinanceReconcileParams) -> list[dict[str
     return rows
 
 
+def _resolve_query_symbols(
+    params: BinanceReconcileParams, positions: list[dict[str, Any]] | None,
+) -> list[str]:
+    """The native symbols to pull a fill window for.  A callable
+    ``query_symbols`` is given the normalized position rows (so momentum can
+    union the open positions' symbols with its static env list); a plain
+    sequence is used as-is (seykota)."""
+    qs = params.query_symbols
+    resolved = qs(positions or []) if callable(qs) else qs
+    return list(resolved)
+
+
 def _fill_rows(
-    client: Any, params: BinanceReconcileParams, since_ms: int,
+    client: Any, params: BinanceReconcileParams, since_ms: int, query_native: list[str],
 ) -> tuple[list[dict[str, Any]], bool]:
-    """``user_trades`` for each native symbol in ``params.query_symbols``
-    (Binance's endpoint is per-symbol).  ``truncated`` is set when any symbol
-    comes back at the page limit."""
+    """``user_trades`` for each native symbol in ``query_native`` (Binance's
+    endpoint is per-symbol).  ``truncated`` is set when any symbol comes back at
+    the page limit."""
     limit = params.user_trades_limit
     rows: list[dict[str, Any]] = []
     truncated = False
-    for native in params.query_symbols:
+    for native in query_native:
         trades = client.user_trades(native, start_time_ms=since_ms, limit=limit)
         truncated = truncated or len(trades) >= limit
         for t in trades:
@@ -202,15 +219,17 @@ def fetch(params: BinanceReconcileParams, *, now: datetime | None = None) -> dic
                        "error": "adapter passed client=None"})
         server_time = balance = positions = orders = None
         fills, truncated = None, False
+        query_native = _resolve_query_symbols(params, None)
     else:
         server_time = _section("server_time", lambda: client.sync_server_time(force=True))
         balance = _section("balance", lambda: _balance_block(client))
         positions = _section("positions", lambda: _position_rows(client, params))
         orders = _section("open_orders", lambda: _order_rows(client, params))
-        fill_result = _section("fills", lambda: _fill_rows(client, params, since_ms))
+        query_native = _resolve_query_symbols(params, positions)
+        fill_result = _section("fills", lambda: _fill_rows(client, params, since_ms, query_native))
         fills, truncated = fill_result if fill_result is not None else (None, False)
 
-    symbols_queried = [params.to_ledger_symbol(s) for s in params.query_symbols]
+    symbols_queried = [params.to_ledger_symbol(s) for s in query_native]
 
     document = {
         "schema_version": SCHEMA_VERSION,
