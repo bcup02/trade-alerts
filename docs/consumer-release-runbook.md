@@ -200,3 +200,32 @@ trade-alerts：v0.13.2
 服務/工作流程驗證：trade-alerts pytest（113）+ node 測試全綠。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.13.3
+變更摘要：apps_script/google_ledger_receiver.gs（+ 同步的參考副本
+          google_ledger_receiver_v2.gs）—— v2 投影寫入 sheet 時，entry_time /
+          exit_time 從 ledger 帶來的 UTC ISO-8601（opened_at / closed_at）改成
+          轉台北時區文字 "yyyy-MM-dd H:mm:ss"（Asia/Taipei，無 DST），與 v2 之前
+          各策略寫的舊列格式一致。新 helper formatSheetTime()（空值 / 已是台北
+          文字 / 不可解析 → 原樣通過，不拋）；needsTextFormat() 取代 4 處內嵌的
+          16+ 位數字檢查，讓台北 datetime 文字也維持左對齊純文字、不被 Sheets
+          自動解析成日期值。sheetValue() 對 entry_time / exit_time 走新分支。
+          payload_digest 不受影響（轉換在 receiver 側、驗章之後）；
+          google_reconcile 不比對時間欄，對帳判定不變。+3 node 斷言。
+          動機：v2 drain 補進表的 ~25 筆列時間欄是 UTC ISO（2026-08-29T15:57:11Z），
+          與舊列（2026-08-26 0:00:49）格式不符。
+受影響消費專案：
+  - 全部：不需 bump pin（.gs 是手動貼上、非 import；v0.13.3 只是 .gs 的版本座標）。
+  - 已寫錯的 ~25 筆既有列由 momentum 端一支改寫工具（讀 list_by_sheet → 逐列
+    update_by_trade_id 送台北文字）修掉；那條路徑也會經過 needsTextFormat 的
+    @ 文字格式化。
+部署入口：需維護者手動把 google_ledger_receiver.gs 貼進「AI自動程式交易紀錄」的
+          Apps Script 編輯器 → 管理部署作業 → 新版本（同一 Web App URL 不變、
+          影響所有分頁、Script Properties 不動）。此動作需另行核准。
+版本驗證：pip show trade-alerts == 0.13.3；trade_alerts.__version__ == "0.13.3"。
+          重新發布後：下一筆 v2 投影的 entry_time / exit_time 在表上為台北文字、
+          左對齊。
+服務/工作流程驗證：trade-alerts pytest（113）+ node 測試全綠。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

@@ -93,6 +93,15 @@ const context = {
     DigestAlgorithm: {SHA_256: 'SHA_256'},
     computeHmacSha256Signature: (text, key) => bytesFromDigest('sha256', text, key),
     computeDigest: (algorithm, text) => bytesFromDigest('sha256', text),
+    // Stub for the one call shape the receiver uses: Asia/Taipei (UTC+8, no
+    // DST) with 'yyyy-MM-dd H:mm:ss' -- hour unpadded, minute/second padded.
+    formatDate: (date, tz, fmt) => {
+      assert.equal(tz, 'Asia/Taipei');
+      assert.equal(fmt, 'yyyy-MM-dd H:mm:ss');
+      const t = new Date(date.getTime() + 8 * 3600 * 1000);
+      const p = n => String(n).padStart(2, '0');
+      return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())} ${t.getUTCHours()}:${p(t.getUTCMinutes())}:${p(t.getUTCSeconds())}`;
+    },
   },
   SpreadsheetApp: {getActiveSpreadsheet: () => ({
     getSheetByName: name => sheets.get(name) || null,
@@ -166,10 +175,20 @@ const v2Open = v2Write({action: 'append_open_v2', eventType: 'trade_open', trade
 const v2OpenFirst = route(v2Open);
 assert.deepEqual(v2OpenFirst, {ok: true, row: 4, provenance_status: 'CONFIRMED'});
 assert.deepEqual(route(v2Open), {ok: true, row: 4, idempotent: true});
+// entry_time (col E, index 4) is projected as UTC ISO but stored as Taipei
+// local text, matching the pre-v2 rows: 2026-08-26T00:00:00Z -> +08:00.
+assert.equal(projectSheet.rows[3][4], '2026-08-26 8:00:00');
 const v2CloseProjection = {trade_id: 'v2-trade-1', exit_time: '2026-08-26T01:00:00Z', entry_price: '1', exit_price: '0.9', entry_volume: '2', exit_volume: '2', leverage: '3', entry_fee: '0.01', exit_fee: '0.01', gross_pnl: '-0.2', net_pnl: '-0.22', return_on_margin: '-10', source: 'test_close'};
 const v2Close = v2Write({action: 'update_close_v2', eventType: 'trade_close', tradeId: 'v2-trade-1', projection: v2CloseProjection, requestId: '00000000-0000-4000-8000-000000000013'});
 assert.deepEqual(route(v2Close), {ok: true, row: 4, provenance_status: 'CONFIRMED'});
 assert.deepEqual(route(v2Close), {ok: true, row: 4, idempotent: true});
+// exit_time (col F, index 5): 2026-08-26T01:00:00Z -> Taipei text.
+assert.equal(projectSheet.rows[3][5], '2026-08-26 9:00:00');
+// formatSheetTime passes an already-Taipei-text value through unchanged and
+// never throws on an unparseable one (unit-level guard for the rewrite tool).
+assert.equal(context.formatSheetTime('2026-08-27 0:30:05'), '2026-08-27 0:30:05');
+assert.equal(context.formatSheetTime(''), '');
+assert.equal(context.formatSheetTime('not-a-date'), 'not-a-date');
 const rejectedOpen = v2Write({action: 'append_open_v2', eventType: 'trade_open', tradeId: 'v2-rejected-1', projection: {...v2OpenProjection, trade_id: 'v2-rejected-1', unexpected: 'field'}, requestId: '00000000-0000-4000-8000-000000000014'});
 assert.deepEqual(route(rejectedOpen), {ok: false, error: 'open_projection_invalid'});
 const auditSheet = sheets.get('Google_Provenance_Audit');
