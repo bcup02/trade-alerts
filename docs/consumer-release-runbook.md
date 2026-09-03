@@ -175,3 +175,28 @@ trade-alerts：v0.13.1
 服務/工作流程驗證：trade-alerts pytest（112）+ node 測試全綠。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.13.2
+變更摘要：deliver_projection_v2 — receiver 的 `ok:false` 錯誤不再一律當終端
+          `REJECTED`。只有「payload 結構本身壞」的少數錯誤（provenance_invalid /
+          open_projection_invalid / close_projection_invalid）才是 REJECTED；
+          其餘（unauthorized / signature_invalid / source_not_allowed /
+          unsupported_action / request_not_fresh / sheet_not_found / malformed…）
+          都是「設定／部署尚未就緒」的問題，同一筆意圖修好後可成功，故改回
+          可重試的 `TRANSPORT_FAILED`，durable outbox 保留該意圖而非燒掉。
+          動機：momentum 首次啟用 v2 遞送時，共用 Apps Script Web App 是舊版
+          （v2 payload 被路由到 legacy secret 檢查 → unauthorized），26 筆積壓
+          意圖被 drain 一次全部標成終端 REJECTED、無法再送。+1 測試（113）。
+受影響消費專案：
+  - vivoy2027game/mexc-4h-momentum-trailing-stop：pin bump 至 v0.13.2（pyproject
+    + deploy/install_systemd.sh）；已被燒掉的 26 筆意圖由 momentum 端的
+    reset 工具（scripts/reset_google_projection_outbox.py）清掉終端 dispatch 記錄
+    後重新變 outstanding。
+  - bcup02/ed-seykota-systematic-trend-following：Phase C 才會用到 v2 遞送，
+    屆時直接鎖 v0.13.2。
+部署入口：Python 套件行為修正（狀態分類）。
+版本驗證：pip show trade-alerts == 0.13.2；trade_alerts.__version__ == "0.13.2"。
+服務/工作流程驗證：trade-alerts pytest（113）+ node 測試全綠。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

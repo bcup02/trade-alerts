@@ -68,11 +68,28 @@ def test_receiver_success_and_rejection_are_terminal_outbox_states(tmp_path):
 
     rejected = submit_projection_v2(
         endpoint="https://example.test/receiver", payload=payload, provenance=provenance, outbox_path=tmp_path / "rejected.jsonl",
-        post=lambda *args, **kwargs: _Response({"ok": False, "error": "source_not_allowed"}), sleep=lambda _: None,
+        post=lambda *args, **kwargs: _Response({"ok": False, "error": "provenance_invalid"}), sleep=lambda _: None,
     )
-    assert not rejected.ok and rejected.error_code == "source_not_allowed"
+    assert not rejected.ok and rejected.status == "REJECTED" and rejected.error_code == "provenance_invalid"
     rows = [json.loads(line) for line in (tmp_path / "rejected.jsonl").read_text(encoding="utf-8").splitlines()]
     assert [row["status"] for row in rows] == ["PENDING", "REJECTED"]
+
+
+def test_receiver_config_errors_stay_retryable_so_the_intent_is_not_burned(tmp_path):
+    # A stale/misdeployed receiver or an unregistered source is a config
+    # problem the operator can fix -- the SAME intent must survive it, not be
+    # marked terminal REJECTED (which would drop it from the durable outbox).
+    provenance, payload = _payload()
+    for err in ("unauthorized", "signature_invalid", "source_not_allowed",
+                "unsupported_action", "request_not_fresh", "sheet_not_found"):
+        out = submit_projection_v2(
+            endpoint="https://example.test/receiver", payload=payload, provenance=provenance,
+            outbox_path=tmp_path / f"{err}.jsonl",
+            post=lambda *a, _e=err, **k: _Response({"ok": False, "error": _e}), sleep=lambda _: None, attempts=1,
+        )
+        assert not out.ok and out.status == "TRANSPORT_FAILED" and out.error_code == err
+        rows = [json.loads(line) for line in (tmp_path / f"{err}.jsonl").read_text(encoding="utf-8").splitlines()]
+        assert [r["status"] for r in rows] == ["PENDING", "TRANSPORT_FAILED"]
 
 
 def test_sender_rejects_non_projection_action_without_outbox(tmp_path):
