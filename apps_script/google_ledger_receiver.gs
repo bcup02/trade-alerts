@@ -65,6 +65,15 @@ const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_pri
 const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
 const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
 const NUMERIC_PROJECTION_FIELDS = new Set(['entry_price', 'exit_price', 'volume', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin']);
+// Time cells (E entry_time / F exit_time) are Taipei-local *text*, e.g.
+// "2026-08-26 0:00:49", matching the rows the strategies wrote before v2. The
+// v2 projection carries entry_time / exit_time as UTC ISO-8601 straight from
+// the ledger (opened_at / closed_at); convert on write. The text shape below
+// is also treated as "keep as text" everywhere a 16+ digit id is, so a Taipei
+// datetime string never gets coerced into a right-aligned Date cell.
+const SHEET_TIME_KEYS = new Set(['entry_time', 'exit_time']);
+const SHEET_TIME_TEXT_RE = /^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2}$/;
+const SHEET_TIME_TZ = 'Asia/Taipei';
 
 function doPost(e) {
   try {
@@ -148,7 +157,7 @@ function handleLegacyAppend(sheet, sheetName, data) {
   const row = sheet.getLastRow() + 1;
   const range = sheet.getRange(row, 1, 1, values.length);
   values.forEach((value, index) => {
-    if (typeof value === 'string' && /^[0-9]{16,}$/.test(value)) range.getCell(1, index + 1).setNumberFormat('@');
+    if (needsTextFormat(value)) range.getCell(1, index + 1).setNumberFormat('@');
   });
   range.setValues([values]);
   return {ok: true, row: row, sheet: sheetName};
@@ -173,7 +182,7 @@ function handleLegacyUpdateByTradeId(sheet, sheetName, data) {
     const value = updates[letter];
     const cell = sheet.getRange(row, column);
     cell.setValue(value === undefined || value === null ? '' : value);
-    if (typeof value === 'string' && /^[0-9]{16,}$/.test(value)) cell.setNumberFormat('@');
+    if (needsTextFormat(value)) cell.setNumberFormat('@');
     updatedColumns.push(letter);
   });
   return {ok: true, row: row, sheet: sheetName, updated_columns: updatedColumns};
@@ -201,7 +210,7 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
     const value = updates[letter];
     const cell = sheet.getRange(row, updateColumn);
     cell.setValue(value === undefined || value === null ? '' : value);
-    if (typeof value === 'string' && /^[0-9]{16,}$/.test(value)) cell.setNumberFormat('@');
+    if (needsTextFormat(value)) cell.setNumberFormat('@');
     updatedColumns.push(letter);
   });
   return {ok: true, row: row, sheet: sheetName, updated_columns: updatedColumns};
@@ -338,7 +347,7 @@ function writeProjection(sheet, row, projection, mapping) {
     if (Object.prototype.hasOwnProperty.call(projection, key)) {
       const cell = sheet.getRange(row, columnIndex(mapping[key]));
       const value = sheetValue(key, projection[key]);
-      if (typeof value === 'string' && /^[0-9]{16,}$/.test(value)) cell.setNumberFormat('@');
+      if (needsTextFormat(value)) cell.setNumberFormat('@');
       cell.setValue(value);
     }
   });
@@ -346,11 +355,31 @@ function writeProjection(sheet, row, projection, mapping) {
 
 function sheetValue(key, value) {
   if (value === null) return '';
+  if (SHEET_TIME_KEYS.has(key)) return formatSheetTime(value);
   if (!NUMERIC_PROJECTION_FIELDS.has(key)) return value;
   if (typeof value !== 'string' || !/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/.test(value)) throw new Error('invalid_numeric_projection');
   const numeric = Number(value);
   if (!isFinite(numeric)) throw new Error('invalid_numeric_projection');
   return numeric;
+}
+
+// UTC ISO-8601 (or any Date-parseable string) -> "yyyy-MM-dd H:mm:ss" in
+// Asia/Taipei (no DST), as left-aligned text.  A value already in that Taipei
+// text shape, an empty value, or an unparseable one is passed through
+// unchanged, so re-sending a row is idempotent and a bad input never throws.
+function formatSheetTime(value) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'string' && SHEET_TIME_TEXT_RE.test(value)) return value;
+  const parsed = new Date(value);
+  if (isNaN(parsed.getTime())) return value;
+  return Utilities.formatDate(parsed, SHEET_TIME_TZ, 'yyyy-MM-dd H:mm:ss');
+}
+
+// A cell value that must stay verbatim text: a 16+ digit id (trade_id /
+// order_id -> no float coercion) or a Taipei datetime string (-> no
+// auto-parse into a right-aligned Date cell, so it matches the pre-v2 rows).
+function needsTextFormat(value) {
+  return typeof value === 'string' && (/^[0-9]{16,}$/.test(value) || SHEET_TIME_TEXT_RE.test(value));
 }
 
 function columnIndex(letter) {

@@ -21,6 +21,13 @@ const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_pri
 const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
 const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
 const NUMERIC_PROJECTION_FIELDS = new Set(['entry_price', 'exit_price', 'volume', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin']);
+// entry_time / exit_time cells are Taipei-local text ("2026-08-26 0:00:49"),
+// matching the pre-v2 rows; the projection carries them as UTC ISO-8601 from
+// the ledger (opened_at / closed_at).  Kept in sync with the canonical
+// google_ledger_receiver.gs.
+const SHEET_TIME_KEYS = new Set(['entry_time', 'exit_time']);
+const SHEET_TIME_TEXT_RE = /^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2}$/;
+const SHEET_TIME_TZ = 'Asia/Taipei';
 
 function doPost(e) {
   try {
@@ -162,7 +169,7 @@ function writeProjection(sheet, row, projection, mapping) {
     if (Object.prototype.hasOwnProperty.call(projection, key)) {
       const cell = sheet.getRange(row, columnIndex(mapping[key]));
       const value = sheetValue(key, projection[key]);
-      if (typeof value === 'string' && /^[0-9]{16,}$/.test(value)) cell.setNumberFormat('@');
+      if (needsTextFormat(value)) cell.setNumberFormat('@');
       cell.setValue(value);
     }
   });
@@ -170,11 +177,28 @@ function writeProjection(sheet, row, projection, mapping) {
 
 function sheetValue(key, value) {
   if (value === null) return '';
+  if (SHEET_TIME_KEYS.has(key)) return formatSheetTime(value);
   if (!NUMERIC_PROJECTION_FIELDS.has(key)) return value;
   if (typeof value !== 'string' || !/^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$/.test(value)) throw new Error('invalid_numeric_projection');
   const numeric = Number(value);
   if (!isFinite(numeric)) throw new Error('invalid_numeric_projection');
   return numeric;
+}
+
+// UTC ISO-8601 (or any Date-parseable string) -> "yyyy-MM-dd H:mm:ss" in
+// Asia/Taipei (no DST), as left-aligned text.  Already-Taipei-text, empty, and
+// unparseable values pass through unchanged.  Kept in sync with the canonical
+// google_ledger_receiver.gs.
+function formatSheetTime(value) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'string' && SHEET_TIME_TEXT_RE.test(value)) return value;
+  const parsed = new Date(value);
+  if (isNaN(parsed.getTime())) return value;
+  return Utilities.formatDate(parsed, SHEET_TIME_TZ, 'yyyy-MM-dd H:mm:ss');
+}
+
+function needsTextFormat(value) {
+  return typeof value === 'string' && (/^[0-9]{16,}$/.test(value) || SHEET_TIME_TEXT_RE.test(value));
 }
 
 function columnIndex(letter) {

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trade-alerts"
-version = "0.13.2"
+version = "0.13.3"
 description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
 readme = "README.md"
 requires-python = ">=3.10"
