@@ -1,0 +1,189 @@
+From 09100e8c069061242d4773839df765014994e704 Mon Sep 17 00:00:00 2001
+From: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 13:27:14 +0800
+Subject: [PATCH] fix(projection): receiver config errors are retryable, not
+ terminal REJECTED (v0.13.2) (#7)
+
+deliver_projection_v2 mapped every receiver ok:false response to a terminal
+REJECTED. A REJECTED dispatch is filtered out of outstanding_projection_intents
+forever, and enqueue_projection_intent dedupes by intent key, so a burned
+intent cannot be re-queued from the ledger.
+
+momentum's first v2-delivery run hit this: the shared Apps Script Web App was
+an old version that routes a v2 payload to the legacy SHARED_SECRET check ->
+{ok:false, error:"unauthorized"}. The drain marked all 26 backlog intents
+terminal REJECTED in one pass.
+
+- Only a structurally-invalid payload is terminal now: provenance_invalid /
+  open_projection_invalid / close_projection_invalid. Every other receiver
+  error (unauthorized, signature_invalid, source_not_allowed,
+  unsupported_action from a stale deployment, request_not_fresh,
+  sheet_not_found, malformed_request, ...) is a config/deploy problem the
+  SAME intent survives once fixed -> TRANSPORT_FAILED, so the durable outbox
+  keeps it.
+- tests: existing terminal test now uses provenance_invalid; new
+  test_receiver_config_errors_stay_retryable_so_the_intent_is_not_burned
+  parametrizes 6 config errors. test_projection_outbox's mock-submit example
+  error updated for consistency. 112 -> 113.
+- version 0.13.1 -> 0.13.2; consumer-release-runbook entry.
+
+Co-authored-by: bcup02 <columnbb@gmail.com>
+Co-authored-by: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ docs/consumer-release-runbook.md         | 25 ++++++++++++++++++++++++
+ pyproject.toml                           |  2 +-
+ src/trade_alerts/__init__.py             |  2 +-
+ src/trade_alerts/google_ledger_client.py | 17 +++++++++++++++-
+ tests/test_google_ledger_client.py       | 21 ++++++++++++++++++--
+ tests/test_projection_outbox.py          |  4 ++--
+ 6 files changed, 64 insertions(+), 7 deletions(-)
+
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 99ce78c..6601259 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -175,3 +175,28 @@ trade-alerts：v0.13.1
+ 服務/工作流程驗證：trade-alerts pytest（112）+ node 測試全綠。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.13.2
++變更摘要：deliver_projection_v2 — receiver 的 `ok:false` 錯誤不再一律當終端
++          `REJECTED`。只有「payload 結構本身壞」的少數錯誤（provenance_invalid /
++          open_projection_invalid / close_projection_invalid）才是 REJECTED；
++          其餘（unauthorized / signature_invalid / source_not_allowed /
++          unsupported_action / request_not_fresh / sheet_not_found / malformed…）
++          都是「設定／部署尚未就緒」的問題，同一筆意圖修好後可成功，故改回
++          可重試的 `TRANSPORT_FAILED`，durable outbox 保留該意圖而非燒掉。
++          動機：momentum 首次啟用 v2 遞送時，共用 Apps Script Web App 是舊版
++          （v2 payload 被路由到 legacy secret 檢查 → unauthorized），26 筆積壓
++          意圖被 drain 一次全部標成終端 REJECTED、無法再送。+1 測試（113）。
++受影響消費專案：
++  - vivoy2027game/mexc-4h-momentum-trailing-stop：pin bump 至 v0.13.2（pyproject
++    + deploy/install_systemd.sh）；已被燒掉的 26 筆意圖由 momentum 端的
++    reset 工具（scripts/reset_google_projection_outbox.py）清掉終端 dispatch 記錄
++    後重新變 outstanding。
++  - bcup02/ed-seykota-systematic-trend-following：Phase C 才會用到 v2 遞送，
++    屆時直接鎖 v0.13.2。
++部署入口：Python 套件行為修正（狀態分類）。
++版本驗證：pip show trade-alerts == 0.13.2；trade_alerts.__version__ == "0.13.2"。
++服務/工作流程驗證：trade-alerts pytest（113）+ node 測試全綠。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index 75acc41..31daba9 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.13.1"
++version = "0.13.2"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 9b33644..1d8bd4d 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -162,4 +162,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.13.1"
++__version__ = "0.13.2"
+diff --git a/src/trade_alerts/google_ledger_client.py b/src/trade_alerts/google_ledger_client.py
+index cbc30e7..3c9c105 100644
+--- a/src/trade_alerts/google_ledger_client.py
++++ b/src/trade_alerts/google_ledger_client.py
+@@ -20,6 +20,19 @@ from .provenance_outbox import append_outbox_record
+ 
+ _PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "update_close_v2"})
+ 
++# Receiver ``ok: false`` errors that mean the payload itself is structurally
++# wrong -- the SAME intent can never succeed, so its dispatch is terminal.
++# Every other receiver error (unauthorized, signature_invalid, request_not_fresh,
++# source_not_allowed, unsupported_action/schema from a stale deployment,
++# sheet_not_found, malformed_request) is a configuration/transport problem the
++# same intent survives once the operator fixes it -> retryable, so a durable
++# outbox keeps the intent instead of burning it.
++_TERMINAL_RECEIVER_ERRORS = frozenset({
++    "provenance_invalid",
++    "open_projection_invalid",
++    "close_projection_invalid",
++})
++
+ 
+ @dataclass(frozen=True)
+ class ProjectionSubmission:
+@@ -142,7 +155,9 @@ def deliver_projection_v2(
+         try:
+             result = _post_json(endpoint=endpoint, payload=payload, post=post, get=get)
+             if not isinstance(result, dict) or not result.get("ok"):
+-                return ProjectionSubmission(False, "REJECTED", None, str(result.get("error") if isinstance(result, dict) else "receiver_invalid_response"))
++                error = str(result.get("error") if isinstance(result, dict) else "receiver_invalid_response")
++                status = "REJECTED" if error in _TERMINAL_RECEIVER_ERRORS else "TRANSPORT_FAILED"
++                return ProjectionSubmission(False, status, None, error)
+             row = result.get("row")
+             if not isinstance(row, int) or row < 2:
+                 return ProjectionSubmission(False, "REJECTED", None, "receiver_row_invalid")
+diff --git a/tests/test_google_ledger_client.py b/tests/test_google_ledger_client.py
+index d159e59..6b9f447 100644
+--- a/tests/test_google_ledger_client.py
++++ b/tests/test_google_ledger_client.py
+@@ -68,13 +68,30 @@ def test_receiver_success_and_rejection_are_terminal_outbox_states(tmp_path):
+ 
+     rejected = submit_projection_v2(
+         endpoint="https://example.test/receiver", payload=payload, provenance=provenance, outbox_path=tmp_path / "rejected.jsonl",
+-        post=lambda *args, **kwargs: _Response({"ok": False, "error": "source_not_allowed"}), sleep=lambda _: None,
++        post=lambda *args, **kwargs: _Response({"ok": False, "error": "provenance_invalid"}), sleep=lambda _: None,
+     )
+-    assert not rejected.ok and rejected.error_code == "source_not_allowed"
++    assert not rejected.ok and rejected.status == "REJECTED" and rejected.error_code == "provenance_invalid"
+     rows = [json.loads(line) for line in (tmp_path / "rejected.jsonl").read_text(encoding="utf-8").splitlines()]
+     assert [row["status"] for row in rows] == ["PENDING", "REJECTED"]
+ 
+ 
++def test_receiver_config_errors_stay_retryable_so_the_intent_is_not_burned(tmp_path):
++    # A stale/misdeployed receiver or an unregistered source is a config
++    # problem the operator can fix -- the SAME intent must survive it, not be
++    # marked terminal REJECTED (which would drop it from the durable outbox).
++    provenance, payload = _payload()
++    for err in ("unauthorized", "signature_invalid", "source_not_allowed",
++                "unsupported_action", "request_not_fresh", "sheet_not_found"):
++        out = submit_projection_v2(
++            endpoint="https://example.test/receiver", payload=payload, provenance=provenance,
++            outbox_path=tmp_path / f"{err}.jsonl",
++            post=lambda *a, _e=err, **k: _Response({"ok": False, "error": _e}), sleep=lambda _: None, attempts=1,
++        )
++        assert not out.ok and out.status == "TRANSPORT_FAILED" and out.error_code == err
++        rows = [json.loads(line) for line in (tmp_path / f"{err}.jsonl").read_text(encoding="utf-8").splitlines()]
++        assert [r["status"] for r in rows] == ["PENDING", "TRANSPORT_FAILED"]
++
++
+ def test_sender_rejects_non_projection_action_without_outbox(tmp_path):
+     provenance, payload = _payload()
+     result = submit_projection_v2(
+diff --git a/tests/test_projection_outbox.py b/tests/test_projection_outbox.py
+index b2e8df8..836132f 100644
+--- a/tests/test_projection_outbox.py
++++ b/tests/test_projection_outbox.py
+@@ -127,11 +127,11 @@ def test_rejected_receiver_response_is_terminal_and_never_falls_back(tmp_path: P
+     result = dispatch_next_projection(
+         path,
+         rebuild=lambda queued: rebuilt(queued),
+-        submit=lambda payload, proof: Submission("REJECTED", error_code="source_not_allowed"),
++        submit=lambda payload, proof: Submission("REJECTED", error_code="provenance_invalid"),
+     )
+ 
+     assert result.dispatch is not None
+     assert result.dispatch.status == "REJECTED"
+-    assert result.dispatch.error_code == "source_not_allowed"
++    assert result.dispatch.error_code == "provenance_invalid"
+     assert legacy_called is False
+     assert outstanding_projection_intents(path) == ()
+-- 
+2.43.0
+
