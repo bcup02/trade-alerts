@@ -1,0 +1,302 @@
+From fe1ab81521e17ab57b9b4d1adadd4f778e8b88f4 Mon Sep 17 00:00:00 2001
+From: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 20:58:54 +0800
+Subject: [PATCH] feat(gs): v2 projection writes entry_time/exit_time as Taipei
+ local text (v0.13.3) (#8)
+
+The v2 projection carries entry_time / exit_time as UTC ISO-8601 straight
+from the ledger (opened_at / closed_at), so drained rows landed as
+"2026-08-29T15:57:11Z" while every pre-v2 row is Taipei local text
+"2026-08-26 0:00:49". Convert on write.
+
+- apps_script/google_ledger_receiver.gs (canonical, deployed) + the
+  reference sibling google_ledger_receiver_v2.gs, kept in sync:
+  * formatSheetTime(value): UTC ISO (or any Date-parseable string) ->
+    Utilities.formatDate(d, 'Asia/Taipei', 'yyyy-MM-dd H:mm:ss'). An
+    already-Taipei-text value, '', or an unparseable one passes through
+    unchanged and never throws -- so re-sending a row / the rewrite tool
+    is safe.
+  * sheetValue(): entry_time / exit_time take the new branch before the
+    numeric check.
+  * needsTextFormat(value): replaces the 4 inline /^[0-9]{16,}$/ checks;
+    now a Taipei datetime string is also kept as verbatim text (@ format)
+    so Sheets does not auto-parse it into a right-aligned Date cell, and
+    it matches the left-aligned pre-v2 rows.
+- payload_digest is unaffected (conversion is receiver-side, after the
+  signature check); google_reconcile does not compare time columns, so
+  reconcile verdicts are unchanged.
+- tests/apps_script_unified_receiver_node_test.js: Utilities.formatDate
+  stub (Asia/Taipei, UTC+8, no DST) + assertions that a v2 open/close
+  with a UTC ISO time lands as Taipei text, and formatSheetTime
+  passthrough/no-throw.
+- pyproject / __init__: 0.13.2 -> 0.13.3. Release-log entry.
+
+Consumers do NOT bump the pin (.gs is pasted manually, not imported);
+v0.13.3 is only the .gs version coordinate. Re-deploying the Web App
+(paste -> Manage deployments -> new version) is a separate manual step.
+The ~25 already-wrong rows are fixed by a momentum-side rewrite tool
+(next).
+
+Co-authored-by: bcup02 <columnbb@gmail.com>
+Co-authored-by: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ apps_script/google_ledger_receiver.gs         | 37 +++++++++++++++++--
+ apps_script/google_ledger_receiver_v2.gs      | 26 ++++++++++++-
+ docs/consumer-release-runbook.md              | 29 +++++++++++++++
+ pyproject.toml                                |  2 +-
+ src/trade_alerts/__init__.py                  |  2 +-
+ .../apps_script_unified_receiver_node_test.js | 19 ++++++++++
+ 6 files changed, 108 insertions(+), 7 deletions(-)
+
+diff --git a/apps_script/google_ledger_receiver.gs b/apps_script/google_ledger_receiver.gs
+index 704f7ff..ea70bbf 100644
+--- a/apps_script/google_ledger_receiver.gs
++++ b/apps_script/google_ledger_receiver.gs
+@@ -65,6 +65,15 @@ const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_pri
+ const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
+ const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
+ const NUMERIC_PROJECTION_FIELDS = new Set(['entry_price', 'exit_price', 'volume', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin']);
++// Time cells (E entry_time / F exit_time) are Taipei-local *text*, e.g.
++// "2026-08-26 0:00:49", matching the rows the strategies wrote before v2. The
++// v2 projection carries entry_time / exit_time as UTC ISO-8601 straight from
++// the ledger (opened_at / closed_at); convert on write. The text shape below
++// is also treated as "keep as text" everywhere a 16+ digit id is, so a Taipei
++// datetime string never gets coerced into a right-aligned Date cell.
++const SHEET_TIME_KEYS = new Set(['entry_time', 'exit_time']);
++const SHEET_TIME_TEXT_RE = /^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2}$/;
++const SHEET_TIME_TZ = 'Asia/Taipei';
+ 
+ function doPost(e) {
+   try {
+@@ -148,7 +157,7 @@ function handleLegacyAppend(sheet, sheetName, data) {
+   const row = sheet.getLastRow() + 1;
+   const range = sheet.getRange(row, 1, 1, values.length);
+   values.forEach((value, index) => {
+-    if (typeof value === 'string' && /^[0-9]{16,}$/.test(value)) range.getCell(1, index + 1).setNumberFormat('@');
++    if (needsTextFormat(value)) range.getCell(1, index + 1).setNumberFormat('@');
+   });
+   range.setValues([values]);
+   return {ok: true, row: row, sheet: sheetName};
+@@ -173,7 +182,7 @@ function handleLegacyUpdateByTradeId(sheet, sheetName, data) {
+     const value = updates[letter];
+     const cell = sheet.getRange(row, column);
+     cell.setValue(value === undefined || value === null ? '' : value);
+-    if (typeof value === 'string' && /^[0-9]{16,}$/.test(value)) cell.setNumberFormat('@');
++    if (needsTextFormat(value)) cell.setNumberFormat('@');
+     updatedColumns.push(letter);
+   });
+   return {ok: true, row: row, sheet: sheetName, updated_columns: updatedColumns};
+@@ -201,7 +210,7 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
+     const value = updates[letter];
+     const cell = sheet.getRange(row, updateColumn);
+     cell.setValue(value === undefined || value === null ? '' : value);
+-    if (typeof value === 'string' && /^[0-9]{16,}$/.test(value)) cell.setNumberFormat('@');
++    if (needsTextFormat(value)) cell.setNumberFormat('@');
+     updatedColumns.push(letter);
+   });
+   return {ok: true, row: row, sheet: sheetName, updated_columns: updatedColumns};
+@@ -338,7 +347,7 @@ function writeProjection(sheet, row, projection, mapping) {
+     if (Object.prototype.hasOwnProperty.call(projection, key)) {
+       const cell = sheet.getRange(row, columnIndex(mapping[key]));
+       const value = sheetValue(key, projection[key]);
+-      if (typeof value === 'string' && /^[0-9]{16,}$/.test(value)) cell.setNumberFormat('@');
++      if (needsTextFormat(value)) cell.setNumberFormat('@');
+       cell.setValue(value);
+     }
+   });
+@@ -346,6 +355,7 @@ function writeProjection(sheet, row, projection, mapping) {
+ 
+ function sheetValue(key, value) {
+   if (value === null) return '';
++  if (SHEET_TIME_KEYS.has(key)) return formatSheetTime(value);
+   if (!NUMERIC_PROJECTION_FIELDS.has(key)) return value;
+   if (typeof value !== 'string' || !/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/.test(value)) throw new Error('invalid_numeric_projection');
+   const numeric = Number(value);
+@@ -353,6 +363,25 @@ function sheetValue(key, value) {
+   return numeric;
+ }
+ 
++// UTC ISO-8601 (or any Date-parseable string) -> "yyyy-MM-dd H:mm:ss" in
++// Asia/Taipei (no DST), as left-aligned text.  A value already in that Taipei
++// text shape, an empty value, or an unparseable one is passed through
++// unchanged, so re-sending a row is idempotent and a bad input never throws.
++function formatSheetTime(value) {
++  if (value === undefined || value === null || value === '') return '';
++  if (typeof value === 'string' && SHEET_TIME_TEXT_RE.test(value)) return value;
++  const parsed = new Date(value);
++  if (isNaN(parsed.getTime())) return value;
++  return Utilities.formatDate(parsed, SHEET_TIME_TZ, 'yyyy-MM-dd H:mm:ss');
++}
++
++// A cell value that must stay verbatim text: a 16+ digit id (trade_id /
++// order_id -> no float coercion) or a Taipei datetime string (-> no
++// auto-parse into a right-aligned Date cell, so it matches the pre-v2 rows).
++function needsTextFormat(value) {
++  return typeof value === 'string' && (/^[0-9]{16,}$/.test(value) || SHEET_TIME_TEXT_RE.test(value));
++}
++
+ function columnIndex(letter) {
+   if (typeof letter !== 'string' || !/^[A-Z]+$/.test(letter)) return null;
+   return letter.split('').reduce((result, character) => result * 26 + character.charCodeAt(0) - 64, 0);
+diff --git a/apps_script/google_ledger_receiver_v2.gs b/apps_script/google_ledger_receiver_v2.gs
+index 5b84302..6f222bd 100644
+--- a/apps_script/google_ledger_receiver_v2.gs
++++ b/apps_script/google_ledger_receiver_v2.gs
+@@ -21,6 +21,13 @@ const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_pri
+ const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
+ const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
+ const NUMERIC_PROJECTION_FIELDS = new Set(['entry_price', 'exit_price', 'volume', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin']);
++// entry_time / exit_time cells are Taipei-local text ("2026-08-26 0:00:49"),
++// matching the pre-v2 rows; the projection carries them as UTC ISO-8601 from
++// the ledger (opened_at / closed_at).  Kept in sync with the canonical
++// google_ledger_receiver.gs.
++const SHEET_TIME_KEYS = new Set(['entry_time', 'exit_time']);
++const SHEET_TIME_TEXT_RE = /^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}:\d{2}$/;
++const SHEET_TIME_TZ = 'Asia/Taipei';
+ 
+ function doPost(e) {
+   try {
+@@ -162,7 +169,7 @@ function writeProjection(sheet, row, projection, mapping) {
+     if (Object.prototype.hasOwnProperty.call(projection, key)) {
+       const cell = sheet.getRange(row, columnIndex(mapping[key]));
+       const value = sheetValue(key, projection[key]);
+-      if (typeof value === 'string' && /^[0-9]{16,}$/.test(value)) cell.setNumberFormat('@');
++      if (needsTextFormat(value)) cell.setNumberFormat('@');
+       cell.setValue(value);
+     }
+   });
+@@ -170,6 +177,7 @@ function writeProjection(sheet, row, projection, mapping) {
+ 
+ function sheetValue(key, value) {
+   if (value === null) return '';
++  if (SHEET_TIME_KEYS.has(key)) return formatSheetTime(value);
+   if (!NUMERIC_PROJECTION_FIELDS.has(key)) return value;
+   if (typeof value !== 'string' || !/^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$/.test(value)) throw new Error('invalid_numeric_projection');
+   const numeric = Number(value);
+@@ -177,6 +185,22 @@ function sheetValue(key, value) {
+   return numeric;
+ }
+ 
++// UTC ISO-8601 (or any Date-parseable string) -> "yyyy-MM-dd H:mm:ss" in
++// Asia/Taipei (no DST), as left-aligned text.  Already-Taipei-text, empty, and
++// unparseable values pass through unchanged.  Kept in sync with the canonical
++// google_ledger_receiver.gs.
++function formatSheetTime(value) {
++  if (value === undefined || value === null || value === '') return '';
++  if (typeof value === 'string' && SHEET_TIME_TEXT_RE.test(value)) return value;
++  const parsed = new Date(value);
++  if (isNaN(parsed.getTime())) return value;
++  return Utilities.formatDate(parsed, SHEET_TIME_TZ, 'yyyy-MM-dd H:mm:ss');
++}
++
++function needsTextFormat(value) {
++  return typeof value === 'string' && (/^[0-9]{16,}$/.test(value) || SHEET_TIME_TEXT_RE.test(value));
++}
++
+ function columnIndex(letter) {
+   return letter.split('').reduce((result, character) => result * 26 + character.charCodeAt(0) - 64, 0);
+ }
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 6601259..6e3d97b 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -200,3 +200,32 @@ trade-alerts：v0.13.2
+ 服務/工作流程驗證：trade-alerts pytest（113）+ node 測試全綠。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.13.3
++變更摘要：apps_script/google_ledger_receiver.gs（+ 同步的參考副本
++          google_ledger_receiver_v2.gs）—— v2 投影寫入 sheet 時，entry_time /
++          exit_time 從 ledger 帶來的 UTC ISO-8601（opened_at / closed_at）改成
++          轉台北時區文字 "yyyy-MM-dd H:mm:ss"（Asia/Taipei，無 DST），與 v2 之前
++          各策略寫的舊列格式一致。新 helper formatSheetTime()（空值 / 已是台北
++          文字 / 不可解析 → 原樣通過，不拋）；needsTextFormat() 取代 4 處內嵌的
++          16+ 位數字檢查，讓台北 datetime 文字也維持左對齊純文字、不被 Sheets
++          自動解析成日期值。sheetValue() 對 entry_time / exit_time 走新分支。
++          payload_digest 不受影響（轉換在 receiver 側、驗章之後）；
++          google_reconcile 不比對時間欄，對帳判定不變。+3 node 斷言。
++          動機：v2 drain 補進表的 ~25 筆列時間欄是 UTC ISO（2026-08-29T15:57:11Z），
++          與舊列（2026-08-26 0:00:49）格式不符。
++受影響消費專案：
++  - 全部：不需 bump pin（.gs 是手動貼上、非 import；v0.13.3 只是 .gs 的版本座標）。
++  - 已寫錯的 ~25 筆既有列由 momentum 端一支改寫工具（讀 list_by_sheet → 逐列
++    update_by_trade_id 送台北文字）修掉；那條路徑也會經過 needsTextFormat 的
++    @ 文字格式化。
++部署入口：需維護者手動把 google_ledger_receiver.gs 貼進「AI自動程式交易紀錄」的
++          Apps Script 編輯器 → 管理部署作業 → 新版本（同一 Web App URL 不變、
++          影響所有分頁、Script Properties 不動）。此動作需另行核准。
++版本驗證：pip show trade-alerts == 0.13.3；trade_alerts.__version__ == "0.13.3"。
++          重新發布後：下一筆 v2 投影的 entry_time / exit_time 在表上為台北文字、
++          左對齊。
++服務/工作流程驗證：trade-alerts pytest（113）+ node 測試全綠。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index 31daba9..dca5d49 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.13.2"
++version = "0.13.3"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 1d8bd4d..ccb5461 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -162,4 +162,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.13.2"
++__version__ = "0.13.3"
+diff --git a/tests/apps_script_unified_receiver_node_test.js b/tests/apps_script_unified_receiver_node_test.js
+index 54a6a91..56b03e0 100644
+--- a/tests/apps_script_unified_receiver_node_test.js
++++ b/tests/apps_script_unified_receiver_node_test.js
+@@ -93,6 +93,15 @@ const context = {
+     DigestAlgorithm: {SHA_256: 'SHA_256'},
+     computeHmacSha256Signature: (text, key) => bytesFromDigest('sha256', text, key),
+     computeDigest: (algorithm, text) => bytesFromDigest('sha256', text),
++    // Stub for the one call shape the receiver uses: Asia/Taipei (UTC+8, no
++    // DST) with 'yyyy-MM-dd H:mm:ss' -- hour unpadded, minute/second padded.
++    formatDate: (date, tz, fmt) => {
++      assert.equal(tz, 'Asia/Taipei');
++      assert.equal(fmt, 'yyyy-MM-dd H:mm:ss');
++      const t = new Date(date.getTime() + 8 * 3600 * 1000);
++      const p = n => String(n).padStart(2, '0');
++      return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())} ${t.getUTCHours()}:${p(t.getUTCMinutes())}:${p(t.getUTCSeconds())}`;
++    },
+   },
+   SpreadsheetApp: {getActiveSpreadsheet: () => ({
+     getSheetByName: name => sheets.get(name) || null,
+@@ -166,10 +175,20 @@ const v2Open = v2Write({action: 'append_open_v2', eventType: 'trade_open', trade
+ const v2OpenFirst = route(v2Open);
+ assert.deepEqual(v2OpenFirst, {ok: true, row: 4, provenance_status: 'CONFIRMED'});
+ assert.deepEqual(route(v2Open), {ok: true, row: 4, idempotent: true});
++// entry_time (col E, index 4) is projected as UTC ISO but stored as Taipei
++// local text, matching the pre-v2 rows: 2026-08-26T00:00:00Z -> +08:00.
++assert.equal(projectSheet.rows[3][4], '2026-08-26 8:00:00');
+ const v2CloseProjection = {trade_id: 'v2-trade-1', exit_time: '2026-08-26T01:00:00Z', entry_price: '1', exit_price: '0.9', entry_volume: '2', exit_volume: '2', leverage: '3', entry_fee: '0.01', exit_fee: '0.01', gross_pnl: '-0.2', net_pnl: '-0.22', return_on_margin: '-10', source: 'test_close'};
+ const v2Close = v2Write({action: 'update_close_v2', eventType: 'trade_close', tradeId: 'v2-trade-1', projection: v2CloseProjection, requestId: '00000000-0000-4000-8000-000000000013'});
+ assert.deepEqual(route(v2Close), {ok: true, row: 4, provenance_status: 'CONFIRMED'});
+ assert.deepEqual(route(v2Close), {ok: true, row: 4, idempotent: true});
++// exit_time (col F, index 5): 2026-08-26T01:00:00Z -> Taipei text.
++assert.equal(projectSheet.rows[3][5], '2026-08-26 9:00:00');
++// formatSheetTime passes an already-Taipei-text value through unchanged and
++// never throws on an unparseable one (unit-level guard for the rewrite tool).
++assert.equal(context.formatSheetTime('2026-08-27 0:30:05'), '2026-08-27 0:30:05');
++assert.equal(context.formatSheetTime(''), '');
++assert.equal(context.formatSheetTime('not-a-date'), 'not-a-date');
+ const rejectedOpen = v2Write({action: 'append_open_v2', eventType: 'trade_open', tradeId: 'v2-rejected-1', projection: {...v2OpenProjection, trade_id: 'v2-rejected-1', unexpected: 'field'}, requestId: '00000000-0000-4000-8000-000000000014'});
+ assert.deepEqual(route(rejectedOpen), {ok: false, error: 'open_projection_invalid'});
+ const auditSheet = sheets.get('Google_Provenance_Audit');
+-- 
+2.43.0
+
