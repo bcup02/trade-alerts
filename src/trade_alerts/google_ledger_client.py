@@ -20,6 +20,19 @@ from .provenance_outbox import append_outbox_record
 
 _PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "update_close_v2"})
 
+# Receiver ``ok: false`` errors that mean the payload itself is structurally
+# wrong -- the SAME intent can never succeed, so its dispatch is terminal.
+# Every other receiver error (unauthorized, signature_invalid, request_not_fresh,
+# source_not_allowed, unsupported_action/schema from a stale deployment,
+# sheet_not_found, malformed_request) is a configuration/transport problem the
+# same intent survives once the operator fixes it -> retryable, so a durable
+# outbox keeps the intent instead of burning it.
+_TERMINAL_RECEIVER_ERRORS = frozenset({
+    "provenance_invalid",
+    "open_projection_invalid",
+    "close_projection_invalid",
+})
+
 
 @dataclass(frozen=True)
 class ProjectionSubmission:
@@ -142,7 +155,9 @@ def deliver_projection_v2(
         try:
             result = _post_json(endpoint=endpoint, payload=payload, post=post, get=get)
             if not isinstance(result, dict) or not result.get("ok"):
-                return ProjectionSubmission(False, "REJECTED", None, str(result.get("error") if isinstance(result, dict) else "receiver_invalid_response"))
+                error = str(result.get("error") if isinstance(result, dict) else "receiver_invalid_response")
+                status = "REJECTED" if error in _TERMINAL_RECEIVER_ERRORS else "TRANSPORT_FAILED"
+                return ProjectionSubmission(False, status, None, error)
             row = result.get("row")
             if not isinstance(row, int) or row < 2:
                 return ProjectionSubmission(False, "REJECTED", None, "receiver_row_invalid")

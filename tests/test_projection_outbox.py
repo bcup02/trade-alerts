@@ -127,11 +127,11 @@ def test_rejected_receiver_response_is_terminal_and_never_falls_back(tmp_path: P
     result = dispatch_next_projection(
         path,
         rebuild=lambda queued: rebuilt(queued),
-        submit=lambda payload, proof: Submission("REJECTED", error_code="source_not_allowed"),
+        submit=lambda payload, proof: Submission("REJECTED", error_code="provenance_invalid"),
     )
 
     assert result.dispatch is not None
     assert result.dispatch.status == "REJECTED"
-    assert result.dispatch.error_code == "source_not_allowed"
+    assert result.dispatch.error_code == "provenance_invalid"
     assert legacy_called is False
     assert outstanding_projection_intents(path) == ()
