@@ -181,8 +181,12 @@ function handleLegacyUpdateByTradeId(sheet, sheetName, data) {
     if (!column) return;
     const value = updates[letter];
     const cell = sheet.getRange(row, column);
-    cell.setValue(value === undefined || value === null ? '' : value);
+    // @ format BEFORE setValue: otherwise Sheets first parses a datetime-shaped
+    // string into a Date serial (dropping seconds if the inherited number
+    // format hides them), and setNumberFormat('@') then freezes that already-
+    // reformatted display string as text.
     if (needsTextFormat(value)) cell.setNumberFormat('@');
+    cell.setValue(value === undefined || value === null ? '' : value);
     updatedColumns.push(letter);
   });
   return {ok: true, row: row, sheet: sheetName, updated_columns: updatedColumns};
@@ -209,8 +213,9 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
     if (!updateColumn) return;
     const value = updates[letter];
     const cell = sheet.getRange(row, updateColumn);
-    cell.setValue(value === undefined || value === null ? '' : value);
+    // @ format BEFORE setValue -- see handleLegacyUpdateByTradeId.
     if (needsTextFormat(value)) cell.setNumberFormat('@');
+    cell.setValue(value === undefined || value === null ? '' : value);
     updatedColumns.push(letter);
   });
   return {ok: true, row: row, sheet: sheetName, updated_columns: updatedColumns};
