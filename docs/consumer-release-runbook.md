@@ -229,3 +229,34 @@ trade-alerts：v0.13.3
 服務/工作流程驗證：trade-alerts pytest（113）+ node 測試全綠。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.13.4
+變更摘要：apps_script/google_ledger_receiver.gs —— 修 v0.13.3 的遺漏。legacy
+          寫入路徑 handleLegacyUpdateByTradeId / handleLegacyUpdateByKey 的
+          cell.setNumberFormat('@') 之前在 cell.setValue() 之後才呼叫，順序反了：
+          Sheets 會先把 datetime 形狀的字串解析成 Date serial（若該 cell 原本
+          帶「不顯示秒」的日期數字格式，秒數就在顯示層被丟掉），setNumberFormat('@')
+          再把「已被重新格式化的顯示字串」凍成文字 —— 結果 "2026-08-20 2:25:00"
+          變成 "2026-08-20 2:25"。改成先 @ 格式、再 setValue。handleLegacyAppend
+          已是先格式再 setValues（forEach 設 @ 後才 range.setValues），不需動；
+          v2 writeProjection 一直是先 @ 再 setValue，不受影響。
+          node 測試：sheet stub 加 callLog 記錄 setValue / setNumberFormat 呼叫
+          順序，斷言 update_by_trade_id / update_by_key 對 datetime 形狀的欄位
+          是「setNumberFormat 先於 setValue」。
+          動機：R6 改寫工具（momentum rewrite_sheet_times_to_taipei.py）走
+          update_by_trade_id 修那 ~25 筆列時，3 筆原本是 Date-value 的列（cell
+          帶日期格式）被這個順序 bug 弄掉了 :00 秒。
+受影響消費專案：
+  - 全部：不需 bump pin（.gs 手動貼上、非 import；v0.13.4 只是版本座標）。
+  - momentum：rewrite_sheet_times_to_taipei.py 同步放寬 canonical_taipei 接受
+    "YYYY-MM-DD H:MM"（無秒）→ 補 :00，重跑 --apply 修那 3 筆。
+部署入口：需維護者手動把 google_ledger_receiver.gs 重新貼進 Apps Script 編輯器
+          → 管理部署作業 → 新版本（同 Web App URL、影響所有分頁、Script
+          Properties 不動）。此動作需另行核准。
+版本驗證：pip show trade-alerts == 0.13.4；trade_alerts.__version__ == "0.13.4"。
+          重新發布後：update_by_trade_id 寫 datetime 字串進原本是 Date-value 的
+          cell，秒數不再掉。
+服務/工作流程驗證：trade-alerts pytest（113）+ node 測試全綠。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

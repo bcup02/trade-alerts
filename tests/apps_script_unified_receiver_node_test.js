@@ -19,6 +19,8 @@ function bytesFromDigest(algorithm, text, key) {
   return Array.from(output).map(number => number > 127 ? number - 256 : number);
 }
 
+const callLog = [];   // {op:'setValue'|'setNumberFormat', row, column} in call order
+
 function createSheet(name, rows) {
   const sheet = {
     name,
@@ -35,10 +37,12 @@ function createSheet(name, rows) {
           });
         },
         setValue(value) {
+          callLog.push({op: 'setValue', row, column});
           while (target.rows.length < row) target.rows.push([]);
           while (target.rows[row - 1].length < column) target.rows[row - 1].push('');
           target.rows[row - 1][column - 1] = value;
         },
+        setNumberFormat() { callLog.push({op: 'setNumberFormat', row, column}); },
         setValues(values) {
           values.forEach((valuesRow, rowOffset) => {
             while (target.rows.length < row + rowOffset) target.rows.push([]);
@@ -60,7 +64,6 @@ function createSheet(name, rows) {
             },
           };
         },
-        setNumberFormat() {},
       };
     },
     appendRow(values) { this.rows.push(values); },
@@ -159,16 +162,27 @@ assert.equal(projectSheet.rows.length, 2);
 projectSheet.rows.push(['legacy-trade-1']);
 const duplicateAppend = route(legacyOpen);
 assert.deepEqual(duplicateAppend, {ok: true, row: 2, sheet: source.sheet_name, note: 'duplicate trade_id on append, treated as an idempotent retry — no new row written'});
+callLog.length = 0;
 const legacyClose = route({secret: legacySecret, sheet_name: source.sheet_name, action: 'update_by_trade_id', trade_id: 'legacy-trade-1', updates: {F: '2026-08-26 13:00:00', N: '-0.1'}});
 assert.deepEqual(legacyClose, {ok: true, row: 2, sheet: source.sheet_name, updated_columns: ['F', 'N']});
 assert.equal(projectSheet.rows[1][5], '2026-08-26 13:00:00');
 assert.equal(projectSheet.rows[1][13], '-0.1');
 assert.equal(projectSheet.rows[2][5], undefined);
+// column F (=6) holds a datetime-shaped string -> @ format MUST be set before
+// setValue, or Sheets parses the string to a Date and the '@' only freezes the
+// re-formatted (seconds-dropped) display string.
+const fCalls = callLog.filter(c => c.column === 6).map(c => c.op);
+assert.deepEqual(fCalls, ['setNumberFormat', 'setValue']);
+// column N (=14) '-0.1' is not datetime-shaped -> setValue only, no @.
+assert.deepEqual(callLog.filter(c => c.column === 14).map(c => c.op), ['setValue']);
 
 const accountSheet = createSheet('帳戶餘額總表', [['id', 'project'], ['', 'my-crypto-bot']]);
-const legacyKeyUpdate = route({secret: legacySecret, sheet_name: '帳戶餘額總表', action: 'update_by_key', key_column: 'B', key_value: 'my-crypto-bot', updates: {G: '0.0234'}});
-assert.deepEqual(legacyKeyUpdate, {ok: true, row: 2, sheet: '帳戶餘額總表', updated_columns: ['G']});
+callLog.length = 0;
+const legacyKeyUpdate = route({secret: legacySecret, sheet_name: '帳戶餘額總表', action: 'update_by_key', key_column: 'B', key_value: 'my-crypto-bot', updates: {G: '0.0234', F: '2026-08-26 0:00:49'}});
+assert.deepEqual(legacyKeyUpdate, {ok: true, row: 2, sheet: '帳戶餘額總表', updated_columns: ['G', 'F']});
 assert.equal(accountSheet.rows[1][6], '0.0234');
+assert.equal(accountSheet.rows[1][5], '2026-08-26 0:00:49');
+assert.deepEqual(callLog.filter(c => c.column === 6).map(c => c.op), ['setNumberFormat', 'setValue']);  // F, datetime-shaped
 
 const v2OpenProjection = {trade_id: 'v2-trade-1', execution_mode: 'LIVE', symbol: 'TEST_USDT', side: 'long', entry_time: '2026-08-26T00:00:00Z', entry_price: '1', volume: '2', leverage: '3', entry_fee: '0.01', entry_order_id: '123456789012345678'};
 const v2Open = v2Write({action: 'append_open_v2', eventType: 'trade_open', tradeId: 'v2-trade-1', projection: v2OpenProjection, requestId: '00000000-0000-4000-8000-000000000012'});
