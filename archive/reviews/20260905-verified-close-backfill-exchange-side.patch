@@ -1,0 +1,139 @@
+From f69002a386762c21d29175d2a6461b1e0a2a551e Mon Sep 17 00:00:00 2001
+From: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date: Sat, 5 Sep 2026 17:22:25 +0800
+Subject: [PATCH] fix: build_evidence records each fill's real side, not
+ hardcoded SELL (v0.14.1) (#11)
+
+build_evidence() wrote every deal's exchange_side as a hardcoded "SELL",
+silently correct only for a long-only consumer (momentum). Found while
+scoping seykota's adapter -- seykota trades both directions (bot.py:
+"SELL" if p.side == "long" else "BUY"), so a short position's real closing
+fills are BUY-side, and the evidence would have permanently mislabeled them.
+
+Now derives exchange_side from each normalized fill's own `side` field
+(uppercased), falling back to "SELL" only when a caller's fills don't carry
+one (backward compatible -- momentum's existing _precise_fill already
+populates side correctly, so its output is byte-identical; no consumer needs
+to change).
+
+Co-authored-by: bcup02 <columnbb@gmail.com>
+Co-authored-by: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ pyproject.toml                              |  2 +-
+ src/trade_alerts/__init__.py                |  2 +-
+ src/trade_alerts/verified_close_backfill.py | 21 +++++++++++------
+ tests/test_verified_close_backfill.py       | 25 +++++++++++++++++++--
+ 4 files changed, 39 insertions(+), 11 deletions(-)
+
+diff --git a/pyproject.toml b/pyproject.toml
+index 0dc4ab6..fc22b8c 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.14.0"
++version = "0.14.1"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index fbe8d08..c9b7df0 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -180,4 +180,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.14.0"
++__version__ = "0.14.1"
+diff --git a/src/trade_alerts/verified_close_backfill.py b/src/trade_alerts/verified_close_backfill.py
+index eedbe97..a73ef94 100644
+--- a/src/trade_alerts/verified_close_backfill.py
++++ b/src/trade_alerts/verified_close_backfill.py
+@@ -104,15 +104,18 @@ def build_evidence(
+     incident_prefix: str = "verified-close-backfill",
+ ) -> dict[str, Any]:
+     """Assemble a schema-``1.0`` evidence dict from a local ``trade_open`` and
+-    the exchange's SELL fills that closed it.
++    the exchange's closing-side fills that closed it.
+ 
+     ``sell_fills`` entries must use the ``reconcile-source/v1`` fill shape
+     (see ``binance_reconcile_fetch.fill_rows``): ``trade_id``, ``order_id``,
+-    ``price``, ``quantity``, ``commission``, ``realized_pnl``, ``time_ms``.
+-    Already side-filtered by the caller (this function trusts every entry in
+-    ``sell_fills`` is a close-side fill; it does not itself inspect a
+-    ``side`` field, since exchanges spell "sell" differently -- Binance's
+-    lowercase string vs MEXC's numeric side codes).
++    ``price``, ``quantity``, ``commission``, ``realized_pnl``, ``time_ms``,
++    ``side``. Despite the parameter name (kept for call-site stability), a
++    *closing* fill is SELL for a long position but BUY for a short one --
++    not every project this core serves is long-only (seykota trades both
++    directions). Already side-filtered by the caller (this function trusts
++    every entry in ``sell_fills`` is a close-side fill for this position; it
++    only reads each entry's own ``side`` to label the deal accurately, it
++    does not use ``side`` to decide inclusion).
+ 
+     ``method`` records *how* this evidence was obtained (e.g.
+     ``"read_only_binance_user_trades"``, ``"read_only_mexc_order_deals"``) so
+@@ -137,7 +140,11 @@ def build_evidence(
+             "price": str(_as_decimal(f.get("price"), field="fill.price")),
+             "fee": str(_as_decimal(f.get("commission") or "0", field="fill.commission")),
+             "profit": str(_as_decimal(f.get("realized_pnl") or "0", field="fill.realized_pnl")),
+-            "exchange_side": "SELL",
++            # Each fill's own side, not a hardcoded "SELL" -- a short
++            # position's real closing fills are BUY-side. Falls back to
++            # "SELL" only when the caller's normalization left it unset
++            # (backward compatible with any pre-existing long-only caller).
++            "exchange_side": str(f.get("side") or "SELL").upper(),
+         })
+         exit_volume += qty
+ 
+diff --git a/tests/test_verified_close_backfill.py b/tests/test_verified_close_backfill.py
+index e0767a5..30698fa 100644
+--- a/tests/test_verified_close_backfill.py
++++ b/tests/test_verified_close_backfill.py
+@@ -35,9 +35,12 @@ def _open_event(trade_id="T1", symbol="PUFFER_USDT", volume=27376.0, price=0.018
+ 
+ # a "normalized fill" -- the reconcile-source/v1 shape binance_reconcile_fetch.fill_rows emits
+ def _sell_fill(*, trade_id="900", order_id="222798734", price="0.01743", quantity="27376",
+-                commission="0.23858184", realized_pnl="-23.81712", time_ms=1788410433000):
+-    return {"trade_id": trade_id, "order_id": order_id, "price": price, "quantity": quantity,
++                commission="0.23858184", realized_pnl="-23.81712", time_ms=1788410433000, side=None):
++    fill = {"trade_id": trade_id, "order_id": order_id, "price": price, "quantity": quantity,
+             "commission": commission, "realized_pnl": realized_pnl, "time_ms": time_ms}
++    if side is not None:
++        fill["side"] = side
++    return fill
+ 
+ 
+ # --------------------------------------------------------------------------- #
+@@ -79,6 +82,24 @@ def test_build_evidence_from_open_and_one_normalized_sell_fill():
+     assert len(ev["source"]["artifact_sha256"]) == 64
+ 
+ 
++def test_build_evidence_records_each_fills_own_side_not_hardcoded_sell():
++    # A short position's real closing fills are BUY-side -- seykota trades
++    # both directions, unlike momentum (long-only). exchange_side must
++    # reflect the actual fill, not a hardcoded "SELL".
++    buy_fill = _sell_fill(side="buy")
++    ev = build_evidence(open_event=_open_event(), sell_fills=[buy_fill], trailing_order_id=None,
++                         artifact_name="x", method="m")
++    assert ev["trade"]["close"]["deals"][0]["exchange_side"] == "BUY"
++
++
++def test_build_evidence_defaults_exchange_side_to_sell_when_fill_omits_it():
++    # Backward compatible: a caller whose normalized fills don't carry a
++    # side key (none of the existing ones do) keeps the original behavior.
++    ev = build_evidence(open_event=_open_event(), sell_fills=[_sell_fill()], trailing_order_id=None,
++                         artifact_name="x", method="m")
++    assert ev["trade"]["close"]["deals"][0]["exchange_side"] == "SELL"
++
++
+ def test_build_evidence_multi_deal_close_is_time_ordered():
+     fills = [
+         _sell_fill(trade_id="2", order_id="6", price="3.0", quantity="60", commission="0.02",
+-- 
+2.43.0
+
