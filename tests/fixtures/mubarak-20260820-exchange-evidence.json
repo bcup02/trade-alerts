@@ -1,0 +1,53 @@
+{
+  "audit_schema_version": "1.0",
+  "incident_id": "mubarak-20260820-native-trailing-stop-reconciliation",
+  "source": {
+    "github_actions_run_id": "32340515456",
+    "artifact_name": "mubarak-readonly-evidence",
+    "artifact_sha256": "7d2a22349fb570cbae4760e20fba84aecdf0fd8d681b451b85d6b28349a11c64",
+    "retrieved_at": "2026-08-20T06:40:04Z",
+    "query_window": {
+      "start_time_ms": 1787163600000,
+      "end_time_ms": 1787174400000
+    }
+  },
+  "symbol": "MUBARAK_USDT",
+  "trade": {
+    "trade_id": "f7f8f3bfc34046aa86bdb0b5db916171",
+    "position_id": "1473779249",
+    "contract_size": 100.0,
+    "leverage": 3,
+    "entry": {
+      "order_id": "845125012549010560",
+      "occurred_at": "2026-08-19T18:25:05Z",
+      "price": 0.02091,
+      "volume": 3.0,
+      "fee": 0.0050184
+    },
+    "close": {
+      "order_id": "845142898906762880",
+      "occurred_at": "2026-08-19T19:36:09Z",
+      "external_oid": "trackorder_845125014654551680_1088",
+      "originating_trailing_order_id": "845125014654551680",
+      "exchange_profit": -0.173,
+      "deals": [
+        {
+          "deal_id": "13415800875",
+          "price": 0.02034,
+          "volume": 1.0,
+          "fee": 0.0016272,
+          "profit": -0.057,
+          "exchange_side": 3
+        },
+        {
+          "deal_id": "13415800877",
+          "price": 0.02033,
+          "volume": 2.0,
+          "fee": 0.0032528,
+          "profit": -0.116,
+          "exchange_side": 3
+        }
+      ]
+    }
+  }
+}

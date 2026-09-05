@@ -46,7 +46,16 @@ from .ledger_integrity import (
     signed_request,
     verify_signed_request,
 )
-from .binance_reconcile_fetch import BinanceReconcileParams, momentum_ledger_symbol
+from .binance_reconcile_fetch import BinanceReconcileParams, fill_rows, momentum_ledger_symbol, position_rows
+from .verified_close_backfill import (
+    REPAIR_EVENT_TYPES,
+    VerifiedCloseError,
+    append_repair,
+    build_evidence,
+    build_repair_events,
+    find_open_event,
+    load_evidence,
+)
 from .ledger_reconcile import (
     CLOSE_MARKERS,
     DRY_RUN_SOURCES,
@@ -110,7 +119,16 @@ __all__ = [
     "outstanding_projection_intents",
     "record_projection_dispatch",
     "BinanceReconcileParams",
+    "fill_rows",
     "momentum_ledger_symbol",
+    "position_rows",
+    "REPAIR_EVENT_TYPES",
+    "VerifiedCloseError",
+    "append_repair",
+    "build_evidence",
+    "build_repair_events",
+    "find_open_event",
+    "load_evidence",
     "ReconciliationFinding",
     "classify_projection_inventory",
     "ProjectionAuditRead",
@@ -162,4 +180,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.13.4"
+__version__ = "0.14.0"
