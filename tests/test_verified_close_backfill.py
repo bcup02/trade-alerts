@@ -35,9 +35,12 @@ def _open_event(trade_id="T1", symbol="PUFFER_USDT", volume=27376.0, price=0.018
 
 # a "normalized fill" -- the reconcile-source/v1 shape binance_reconcile_fetch.fill_rows emits
 def _sell_fill(*, trade_id="900", order_id="222798734", price="0.01743", quantity="27376",
-                commission="0.23858184", realized_pnl="-23.81712", time_ms=1788410433000):
-    return {"trade_id": trade_id, "order_id": order_id, "price": price, "quantity": quantity,
+                commission="0.23858184", realized_pnl="-23.81712", time_ms=1788410433000, side=None):
+    fill = {"trade_id": trade_id, "order_id": order_id, "price": price, "quantity": quantity,
             "commission": commission, "realized_pnl": realized_pnl, "time_ms": time_ms}
+    if side is not None:
+        fill["side"] = side
+    return fill
 
 
 # --------------------------------------------------------------------------- #
@@ -77,6 +80,24 @@ def test_build_evidence_from_open_and_one_normalized_sell_fill():
     assert ev["trade"]["close"]["originating_trailing_order_id"] == "1000000190615768"
     assert ev["trade"]["close"]["method"] == "read_only_binance_user_trades"
     assert len(ev["source"]["artifact_sha256"]) == 64
+
+
+def test_build_evidence_records_each_fills_own_side_not_hardcoded_sell():
+    # A short position's real closing fills are BUY-side -- seykota trades
+    # both directions, unlike momentum (long-only). exchange_side must
+    # reflect the actual fill, not a hardcoded "SELL".
+    buy_fill = _sell_fill(side="buy")
+    ev = build_evidence(open_event=_open_event(), sell_fills=[buy_fill], trailing_order_id=None,
+                         artifact_name="x", method="m")
+    assert ev["trade"]["close"]["deals"][0]["exchange_side"] == "BUY"
+
+
+def test_build_evidence_defaults_exchange_side_to_sell_when_fill_omits_it():
+    # Backward compatible: a caller whose normalized fills don't carry a
+    # side key (none of the existing ones do) keeps the original behavior.
+    ev = build_evidence(open_event=_open_event(), sell_fills=[_sell_fill()], trailing_order_id=None,
+                         artifact_name="x", method="m")
+    assert ev["trade"]["close"]["deals"][0]["exchange_side"] == "SELL"
 
 
 def test_build_evidence_multi_deal_close_is_time_ordered():

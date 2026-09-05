@@ -104,15 +104,18 @@ def build_evidence(
     incident_prefix: str = "verified-close-backfill",
 ) -> dict[str, Any]:
     """Assemble a schema-``1.0`` evidence dict from a local ``trade_open`` and
-    the exchange's SELL fills that closed it.
+    the exchange's closing-side fills that closed it.
 
     ``sell_fills`` entries must use the ``reconcile-source/v1`` fill shape
     (see ``binance_reconcile_fetch.fill_rows``): ``trade_id``, ``order_id``,
-    ``price``, ``quantity``, ``commission``, ``realized_pnl``, ``time_ms``.
-    Already side-filtered by the caller (this function trusts every entry in
-    ``sell_fills`` is a close-side fill; it does not itself inspect a
-    ``side`` field, since exchanges spell "sell" differently -- Binance's
-    lowercase string vs MEXC's numeric side codes).
+    ``price``, ``quantity``, ``commission``, ``realized_pnl``, ``time_ms``,
+    ``side``. Despite the parameter name (kept for call-site stability), a
+    *closing* fill is SELL for a long position but BUY for a short one --
+    not every project this core serves is long-only (seykota trades both
+    directions). Already side-filtered by the caller (this function trusts
+    every entry in ``sell_fills`` is a close-side fill for this position; it
+    only reads each entry's own ``side`` to label the deal accurately, it
+    does not use ``side`` to decide inclusion).
 
     ``method`` records *how* this evidence was obtained (e.g.
     ``"read_only_binance_user_trades"``, ``"read_only_mexc_order_deals"``) so
@@ -137,7 +140,11 @@ def build_evidence(
             "price": str(_as_decimal(f.get("price"), field="fill.price")),
             "fee": str(_as_decimal(f.get("commission") or "0", field="fill.commission")),
             "profit": str(_as_decimal(f.get("realized_pnl") or "0", field="fill.realized_pnl")),
-            "exchange_side": "SELL",
+            # Each fill's own side, not a hardcoded "SELL" -- a short
+            # position's real closing fills are BUY-side. Falls back to
+            # "SELL" only when the caller's normalization left it unset
+            # (backward compatible with any pre-existing long-only caller).
+            "exchange_side": str(f.get("side") or "SELL").upper(),
         })
         exit_volume += qty
 
