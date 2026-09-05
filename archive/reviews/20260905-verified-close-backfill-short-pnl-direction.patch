@@ -1,0 +1,139 @@
+From 4c65ce1c3c951dd8abf3fcc2c288be751b839003 Mon Sep 17 00:00:00 2001
+From: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date: Sat, 5 Sep 2026 17:32:37 +0800
+Subject: [PATCH] fix: gross_pnl direction for a short-position close (v0.14.2)
+ (#12)
+
+build_repair_events() computed gross_pnl = (exit_price - entry_price) *
+exit_volume * contract_size unconditionally -- correct for a long position
+(profit when price rises) but backwards for a short (profit when price
+falls). Found while building seykota's adapter: seykota trades both
+directions, unlike momentum.
+
+Direction is now derived from the closing fills' own exchange_side (v0.14.1):
+an unambiguous "BUY" (closing a short) flips the sign; every other value --
+including "SELL", anything unrecognized, and pre-v0.14.0 evidence carrying
+MEXC's numeric side codes (the real MUBARAK fixture's exchange_side=3) --
+keeps the original long formula. This is deliberately an opt-IN to the new
+short-close math on an unambiguous signal, never an opt-out of the
+long-standing default on an ambiguous one, so no evidence format that
+predates bidirectional support can be silently misread.
+
+Caught this the same way as the two v0.14.0/v0.14.1 issues: a first attempt
+that defaulted to "assume long unless told SELL" broke the real MUBARAK
+golden fixture (its legacy MEXC numeric side code isn't "SELL", so it fell
+through to the short branch and flipped its sign) -- the test suite caught
+it before this ever reached a PR.
+
+3 new tests: short-close profits on a falling price, long-close still
+profits on a rising price (unchanged direction), and the real legacy
+fixture's numeric side code still resolves to the long formula.
+
+Co-authored-by: bcup02 <columnbb@gmail.com>
+Co-authored-by: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ pyproject.toml                              |  2 +-
+ src/trade_alerts/__init__.py                |  2 +-
+ src/trade_alerts/verified_close_backfill.py | 13 ++++++-
+ tests/test_verified_close_backfill.py       | 38 +++++++++++++++++++++
+ 4 files changed, 52 insertions(+), 3 deletions(-)
+
+diff --git a/pyproject.toml b/pyproject.toml
+index fc22b8c..886b900 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.14.1"
++version = "0.14.2"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index c9b7df0..6be2cc1 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -180,4 +180,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.14.1"
++__version__ = "0.14.2"
+diff --git a/src/trade_alerts/verified_close_backfill.py b/src/trade_alerts/verified_close_backfill.py
+index a73ef94..eeb5869 100644
+--- a/src/trade_alerts/verified_close_backfill.py
++++ b/src/trade_alerts/verified_close_backfill.py
+@@ -249,7 +249,18 @@ def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, A
+         Decimal("0"),
+     ) / exit_volume
+     exit_fee = sum((_as_decimal(deal["fee"], field="deal.fee") for deal in deals), Decimal("0"))
+-    gross_pnl = (exit_price - entry_price) * exit_volume * contract_size
++    # Direction from the closing fills' own side (every deal in one close
++    # shares it): a BUY closes a short (profit when exit < entry) -- every
++    # other value, including SELL, unrecognized strings, and pre-v0.14.0
++    # evidence carrying MEXC's numeric side codes (e.g. the legacy MUBARAK
++    # fixture's exchange_side=3), defaults to the long formula (profit when
++    # exit > entry), which is what every evidence file predating
++    # bidirectional support already assumed unconditionally. Only opt IN to
++    # the short formula on an unambiguous "BUY" -- never opt out of the
++    # long-standing default on an ambiguous or unrecognized value.
++    closing_side = str(deals[0].get("exchange_side") or "").upper()
++    direction = Decimal("-1") if closing_side == "BUY" else Decimal("1")
++    gross_pnl = direction * (exit_price - entry_price) * exit_volume * contract_size
+     total_fees = entry_fee + exit_fee
+     net_pnl = gross_pnl - total_fees
+     margin = entry_price * entry_volume * contract_size / Decimal(leverage) if leverage else Decimal("0")
+diff --git a/tests/test_verified_close_backfill.py b/tests/test_verified_close_backfill.py
+index 30698fa..94f9eec 100644
+--- a/tests/test_verified_close_backfill.py
++++ b/tests/test_verified_close_backfill.py
+@@ -243,6 +243,44 @@ def test_load_evidence_refuses_malformed_payload(tmp_path):
+         load_evidence(bad)
+ 
+ 
++def test_build_repair_events_short_close_profits_when_price_falls():
++    # A short position (closed by a BUY fill) profits when exit < entry --
++    # the opposite sign from momentum's long-only closes. Entry 100, exit 90,
++    # volume 1, contract_size 1 -> gross_pnl must be +10, not -10.
++    ev = build_evidence(
++        open_event=_open_event(price=100.0, fee=0.0),
++        sell_fills=[_sell_fill(price="90.0", quantity="27376", commission="0", realized_pnl="10", side="buy")],
++        trailing_order_id=None, artifact_name="x", method="m",
++    )
++    events = {event_type: fields for event_type, fields in build_repair_events(ev)}
++    assert events["trade_close"]["gross_pnl"] == pytest.approx(10.0 * 27376.0 * 1.0)
++    assert events["trade_close"]["exit_price"] == pytest.approx(90.0)
++
++
++def test_build_repair_events_long_close_still_profits_when_price_rises():
++    # Same shape, SELL-closing (long) fill: unchanged long-only direction.
++    ev = build_evidence(
++        open_event=_open_event(price=100.0, fee=0.0),
++        sell_fills=[_sell_fill(price="110.0", quantity="27376", commission="0", realized_pnl="10", side="sell")],
++        trailing_order_id=None, artifact_name="x", method="m",
++    )
++    events = {event_type: fields for event_type, fields in build_repair_events(ev)}
++    assert events["trade_close"]["gross_pnl"] == pytest.approx(10.0 * 27376.0 * 1.0)
++    assert events["trade_close"]["exit_price"] == pytest.approx(110.0)
++
++
++def test_build_repair_events_legacy_numeric_exchange_side_defaults_to_long_direction():
++    # The real MUBARAK fixture's deals carry exchange_side=3 (a MEXC numeric
++    # code), not "SELL"/"BUY". This must NOT be misread as a short close --
++    # every evidence file predating bidirectional support assumed the long
++    # formula unconditionally, and this fixture's own golden net_pnl
++    # (asserted elsewhere in this file) only holds under that assumption.
++    evidence = load_evidence(EVIDENCE)
++    assert evidence["trade"]["close"]["deals"][0]["exchange_side"] == 3
++    events = {event_type: fields for event_type, fields in build_repair_events(evidence)}
++    assert events["trade_close"]["net_pnl"] == pytest.approx(-0.1828984)
++
++
+ def test_repair_event_types_matches_what_build_repair_events_emits():
+     evidence = load_evidence(EVIDENCE)
+     event_types = {event_type for event_type, _fields in build_repair_events(evidence)}
+-- 
+2.43.0
+
