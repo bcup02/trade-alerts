@@ -249,7 +249,18 @@ def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, A
         Decimal("0"),
     ) / exit_volume
     exit_fee = sum((_as_decimal(deal["fee"], field="deal.fee") for deal in deals), Decimal("0"))
-    gross_pnl = (exit_price - entry_price) * exit_volume * contract_size
+    # Direction from the closing fills' own side (every deal in one close
+    # shares it): a BUY closes a short (profit when exit < entry) -- every
+    # other value, including SELL, unrecognized strings, and pre-v0.14.0
+    # evidence carrying MEXC's numeric side codes (e.g. the legacy MUBARAK
+    # fixture's exchange_side=3), defaults to the long formula (profit when
+    # exit > entry), which is what every evidence file predating
+    # bidirectional support already assumed unconditionally. Only opt IN to
+    # the short formula on an unambiguous "BUY" -- never opt out of the
+    # long-standing default on an ambiguous or unrecognized value.
+    closing_side = str(deals[0].get("exchange_side") or "").upper()
+    direction = Decimal("-1") if closing_side == "BUY" else Decimal("1")
+    gross_pnl = direction * (exit_price - entry_price) * exit_volume * contract_size
     total_fees = entry_fee + exit_fee
     net_pnl = gross_pnl - total_fees
     margin = entry_price * entry_volume * contract_size / Decimal(leverage) if leverage else Decimal("0")
