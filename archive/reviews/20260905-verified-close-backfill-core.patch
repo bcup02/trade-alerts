@@ -1,0 +1,813 @@
+From aa859b10eed7308d84456fe374e54721dbfecbd8 Mon Sep 17 00:00:00 2001
+From: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date: Sat, 5 Sep 2026 15:22:30 +0800
+Subject: [PATCH] feat: exchange-agnostic verified-close-backfill core
+ (v0.14.0) (#10)
+
+New verified_close_backfill module: builds a schema-1.0 evidence dict from a
+local trade_open + normalized exchange fills (the same reconcile-source/v1
+shape binance_reconcile_fetch.fill_rows already emits), then appends the
+evidence-backed repair events (reconciliation_evidence_recorded / fill /
+trade_close / position_reconciled_closed) via an injected ledger_append
+callable -- never constructs an exchange client or a project's own
+TradeLedger, so any exchange adapter emitting the normalized fill shape can
+feed it and any project's own ledger class can consume it.
+
+Ported (not copied) from momentum's fetch_verified_close_evidence.py /
+append_reconciled_close.py, which hardcode Binance's raw field names deep in
+the evidence builder and a "method": "read_only_mexc_history_orders_and_deals"
+string that's been wrong since momentum's Binance migration. Fixed here:
+method is now a parameter threaded through from whichever adapter actually
+fetched the evidence, defaulting to a neutral label for old evidence that
+predates the field entirely (proven against momentum's real MUBARAK evidence
+fixture, which has neither a "method" field nor Binance-shaped fields at
+all -- MEXC-era numeric exchange_side codes pass through untouched).
+
+binance_reconcile_fetch.position_rows / .fill_rows made public (renamed from
+_position_rows / _fill_rows, pure rename, no logic change) so a project's
+verified-close CLI can call them directly for a narrow symbol+window query
+without going through the heavier full fetch() (balance, open orders, ...).
+
+Momentum's own two tools will be refactored to consume this in a follow-up
+PR; this PR only adds the shared core and does not change any consuming
+project yet.
+
+Co-authored-by: bcup02 <columnbb@gmail.com>
+Co-authored-by: Claude Sonnet 5 <noreply@anthropic.com>
+---
+ pyproject.toml                                |   2 +-
+ src/trade_alerts/__init__.py                  |  22 +-
+ src/trade_alerts/binance_reconcile_fetch.py   |   8 +-
+ src/trade_alerts/verified_close_backfill.py   | 370 ++++++++++++++++++
+ .../mubarak-20260820-exchange-evidence.json   |  53 +++
+ tests/test_verified_close_backfill.py         | 228 +++++++++++
+ 6 files changed, 676 insertions(+), 7 deletions(-)
+ create mode 100644 src/trade_alerts/verified_close_backfill.py
+ create mode 100644 tests/fixtures/mubarak-20260820-exchange-evidence.json
+ create mode 100644 tests/test_verified_close_backfill.py
+
+diff --git a/pyproject.toml b/pyproject.toml
+index 7759412..0dc4ab6 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.13.4"
++version = "0.14.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index e052b3f..fbe8d08 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -46,7 +46,16 @@ from .ledger_integrity import (
+     signed_request,
+     verify_signed_request,
+ )
+-from .binance_reconcile_fetch import BinanceReconcileParams, momentum_ledger_symbol
++from .binance_reconcile_fetch import BinanceReconcileParams, fill_rows, momentum_ledger_symbol, position_rows
++from .verified_close_backfill import (
++    REPAIR_EVENT_TYPES,
++    VerifiedCloseError,
++    append_repair,
++    build_evidence,
++    build_repair_events,
++    find_open_event,
++    load_evidence,
++)
+ from .ledger_reconcile import (
+     CLOSE_MARKERS,
+     DRY_RUN_SOURCES,
+@@ -110,7 +119,16 @@ __all__ = [
+     "outstanding_projection_intents",
+     "record_projection_dispatch",
+     "BinanceReconcileParams",
++    "fill_rows",
+     "momentum_ledger_symbol",
++    "position_rows",
++    "REPAIR_EVENT_TYPES",
++    "VerifiedCloseError",
++    "append_repair",
++    "build_evidence",
++    "build_repair_events",
++    "find_open_event",
++    "load_evidence",
+     "ReconciliationFinding",
+     "classify_projection_inventory",
+     "ProjectionAuditRead",
+@@ -162,4 +180,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.13.4"
++__version__ = "0.14.0"
+diff --git a/src/trade_alerts/binance_reconcile_fetch.py b/src/trade_alerts/binance_reconcile_fetch.py
+index c388597..803f675 100644
+--- a/src/trade_alerts/binance_reconcile_fetch.py
++++ b/src/trade_alerts/binance_reconcile_fetch.py
+@@ -106,7 +106,7 @@ def _balance_block(client: Any) -> dict[str, Any]:
+             "unrealized_pnl": None, "update_time_ms": None}
+ 
+ 
+-def _position_rows(client: Any, params: BinanceReconcileParams) -> list[dict[str, Any]]:
++def position_rows(client: Any, params: BinanceReconcileParams) -> list[dict[str, Any]]:
+     rows: list[dict[str, Any]] = []
+     for p in client.position_information(params.scope_symbol):
+         amt = to_number(p.get("positionAmt")) or 0.0
+@@ -140,7 +140,7 @@ def _resolve_query_symbols(
+     return list(resolved)
+ 
+ 
+-def _fill_rows(
++def fill_rows(
+     client: Any, params: BinanceReconcileParams, since_ms: int, query_native: list[str],
+ ) -> tuple[list[dict[str, Any]], bool]:
+     """``user_trades`` for each native symbol in ``query_native`` (Binance's
+@@ -229,10 +229,10 @@ def fetch(params: BinanceReconcileParams, *, now: datetime | None = None) -> dic
+     else:
+         server_time = _section("server_time", lambda: client.sync_server_time(force=True))
+         balance = _section("balance", lambda: _balance_block(client))
+-        positions = _section("positions", lambda: _position_rows(client, params))
++        positions = _section("positions", lambda: position_rows(client, params))
+         orders = _section("open_orders", lambda: _order_rows(client, params))
+         query_native = _resolve_query_symbols(params, positions)
+-        fill_result = _section("fills", lambda: _fill_rows(client, params, since_ms, query_native))
++        fill_result = _section("fills", lambda: fill_rows(client, params, since_ms, query_native))
+         fills, truncated = fill_result if fill_result is not None else (None, False)
+ 
+     symbols_queried = [params.to_ledger_symbol(s) for s in query_native]
+diff --git a/src/trade_alerts/verified_close_backfill.py b/src/trade_alerts/verified_close_backfill.py
+new file mode 100644
+index 0000000..eedbe97
+--- /dev/null
++++ b/src/trade_alerts/verified_close_backfill.py
+@@ -0,0 +1,370 @@
++"""Exchange-agnostic evidence-building + append-only ledger repair for a
++"verified-close backfill": a tracked position vanished from the exchange
++without the strategy recording a ``trade_close`` (a race in the strategy's
++own decoupled position-sync), and was later confirmed -- via a read-only
++query of the exchange's own trade history -- to have genuinely closed for
++real money.
++
++This module never talks to an exchange and never constructs a ledger writer.
++Callers resolve those two things themselves and pass in:
++
++  * ``sell_fills`` -- exchange fills already normalized to the same shape
++    ``trade_alerts.binance_reconcile_fetch``'s ``fills`` entries use
++    (``trade_id``, ``order_id``, ``price``, ``quantity``, ``commission``,
++    ``realized_pnl``, ``time_ms``, ...). Any exchange adapter that already
++    emits that shape -- Binance today via ``binance_reconcile_fetch.fill_rows``,
++    MEXC when a matching adapter exists -- can feed this directly, so a
++    project's exchange reassignment needs no changes here.
++  * ``ledger_append`` -- a callable bound to the caller's own ``TradeLedger``
++    instance (each project has its own append-only ledger class; this module
++    deliberately never imports one, so it stays usable regardless of which
++    project's ledger schema it's writing into).
++
++Two-stage flow, mirroring every other repair tool in this toolkit family
++(``reconcile_apply.py``, ``safe_halt_resume.py``): build + preview the
++evidence first, only append after an explicit second step.
++
++  1. ``build_evidence(...)`` -> a schema ``1.0`` evidence dict. The caller
++     writes it to disk (or not, for a preview-only run).
++  2. ``append_repair(ledger_path, evidence_path, ledger_append=..., apply=...)``
++     -- reads that evidence file back and, only when ``apply=True``, appends
++     ``reconciliation_evidence_recorded`` / ``fill`` (one per deal) /
++     ``trade_close`` / ``position_reconciled_closed`` events via the injected
++     ``ledger_append``.
++
++Consumers: ``mexc-4h-momentum-trailing-stop`` (Binance today); ``ed-seykota``
++and ``my-crypto-bot`` planned.
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++from datetime import datetime, timezone
++from decimal import Decimal, InvalidOperation
++from pathlib import Path
++from typing import Any, Callable
++
++from .ledger_reconcile import read_ledger
++
++_SCHEMA_VERSION = "1.0"
++_DEFAULT_METHOD = "read_only_exchange_history"
++
++REPAIR_EVENT_TYPES = frozenset({
++    "reconciliation_evidence_recorded",
++    "fill",
++    "trade_close",
++    "position_reconciled_closed",
++})
++
++
++class VerifiedCloseError(RuntimeError):
++    """Raised for anything that should abort a backfill attempt (ambiguous
++    fills, position still open, evidence already applied, ...). Callers
++    decide how to surface it (a CLI turns this into ``SystemExit``, per the
++    existing ``fetch_verified_close_evidence.py`` convention)."""
++
++
++def _as_decimal(value: Any, *, field: str) -> Decimal:
++    try:
++        return Decimal(str(value))
++    except (InvalidOperation, TypeError, ValueError) as exc:
++        raise VerifiedCloseError(f"invalid {field}: {value!r}") from exc
++
++
++def _canonical(obj: Any) -> str:
++    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
++
++
++def _epoch_ms_to_iso(epoch_ms: int) -> str:
++    return datetime.fromtimestamp(epoch_ms / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
++
++
++# --------------------------------------------------------------------------- #
++# stage 1: build evidence from a local trade_open + exchange fills
++# --------------------------------------------------------------------------- #
++def find_open_event(events: list[dict[str, Any]], trade_id: str) -> dict[str, Any]:
++    """The most recent ``trade_open`` for ``trade_id``. Refuses if the trade
++    already has a ``trade_close`` -- this tool is only for a genuinely missing
++    close, never a second opinion on an existing one."""
++    opens = [e for e in events if e.get("event_type") == "trade_open" and e.get("trade_id") == trade_id]
++    if not opens:
++        raise VerifiedCloseError(f"no trade_open in the ledger for trade_id {trade_id}")
++    if any(e.get("event_type") == "trade_close" and e.get("trade_id") == trade_id for e in events):
++        raise VerifiedCloseError(f"trade_id {trade_id} already has a trade_close -- nothing to back-fill")
++    return opens[-1]
++
++
++def build_evidence(
++    *,
++    open_event: dict[str, Any],
++    sell_fills: list[dict[str, Any]],
++    trailing_order_id: str | None,
++    artifact_name: str,
++    method: str = _DEFAULT_METHOD,
++    incident_prefix: str = "verified-close-backfill",
++) -> dict[str, Any]:
++    """Assemble a schema-``1.0`` evidence dict from a local ``trade_open`` and
++    the exchange's SELL fills that closed it.
++
++    ``sell_fills`` entries must use the ``reconcile-source/v1`` fill shape
++    (see ``binance_reconcile_fetch.fill_rows``): ``trade_id``, ``order_id``,
++    ``price``, ``quantity``, ``commission``, ``realized_pnl``, ``time_ms``.
++    Already side-filtered by the caller (this function trusts every entry in
++    ``sell_fills`` is a close-side fill; it does not itself inspect a
++    ``side`` field, since exchanges spell "sell" differently -- Binance's
++    lowercase string vs MEXC's numeric side codes).
++
++    ``method`` records *how* this evidence was obtained (e.g.
++    ``"read_only_binance_user_trades"``, ``"read_only_mexc_order_deals"``) so
++    the eventual ledger repair event carries an accurate provenance label
++    instead of a value hardcoded to whichever exchange this tool was first
++    written against.
++    """
++    entry_volume = _as_decimal(open_event["volume"], field="open_event.volume")
++    if not sell_fills:
++        raise VerifiedCloseError(
++            "no closing fills found on the exchange for this symbol/window -- "
++            "the position may still be open, or the close is outside the lookback window"
++        )
++
++    deals: list[dict[str, Any]] = []
++    exit_volume = Decimal("0")
++    for f in sorted(sell_fills, key=lambda r: int(r.get("time_ms") or 0)):
++        qty = _as_decimal(f.get("quantity"), field="fill.quantity")
++        deals.append({
++            "deal_id": str(f.get("trade_id")),
++            "volume": str(qty),
++            "price": str(_as_decimal(f.get("price"), field="fill.price")),
++            "fee": str(_as_decimal(f.get("commission") or "0", field="fill.commission")),
++            "profit": str(_as_decimal(f.get("realized_pnl") or "0", field="fill.realized_pnl")),
++            "exchange_side": "SELL",
++        })
++        exit_volume += qty
++
++    if exit_volume != entry_volume:
++        raise VerifiedCloseError(
++            f"closing fills sum to {exit_volume} but the trade_open volume is {entry_volume}; "
++            "refusing an ambiguous close (widen the lookback window, or reconcile by hand)"
++        )
++
++    last = max(sell_fills, key=lambda r: int(r.get("time_ms") or 0))
++    occurred_at = _epoch_ms_to_iso(int(last["time_ms"]))
++    exchange_profit = sum((Decimal(d["profit"]) for d in deals), Decimal("0"))
++    artifact_sha256 = hashlib.sha256(_canonical(sorted(deals, key=lambda d: d["deal_id"])).encode()).hexdigest()
++
++    return {
++        "audit_schema_version": _SCHEMA_VERSION,
++        "incident_id": f"{incident_prefix}-{str(open_event['trade_id'])[:12]}",
++        "symbol": open_event["symbol"],
++        "source": {
++            "artifact_sha256": artifact_sha256,
++            "artifact_name": artifact_name,
++            "github_actions_run_id": None,
++        },
++        "trade": {
++            "trade_id": open_event["trade_id"],
++            "contract_size": str(_as_decimal(open_event.get("contract_size") or "1", field="contract_size")),
++            "leverage": int(open_event.get("leverage") or 3),
++            "entry": {
++                "price": str(_as_decimal(open_event["price"], field="open_event.price")),
++                "volume": str(entry_volume),
++                "fee": str(_as_decimal(open_event.get("fee") or "0", field="open_event.fee")),
++            },
++            "close": {
++                "order_id": str(last.get("order_id")),
++                "occurred_at": occurred_at,
++                "exchange_profit": str(exchange_profit),
++                "originating_trailing_order_id": trailing_order_id,
++                "deals": deals,
++                "method": method,
++            },
++        },
++    }
++
++
++# --------------------------------------------------------------------------- #
++# stage 2: append the evidence-backed repair to the local ledger
++# --------------------------------------------------------------------------- #
++def load_evidence(path: str | Path) -> dict[str, Any]:
++    payload = json.loads(Path(path).read_text(encoding="utf-8"))
++    if not isinstance(payload, dict) or payload.get("audit_schema_version") != _SCHEMA_VERSION:
++        raise VerifiedCloseError("unsupported or malformed reconciliation evidence")
++    source = payload.get("source")
++    trade = payload.get("trade")
++    if not isinstance(source, dict) or not isinstance(trade, dict):
++        raise VerifiedCloseError("reconciliation evidence is missing source or trade data")
++    if not isinstance(source.get("artifact_sha256"), str) or not source["artifact_sha256"]:
++        raise VerifiedCloseError("reconciliation evidence is missing artifact SHA-256")
++    if not isinstance(payload.get("incident_id"), str) or not payload["incident_id"]:
++        raise VerifiedCloseError("reconciliation evidence is missing incident ID")
++    if not isinstance(trade.get("entry"), dict) or not isinstance(trade.get("close"), dict):
++        raise VerifiedCloseError("reconciliation evidence is missing entry or close data")
++    if not isinstance(trade["close"].get("deals"), list) or not trade["close"]["deals"]:
++        raise VerifiedCloseError("reconciliation evidence has no close deals")
++    return payload
++
++
++def _existing_repair(events: list[dict[str, Any]], *, trade_id: str, incident_id: str) -> bool:
++    return any(
++        event.get("trade_id") == trade_id
++        and event.get("event_type") in {"trade_close", "position_reconciled_closed"}
++        and isinstance(event.get("reconciliation"), dict)
++        and event["reconciliation"].get("incident_id") == incident_id
++        for event in events
++    )
++
++
++def _existing_close(events: list[dict[str, Any]], *, trade_id: str) -> bool:
++    return any(event.get("event_type") == "trade_close" and event.get("trade_id") == trade_id for event in events)
++
++
++def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
++    """Build deterministic append-only events from verified exchange evidence."""
++    source = evidence["source"]
++    trade = evidence["trade"]
++    entry = trade["entry"]
++    close = trade["close"]
++    deals = close["deals"]
++
++    entry_price = _as_decimal(entry["price"], field="entry.price")
++    entry_volume = _as_decimal(entry["volume"], field="entry.volume")
++    entry_fee = _as_decimal(entry["fee"], field="entry.fee")
++    contract_size = _as_decimal(trade["contract_size"], field="contract_size")
++    leverage = int(trade["leverage"])
++    exchange_profit = _as_decimal(close["exchange_profit"], field="close.exchange_profit")
++
++    exit_volume = sum((_as_decimal(deal["volume"], field="deal.volume") for deal in deals), Decimal("0"))
++    if exit_volume <= 0 or exit_volume != entry_volume:
++        raise VerifiedCloseError("close deal volume does not exactly reconcile to entry volume")
++    exit_price = sum(
++        (_as_decimal(deal["price"], field="deal.price") * _as_decimal(deal["volume"], field="deal.volume")
++         for deal in deals),
++        Decimal("0"),
++    ) / exit_volume
++    exit_fee = sum((_as_decimal(deal["fee"], field="deal.fee") for deal in deals), Decimal("0"))
++    gross_pnl = (exit_price - entry_price) * exit_volume * contract_size
++    total_fees = entry_fee + exit_fee
++    net_pnl = gross_pnl - total_fees
++    margin = entry_price * entry_volume * contract_size / Decimal(leverage) if leverage else Decimal("0")
++    # ``method`` on old evidence predating this field falls back to a neutral
++    # label rather than guessing which exchange it came from.
++    reconciliation = {
++        "incident_id": evidence["incident_id"],
++        "artifact_sha256": source["artifact_sha256"],
++        "github_actions_run_id": source.get("github_actions_run_id"),
++        "method": close.get("method") or _DEFAULT_METHOD,
++        "exchange_occurred_at": close["occurred_at"],
++        "originating_trailing_order_id": close["originating_trailing_order_id"],
++    }
++    common = {
++        "trade_id": trade["trade_id"],
++        "symbol": evidence["symbol"],
++        "closed_at": close["occurred_at"],
++        "reconciliation": reconciliation,
++    }
++    events: list[tuple[str, dict[str, Any]]] = [
++        (
++            "reconciliation_evidence_recorded",
++            {
++                **common,
++                "evidence_schema_version": evidence["audit_schema_version"],
++                "evidence_artifact_sha256": source["artifact_sha256"],
++                "evidence_artifact_name": source.get("artifact_name"),
++                "evidence_run_id": source.get("github_actions_run_id"),
++            },
++        )
++    ]
++    for deal in deals:
++        events.append(
++            (
++                "fill",
++                {
++                    **common,
++                    "order_id": close["order_id"],
++                    "action": "reconcile_missing_native_trailing_stop",
++                    "side": deal.get("exchange_side"),
++                    "volume": float(_as_decimal(deal["volume"], field="deal.volume")),
++                    "price": float(_as_decimal(deal["price"], field="deal.price")),
++                    "fee": float(_as_decimal(deal["fee"], field="deal.fee")),
++                    "exchange_profit": float(_as_decimal(deal["profit"], field="deal.profit")),
++                    "raw": {
++                        "deal_id": deal.get("deal_id"),
++                        "order_id": close["order_id"],
++                        "source_artifact_sha256": source["artifact_sha256"],
++                    },
++                },
++            )
++        )
++    events.extend(
++        [
++            (
++                "trade_close",
++                {
++                    **common,
++                    "entry_volume": float(entry_volume),
++                    "exit_volume": float(exit_volume),
++                    "entry_price": float(entry_price),
++                    "exit_price": float(exit_price),
++                    "contract_size": float(contract_size),
++                    "leverage": leverage,
++                    "entry_fee": float(entry_fee),
++                    "exit_fee": float(exit_fee),
++                    "total_fees": float(total_fees),
++                    "gross_pnl": float(gross_pnl),
++                    "net_pnl": float(net_pnl),
++                    "return_on_margin": float(net_pnl / margin) if margin else None,
++                    "order_id": close["order_id"],
++                    "source": "native_trailing_stop",
++                    "exchange_profit": float(exchange_profit),
++                    "reconciliation_delta": float(net_pnl - exchange_profit),
++                },
++            ),
++            (
++                "position_reconciled_closed",
++                {
++                    **common,
++                    "source": "native_trailing_stop",
++                    "order_id": close["order_id"],
++                    "exchange_profit": float(exchange_profit),
++                    "net_pnl": float(net_pnl),
++                },
++            ),
++        ]
++    )
++    return events
++
++
++def append_repair(
++    ledger_path: str | Path,
++    evidence_path: str | Path,
++    *,
++    ledger_append: Callable[..., str],
++    apply: bool = False,
++) -> dict[str, Any]:
++    """Preview or append one idempotent reconciliation repair; never touches
++    strategy state.
++
++    ``ledger_append`` is the caller's own ``TradeLedger.append`` (or
++    equivalent) bound method -- this module never constructs a ledger writer
++    itself, since every project in this toolkit family has its own
++    ``TradeLedger`` class."""
++    evidence = load_evidence(evidence_path)
++    trade = evidence["trade"]
++    events = read_ledger(ledger_path)
++    if _existing_repair(events, trade_id=trade["trade_id"], incident_id=evidence["incident_id"]):
++        raise VerifiedCloseError("this evidence-backed repair has already been appended")
++    if _existing_close(events, trade_id=trade["trade_id"]):
++        raise VerifiedCloseError("trade already has a close record; manual review is required")
++
++    repair_events = build_repair_events(evidence)
++    result = {
++        "apply": apply,
++        "incident_id": evidence["incident_id"],
++        "trade_id": trade["trade_id"],
++        "event_count": len(repair_events),
++        "event_types": [event_type for event_type, _fields in repair_events],
++        "state_file_touched": False,
++    }
++    if apply:
++        result["appended_event_ids"] = [ledger_append(event_type, **fields) for event_type, fields in repair_events]
++    return result
+diff --git a/tests/fixtures/mubarak-20260820-exchange-evidence.json b/tests/fixtures/mubarak-20260820-exchange-evidence.json
+new file mode 100644
+index 0000000..e0ccb8d
+--- /dev/null
++++ b/tests/fixtures/mubarak-20260820-exchange-evidence.json
+@@ -0,0 +1,53 @@
++{
++  "audit_schema_version": "1.0",
++  "incident_id": "mubarak-20260820-native-trailing-stop-reconciliation",
++  "source": {
++    "github_actions_run_id": "32340515456",
++    "artifact_name": "mubarak-readonly-evidence",
++    "artifact_sha256": "7d2a22349fb570cbae4760e20fba84aecdf0fd8d681b451b85d6b28349a11c64",
++    "retrieved_at": "2026-08-20T06:40:04Z",
++    "query_window": {
++      "start_time_ms": 1787163600000,
++      "end_time_ms": 1787174400000
++    }
++  },
++  "symbol": "MUBARAK_USDT",
++  "trade": {
++    "trade_id": "f7f8f3bfc34046aa86bdb0b5db916171",
++    "position_id": "1473779249",
++    "contract_size": 100.0,
++    "leverage": 3,
++    "entry": {
++      "order_id": "845125012549010560",
++      "occurred_at": "2026-08-19T18:25:05Z",
++      "price": 0.02091,
++      "volume": 3.0,
++      "fee": 0.0050184
++    },
++    "close": {
++      "order_id": "845142898906762880",
++      "occurred_at": "2026-08-19T19:36:09Z",
++      "external_oid": "trackorder_845125014654551680_1088",
++      "originating_trailing_order_id": "845125014654551680",
++      "exchange_profit": -0.173,
++      "deals": [
++        {
++          "deal_id": "13415800875",
++          "price": 0.02034,
++          "volume": 1.0,
++          "fee": 0.0016272,
++          "profit": -0.057,
++          "exchange_side": 3
++        },
++        {
++          "deal_id": "13415800877",
++          "price": 0.02033,
++          "volume": 2.0,
++          "fee": 0.0032528,
++          "profit": -0.116,
++          "exchange_side": 3
++        }
++      ]
++    }
++  }
++}
+diff --git a/tests/test_verified_close_backfill.py b/tests/test_verified_close_backfill.py
+new file mode 100644
+index 0000000..e0767a5
+--- /dev/null
++++ b/tests/test_verified_close_backfill.py
+@@ -0,0 +1,228 @@
++"""Exchange-agnostic verified-close-backfill core: evidence building from
++normalized (reconcile-source/v1-shaped) fills, and append-only ledger repair
++via an injected ``ledger_append`` callable.
++
++No exchange, no ledger-implementation import -- this is the toolkit-level
++core every project's thin per-exchange adapter is meant to feed.
++"""
++from __future__ import annotations
++
++import json
++from decimal import Decimal
++from pathlib import Path
++
++import pytest
++
++from trade_alerts import (
++    REPAIR_EVENT_TYPES,
++    VerifiedCloseError,
++    append_repair,
++    build_evidence,
++    build_repair_events,
++    find_open_event,
++    load_evidence,
++)
++from trade_alerts.ledger_reconcile import read_ledger
++
++
++def _open_event(trade_id="T1", symbol="PUFFER_USDT", volume=27376.0, price=0.0183, fee=0.2504904):
++    return {
++        "event_type": "trade_open", "trade_id": trade_id, "symbol": symbol,
++        "volume": volume, "price": price, "fee": fee, "contract_size": 1.0, "leverage": 3,
++        "order_id": "222778500", "event_epoch_ms": 1788408032535, "opened_at": "2026-09-03T04:00:32Z",
++    }
++
++
++# a "normalized fill" -- the reconcile-source/v1 shape binance_reconcile_fetch.fill_rows emits
++def _sell_fill(*, trade_id="900", order_id="222798734", price="0.01743", quantity="27376",
++                commission="0.23858184", realized_pnl="-23.81712", time_ms=1788410433000):
++    return {"trade_id": trade_id, "order_id": order_id, "price": price, "quantity": quantity,
++            "commission": commission, "realized_pnl": realized_pnl, "time_ms": time_ms}
++
++
++# --------------------------------------------------------------------------- #
++# find_open_event
++# --------------------------------------------------------------------------- #
++def test_find_open_event_returns_the_matching_open():
++    events = [_open_event(), {"event_type": "order_result", "trade_id": "T1"}]
++    assert find_open_event(events, "T1")["trade_id"] == "T1"
++
++
++def test_find_open_event_refuses_when_missing():
++    with pytest.raises(VerifiedCloseError, match="no trade_open"):
++        find_open_event([_open_event(trade_id="OTHER")], "T1")
++
++
++def test_find_open_event_refuses_when_already_closed():
++    events = [_open_event(), {"event_type": "trade_close", "trade_id": "T1"}]
++    with pytest.raises(VerifiedCloseError, match="already has a trade_close"):
++        find_open_event(events, "T1")
++
++
++# --------------------------------------------------------------------------- #
++# build_evidence
++# --------------------------------------------------------------------------- #
++def test_build_evidence_from_open_and_one_normalized_sell_fill():
++    ev = build_evidence(
++        open_event=_open_event(), sell_fills=[_sell_fill()], trailing_order_id="1000000190615768",
++        artifact_name="binance_user_trades:PUFFERUSDT", method="read_only_binance_user_trades",
++    )
++    assert ev["audit_schema_version"] == "1.0"
++    assert ev["symbol"] == "PUFFER_USDT"
++    assert ev["trade"]["entry"]["price"] == "0.0183" and ev["trade"]["entry"]["fee"] == "0.2504904"
++    assert Decimal(ev["trade"]["entry"]["volume"]) == Decimal("27376")
++    d = ev["trade"]["close"]["deals"]
++    assert len(d) == 1 and Decimal(d[0]["volume"]) == Decimal("27376") and d[0]["price"] == "0.01743"
++    assert ev["trade"]["close"]["exchange_profit"] == "-23.81712"
++    assert ev["trade"]["close"]["originating_trailing_order_id"] == "1000000190615768"
++    assert ev["trade"]["close"]["method"] == "read_only_binance_user_trades"
++    assert len(ev["source"]["artifact_sha256"]) == 64
++
++
++def test_build_evidence_multi_deal_close_is_time_ordered():
++    fills = [
++        _sell_fill(trade_id="2", order_id="6", price="3.0", quantity="60", commission="0.02",
++                   realized_pnl="-2", time_ms=1788410100000),
++        _sell_fill(trade_id="1", order_id="5", price="2.0", quantity="40", commission="0.01",
++                   realized_pnl="-1", time_ms=1788410000000),
++    ]
++    ev = build_evidence(
++        open_event=_open_event(volume=100.0), sell_fills=fills, trailing_order_id=None,
++        artifact_name="x", method="read_only_binance_user_trades",
++    )
++    c = ev["trade"]["close"]
++    assert [x["deal_id"] for x in c["deals"]] == ["1", "2"]  # time-ordered despite input order
++    assert c["exchange_profit"] == "-3"
++    assert c["order_id"] == "6"  # last (latest) fill's order
++
++
++def test_build_evidence_refuses_when_no_fills():
++    with pytest.raises(VerifiedCloseError, match="no closing fills"):
++        build_evidence(open_event=_open_event(), sell_fills=[], trailing_order_id=None,
++                        artifact_name="x", method="m")
++
++
++def test_build_evidence_refuses_when_fills_do_not_sum_to_entry_volume():
++    short = [_sell_fill(quantity="20000")]
++    with pytest.raises(VerifiedCloseError, match="ambiguous close"):
++        build_evidence(open_event=_open_event(volume=27376.0), sell_fills=short, trailing_order_id=None,
++                        artifact_name="x", method="m")
++
++
++def test_build_evidence_defaults_method_when_not_given():
++    ev = build_evidence(open_event=_open_event(), sell_fills=[_sell_fill()], trailing_order_id=None,
++                         artifact_name="x")
++    assert ev["trade"]["close"]["method"] == "read_only_exchange_history"
++
++
++# --------------------------------------------------------------------------- #
++# append_repair / build_repair_events -- against the same real evidence fixture
++# momentum's tests use, ported verbatim (legacy MEXC-era evidence: numeric
++# exchange_side codes, no "method" field -- proves the repair path stays
++# fully exchange-agnostic and backward compatible with pre-"method" evidence)
++# --------------------------------------------------------------------------- #
++EVIDENCE = Path(__file__).parent / "fixtures" / "mubarak-20260820-exchange-evidence.json"
++TRADE_ID = "f7f8f3bfc34046aa86bdb0b5db916171"
++
++
++def _write_open_trade(ledger_path):
++    ledger_path.write_text(json.dumps({
++        "event_id": "open-1", "event_type": "trade_open", "event_time": "2026-08-19T18:25:05Z",
++        "trade_id": TRADE_ID, "symbol": "MUBARAK_USDT", "volume": 3.0, "price": 0.02091,
++    }) + "\n", encoding="utf-8")
++
++
++class _FakeLedger:
++    """Minimal stand-in for a project's own TradeLedger: append() writes one
++    JSONL line and returns a fake event id, mirroring every project's real
++    TradeLedger.append(event_type, **fields) -> str signature."""
++
++    def __init__(self, path):
++        self.path = Path(path)
++
++    def append(self, event_type, **fields):
++        event_id = f"evt-{event_type}-{fields.get('trade_id', '')}"
++        with self.path.open("a", encoding="utf-8") as handle:
++            handle.write(json.dumps({"event_id": event_id, "event_type": event_type, **fields}) + "\n")
++        return event_id
++
++
++def test_preview_is_non_mutating_and_lists_exact_repair_events(tmp_path):
++    ledger_path = tmp_path / "ledger.jsonl"
++    _write_open_trade(ledger_path)
++    before = ledger_path.read_text(encoding="utf-8")
++
++    result = append_repair(ledger_path, EVIDENCE, ledger_append=_FakeLedger(ledger_path).append, apply=False)
++
++    assert result == {
++        "apply": False,
++        "incident_id": "mubarak-20260820-native-trailing-stop-reconciliation",
++        "trade_id": TRADE_ID,
++        "event_count": 5,
++        "event_types": [
++            "reconciliation_evidence_recorded", "fill", "fill", "trade_close", "position_reconciled_closed",
++        ],
++        "state_file_touched": False,
++    }
++    assert ledger_path.read_text(encoding="utf-8") == before
++
++
++def test_apply_appends_evidence_backed_close_without_overwriting_open_trade(tmp_path):
++    ledger_path = tmp_path / "ledger.jsonl"
++    _write_open_trade(ledger_path)
++
++    result = append_repair(ledger_path, EVIDENCE, ledger_append=_FakeLedger(ledger_path).append, apply=True)
++    events = read_ledger(ledger_path)
++
++    assert len(result["appended_event_ids"]) == 5
++    assert len(events) == 6
++    assert events[0]["event_type"] == "trade_open"
++    assert [event["event_type"] for event in events[1:]] == [
++        "reconciliation_evidence_recorded", "fill", "fill", "trade_close", "position_reconciled_closed",
++    ]
++    close = events[-2]
++    assert close["trade_id"] == TRADE_ID
++    assert close["closed_at"] == "2026-08-19T19:36:09Z"
++    assert close["entry_price"] == 0.02091
++    assert close["exit_price"] == pytest.approx(0.020333333333333333)
++    assert close["entry_fee"] == 0.0050184
++    assert close["exit_fee"] == 0.00488
++    assert close["net_pnl"] == pytest.approx(-0.1828984)
++    assert close["exchange_profit"] == -0.173
++    assert close["reconciliation"]["artifact_sha256"] == "7d2a22349fb570cbae4760e20fba84aecdf0fd8d681b451b85d6b28349a11c64"
++    # This fixture predates the "method" field entirely -> neutral fallback,
++    # not a guess at which exchange it came from.
++    assert close["reconciliation"]["method"] == "read_only_exchange_history"
++
++
++def test_apply_is_idempotent_and_refuses_to_duplicate_a_repaired_trade(tmp_path):
++    ledger_path = tmp_path / "ledger.jsonl"
++    _write_open_trade(ledger_path)
++
++    append_repair(ledger_path, EVIDENCE, ledger_append=_FakeLedger(ledger_path).append, apply=True)
++
++    with pytest.raises(VerifiedCloseError, match="already been appended"):
++        append_repair(ledger_path, EVIDENCE, ledger_append=_FakeLedger(ledger_path).append, apply=True)
++
++
++def test_refuses_to_override_an_existing_close(tmp_path):
++    ledger_path = tmp_path / "ledger.jsonl"
++    _write_open_trade(ledger_path)
++    with ledger_path.open("a", encoding="utf-8") as handle:
++        handle.write(json.dumps({"event_id": "close-1", "event_type": "trade_close", "trade_id": TRADE_ID}) + "\n")
++
++    with pytest.raises(VerifiedCloseError, match="already has a close record"):
++        append_repair(ledger_path, EVIDENCE, ledger_append=_FakeLedger(ledger_path).append, apply=True)
++
++
++def test_load_evidence_refuses_malformed_payload(tmp_path):
++    bad = tmp_path / "bad.json"
++    bad.write_text(json.dumps({"audit_schema_version": "2.0"}), encoding="utf-8")
++    with pytest.raises(VerifiedCloseError, match="unsupported or malformed"):
++        load_evidence(bad)
++
++
++def test_repair_event_types_matches_what_build_repair_events_emits():
++    evidence = load_evidence(EVIDENCE)
++    event_types = {event_type for event_type, _fields in build_repair_events(evidence)}
++    assert event_types == REPAIR_EVENT_TYPES
+-- 
+2.43.0
+
