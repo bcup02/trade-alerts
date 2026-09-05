@@ -243,6 +243,44 @@ def test_load_evidence_refuses_malformed_payload(tmp_path):
         load_evidence(bad)
 
 
+def test_build_repair_events_short_close_profits_when_price_falls():
+    # A short position (closed by a BUY fill) profits when exit < entry --
+    # the opposite sign from momentum's long-only closes. Entry 100, exit 90,
+    # volume 1, contract_size 1 -> gross_pnl must be +10, not -10.
+    ev = build_evidence(
+        open_event=_open_event(price=100.0, fee=0.0),
+        sell_fills=[_sell_fill(price="90.0", quantity="27376", commission="0", realized_pnl="10", side="buy")],
+        trailing_order_id=None, artifact_name="x", method="m",
+    )
+    events = {event_type: fields for event_type, fields in build_repair_events(ev)}
+    assert events["trade_close"]["gross_pnl"] == pytest.approx(10.0 * 27376.0 * 1.0)
+    assert events["trade_close"]["exit_price"] == pytest.approx(90.0)
+
+
+def test_build_repair_events_long_close_still_profits_when_price_rises():
+    # Same shape, SELL-closing (long) fill: unchanged long-only direction.
+    ev = build_evidence(
+        open_event=_open_event(price=100.0, fee=0.0),
+        sell_fills=[_sell_fill(price="110.0", quantity="27376", commission="0", realized_pnl="10", side="sell")],
+        trailing_order_id=None, artifact_name="x", method="m",
+    )
+    events = {event_type: fields for event_type, fields in build_repair_events(ev)}
+    assert events["trade_close"]["gross_pnl"] == pytest.approx(10.0 * 27376.0 * 1.0)
+    assert events["trade_close"]["exit_price"] == pytest.approx(110.0)
+
+
+def test_build_repair_events_legacy_numeric_exchange_side_defaults_to_long_direction():
+    # The real MUBARAK fixture's deals carry exchange_side=3 (a MEXC numeric
+    # code), not "SELL"/"BUY". This must NOT be misread as a short close --
+    # every evidence file predating bidirectional support assumed the long
+    # formula unconditionally, and this fixture's own golden net_pnl
+    # (asserted elsewhere in this file) only holds under that assumption.
+    evidence = load_evidence(EVIDENCE)
+    assert evidence["trade"]["close"]["deals"][0]["exchange_side"] == 3
+    events = {event_type: fields for event_type, fields in build_repair_events(evidence)}
+    assert events["trade_close"]["net_pnl"] == pytest.approx(-0.1828984)
+
+
 def test_repair_event_types_matches_what_build_repair_events_emits():
     evidence = load_evidence(EVIDENCE)
     event_types = {event_type for event_type, _fields in build_repair_events(evidence)}
