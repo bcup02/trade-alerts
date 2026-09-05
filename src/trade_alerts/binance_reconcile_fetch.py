@@ -106,7 +106,7 @@ def _balance_block(client: Any) -> dict[str, Any]:
             "unrealized_pnl": None, "update_time_ms": None}
 
 
-def _position_rows(client: Any, params: BinanceReconcileParams) -> list[dict[str, Any]]:
+def position_rows(client: Any, params: BinanceReconcileParams) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for p in client.position_information(params.scope_symbol):
         amt = to_number(p.get("positionAmt")) or 0.0
@@ -140,7 +140,7 @@ def _resolve_query_symbols(
     return list(resolved)
 
 
-def _fill_rows(
+def fill_rows(
     client: Any, params: BinanceReconcileParams, since_ms: int, query_native: list[str],
 ) -> tuple[list[dict[str, Any]], bool]:
     """``user_trades`` for each native symbol in ``query_native`` (Binance's
@@ -229,10 +229,10 @@ def fetch(params: BinanceReconcileParams, *, now: datetime | None = None) -> dic
     else:
         server_time = _section("server_time", lambda: client.sync_server_time(force=True))
         balance = _section("balance", lambda: _balance_block(client))
-        positions = _section("positions", lambda: _position_rows(client, params))
+        positions = _section("positions", lambda: position_rows(client, params))
         orders = _section("open_orders", lambda: _order_rows(client, params))
         query_native = _resolve_query_symbols(params, positions)
-        fill_result = _section("fills", lambda: _fill_rows(client, params, since_ms, query_native))
+        fill_result = _section("fills", lambda: fill_rows(client, params, since_ms, query_native))
         fills, truncated = fill_result if fill_result is not None else (None, False)
 
     symbols_queried = [params.to_ledger_symbol(s) for s in query_native]
