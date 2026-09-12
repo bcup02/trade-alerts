@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bcup02/trade-alerts/schemas/fleet-event-log-v1.schema.json",
+  "title": "Fleet event log record v1",
+  "description": "One line of a strategy's append-only fleet event log. Every operator-visible detection is recorded here and nothing here notifies anybody; a condition that crossed a threshold additionally opens an error request. Codes are the bare condition names the strategies emit -- the log is per project, so the catalog prefix is added by readers.",
+  "type": "object",
+  "required": ["kind", "event_id", "recorded_at", "project", "code", "evidence", "details", "measurements"],
+  "additionalProperties": false,
+  "properties": {
+    "kind": {"const": "fleet_event_v1"},
+    "event_id": {"type": "string", "minLength": 1},
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "project": {
+      "type": "string",
+      "description": "Catalog/ops-notify project key.",
+      "enum": ["seykota", "momentum", "mycrypto", "btc-competition", "fleet"]
+    },
+    "code": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Bare condition name, never a prefixed catalog code.",
+      "not": {"pattern": "\\."}
+    },
+    "summary": {"type": "string"},
+    "risk_tier": {
+      "description": "The catalog tier as resolved when the event was written, or null when the writer did not resolve one. Recorded for audit only; this log never decides a tier.",
+      "oneOf": [{"type": "null"}, {"enum": ["R0", "R1", "R2", "R3", "R4"]}]
+    },
+    "evidence": {
+      "type": "object",
+      "description": "Stable facts identifying this occurrence; the input a request fingerprint is derived from."
+    },
+    "details": {
+      "type": "object",
+      "description": "Diagnostic context that may differ between two records of the same occurrence."
+    },
+    "measurements": {
+      "type": "object",
+      "description": "Numeric indicators for conditions that are only a metric (a single reconciliation delta lands here and escalates nothing)."
+    }
+  }
+}

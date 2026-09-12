@@ -1,7 +1,7 @@
 {
   "catalog_version": "fleet-error-catalog/v1",
   "generated_for_phase": 3,
-  "note": "Authoritative classification of every operator-visible error path that survived Phase 2. Consumed by the Phase 4 event log and error-handling request queue. 'current' describes the code as of the Phase 3 merge -- entries whose lands_in_phase is 3 are already in that state; everything later still shows the behaviour Phase 4+ will change. Prose rationale lives in docs/fleet-error-catalog.md.",
+  "note": "Authoritative classification of every operator-visible error path that survived Phase 2. Consumed by trade_alerts.fleet_event_log (Phase 4a: risk_tier_for / catalog_entry) and trade_alerts.error_request_queue. 'current' describes the code as of the Phase 3 merge -- entries whose lands_in_phase is 3 are already in that state; everything later still shows the behaviour Phase 4+ will change. Prose rationale lives in docs/fleet-error-catalog.md.",
   "risk_tiers": {
     "R0": {
       "label": "LOG",
