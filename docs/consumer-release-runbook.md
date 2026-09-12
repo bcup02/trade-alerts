@@ -260,3 +260,74 @@ trade-alerts：v0.13.4
 服務/工作流程驗證：trade-alerts pytest（113）+ node 測試全綠。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.14.0（commit aa859b1）
+變更摘要：新模組 verified_close_backfill——把 momentum 的
+          fetch_verified_close_evidence.py / append_reconciled_close.py 移植
+          （非複製）成交易所無關的共用核心：從本地 trade_open + 標準化
+          exchange fills（binance_reconcile_fetch.fill_rows 已用的
+          reconcile-source/v1 形狀）組出 schema-1.0 evidence dict，再透過
+          注入的 ledger_append callable 寫入證據型修復事件（
+          reconciliation_evidence_recorded / fill / trade_close /
+          position_reconciled_closed）——不自建交易所 client，也不自建任何
+          專案自己的 TradeLedger，任何吐得出標準化 fill 形狀的交易所轉接器
+          都能餵它，任何專案自己的 ledger 類別都能吃它。同時修正移植時發現的
+          舊 bug：method 欄位原本寫死
+          "read_only_mexc_history_orders_and_deals"，現在改成呼叫端傳入的
+          參數，讓沒有這欄位的舊證據（用 momentum 真實 MUBARAK evidence
+          fixture 驗證過）能安全退化成中性標籤。binance_reconcile_fetch 的
+          position_rows / fill_rows 改為公開（原 _position_rows /
+          _fill_rows 單純改名，邏輯不變），讓專案的 verified-close CLI 可以
+          直接查窄範圍的 symbol+window，不必走較重的完整 fetch()。
+受影響消費專案：本次 PR 只新增共用核心，未改動任何消費專案；momentum 既有
+          兩支工具留待後續 PR 改用。
+部署入口：無（純函式庫新增，未觸發任何部署）。
+版本驗證：pip show trade-alerts == 0.14.0；trade_alerts.__version__ ==
+          "0.14.0"。
+服務/工作流程驗證：trade-alerts pytest（127）全綠。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```
+
+```text
+trade-alerts：v0.14.1（commit f69002a）
+變更摘要：build_evidence() 原本把每筆 deal 的 exchange_side 寫死成
+          "SELL"，只在純多單消費者（momentum）身上剛好是對的。在幫 seykota
+          的轉接器估工時發現：seykota 雙向都做（bot.py 用 "SELL" if
+          p.side == "long" else "BUY"），空單真正的平倉 fill 是 BUY 方向，
+          寫死 SELL 會永久標錯。改成從每筆標準化 fill 自己的 side 欄位
+          （轉大寫）推導 exchange_side，只有呼叫端的 fills 完全沒帶 side
+          時才退回 "SELL"（向後相容——momentum 既有的 _precise_fill 本來
+          就有填 side，輸出逐位元組不變，不需要改動）。
+受影響消費專案：momentum 輸出不變，不需 bump pin 就相容；seykota 之後接入
+          時會需要這個修正（雙向交易）。
+部署入口：無（純函式庫修正，未觸發任何部署）。
+版本驗證：pip show trade-alerts == 0.14.1；trade_alerts.__version__ ==
+          "0.14.1"。
+服務/工作流程驗證：trade-alerts pytest（129，+2 針對雙向 side 的斷言）全綠。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```
+
+```text
+trade-alerts：v0.14.2（commit 4c65ce1）
+變更摘要：build_repair_events() 原本無條件用 gross_pnl = (exit_price -
+          entry_price) * exit_volume * contract_size——對多單（漲才賺）是對
+          的，對空單（跌才賺）方向完全反了。同樣在幫 seykota 轉接器估工時
+          發現（seykota 雙向交易，momentum 目前只做多）。方向改成從平倉
+          fills 自己的 exchange_side（v0.14.1 才有）推導：只有明確是
+          "BUY"（平掉一個空單）才翻轉正負號；其餘所有值——包含 "SELL"、
+          任何無法辨識的值、以及 v0.14.0 之前帶著 MEXC 數字 side code 的舊
+          證據（真實 MUBARAK fixture 的 exchange_side=3）——一律維持原本
+          的多單公式。刻意設計成「在明確訊號下才選擇啟用新的空單算法」，
+          不是「在模糊訊號下退出行之有年的預設」，所以任何早於雙向支援的
+          證據格式都不會被誤讀。3 個新測試：下跌時空單平倉會賺錢、上漲時
+          多單平倉仍照舊賺錢（方向不變）、真實舊版 fixture 的數字 side code
+          仍解析成多單公式。
+受影響消費專案：momentum 輸出不變，不需 bump pin 就相容；seykota 之後接入
+          時會需要這個修正（雙向交易）。
+部署入口：無（純函式庫修正，未觸發任何部署）。
+版本驗證：pip show trade-alerts == 0.14.2；trade_alerts.__version__ ==
+          "0.14.2"。
+服務/工作流程驗證：trade-alerts pytest（132，+3 針對空單方向的斷言）全綠。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```
