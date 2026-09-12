@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bcup02/trade-alerts/schemas/fleet-error-catalog-v1.schema.json",
+  "title": "Fleet error catalog v1",
+  "description": "One entry per operator-visible error condition in the trading fleet: what the code does today, whether a human could decide anything different, which risk tier that puts it in, and which phase the change lands in.",
+  "type": "object",
+  "required": ["catalog_version", "risk_tiers", "projects", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "catalog_version": {"const": "fleet-error-catalog/v1"},
+    "generated_for_phase": {"type": "integer", "minimum": 0},
+    "note": {"type": "string"},
+    "risk_tiers": {
+      "type": "object",
+      "description": "R0..R4, from 'log only' to 'a human must act'. Keys are fixed; the descriptions are the authoritative definition.",
+      "required": ["R0", "R1", "R2", "R3", "R4"],
+      "additionalProperties": false,
+      "patternProperties": {
+        "^R[0-4]$": {
+          "type": "object",
+          "required": ["label", "notifies", "auto_executes", "description"],
+          "additionalProperties": false,
+          "properties": {
+            "label": {"type": "string"},
+            "notifies": {"type": "boolean"},
+            "auto_executes": {"type": "boolean"},
+            "description": {"type": "string"}
+          }
+        }
+      }
+    },
+    "projects": {
+      "type": "object",
+      "description": "Project key -> repository name. Keys match ops-notify's target keys so a catalog entry can be joined to a notification axis without a second mapping table.",
+      "minProperties": 1,
+      "additionalProperties": {"type": "string"}
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/definitions/entry"}
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "required": [
+        "code", "title", "project", "sources", "current",
+        "verdict", "risk_tier", "auto_action", "human_action",
+        "resume", "lands_in_phase", "rationale"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$",
+          "description": "Stable fleet-wide identifier: <project prefix>.<CONDITION>. Never reused for a different condition once published."
+        },
+        "title": {"type": "string", "minLength": 1},
+        "project": {"type": "string", "minLength": 1},
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": ".+:[0-9]+$"},
+          "description": "file:line of every call site this condition is raised from. Repo-relative, except 'fleet' entries which are repo-qualified."
+        },
+        "current": {
+          "type": "object",
+          "description": "What the code does TODAY, before any phase-4+ change.",
+          "required": ["latch", "notify", "unit_exit"],
+          "additionalProperties": false,
+          "properties": {
+            "latch": {"type": ["string", "null"], "description": "Current latch reason string, or null when this condition does not latch."},
+            "notify": {"type": ["string", "null"], "description": "Current notification event name plus its severity, or null when no notifier exists."},
+            "unit_exit": {"type": ["integer", "null"], "description": "Non-zero process exit code used as a second notification channel, or null."}
+          }
+        },
+        "verdict": {
+          "enum": ["MECHANICAL", "JUDGEMENT"],
+          "description": "Answer to the project's governing test: does this error let a human make a decision different from what automation would do anyway? No -> MECHANICAL."
+        },
+        "risk_tier": {"enum": ["R0", "R1", "R2", "R3", "R4"]},
+        "auto_action": {"type": "string", "minLength": 1},
+        "human_action": {"type": "string", "minLength": 1},
+        "resume": {
+          "enum": ["automatic", "two_stage_fingerprint", "restart_after_config_fix", "n/a"],
+          "description": "How a latch for this condition is cleared. 'two_stage_fingerprint' is momentum's existing gate: --confirm must match the live latch fingerprint, and a matching ledger row makes a second clear a no-op."
+        },
+        "lands_in_phase": {"type": "integer", "minimum": 3, "maximum": 7},
+        "rationale": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

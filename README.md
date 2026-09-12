@@ -62,6 +62,21 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
 
 既有專案不必一次重構：可以繼續呼叫 `publish()`，先把 `schema_version=1.0`、`project_id` 與 `execution_mode=DRY_RUN` 放入 `fields`；新版則使用 `contract_event()` 與 `AlertDispatcher.publish_contract()`。接收端對未知選填欄位採忽略但保留原始資料的策略。
 
+## 交易機隊錯誤目錄 v1
+
+全機隊錯誤分類的權威來源位於 [`docs/fleet-error-catalog.md`](docs/fleet-error-catalog.md)，
+機器可讀版本位於 [`catalog/fleet-error-catalog-v1.json`](catalog/fleet-error-catalog-v1.json)，
+其 JSON Schema 位於
+[`schemas/fleet-error-catalog-v1.schema.json`](schemas/fleet-error-catalog-v1.schema.json)。
+
+目錄替四支策略每一條維運可見的錯誤條件記錄：現行程式的行為、依判準「這個錯誤讓人做出什麼、
+跟自動處理不一樣的決定？」判定的 `MECHANICAL`／`JUDGEMENT`、風險等級 R0–R4、自動與人工處置，
+以及改動落在哪一個 Phase。它是**資料與契約，不是功能**——本套件沒有任何執行期程式碼讀取它，
+所以新增或修改目錄不影響既有消費專案，也不需要重新釘選版本。
+
+`tests/test_fleet_error_catalog.py` 守住幾條不變式，其中最重要的一條是：判定為 `MECHANICAL`
+的條件不得落在任何會通知人的風險等級。
+
 ## 共用 Google Apps Script
 
 `apps_script/google_ledger_receiver.gs` 是綁在「AI自動程式交易紀錄」試算表上的**共用 Apps Script Web App 的權威源**（一個部署服所有專案分頁，靠 payload 的 `sheet_name` 選分頁）。它同時處理 legacy 協定（`SHARED_SECRET` + `append` / `update_by_trade_id` / `update_by_key` / `list_by_sheet` 唯讀）與 `google-ledger-projection-v2`（per-source HMAC + provenance）。欄位 schema、部署步驟、`list_by_sheet` 契約與呼叫端轉址告警都在該檔檔頭。`apps_script/google_ledger_receiver_v2.gs` 是 v2-only 的參考源，非部署對象。**部署（貼進 Apps Script 編輯器 → 管理部署作業 → 新版本）是手動、需另行核准的動作，不在版本標籤的自動範圍內。**
