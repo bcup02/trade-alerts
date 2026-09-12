@@ -58,11 +58,9 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
 
 ## 投資人整合契約 v1
 
-跨專案的公開契約位於 [`docs/investor-contract-v1.md`](docs/investor-contract-v1.md)，machine-readable JSON Schema 位於 [`schemas/investor-contract-v1.schema.json`](schemas/investor-contract-v1.schema.json)。第一版同時支援事件推播、唯讀投資人狀態快照、保護單描述、已平倉交易與 `7d`／`30d`／`ytd`／`1y` 績效窗口。
+跨專案的公開契約位於 [`docs/investor-contract-v1.md`](docs/investor-contract-v1.md)，machine-readable JSON Schema 位於 [`schemas/investor-contract-v1.schema.json`](schemas/investor-contract-v1.schema.json)。第一版支援標準化事件推播。
 
-既有專案不必一次重構：可以繼續呼叫 `publish()`，先把 `schema_version=1.0`、`project_id` 與 `execution_mode=DRY_RUN` 放入 `fields`；新版則使用 `contract_event()` 與 `AlertDispatcher.publish_contract()`。接收端對未知選填欄位採忽略但保留原始資料的策略，對缺失損益使用 `null` 與 `data_quality.missing_fields`，不得推算或偽造數值。
-
-LINE／Telegram 的共用唯讀查詢控制器位於 `InvestorQueryController`，詳細的 provider 與安全邊界請見 [`docs/investor-query-interface-v1.md`](docs/investor-query-interface-v1.md)。它只支援 `查看投資摘要`、`查看交易紀錄` 與 provider 固定指令；身分驗證、webhook 驗章與任何策略控制必須留在宿主專案。
+既有專案不必一次重構：可以繼續呼叫 `publish()`，先把 `schema_version=1.0`、`project_id` 與 `execution_mode=DRY_RUN` 放入 `fields`；新版則使用 `contract_event()` 與 `AlertDispatcher.publish_contract()`。接收端對未知選填欄位採忽略但保留原始資料的策略。
 
 ## 共用 Google Apps Script
 
