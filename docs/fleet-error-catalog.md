@@ -160,15 +160,33 @@ seykota 的 `state.status` 同時裝著 `FLAT`／`LONG`／`SAFE_HALT`，所以�
 ```json
 {
   "active": true,
-  "code": "SEY.PROTECTION_UNVERIFIED",
+  "code": "PROTECTION_UNVERIFIED",
   "reason": "交易所存在部位，但沒有可唯一確認的原生保護單",
   "since": "2026-09-12T10:03:00Z",
-  "fingerprint": "<code + 觸發當下的關鍵事實摘要>",
-  "evidence": {}
+  "evidence": {"symbol": "BTCUSDT", "side": "long", "quantity": 0.01},
+  "details": {}
 }
 ```
 
-- `code` 取自本目錄，不再是自由字串。
+權威實作是 `trade_alerts.safe_halt_model`（Phase 4a，v0.15.0）：`build_safe_halt()` 寫出這個
+dict，四支共用同一份程式而不是各自複製形狀。與本節初版（Phase 3 定稿）的三處差異，理由如下——
+
+- `code` 取自本目錄，不再是自由字串，但**存的是不帶前綴的條件名**（`PROTECTION_UNVERIFIED`），
+  不是目錄碼（`SEY.PROTECTION_UNVERIFIED`）。初版此處的範例與 §5 的命名規則互相矛盾，以 §5
+  為準：state 檔本身是逐專案分開的，前綴在寫入端是多餘資訊，讀取端用
+  `fleet_event_log.catalog_code(project, code)` 補上。`build_safe_halt()` 會**拒絕**帶點的
+  code，所以同一個條件不會因為寫入的層不同而有兩種拼法。
+- **`fingerprint` 不再是 state 的欄位。** 初版照 btc 現行做法把它存進 state，但存下來的副本會
+  跟它聲稱描述的 latch 不一致（btc 現行就有這個形狀的風險：latch 內容改了、fingerprint 欄位沒
+  跟著改，確認閘門就形同虛設）。改由 `safe_halt_fingerprint(halt)` 從 latch 本身動態算，
+  每個讀取端算出來必然一致，沒有第二份可以走鐘的副本。
+- **新增 `details`，與 `evidence` 分工明確。** `evidence` 是穩定事實，也是 fingerprint 的**唯一**
+  輸入（連同 `code`／`reason`）；`details` 是每輪重新斷言同一個 latch 時可能變動的診斷資訊
+  （重讀的保護單狀態、當時的標記價、重試次數）。混在一起會讓 fingerprint 每輪跳動，preview
+  印出的 token 在操作者貼回來之前就過期——latch 會變成永遠無法解除。momentum 現行是靠
+  `_halt_fingerprint()` 裡一份手維護的排除清單處理同一個問題（`updated_at`／
+  `protection_status`／`expected_order_id`）；在寫入端就分開，是把這一整類 bug 消掉而不是繼續
+  逐一列舉它的實例。
 - **`state.status` 不再承載 `SAFE_HALT`**（seykota），部位狀態與停機狀態徹底分家。
 - btc 的 4 個扁平欄位（`safe_halt` / `safe_halt_reason` / `safe_halt_fingerprint` /
   `safe_halt_at`）折成同一個 dict。舊 state 檔的遷移：`state.py` 的 `load()` 以
@@ -178,13 +196,17 @@ seykota 的 `state.status` 同時裝著 `FLAT`／`LONG`／`SAFE_HALT`，所以�
 
 ### 4.3 統一後的 resume 路徑
 
-全部採用 momentum 現行的兩階段 fingerprint 閘門，它已經在真倉用過：
+全部採用 momentum 現行的兩階段 fingerprint 閘門，它已經在真倉用過。三支共用
+`trade_alerts.safe_halt_model` 的同一組函式，各專案只負責讀寫自己的 state 檔與帳本：
 
-1. `plan()` 印出目前 latch 的 code、原因、fingerprint 與確切的解除指令。
-2. `resume --confirm <fingerprint>` 必須與當下 latch 的 fingerprint 完全相符才執行——latch 內容
-   在你讀完 plan 之後變了，舊 fingerprint 就失效。
-3. 解除時往帳本補一筆 `safe_halt_cleared` 並帶上同一個 fingerprint；已存在同 fingerprint 的
-   資料列時第二次解除是 no-op（**帳本冪等**，btc 目前缺這一段，Phase 4 補上）。
+1. `resume_preview(halt, events)` 印出目前 latch 的 code、原因、`since`、evidence 與
+   confirmation token（＝fingerprint），且保證 `state_file_touched: false`。
+2. `check_confirmation(halt, token)`：`resume --confirm <token>` 必須與當下 latch 算出來的
+   fingerprint 完全相符才執行——latch 的 evidence 在你讀完 preview 之後變了，舊 token 就失效
+   （`details` 變動不會使它失效，見 §4.2）。
+3. 解除時往帳本補一筆 `safe_halt_cleared`，欄位由 `safe_halt_cleared_fields()` 產生（三支
+   逐欄位一致），並帶上同一個 fingerprint；`assert_not_already_cleared()` 以帳本裡既有的
+   `halt_fingerprint` 為準拒絕第二次解除（**帳本冪等**，btc 目前缺這一段，Phase 4 補上）。
 
 seykota 從「無 resume 路徑」直接進到這一套完整閘門。`SEY.EXCHANGE_TARGET_UNSAFE` 與
 `SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE` 兩條是例外（`resume: restart_after_config_fix`）：
@@ -202,6 +224,43 @@ seykota 從「無 resume 路徑」直接進到這一套完整閘門。`SEY.EXCHA
 其餘八個原因碼在 catch-all 之前就已經各自 latch，不受計數器影響——計數器只作用在「連自己都不知道
 是什麼」的那一類。這直接修掉 2026-09-11 venv 競態事故的形狀：一次暫時性的 TLS 憑證讀取失敗，
 讓一支真倉策略靜默停止交易且無法遠端復原。
+
+### 4.5 事件日誌（`trade_alerts.fleet_event_log`）
+
+**所有偵測結果都進日誌，而且日誌不通知任何人。** 這是本目錄判準的直接結果：57 條路徑裡 25 條
+（44%）不給人任何能做得不一樣的決定，那它們該有的紀錄是一行耐久的資料，不是一則告警。Phase 5
+的修復 bot 讀這份日誌來回頭評估自己這段期間的判斷（「看一段時間的決策」取代「看每一筆」）。
+
+- append-only JSONL，逐專案一個檔，放該策略的 `audit/`（跟帳本同一個目錄）。
+- 形狀與鎖定機制照 `projection_outbox`：一行一個 JSON 物件、附加時取 `flock` 獨佔鎖、解鎖前
+  `fsync`、讀取時取共享鎖。格式在 `schemas/fleet-event-log-v1.schema.json`。
+- 因為檔案是逐專案的，`code` 存**不帶前綴的條件名**（同 §4.2）；跨機隊聚合或 join 回本目錄時
+  由讀取端用 `catalog_code()` 補前綴。
+- `evidence` / `details` 的分工同 §4.2。另有 `measurements` 放「這個條件本身只是一個指標」的
+  數值：`reconciliation_delta` **每一筆都寫在這裡、且什麼都不升級**，只有聚合偏離才開請求。
+- `risk_tier` 是可選的稽核欄位，記錄寫入當下從本目錄查到的等級。**這個模組自己從不決定等級、
+  也從不通知。**
+- 讀取時遇到壞行會直接拋錯，不是跳過：這個檔案是證據，靜默丟掉一部分會讓稽核看起來完整而
+  其實不是。
+
+### 4.6 錯誤處理請求佇列（`trade_alerts.error_request_queue`）
+
+跨過門檻的錯誤開一張「請求」——請求對錯誤，就像 PR 對 commit：它指名一個條件、帶著證據與本目錄
+的風險等級，開著直到有一個 outcome 關掉它。**開請求此時仍然不通知**；Phase 5 的修復 bot 先算出
+具體的修復內容，才發通知並附上提案（只重述問題的通知，等於把機器能做的分析丟回給讀的人做）。
+
+- 佇列放策略的 `audit/`，**刻意不放 `/var/lib/*-control`**——後者是 2770 setgid、ops-control
+  可寫，放那裡等於讓 Telegram relay 能偽造待處理項目給修復 bot 去執行。
+- **R0 永遠不能開請求**，這條規則寫在函式裡而不是留給每個呼叫端自律。R0 的意思是偵測之後的動作
+  是固定的，所以沒有東西可以讓一張請求「關於」它——那些只進 §4.5 的事件日誌。這與本目錄
+  「MECHANICAL 判定不得落在會通知的等級」是同一條判準的兩個執行點。
+- 去重鍵是 `(project, code, evidence)` 的 fingerprint：一個條件連續成立 20 個輪詢週期產生
+  **一張**請求，不是 20 張。請求被解決之後同一條件再發生，會開**新的一張**——策略確實第二次撞到
+  這個問題，值得一張新請求，而不是靜默重開一張已關閉的。
+- 關閉狀態四種：`RESOLVED_AUTO`（R2，以及 R3 逾時後自動執行）、`RESOLVED_HUMAN`、`SUPERSEDED`
+  （同條件帶著不同證據重開）、`WITHDRAWN`（條件自己不再成立）。已關閉的請求拒絕再關一次——
+  outcome 是「實際發生了什麼」的稽核紀錄，第二筆會讓歷史對「哪個修復真的跑了」變得有歧義。
+- 格式在 `schemas/error-request-queue-v1.schema.json`。
 
 ## 5. Phase 3 實際落地的程式改動
 
@@ -228,3 +287,10 @@ log 行的 `event=` 與 `severity=` 欄位，不影響任何推播、下單或�
 - 改風險等級：連同 `rationale` 一起改，說清楚為什麼判斷變了。
 - 每次改動都要跑 `tests/test_fleet_error_catalog.py`；`MECHANICAL` 不得落進會通知的等級這條
   不變式是硬性的，測試擋下來時要改的是判定或等級，不是測試。
+- Phase 4a 起另有三條會讀本目錄的不變式，同樣是硬性的：
+  `test_fleet_event_log.py::test_prefix_table_reproduces_every_published_catalog_code`
+  （`PROJECT_CODE_PREFIXES` 不得與已發布的 `code` 前綴 drift）、
+  `test_safe_halt_model.py::test_every_catalog_resume_path_is_one_this_model_implements`
+  （entry 不得規定沒有任何策略實作得出來的 resume 路徑）、
+  `test_error_request_queue.py::test_r0_conditions_can_never_open_a_request`
+  （逐筆拿目錄裡的 R0 條件去試開請求，必須全部被拒）。

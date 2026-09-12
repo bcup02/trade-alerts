@@ -331,3 +331,46 @@ trade-alerts：v0.14.2（commit 4c65ce1）
 服務/工作流程驗證：trade-alerts pytest（132，+3 針對空單方向的斷言）全綠。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.15.0（Phase 4a）
+變更摘要：新增三個模組，全部是資料結構與不變式，沒有任何執行期副作用（不讀秘密、
+          不開連線、不 import 交易所 client）。
+          1. safe_halt_model —— 全機隊共用的一份 latch 形狀與一套 fingerprint
+          演算法。Phase 4 之前 momentum 用單一 dict、btc 用 4 個扁平欄位、
+          seykota 把 SAFE_HALT 塞在跟 FLAT/LONG 共用的 state.status 字串裡、
+          my-crypto 沒有 latch；三支 resume 工具算出三種 fingerprint，而且只有
+          momentum 的解除對帳本冪等。這支統一 build_safe_halt()／
+          safe_halt_fingerprint()／resume_preview()／check_confirmation()／
+          safe_halt_cleared_fields()／assert_not_already_cleared()。兩個刻意
+          偏離 Phase 3 初版設計的決定：fingerprint 不存進 state（動態算，
+          消掉「存下來的副本跟 latch 走鐘」這個形狀），以及 evidence（穩定
+          事實、fingerprint 的唯一輸入）與 details（每輪會變的診斷資訊）在
+          寫入端就分開——混在一起會讓 confirmation token 每輪跳動，latch 變成
+          永遠無法解除。
+          2. fleet_event_log —— append-only JSONL 事件日誌，逐專案一個檔，
+          放策略的 audit/。形狀與鎖定照 projection_outbox（flock 獨佔附加 +
+          fsync + 共享鎖讀取）。這個模組不通知任何人、也不決定風險等級；
+          measurements 欄位收「只是指標」的數值（reconciliation_delta 每筆
+          都寫、什麼都不升級）。另含 catalog_code()／risk_tier_for() 讓呼叫端
+          把不帶前綴的條件名 join 回目錄。
+          3. error_request_queue —— 跨過門檻的錯誤開一張請求，帶錯誤碼、
+          風險等級、證據，開著直到 outcome 關掉。開請求仍然不通知。R0 條件
+          永遠不能開請求（寫在函式裡，不是留給呼叫端自律）；去重鍵是
+          (project, code, evidence)，同一條件連續成立多輪只有一張請求；
+          已關閉的請求拒絕再關一次。
+          兩份新 schema：schemas/fleet-event-log-v1.schema.json、
+          schemas/error-request-queue-v1.schema.json。
+受影響消費專案：無立即影響（純新增，既有公開 API 逐一未變）。Phase 4c 的
+          seykota／btc／momentum latch 統一會 bump pin 到這個版本並改用
+          safe_halt_model；在那之前三支照舊各自的實作運作。
+部署入口：無（純函式庫，未觸發任何部署）。
+版本驗證：pyproject.toml version == 0.15.0；trade_alerts.__version__ ==
+          "0.15.0"。
+服務/工作流程驗證：trade-alerts pytest 160 全綠（126 → 160，+34：11 條
+          safe_halt_model、11 條 fleet_event_log、12 條 error_request_queue）。
+          其中三條是會讀已發布目錄的硬性不變式：前綴表不得與目錄的 code 前綴
+          drift、目錄不得規定沒有實作的 resume 路徑、目錄裡每一筆 R0 條件
+          逐筆試開請求都必須被拒。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

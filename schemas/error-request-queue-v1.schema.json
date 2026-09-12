@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bcup02/trade-alerts/schemas/error-request-queue-v1.schema.json",
+  "title": "Error-handling request queue record v1",
+  "description": "One line of a strategy's append-only error-handling request queue, kept in the strategy's audit/ directory (never in /var/lib/*-control, which ops-control can write). A request names one condition that crossed a threshold and stays open until an outcome closes it. Opening a request notifies nobody; R0 conditions can never open one.",
+  "type": "object",
+  "required": ["kind"],
+  "oneOf": [
+    {
+      "required": ["kind", "request"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"const": "error_request_v1"},
+        "request": {"$ref": "#/definitions/request"}
+      }
+    },
+    {
+      "required": ["kind", "outcome"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"const": "error_request_outcome_v1"},
+        "outcome": {"$ref": "#/definitions/outcome"}
+      }
+    }
+  ],
+  "definitions": {
+    "request": {
+      "type": "object",
+      "required": ["request_id", "opened_at", "project", "code", "risk_tier", "fingerprint", "evidence", "details", "measurements"],
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {"type": "string", "minLength": 1},
+        "opened_at": {"type": "string", "format": "date-time"},
+        "project": {"enum": ["seykota", "momentum", "mycrypto", "btc-competition", "fleet"]},
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Bare condition name, never a prefixed catalog code.",
+          "not": {"pattern": "\\."}
+        },
+        "risk_tier": {
+          "description": "R0 is absent by construction: its action after detection is fixed, so there is nothing for a request to be about.",
+          "enum": ["R1", "R2", "R3", "R4"]
+        },
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{12}$",
+          "description": "Deduplication key over (project, code, evidence). One condition staying true across many cycles yields one request."
+        },
+        "summary": {"type": "string"},
+        "evidence": {"type": "object"},
+        "details": {"type": "object"},
+        "measurements": {"type": "object"},
+        "event_ref": {
+          "description": "event_id of the fleet event log record this request was opened from, when there is one.",
+          "oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["request_id", "recorded_at", "status", "details"],
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {"type": "string", "minLength": 1},
+        "recorded_at": {"type": "string", "format": "date-time"},
+        "status": {
+          "description": "RESOLVED_AUTO: an automatic remedy ran (R2, or R3 after its timeout). RESOLVED_HUMAN: an operator acted. SUPERSEDED: the same condition re-opened with different evidence. WITHDRAWN: the condition stopped holding on its own.",
+          "enum": ["RESOLVED_AUTO", "RESOLVED_HUMAN", "SUPERSEDED", "WITHDRAWN"]
+        },
+        "note": {"type": "string"},
+        "details": {"type": "object"}
+      }
+    }
+  }
+}
