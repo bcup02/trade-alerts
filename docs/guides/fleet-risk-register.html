@@ -1,0 +1,456 @@
+<title>機隊風險登記冊</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root{
+    --paper:#F1F3EC;
+    --paper-raised:#FAFBF6;
+    --line:#DBE0D0;
+    --ink:#1F2A22;
+    --ink-soft:#57604E;
+    --ink-faint:#8A9080;
+    --accent:#5B3A5C;
+    --accent-bg:#EDE3EC;
+    --accent-line:#C9AECB;
+
+    --r4:#963025; --r4-bg:#F4E1DD; --r4-line:#DBAA9F;
+    --r3:#8C6317; --r3-bg:#F1E6C9; --r3-line:#D8BE84;
+    --r2:#357357; --r2-bg:#DEEAE3; --r2-line:#A9CBBA;
+    --r1:#33547A; --r1-bg:#DEE6EE; --r1-line:#A8BFD7;
+    --r0:#6B7566; --r0-bg:#E7EAE0; --r0-line:#C3C9B6;
+
+    --shadow: 0 1px 0 rgba(31,42,34,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#18150F;
+      --paper-raised:#211D16;
+      --line:#332D22;
+      --ink:#EDE6D8;
+      --ink-soft:#B7AF9C;
+      --ink-faint:#847C6C;
+      --accent:#C6A0C8;
+      --accent-bg:#302733;
+      --accent-line:#5A455C;
+
+      --r4:#E58A7C; --r4-bg:#3A241F; --r4-line:#5C332B;
+      --r3:#D9B364; --r3-bg:#382D18; --r3-line:#5A4623;
+      --r2:#7FC6A2; --r2-bg:#1D3227; --r2-line:#2E4F3C;
+      --r1:#8FB4DD; --r1-bg:#1F2E3E; --r1-line:#2D4560;
+      --r0:#A6AD97; --r0-bg:#292B21; --r0-line:#3E4234;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#18150F;
+    --paper-raised:#211D16;
+    --line:#332D22;
+    --ink:#EDE6D8;
+    --ink-soft:#B7AF9C;
+    --ink-faint:#847C6C;
+    --accent:#C6A0C8;
+    --accent-bg:#302733;
+    --accent-line:#5A455C;
+
+    --r4:#E58A7C; --r4-bg:#3A241F; --r4-line:#5C332B;
+    --r3:#D9B364; --r3-bg:#382D18; --r3-line:#5A4623;
+    --r2:#7FC6A2; --r2-bg:#1D3227; --r2-line:#2E4F3C;
+    --r1:#8FB4DD; --r1-bg:#1F2E3E; --r1-line:#2D4560;
+    --r0:#A6AD97; --r0-bg:#292B21; --r0-line:#3E4234;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Noto Sans TC","IBM Plex Mono",sans-serif;
+    padding-inline:20px;
+    padding-block:40px 64px;
+  }
+  .wrap{max-width:840px;margin-inline:auto;}
+
+  .eyebrow{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+  h1{
+    font-family:"Noto Serif TC",serif;
+    font-weight:900;
+    font-size:clamp(28px,5vw,40px);
+    line-height:1.25;
+    margin:6px 0 12px;
+    text-wrap:balance;
+    letter-spacing:.01em;
+  }
+  .lede{
+    font-size:15.5px;
+    line-height:1.75;
+    color:var(--ink-soft);
+    max-width:56ch;
+    margin:0 0 28px;
+  }
+  .lede b{color:var(--ink);font-weight:700;}
+
+  /* ---- legend strip: the "stamp key" on the inside cover ---- */
+  .legend{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+    border-radius:3px;
+    overflow:hidden;
+    margin-bottom:28px;
+  }
+  .legend-item{
+    background:var(--paper-raised);
+    padding:14px 12px 12px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .legend-code{
+    font-family:"IBM Plex Mono",monospace;
+    font-weight:600;
+    font-size:12px;
+    letter-spacing:.06em;
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+  }
+  .legend-code::before{
+    content:"";
+    width:8px;height:8px;border-radius:50%;
+    background:var(--dot);
+    flex:none;
+  }
+  .legend-name{font-size:13px;font-weight:700;line-height:1.3;}
+  .legend-sub{font-size:11.5px;color:var(--ink-faint);line-height:1.5;}
+
+  .lg-r4{--dot:var(--r4);} .lg-r4 .legend-code{color:var(--r4);}
+  .lg-r3{--dot:var(--r3);} .lg-r3 .legend-code{color:var(--r3);}
+  .lg-r2{--dot:var(--r2);} .lg-r2 .legend-code{color:var(--r2);}
+  .lg-r1{--dot:var(--r1);} .lg-r1 .legend-code{color:var(--r1);}
+  .lg-r0{--dot:var(--r0);} .lg-r0 .legend-code{color:var(--r0);}
+
+  /* ---- filter chips ---- */
+  .filters{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:32px;
+  }
+  .chip{
+    font-family:"Noto Sans TC",sans-serif;
+    font-size:13px;
+    font-weight:500;
+    padding:7px 14px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:var(--paper-raised);
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s;
+  }
+  .chip:hover{border-color:var(--accent-line);color:var(--ink);}
+  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .chip[aria-pressed="true"]{
+    background:var(--accent-bg);
+    border-color:var(--accent-line);
+    color:var(--accent);
+    font-weight:700;
+  }
+  .chip .n{
+    font-family:"IBM Plex Mono",monospace;
+    font-variant-numeric:tabular-nums;
+    opacity:.75;
+    margin-inline-start:2px;
+  }
+
+  /* ---- register sections ---- */
+  section.tier{margin-bottom:8px;}
+  .tier-head{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    padding:14px 16px;
+    border-radius:3px 3px 0 0;
+    border-inline-start:4px solid var(--edge);
+  }
+  .tier-code{
+    font-family:"IBM Plex Mono",monospace;
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:.08em;
+    color:var(--txt);
+    flex:none;
+  }
+  .tier-title{
+    font-family:"Noto Serif TC",serif;
+    font-weight:700;
+    font-size:17px;
+    color:var(--ink);
+  }
+  .tier-count{
+    font-family:"IBM Plex Mono",monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:12px;
+    color:var(--ink-faint);
+    margin-inline-start:auto;
+    flex:none;
+    white-space:nowrap;
+  }
+
+  .t-r4{--edge:var(--r4);--bg:var(--r4-bg);--txt:var(--r4);}
+  .t-r3{--edge:var(--r3);--bg:var(--r3-bg);--txt:var(--r3);}
+  .t-r2{--edge:var(--r2);--bg:var(--r2-bg);--txt:var(--r2);}
+  .t-r1{--edge:var(--r1);--bg:var(--r1-bg);--txt:var(--r1);}
+  .t-r0{--edge:var(--r0);--bg:var(--r0-bg);--txt:var(--r0);}
+  .tier-head{background:var(--bg);}
+
+  .rows{
+    border-inline-start:4px solid var(--line);
+    border-block-end:1px solid var(--line);
+  }
+  .row{
+    display:grid;
+    grid-template-columns:104px 1fr;
+    gap:16px;
+    padding:14px 16px;
+    border-block-start:1px solid var(--line);
+  }
+  .row-bot{
+    font-size:11.5px;
+    font-weight:700;
+    color:var(--ink-soft);
+    padding:3px 8px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    background:var(--paper-raised);
+    text-align:center;
+    align-self:start;
+    white-space:nowrap;
+  }
+  .row-body p{
+    margin:0;
+    font-size:14.5px;
+    line-height:1.7;
+  }
+  .row-what{color:var(--ink);font-weight:500;}
+  .row-how{color:var(--ink-soft);margin-top:5px;}
+  .row-how b{color:var(--ink);font-weight:700;}
+
+  section.tier[hidden]{display:none;}
+  .row[hidden]{display:none;}
+
+  @media (max-width:520px){
+    .legend{grid-template-columns:1fr 1fr;}
+    .row{grid-template-columns:1fr;}
+    .row-bot{justify-self:start;}
+    body{padding-inline:16px;}
+  }
+
+  .foot{
+    margin-top:36px;
+    font-size:12px;
+    color:var(--ink-faint);
+    line-height:1.7;
+    border-block-start:1px solid var(--line);
+    padding-top:16px;
+  }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">交易機隊 · 錯誤處理設計</div>
+  <h1>機隊風險登記冊</h1>
+  <p class="lede">
+    四支策略目前所有已知的「出問題」情況，共 <b>30 種</b>，依照「系統會不會自己處理、要不要通知人」分成五個等級。
+    點下面的等級或策略可以篩選；一般情況下你只需要在意最上面的紅色那一段。
+  </p>
+
+  <div class="legend">
+    <div class="legend-item lg-r4">
+      <span class="legend-code">R4</span>
+      <span class="legend-name">一定要人處理</span>
+      <span class="legend-sub">系統絕不自己動手</span>
+    </div>
+    <div class="legend-item lg-r3">
+      <span class="legend-code">R3</span>
+      <span class="legend-name">先通知，晚一點自動做</span>
+      <span class="legend-sub">你沒空理，過一陣子系統自己做</span>
+    </div>
+    <div class="legend-item lg-r2">
+      <span class="legend-code">R2</span>
+      <span class="legend-name">自動處理，幾乎沒風險</span>
+      <span class="legend-sub">不特別通知，事後可查</span>
+    </div>
+    <div class="legend-item lg-r1">
+      <span class="legend-code">R1</span>
+      <span class="legend-name">想出辦法才通知你</span>
+      <span class="legend-sub">是建議，等你核准</span>
+    </div>
+    <div class="legend-item lg-r0">
+      <span class="legend-code">R0</span>
+      <span class="legend-name">只是記一筆</span>
+      <span class="legend-sub">不通知任何人</span>
+    </div>
+  </div>
+
+  <div class="filters" id="filters" role="group" aria-label="依風險等級或策略篩選"></div>
+
+  <div id="register"></div>
+
+  <div class="foot">
+    資料來源：機隊共用的錯誤分類清單（trade-alerts <code>fleet-error-catalog-v1</code>）。<br>
+    「趨勢策略」「動能策略」「競賽策略」「加密策略」各自獨立運作；「全機隊」是四支共用的同一種機制。
+  </div>
+</div>
+
+<script>
+(function(){
+  var BOTS = {
+    seykota:  {label:"趨勢策略", full:"BTC 趨勢策略"},
+    momentum: {label:"動能策略", full:"動能輪動策略"},
+    btc:      {label:"競賽策略", full:"BTC 競賽策略"},
+    mycrypto: {label:"加密策略", full:"加密貨幣策略"},
+    fleet:    {label:"全機隊",   full:"全機隊共用機制"}
+  };
+
+  var TIERS = [
+    {id:"r4", code:"R4", title:"一定要人處理"},
+    {id:"r3", code:"R3", title:"先通知，晚一點自動做"},
+    {id:"r2", code:"R2", title:"自動處理，幾乎沒風險"},
+    {id:"r1", code:"R1", title:"想出辦法才通知你"},
+    {id:"r0", code:"R0", title:"只是記一筆"}
+  ];
+
+  var ENTRIES = [
+    // ---- R4：一定要人處理 ----
+    {tier:"r4", bot:"seykota", what:"開倉後想掛停損單失敗，緊急用市價平倉也失敗——交易所上可能還留著完全沒有保護的真實倉位。", how:"這是全機隊最嚴重的一種。系統整個停下來、不再新增任何風險，<b>必須立刻</b>到交易所人工檢查，處理完才能解除。"},
+    {tier:"r4", bot:"seykota", what:"交易所上有倉位，但系統找不到能確定屬於這個倉位的停損單。", how:"系統先停下來，等人到交易所核對清楚部位跟保護單，補齊或確認後才解除。"},
+    {tier:"r4", bot:"seykota", what:"交易所回報的倉位資料，系統看不懂或認不出來是哪一筆。", how:"系統停下來，等人工核對交易所實際部位後才解除。"},
+    {tier:"r4", bot:"seykota", what:"系統本來設定要連模擬帳戶，卻接到了真實帳戶（或反過來）——設定跟目標不一致。", how:"整支策略立刻全部停擺、拒絕任何操作。要改好設定檔再重新啟動，不能只按一下解除。"},
+    {tier:"r4", bot:"seykota", what:"在真倉模式下，系統沒辦法精確辨識自己下的每一張單。", how:"停下來，拒絕所有真倉操作。要先確認交易所帳號權限沒問題，再重新啟動。"},
+    {tier:"r4", bot:"momentum", what:"交易所上的移動停損單，系統驗證不出它到底存不存在。", how:"停下來，等人核對交易所實際委託後才解除。"},
+    {tier:"r4", bot:"momentum", what:"有人用工具手動修過本地紀錄，工具修完後故意讓系統停下來。", how:"這是刻意設計成這樣：工具改過帳目，就一定要等人親自確認改得對，才能讓系統繼續跑。"},
+    {tier:"r4", bot:"btc", what:"帳上出現負的、或不可能存在的金額——代表這份本地記錄本身已經不能信了。", how:"停下來，等人核對交易所實際餘額跟本地記錄，確認沒問題後才解除。"},
+    {tier:"r4", bot:"mycrypto", what:"開倉後想掛的停損單被交易所直接拒絕，這筆倉位可能完全沒有保護。", how:"系統不會自動下單。要立刻到交易所確認部位跟保護單狀態。"},
+    {tier:"r4", bot:"mycrypto", what:"掛停損單的過程中程式出錯，但倉位本身已經開了，一樣沒有保護。", how:"系統不會自動下單。要立刻到交易所確認部位跟保護單狀態。"},
+
+    // ---- R3：先通知，晚一點自動做 ----
+    {tier:"r3", bot:"seykota", what:"要把移動停損換到新價位，舊單已經取消，但新單沒掛上——這段時間倉位是沒有保護的。", how:"過一段時間系統會<b>自動用原來的價位</b>重新掛一張，成功就沒事。你也可以提早按確認讓它馬上做。"},
+    {tier:"r3", bot:"seykota", what:"跟交易所對帳反覆失敗，不是網路暫時斷線那種小問題。", how:"先重試幾次，連續失敗到一定次數才真的停下；停下後過一陣子系統會<b>自動再對一次帳</b>。你也可以提早按確認。"},
+    {tier:"r3", bot:"seykota", what:"程式運作中出現一個沒被特別分類過的錯誤（各種意外狀況都算）。", how:"先重試，連續失敗多次才真的停下；停下後系統一樣會<b>自動嘗試恢復</b>，你也可以提早按確認。"},
+    {tier:"r3", bot:"btc", what:"連續 3 天該重新調整持倉比例，卻完全成交不了任何一筆。", how:"過一段時間系統會<b>自動整個重試一次</b>（重新報價、重算下單量）。如果連試兩次都還是零成交，才會升級成一定要人處理。"},
+    {tier:"r3", bot:"mycrypto", what:"剛開完倉，卻查不到這筆倉位的資訊，沒辦法掛停損單。", how:"過一段時間系統會<b>自動重新查一次</b>並補掛停損，你也可以提早按確認讓它馬上查。"},
+    {tier:"r3", bot:"mycrypto", what:"要把移動停損單搬到新價位卻失敗，交易所端目前沒有停損保護。", how:"下一輪本來就會<b>自動重新掛上</b>；如果連續好幾輪都不行，才會真正升級成要人處理。"},
+
+    // ---- R2：自動處理，幾乎沒風險 ----
+    {tier:"r2", bot:"seykota", what:"開倉後想掛停損單失敗，但系統立刻用市價把這筆倉位整個平掉，而且成功了。", how:"因為倉位已經平掉、交易所上沒有任何裸露風險，系統<b>自動繼續</b>，不用人管，事後可以在記錄裡查到這一筆。"},
+
+    // ---- R1：想出辦法才通知你 ----
+    {tier:"r1", bot:"seykota", what:"換停損單時，舊單本該被取消卻取消失敗，可能還留在交易所上。", how:"系統會去查清楚到底是哪一張多出來的單，<b>寫成一個「建議取消」的提案通知你</b>，但不會自己送出取消。"},
+    {tier:"r1", bot:"seykota", what:"平倉後要收掉停損單卻收不掉，可能還掛著。", how:"同上：系統算出確切是哪一張，<b>通知你核准取消</b>，或者你確認那張單其實已經自己失效了。"},
+    {tier:"r1", bot:"mycrypto", what:"程式運作中出現一個沒被特別分類過的錯誤。", how:"先自動重試；如果連續發生，系統<b>想出處理辦法後才通知你</b>，由你決定要不要介入。"},
+    {tier:"r1", bot:"mycrypto", what:"平倉後要取消殘留的停損單卻取消失敗。", how:"系統算出確切是哪一張，<b>寫成提案通知你核准取消</b>，不會自己送出。"},
+
+    // ---- R0：只是記一筆 ----
+    {tier:"r0", bot:"seykota", what:"交易所上的倉位已經消失（代表已經平倉了），只是成交細節還沒補進記錄。", how:"系統自己標記成「已平倉」，下一輪自動把細節補齊。不用管，也不會通知你。"},
+    {tier:"r0", bot:"seykota", what:"原生停損正常觸發，倉位正常平掉。", how:"這就是策略本來該做的事，不是問題。系統正常記錄結算，不用管。"},
+    {tier:"r0", bot:"seykota", what:"帳戶裡的資金不夠最低下單金額，這次先跳過不進場。", how:"系統自動跳過這一次，下次訊號再重新評估。要不要加碼本金是你的投資決定，這不算錯誤，不用管。"},
+    {tier:"r0", bot:"momentum", what:"程式運作中出現一個沒被特別分類過的錯誤。", how:"系統記一筆「有狀況」的標記，下一輪照常重試，<b>不會真的停下來</b>。不用管。"},
+    {tier:"r0", bot:"btc", what:"這次調整持倉只成交了一部分，目標比例還沒完全達到。", how:"這是正常過程，系統下一輪會<b>自動接著補上</b>剩下的部分。不用管。"},
+    {tier:"r0", bot:"btc", what:"程式運作中出現一個沒被特別分類過的錯誤。", how:"系統記一筆，明天排程一到會<b>自動重試一次</b>。不用管。"},
+    {tier:"r0", bot:"mycrypto", what:"本地帳本算出來的賺賠，跟交易所回報的賺賠有落差，但落差不算大。", how:"交易所的數字才是準的，這只是<b>記一筆備查</b>，不影響任何操作、不用管。（只有連續好幾筆都偏同一個方向，才會真的升級成要處理的問題。）"},
+    {tier:"r0", bot:"fleet", what:"本地帳本跟交易所對不上時，畫面故意顯示一個紅色警示。", how:"這只是重複通知——同一件事已經用其他方式（像 LINE）通知過你了。<b>這個紅色警示本身看到不用緊張</b>，不用再處理一次。"},
+    {tier:"r0", bot:"fleet", what:"本地帳本跟共用的 Google 表格對不上時，畫面故意顯示一個紅色警示。", how:"跟上面完全一樣，只是對照的對象換成 Google 表格。<b>看到不用緊張</b>，不用再處理一次。"}
+  ];
+
+  var counts = {all:ENTRIES.length};
+  TIERS.forEach(function(t){ counts[t.id] = 0; });
+  Object.keys(BOTS).forEach(function(b){ counts[b] = 0; });
+  ENTRIES.forEach(function(e){ counts[e.tier]++; counts[e.bot]++; });
+
+  var registerEl = document.getElementById("register");
+  TIERS.forEach(function(t){
+    var section = document.createElement("section");
+    section.className = "tier";
+    section.dataset.tier = t.id;
+
+    var head = document.createElement("div");
+    head.className = "tier-head t-" + t.id;
+    head.innerHTML =
+      '<span class="tier-code">' + t.code + '</span>' +
+      '<span class="tier-title">' + t.title + '</span>' +
+      '<span class="tier-count">' + counts[t.id] + ' 種</span>';
+    section.appendChild(head);
+
+    var rows = document.createElement("div");
+    rows.className = "rows";
+    ENTRIES.filter(function(e){ return e.tier === t.id; }).forEach(function(e){
+      var row = document.createElement("div");
+      row.className = "row";
+      row.dataset.bot = e.bot;
+      row.innerHTML =
+        '<span class="row-bot">' + BOTS[e.bot].label + '</span>' +
+        '<div class="row-body">' +
+          '<p class="row-what">' + e.what + '</p>' +
+          '<p class="row-how">' + e.how + '</p>' +
+        '</div>';
+      rows.appendChild(row);
+    });
+    section.appendChild(rows);
+    registerEl.appendChild(section);
+  });
+
+  var filtersEl = document.getElementById("filters");
+  var state = {tier:"all", bot:"all"};
+
+  function chip(id, label, n, group){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip";
+    b.dataset.group = group;
+    b.dataset.value = id;
+    b.setAttribute("aria-pressed", id === "all" ? "true" : "false");
+    b.innerHTML = label + '<span class="n">' + n + '</span>';
+    b.addEventListener("click", function(){
+      state[group] = id;
+      document.querySelectorAll('.chip[data-group="' + group + '"]').forEach(function(c){
+        c.setAttribute("aria-pressed", c.dataset.value === id ? "true" : "false");
+      });
+      applyFilter();
+    });
+    return b;
+  }
+
+  filtersEl.appendChild(chip("all", "全部等級", counts.all, "tier"));
+  TIERS.forEach(function(t){ filtersEl.appendChild(chip(t.id, t.code, counts[t.id], "tier")); });
+
+  var sep = document.createElement("span");
+  sep.style.width = "1px";
+  sep.style.background = "var(--line)";
+  sep.style.margin = "4px 4px";
+  filtersEl.appendChild(sep);
+
+  filtersEl.appendChild(chip("all", "全部策略", counts.all, "bot"));
+  Object.keys(BOTS).forEach(function(b){ filtersEl.appendChild(chip(b, BOTS[b].label, counts[b], "bot")); });
+
+  function applyFilter(){
+    document.querySelectorAll("section.tier").forEach(function(section){
+      var tierMatch = state.tier === "all" || section.dataset.tier === state.tier;
+      var visibleRows = 0;
+      section.querySelectorAll(".row").forEach(function(row){
+        var botMatch = state.bot === "all" || row.dataset.bot === state.bot;
+        var show = tierMatch && botMatch;
+        row.hidden = !show;
+        if (show) visibleRows++;
+      });
+      section.hidden = visibleRows === 0;
+    });
+  }
+})();
+</script>
