@@ -1,0 +1,399 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index c35e7ba..e0454d6 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -374,3 +374,41 @@ trade-alerts：v0.15.0（Phase 4a）
+           逐筆試開請求都必須被拒。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.16.0（Phase 5a）
++變更摘要：Phase 5「修復 bot 影子模式」的共用地基，全部是純函式庫改動，無任何
++          執行期副作用。
++          1. AlertDispatcher._send_text／publish／publish_contract／test 改回
++          傳 bool（是否至少一個 channel 送達），取代原本的 None。單一 channel
++          失敗仍只記 log、不中斷其他 channel——只是把「有沒有送達」的結果讓
++          呼叫端看得到。既有呼叫端（四支策略的 alerts.publish(...)）忽略回傳
++          值照樣能跑，向下相容。這是 Phase 7「計時器只在通知確認送達後才開始
++          倒數」的地基，現在先修不用等到 Phase 7。
++          2. verified_close_backfill 新增兩個純函式：
++             - detect_repair_candidates(ledger_status, ledger_events)——把
++             reconcile_compare.py 的 DIVERGED 判定裡 evidence.position_diffs
++             的 symbol 級數量差，換算成候選 trade_id（該 symbol 唯一還沒
++             trade_close 的 trade_open）。symbol 沒有落在 position_diffs、
++             已經有 close、或同一 symbol 有一筆以上未結案 trade_open（有歧義）
++             都回傳空——只在無歧義時才給答案，不猜。這正是
++             reconcile_apply.py 目前明確拒絕、留給「之後的 PR」處理的那個
++             case（見其 module docstring）。
++             - render_repair_proposal_text(evidence, repair_events, project)——
++             把 build_repair_events() 算出的完整修復內容，組成人看得懂的 LINE
++             通知文字（trade_id、symbol、數量、進出場價、手續費、本地淨損益
++             vs 交易所毛損益、差額、證據來源、平倉時間），對應
++             fleet-error-catalog.md §2 的 R1 PROPOSE 語意：算出方案才通知，
++             附上提案。純字串組裝，不呼叫任何 channel。
++受影響消費專案：無立即影響（純新增 + 回傳型別放寬，既有呼叫端不用改）。
++          Phase 5b／5c 的 momentum／seykota 影子模式 bot 會 bump pin 到這個
++          版本並呼叫這兩個新函式；在那之前四支策略照舊運作。
++部署入口：無（純函式庫，未觸發任何部署）。
++版本驗證：pyproject.toml version == 0.16.0；trade_alerts.__version__ ==
++          "0.16.0"。
++服務/工作流程驗證：trade-alerts pytest 169 全綠（161 → 169，+8：core.py 2 條
++          新增回傳值斷言（全部 channel 失敗 / 無 channel 都回 False，另 3 條
++          既有測試補上 bool 斷言）+ detect_repair_candidates 5 條 +
++          render_repair_proposal_text 1 條）。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index 02038dd..076434f 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.15.0"
++version = "0.16.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 9435169..dedaad1 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -91,8 +91,10 @@ from .verified_close_backfill import (
+     append_repair,
+     build_evidence,
+     build_repair_events,
++    detect_repair_candidates,
+     find_open_event,
+     load_evidence,
++    render_repair_proposal_text,
+ )
+ from .ledger_reconcile import (
+     CLOSE_MARKERS,
+@@ -154,8 +156,10 @@ __all__ = [
+     "append_repair",
+     "build_evidence",
+     "build_repair_events",
++    "detect_repair_candidates",
+     "find_open_event",
+     "load_evidence",
++    "render_repair_proposal_text",
+     "FLEET_EVENT_KIND",
+     "PROJECT_CODE_PREFIXES",
+     "RISK_TIERS",
+@@ -245,4 +249,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.15.0"
++__version__ = "0.16.0"
+diff --git a/src/trade_alerts/core.py b/src/trade_alerts/core.py
+index 4bbfbe6..ebba608 100644
+--- a/src/trade_alerts/core.py
++++ b/src/trade_alerts/core.py
+@@ -55,12 +55,23 @@ class AlertDispatcher:
+         self.channels = channels or []
+         self.system = system
+ 
+-    def _send_text(self, text: str) -> None:
++    def _send_text(self, text: str) -> bool:
++        """Fan out to every channel; return whether at least one delivered.
++
++        A caller that needs delivery confirmation (e.g. a timeout timer that
++        must only start counting down once a human could plausibly have seen
++        the notification) checks this return value. Per-channel failures are
++        still only logged, not raised -- one broken channel must not block
++        the others or the caller.
++        """
++        delivered = False
+         for channel in self.channels:
+             try:
+                 channel.send(text, timeout=getattr(channel, "policy", RetryPolicy()).timeout_seconds)
++                delivered = True
+             except Exception:
+                 log.exception("alert channel failed: %s", getattr(channel, "name", "unknown"))
++        return delivered
+ 
+     @staticmethod
+     def _investor_mobile_text(envelope: Mapping[str, Any]) -> str | None:
+@@ -85,7 +96,7 @@ class AlertDispatcher:
+         *,
+         critical: bool = False,
+         fields: dict[str, Any] | None = None,
+-    ) -> None:
++    ) -> bool:
+         alert = event if isinstance(event, AlertEvent) else AlertEvent(
+             event=event,
+             message=message or "",
+@@ -93,14 +104,15 @@ class AlertDispatcher:
+             fields=fields or {},
+             system=self.system,
+         )
+-        self._send_text(alert.render())
++        return self._send_text(alert.render())
+ 
+-    def publish_contract(self, envelope: Mapping[str, Any]) -> None:
++    def publish_contract(self, envelope: Mapping[str, Any]) -> bool:
+         """Publish a v1 envelope through existing text channels.
+ 
+         Legacy and ordinary v1 events retain the diagnostic rendering. Producers
+         may opt into ``presentation.format=investor_mobile_v1`` to send a curated
+-        investor message instead of raw machine metadata.
++        investor message instead of raw machine metadata. Returns whether at
++        least one channel delivered the message.
+         """
+         required = ("schema_version", "event_type", "project_id", "message")
+         missing = [key for key in required if not envelope.get(key)]
+@@ -108,19 +120,18 @@ class AlertDispatcher:
+             raise ValueError(f"contract envelope missing required fields: {', '.join(missing)}")
+         investor_text = self._investor_mobile_text(envelope)
+         if investor_text:
+-            self._send_text(investor_text)
+-            return
++            return self._send_text(investor_text)
+         data = dict(envelope.get("data") or {})
+         data.update({"schema_version": envelope["schema_version"], "project_id": envelope["project_id"], "execution_mode": envelope.get("execution_mode", "DRY_RUN")})
+-        self.publish(
++        return self.publish(
+             str(envelope["event_type"]),
+             str(envelope["message"]),
+             critical=str(envelope.get("severity", "INFO")) == "CRITICAL",
+             fields=data,
+         )
+ 
+-    def test(self) -> None:
+-        self.publish("TEST", "通知渠道測試成功。")
++    def test(self) -> bool:
++        return self.publish("TEST", "通知渠道測試成功。")
+ 
+ 
+ def request_with_retry(request_fn: Any, policy: RetryPolicy) -> Any:
+diff --git a/src/trade_alerts/verified_close_backfill.py b/src/trade_alerts/verified_close_backfill.py
+index eeb5869..34dd926 100644
+--- a/src/trade_alerts/verified_close_backfill.py
++++ b/src/trade_alerts/verified_close_backfill.py
+@@ -352,6 +352,89 @@ def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, A
+     return events
+ 
+ 
++# --------------------------------------------------------------------------- #
++# stage 0 (Phase 5 repair-bot shadow mode): detect candidates + render a
++# human-readable proposal, both pure -- neither function writes anything.
++# --------------------------------------------------------------------------- #
++def detect_repair_candidates(
++    ledger_status: dict[str, Any],
++    ledger_events: list[dict[str, Any]],
++    *,
++    norm_symbol: Callable[[Any], str] = str,
++) -> list[str]:
++    """Map a ``DIVERGED`` ``ledger_status.json`` verdict's ``position_diffs``
++    to candidate ``trade_id``s a verified-close backfill might fix.
++
++    Only symbols reported in ``evidence.position_diffs`` are considered -- a
++    real position-quantity divergence, not merely a stale pending marker.
++    ``reconcile_apply.py`` already owns the pending-marker case and
++    explicitly refuses this one (see its module docstring); this is the
++    detection half of the path it defers to "a later PR".
++
++    For each such symbol, the candidate is that symbol's still-open
++    ``trade_id``: a ``trade_open`` with no matching ``trade_close``. Every
++    strategy in this toolkit family runs at most one open position per
++    symbol, so a single candidate per symbol is unambiguous. A symbol with
++    zero or more than one still-open ``trade_id`` is skipped rather than
++    guessed at -- shadow mode logs what it can act on, it never picks
++    between two plausible answers.
++    """
++    if ledger_status.get("value") != "DIVERGED":
++        return []
++    evidence = ledger_status.get("evidence") or {}
++    diff_symbols = {norm_symbol(d.get("symbol")) for d in evidence.get("position_diffs") or []}
++    if not diff_symbols:
++        return []
++
++    open_by_symbol: dict[str, list[str]] = {}
++    closed_trade_ids: set[str] = set()
++    for event in ledger_events:
++        trade_id = event.get("trade_id")
++        if not trade_id:
++            continue
++        event_type = event.get("event_type")
++        if event_type == "trade_open":
++            open_by_symbol.setdefault(norm_symbol(event.get("symbol")), []).append(str(trade_id))
++        elif event_type == "trade_close":
++            closed_trade_ids.add(str(trade_id))
++
++    candidates: list[str] = []
++    for symbol in sorted(diff_symbols):
++        still_open = [tid for tid in open_by_symbol.get(symbol, []) if tid not in closed_trade_ids]
++        if len(still_open) == 1:
++            candidates.append(still_open[0])
++    return candidates
++
++
++def render_repair_proposal_text(
++    evidence: dict[str, Any],
++    repair_events: list[tuple[str, dict[str, Any]]],
++    *,
++    project: str,
++) -> str:
++    """Render a computed verified-close-backfill repair as a human-readable
++    notification body -- R1 ``PROPOSE`` semantics (§2 of the fleet error
++    catalog): the notification carries the already-computed fix as a
++    proposal, and nothing in this module ever executes it. Shadow mode
++    passes this text straight to ``AlertDispatcher.publish``; nothing here
++    talks to a notification channel."""
++    trade_close = next(fields for event_type, fields in repair_events if event_type == "trade_close")
++    reconciliation = trade_close["reconciliation"]
++    lines = [
++        f"[{project}] verified-close-backfill 提案（僅記錄事件日誌，未寫入帳本，需人工核准）",
++        f"incident_id: {evidence['incident_id']}",
++        f"trade_id: {trade_close['trade_id']}  symbol: {trade_close['symbol']}",
++        f"數量: {trade_close['entry_volume']}  進場價: {trade_close['entry_price']}"
++        f"  出場價: {trade_close['exit_price']}",
++        f"手續費合計: {trade_close['total_fees']:.6f}",
++        f"本地淨損益: {trade_close['net_pnl']:.6f}  交易所毛損益: {trade_close['exchange_profit']:.6f}"
++        f"  差額: {trade_close['reconciliation_delta']:.6f}",
++        f"證據來源: {reconciliation['method']}",
++        f"平倉時間 (UTC): {trade_close['closed_at']}",
++    ]
++    return "\n".join(lines)
++
++
+ def append_repair(
+     ledger_path: str | Path,
+     evidence_path: str | Path,
+diff --git a/tests/test_core.py b/tests/test_core.py
+index d295cbc..d14097b 100644
+--- a/tests/test_core.py
++++ b/tests/test_core.py
+@@ -30,9 +30,10 @@ def test_event_render_contains_system_and_fields():
+ 
+ def test_dispatcher_fans_out():
+     channel = RecordingChannel()
+-    AlertDispatcher([channel], system="test").publish("TEST", "hello")
++    delivered = AlertDispatcher([channel], system="test").publish("TEST", "hello")
+     assert len(channel.messages) == 1
+     assert "hello" in channel.messages[0][0]
++    assert delivered is True
+ 
+ 
+ def test_channel_failure_isolated():
+@@ -44,15 +45,32 @@ def test_channel_failure_isolated():
+             raise RuntimeError("offline")
+ 
+     good = RecordingChannel()
+-    AlertDispatcher([Broken(), good]).publish("TEST", "still delivered")
++    delivered = AlertDispatcher([Broken(), good]).publish("TEST", "still delivered")
+     assert len(good.messages) == 1
++    assert delivered is True
++
++
++def test_publish_returns_false_when_every_channel_fails():
++    class Broken:
++        name = "broken"
++        policy = RetryPolicy(attempts=1)
++
++        def send(self, text, *, timeout):
++            raise RuntimeError("offline")
++
++    delivered = AlertDispatcher([Broken(), Broken()]).publish("TEST", "nobody heard this")
++    assert delivered is False
++
++
++def test_publish_returns_false_with_no_channels():
++    assert AlertDispatcher([]).publish("TEST", "no channels configured") is False
+ 
+ 
+ def test_contract_mobile_presentation_hides_internal_metadata():
+     channel = RecordingChannel()
+     dispatcher = AlertDispatcher([channel], system="test")
+ 
+-    dispatcher.publish_contract(
++    delivered = dispatcher.publish_contract(
+         {
+             "schema_version": "1.0",
+             "event_id": "event-1",
+@@ -72,6 +90,7 @@ def test_contract_mobile_presentation_hides_internal_metadata():
+     )
+ 
+     text = channel.messages[0][0]
++    assert delivered is True
+     assert text == "【MEXC 4H Momentum Trailing Stop】\n開倉通知\n\n標的：MUBARAK_USDT"
+     assert "trade_id" not in text
+     assert "private-project-id" not in text
+diff --git a/tests/test_verified_close_backfill.py b/tests/test_verified_close_backfill.py
+index 94f9eec..4784854 100644
+--- a/tests/test_verified_close_backfill.py
++++ b/tests/test_verified_close_backfill.py
+@@ -19,8 +19,10 @@ from trade_alerts import (
+     append_repair,
+     build_evidence,
+     build_repair_events,
++    detect_repair_candidates,
+     find_open_event,
+     load_evidence,
++    render_repair_proposal_text,
+ )
+ from trade_alerts.ledger_reconcile import read_ledger
+ 
+@@ -285,3 +287,58 @@ def test_repair_event_types_matches_what_build_repair_events_emits():
+     evidence = load_evidence(EVIDENCE)
+     event_types = {event_type for event_type, _fields in build_repair_events(evidence)}
+     assert event_types == REPAIR_EVENT_TYPES
++
++
++# --------------------------------------------------------------------------- #
++# detect_repair_candidates
++# --------------------------------------------------------------------------- #
++def _diverged_status(*symbols):
++    return {
++        "value": "DIVERGED",
++        "evidence": {"position_diffs": [{"symbol": s, "ledger_qty": 0.0, "exchange_qty": 1.0} for s in symbols]},
++    }
++
++
++def test_detect_repair_candidates_finds_the_still_open_trade_for_a_diverged_symbol():
++    events = [_open_event(trade_id="T1", symbol="PUFFER_USDT")]
++    assert detect_repair_candidates(_diverged_status("PUFFER_USDT"), events) == ["T1"]
++
++
++def test_detect_repair_candidates_ignores_symbols_without_a_position_diff():
++    events = [_open_event(trade_id="T1", symbol="PUFFER_USDT")]
++    assert detect_repair_candidates(_diverged_status("OTHER_USDT"), events) == []
++
++
++def test_detect_repair_candidates_skips_a_symbol_already_closed():
++    events = [_open_event(trade_id="T1", symbol="PUFFER_USDT"),
++              {"event_type": "trade_close", "trade_id": "T1", "symbol": "PUFFER_USDT"}]
++    assert detect_repair_candidates(_diverged_status("PUFFER_USDT"), events) == []
++
++
++def test_detect_repair_candidates_skips_an_ambiguous_symbol_with_two_open_trades():
++    events = [_open_event(trade_id="T1", symbol="PUFFER_USDT"),
++              _open_event(trade_id="T2", symbol="PUFFER_USDT")]
++    assert detect_repair_candidates(_diverged_status("PUFFER_USDT"), events) == []
++
++
++def test_detect_repair_candidates_returns_nothing_when_not_diverged():
++    events = [_open_event(trade_id="T1", symbol="PUFFER_USDT")]
++    assert detect_repair_candidates({"value": "PENDING", "evidence": {"position_diffs": []}}, events) == []
++    assert detect_repair_candidates({"value": "RECONCILED"}, events) == []
++
++
++# --------------------------------------------------------------------------- #
++# render_repair_proposal_text
++# --------------------------------------------------------------------------- #
++def test_render_repair_proposal_text_includes_the_key_decision_fields():
++    evidence = load_evidence(EVIDENCE)
++    repair_events = build_repair_events(evidence)
++    text = render_repair_proposal_text(evidence, repair_events, project="momentum")
++    trade_close = dict(next(fields for event_type, fields in repair_events if event_type == "trade_close"))
++    assert "[momentum]" in text
++    assert evidence["incident_id"] in text
++    assert trade_close["trade_id"] in text
++    assert trade_close["symbol"] in text
++    assert f"{trade_close['net_pnl']:.6f}" in text
++    assert f"{trade_close['exchange_profit']:.6f}" in text
++    assert trade_close["reconciliation"]["method"] in text
