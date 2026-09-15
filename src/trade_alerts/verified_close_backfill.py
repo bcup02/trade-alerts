@@ -352,6 +352,89 @@ def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, A
     return events
 
 
+# --------------------------------------------------------------------------- #
+# stage 0 (Phase 5 repair-bot shadow mode): detect candidates + render a
+# human-readable proposal, both pure -- neither function writes anything.
+# --------------------------------------------------------------------------- #
+def detect_repair_candidates(
+    ledger_status: dict[str, Any],
+    ledger_events: list[dict[str, Any]],
+    *,
+    norm_symbol: Callable[[Any], str] = str,
+) -> list[str]:
+    """Map a ``DIVERGED`` ``ledger_status.json`` verdict's ``position_diffs``
+    to candidate ``trade_id``s a verified-close backfill might fix.
+
+    Only symbols reported in ``evidence.position_diffs`` are considered -- a
+    real position-quantity divergence, not merely a stale pending marker.
+    ``reconcile_apply.py`` already owns the pending-marker case and
+    explicitly refuses this one (see its module docstring); this is the
+    detection half of the path it defers to "a later PR".
+
+    For each such symbol, the candidate is that symbol's still-open
+    ``trade_id``: a ``trade_open`` with no matching ``trade_close``. Every
+    strategy in this toolkit family runs at most one open position per
+    symbol, so a single candidate per symbol is unambiguous. A symbol with
+    zero or more than one still-open ``trade_id`` is skipped rather than
+    guessed at -- shadow mode logs what it can act on, it never picks
+    between two plausible answers.
+    """
+    if ledger_status.get("value") != "DIVERGED":
+        return []
+    evidence = ledger_status.get("evidence") or {}
+    diff_symbols = {norm_symbol(d.get("symbol")) for d in evidence.get("position_diffs") or []}
+    if not diff_symbols:
+        return []
+
+    open_by_symbol: dict[str, list[str]] = {}
+    closed_trade_ids: set[str] = set()
+    for event in ledger_events:
+        trade_id = event.get("trade_id")
+        if not trade_id:
+            continue
+        event_type = event.get("event_type")
+        if event_type == "trade_open":
+            open_by_symbol.setdefault(norm_symbol(event.get("symbol")), []).append(str(trade_id))
+        elif event_type == "trade_close":
+            closed_trade_ids.add(str(trade_id))
+
+    candidates: list[str] = []
+    for symbol in sorted(diff_symbols):
+        still_open = [tid for tid in open_by_symbol.get(symbol, []) if tid not in closed_trade_ids]
+        if len(still_open) == 1:
+            candidates.append(still_open[0])
+    return candidates
+
+
+def render_repair_proposal_text(
+    evidence: dict[str, Any],
+    repair_events: list[tuple[str, dict[str, Any]]],
+    *,
+    project: str,
+) -> str:
+    """Render a computed verified-close-backfill repair as a human-readable
+    notification body -- R1 ``PROPOSE`` semantics (§2 of the fleet error
+    catalog): the notification carries the already-computed fix as a
+    proposal, and nothing in this module ever executes it. Shadow mode
+    passes this text straight to ``AlertDispatcher.publish``; nothing here
+    talks to a notification channel."""
+    trade_close = next(fields for event_type, fields in repair_events if event_type == "trade_close")
+    reconciliation = trade_close["reconciliation"]
+    lines = [
+        f"[{project}] verified-close-backfill 提案（僅記錄事件日誌，未寫入帳本，需人工核准）",
+        f"incident_id: {evidence['incident_id']}",
+        f"trade_id: {trade_close['trade_id']}  symbol: {trade_close['symbol']}",
+        f"數量: {trade_close['entry_volume']}  進場價: {trade_close['entry_price']}"
+        f"  出場價: {trade_close['exit_price']}",
+        f"手續費合計: {trade_close['total_fees']:.6f}",
+        f"本地淨損益: {trade_close['net_pnl']:.6f}  交易所毛損益: {trade_close['exchange_profit']:.6f}"
+        f"  差額: {trade_close['reconciliation_delta']:.6f}",
+        f"證據來源: {reconciliation['method']}",
+        f"平倉時間 (UTC): {trade_close['closed_at']}",
+    ]
+    return "\n".join(lines)
+
+
 def append_repair(
     ledger_path: str | Path,
     evidence_path: str | Path,

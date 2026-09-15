@@ -91,8 +91,10 @@ from .verified_close_backfill import (
     append_repair,
     build_evidence,
     build_repair_events,
+    detect_repair_candidates,
     find_open_event,
     load_evidence,
+    render_repair_proposal_text,
 )
 from .ledger_reconcile import (
     CLOSE_MARKERS,
@@ -154,8 +156,10 @@ __all__ = [
     "append_repair",
     "build_evidence",
     "build_repair_events",
+    "detect_repair_candidates",
     "find_open_event",
     "load_evidence",
+    "render_repair_proposal_text",
     "FLEET_EVENT_KIND",
     "PROJECT_CODE_PREFIXES",
     "RISK_TIERS",
@@ -245,4 +249,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.15.0"
+__version__ = "0.16.0"
