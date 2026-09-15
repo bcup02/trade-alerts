@@ -111,7 +111,7 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障�
 
 | 錯誤碼 | 現行事件名 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
-| `MYC.RECONCILE_DELTA_EXCEEDED` | `SAFE_HALT`（誤導） | MECHANICAL | R0 | **P3** |
+| `MYC.RECONCILE_DELTA_EXCEEDED` | `SAFE_HALT`（誤導） | MECHANICAL | R0 | **P3** 改名 / **P4e** 定案不聚合 |
 | `MYC.RUNTIME_CYCLE_FAILED` | `SAFE_HALT`（誤導） | JUDGEMENT | R1 | **P3** 改名 / P5 |
 | `MYC.PROTECTION_PLACEMENT_REJECTED` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R4 | **P3** 改名 / P5 |
 | `MYC.PROTECTION_PLACEMENT_NO_POSITION` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P6 |
@@ -242,7 +242,8 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
 - 因為檔案是逐專案的，`code` 存**不帶前綴的條件名**（同 §4.2）；跨機隊聚合或 join 回本目錄時
   由讀取端用 `catalog_code()` 補前綴。
 - `evidence` / `details` 的分工同 §4.2。另有 `measurements` 放「這個條件本身只是一個指標」的
-  數值：`reconciliation_delta` **每一筆都寫在這裡、且什麼都不升級**，只有聚合偏離才開請求。
+  數值：`reconciliation_delta` 寫在這裡、永遠不升級——**2026-09-15（Phase 4e）撤回「聚合偏離
+  才開請求」的計畫**，見 §4.7，這個指標永久停在事件日誌這一層，不會有東西讀它去開 §4.6 的請求。
 - `risk_tier` 是可選的稽核欄位，記錄寫入當下從本目錄查到的等級。**這個模組自己從不決定等級、
   也從不通知。**
 - 讀取時遇到壞行會直接拋錯，不是跳過：這個檔案是證據，靜默丟掉一部分會讓稽核看起來完整而
@@ -266,6 +267,33 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
   （同條件帶著不同證據重開）、`WITHDRAWN`（條件自己不再成立）。已關閉的請求拒絕再關一次——
   outcome 是「實際發生了什麼」的稽核紀錄，第二筆會讓歷史對「哪個修復真的跑了」變得有歧義。
 - 格式在 `schemas/error-request-queue-v1.schema.json`。
+
+### 4.7 `reconciliation_delta`：撤回聚合計畫（Phase 4e，2026-09-15）
+
+§4.5/4.6 原本規劃 `reconciliation_delta` 是請求佇列的第一個生產者：每筆照存不觸發，只有**聚合
+偏離**（連續同向 N 筆 / 移動平均偏離零）才開請求。Phase 4e 開工盤查 trading-main 真實帳本後
+**撤回這個計畫**——不是實作方式的問題，是這個訊號本身已經不需要聚合邏輯。
+
+**盤查發現**：拉出 momentum 連續 17 筆、my-crypto 唯一 1 筆有效資料的 `reconciliation_delta`，
+每一筆都精確等於 `-(entry_fee + exit_fee)`，誤差在小數點第 6 位。原因：交易所回報的
+`exchange_profit` 是手續費前的毛損益，本地 `net_pnl` 是手續費後的淨損益，兩者相減從定義上就
+只會得到「負的手續費」——不是雜訊，是一個已知、良性、每筆都會出現、方向永遠一致的系統性偏差。
+不管怎麼調整比較公式（比毛損益還是想辦法比淨損益），聚合起來永遠是同一個已知原因，不會有真正
+需要人介入的訊號可抓。
+
+**為什麼觀察不到殘留雜訊**：這個指標最初想抓的問題（my-crypto 程式碼開頭第 13 點）是「本地記錄
+的進出場價格跟交易所現實脫節，錯誤會沿用進未來的移動停損計算」。這個問題已經被 my-crypto
+2026-08-22 的另一個修正（第 14 點：`_fetch_order_info()` 改用交易所確認過的
+`dealAvgPrice`/`totalFee` 入帳）從源頭堵住了——本地價格現在本來就是交易所確認過的數字，不會再
+脫節，所以 `reconciliation_delta` 剩下的就只有手續費這個已知常數，不會再出現代表真實問題的
+離群值。
+
+**結論**：`reconciliation_delta` 永久停在 §4.5 事件日誌這一層，**不建聚合邏輯、不接 §4.6 請求
+佇列**。my-crypto 端把原本呼叫的 `alerts.publish("RECONCILE_DELTA_EXCEEDED", ...)` 換成
+`append_fleet_event(...)`——後者在 my-crypto 本來就已經是 2026-08-30 起的本地 no-op stub（見
+`_LogOnlyAlerts`），這次替換是把稽核紀錄放進機隊統一格式，不是關掉一個正在發送的通知。momentum
+維持現狀不動（本來就只寫帳本、完全沒有事件產生）。§4.6 的請求佇列基礎設施留著，等以後真的出現
+需要它的訊號源再用。
 
 ## 5. Phase 3 實際落地的程式改動
 
