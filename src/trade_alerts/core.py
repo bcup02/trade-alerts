@@ -55,12 +55,23 @@ class AlertDispatcher:
         self.channels = channels or []
         self.system = system
 
-    def _send_text(self, text: str) -> None:
+    def _send_text(self, text: str) -> bool:
+        """Fan out to every channel; return whether at least one delivered.
+
+        A caller that needs delivery confirmation (e.g. a timeout timer that
+        must only start counting down once a human could plausibly have seen
+        the notification) checks this return value. Per-channel failures are
+        still only logged, not raised -- one broken channel must not block
+        the others or the caller.
+        """
+        delivered = False
         for channel in self.channels:
             try:
                 channel.send(text, timeout=getattr(channel, "policy", RetryPolicy()).timeout_seconds)
+                delivered = True
             except Exception:
                 log.exception("alert channel failed: %s", getattr(channel, "name", "unknown"))
+        return delivered
 
     @staticmethod
     def _investor_mobile_text(envelope: Mapping[str, Any]) -> str | None:
@@ -85,7 +96,7 @@ class AlertDispatcher:
         *,
         critical: bool = False,
         fields: dict[str, Any] | None = None,
-    ) -> None:
+    ) -> bool:
         alert = event if isinstance(event, AlertEvent) else AlertEvent(
             event=event,
             message=message or "",
@@ -93,14 +104,15 @@ class AlertDispatcher:
             fields=fields or {},
             system=self.system,
         )
-        self._send_text(alert.render())
+        return self._send_text(alert.render())
 
-    def publish_contract(self, envelope: Mapping[str, Any]) -> None:
+    def publish_contract(self, envelope: Mapping[str, Any]) -> bool:
         """Publish a v1 envelope through existing text channels.
 
         Legacy and ordinary v1 events retain the diagnostic rendering. Producers
         may opt into ``presentation.format=investor_mobile_v1`` to send a curated
-        investor message instead of raw machine metadata.
+        investor message instead of raw machine metadata. Returns whether at
+        least one channel delivered the message.
         """
         required = ("schema_version", "event_type", "project_id", "message")
         missing = [key for key in required if not envelope.get(key)]
@@ -108,19 +120,18 @@ class AlertDispatcher:
             raise ValueError(f"contract envelope missing required fields: {', '.join(missing)}")
         investor_text = self._investor_mobile_text(envelope)
         if investor_text:
-            self._send_text(investor_text)
-            return
+            return self._send_text(investor_text)
         data = dict(envelope.get("data") or {})
         data.update({"schema_version": envelope["schema_version"], "project_id": envelope["project_id"], "execution_mode": envelope.get("execution_mode", "DRY_RUN")})
-        self.publish(
+        return self.publish(
             str(envelope["event_type"]),
             str(envelope["message"]),
             critical=str(envelope.get("severity", "INFO")) == "CRITICAL",
             fields=data,
         )
 
-    def test(self) -> None:
-        self.publish("TEST", "通知渠道測試成功。")
+    def test(self) -> bool:
+        return self.publish("TEST", "通知渠道測試成功。")
 
 
 def request_with_retry(request_fn: Any, policy: RetryPolicy) -> Any:

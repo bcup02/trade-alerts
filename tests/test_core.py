@@ -30,9 +30,10 @@ def test_event_render_contains_system_and_fields():
 
 def test_dispatcher_fans_out():
     channel = RecordingChannel()
-    AlertDispatcher([channel], system="test").publish("TEST", "hello")
+    delivered = AlertDispatcher([channel], system="test").publish("TEST", "hello")
     assert len(channel.messages) == 1
     assert "hello" in channel.messages[0][0]
+    assert delivered is True
 
 
 def test_channel_failure_isolated():
@@ -44,15 +45,32 @@ def test_channel_failure_isolated():
             raise RuntimeError("offline")
 
     good = RecordingChannel()
-    AlertDispatcher([Broken(), good]).publish("TEST", "still delivered")
+    delivered = AlertDispatcher([Broken(), good]).publish("TEST", "still delivered")
     assert len(good.messages) == 1
+    assert delivered is True
+
+
+def test_publish_returns_false_when_every_channel_fails():
+    class Broken:
+        name = "broken"
+        policy = RetryPolicy(attempts=1)
+
+        def send(self, text, *, timeout):
+            raise RuntimeError("offline")
+
+    delivered = AlertDispatcher([Broken(), Broken()]).publish("TEST", "nobody heard this")
+    assert delivered is False
+
+
+def test_publish_returns_false_with_no_channels():
+    assert AlertDispatcher([]).publish("TEST", "no channels configured") is False
 
 
 def test_contract_mobile_presentation_hides_internal_metadata():
     channel = RecordingChannel()
     dispatcher = AlertDispatcher([channel], system="test")
 
-    dispatcher.publish_contract(
+    delivered = dispatcher.publish_contract(
         {
             "schema_version": "1.0",
             "event_id": "event-1",
@@ -72,6 +90,7 @@ def test_contract_mobile_presentation_hides_internal_metadata():
     )
 
     text = channel.messages[0][0]
+    assert delivered is True
     assert text == "【MEXC 4H Momentum Trailing Stop】\n開倉通知\n\n標的：MUBARAK_USDT"
     assert "trade_id" not in text
     assert "private-project-id" not in text

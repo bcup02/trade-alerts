@@ -374,3 +374,41 @@ trade-alerts：v0.15.0（Phase 4a）
           逐筆試開請求都必須被拒。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.16.0（Phase 5a）
+變更摘要：Phase 5「修復 bot 影子模式」的共用地基，全部是純函式庫改動，無任何
+          執行期副作用。
+          1. AlertDispatcher._send_text／publish／publish_contract／test 改回
+          傳 bool（是否至少一個 channel 送達），取代原本的 None。單一 channel
+          失敗仍只記 log、不中斷其他 channel——只是把「有沒有送達」的結果讓
+          呼叫端看得到。既有呼叫端（四支策略的 alerts.publish(...)）忽略回傳
+          值照樣能跑，向下相容。這是 Phase 7「計時器只在通知確認送達後才開始
+          倒數」的地基，現在先修不用等到 Phase 7。
+          2. verified_close_backfill 新增兩個純函式：
+             - detect_repair_candidates(ledger_status, ledger_events)——把
+             reconcile_compare.py 的 DIVERGED 判定裡 evidence.position_diffs
+             的 symbol 級數量差，換算成候選 trade_id（該 symbol 唯一還沒
+             trade_close 的 trade_open）。symbol 沒有落在 position_diffs、
+             已經有 close、或同一 symbol 有一筆以上未結案 trade_open（有歧義）
+             都回傳空——只在無歧義時才給答案，不猜。這正是
+             reconcile_apply.py 目前明確拒絕、留給「之後的 PR」處理的那個
+             case（見其 module docstring）。
+             - render_repair_proposal_text(evidence, repair_events, project)——
+             把 build_repair_events() 算出的完整修復內容，組成人看得懂的 LINE
+             通知文字（trade_id、symbol、數量、進出場價、手續費、本地淨損益
+             vs 交易所毛損益、差額、證據來源、平倉時間），對應
+             fleet-error-catalog.md §2 的 R1 PROPOSE 語意：算出方案才通知，
+             附上提案。純字串組裝，不呼叫任何 channel。
+受影響消費專案：無立即影響（純新增 + 回傳型別放寬，既有呼叫端不用改）。
+          Phase 5b／5c 的 momentum／seykota 影子模式 bot 會 bump pin 到這個
+          版本並呼叫這兩個新函式；在那之前四支策略照舊運作。
+部署入口：無（純函式庫，未觸發任何部署）。
+版本驗證：pyproject.toml version == 0.16.0；trade_alerts.__version__ ==
+          "0.16.0"。
+服務/工作流程驗證：trade-alerts pytest 169 全綠（161 → 169，+8：core.py 2 條
+          新增回傳值斷言（全部 channel 失敗 / 無 channel 都回 False，另 3 條
+          既有測試補上 bool 斷言）+ detect_repair_candidates 5 條 +
+          render_repair_proposal_text 1 條）。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

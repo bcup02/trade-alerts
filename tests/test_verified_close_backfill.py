@@ -19,8 +19,10 @@ from trade_alerts import (
     append_repair,
     build_evidence,
     build_repair_events,
+    detect_repair_candidates,
     find_open_event,
     load_evidence,
+    render_repair_proposal_text,
 )
 from trade_alerts.ledger_reconcile import read_ledger
 
@@ -285,3 +287,58 @@ def test_repair_event_types_matches_what_build_repair_events_emits():
     evidence = load_evidence(EVIDENCE)
     event_types = {event_type for event_type, _fields in build_repair_events(evidence)}
     assert event_types == REPAIR_EVENT_TYPES
+
+
+# --------------------------------------------------------------------------- #
+# detect_repair_candidates
+# --------------------------------------------------------------------------- #
+def _diverged_status(*symbols):
+    return {
+        "value": "DIVERGED",
+        "evidence": {"position_diffs": [{"symbol": s, "ledger_qty": 0.0, "exchange_qty": 1.0} for s in symbols]},
+    }
+
+
+def test_detect_repair_candidates_finds_the_still_open_trade_for_a_diverged_symbol():
+    events = [_open_event(trade_id="T1", symbol="PUFFER_USDT")]
+    assert detect_repair_candidates(_diverged_status("PUFFER_USDT"), events) == ["T1"]
+
+
+def test_detect_repair_candidates_ignores_symbols_without_a_position_diff():
+    events = [_open_event(trade_id="T1", symbol="PUFFER_USDT")]
+    assert detect_repair_candidates(_diverged_status("OTHER_USDT"), events) == []
+
+
+def test_detect_repair_candidates_skips_a_symbol_already_closed():
+    events = [_open_event(trade_id="T1", symbol="PUFFER_USDT"),
+              {"event_type": "trade_close", "trade_id": "T1", "symbol": "PUFFER_USDT"}]
+    assert detect_repair_candidates(_diverged_status("PUFFER_USDT"), events) == []
+
+
+def test_detect_repair_candidates_skips_an_ambiguous_symbol_with_two_open_trades():
+    events = [_open_event(trade_id="T1", symbol="PUFFER_USDT"),
+              _open_event(trade_id="T2", symbol="PUFFER_USDT")]
+    assert detect_repair_candidates(_diverged_status("PUFFER_USDT"), events) == []
+
+
+def test_detect_repair_candidates_returns_nothing_when_not_diverged():
+    events = [_open_event(trade_id="T1", symbol="PUFFER_USDT")]
+    assert detect_repair_candidates({"value": "PENDING", "evidence": {"position_diffs": []}}, events) == []
+    assert detect_repair_candidates({"value": "RECONCILED"}, events) == []
+
+
+# --------------------------------------------------------------------------- #
+# render_repair_proposal_text
+# --------------------------------------------------------------------------- #
+def test_render_repair_proposal_text_includes_the_key_decision_fields():
+    evidence = load_evidence(EVIDENCE)
+    repair_events = build_repair_events(evidence)
+    text = render_repair_proposal_text(evidence, repair_events, project="momentum")
+    trade_close = dict(next(fields for event_type, fields in repair_events if event_type == "trade_close"))
+    assert "[momentum]" in text
+    assert evidence["incident_id"] in text
+    assert trade_close["trade_id"] in text
+    assert trade_close["symbol"] in text
+    assert f"{trade_close['net_pnl']:.6f}" in text
+    assert f"{trade_close['exchange_profit']:.6f}" in text
+    assert trade_close["reconciliation"]["method"] in text
