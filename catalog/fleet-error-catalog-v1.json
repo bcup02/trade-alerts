@@ -476,20 +476,20 @@
       "title": "本地帳本與交易所回報損益差額超過容忍值",
       "project": "mycrypto",
       "sources": [
-        "mexc_futures_bot.py:686"
+        "mexc_futures_bot.py:713"
       ],
       "current": {
         "latch": null,
-        "notify": "RECONCILE_DELTA_EXCEEDED (log-only)",
+        "notify": "fleet_event_log measurement (audit-only, never notifies)",
         "unit_exit": null
       },
       "verdict": "MECHANICAL",
       "risk_tier": "R0",
       "auto_action": "以交易所為權威記錄差額，不改變交易行為。",
-      "human_action": "無。只有聚合偏離（連續同向 N 筆／移動平均偏離零）才升級成請求。",
+      "human_action": "無，永久不會升級。2026-09-15（Phase 4e）盤查 trading-main 真實帳本（momentum 連續 17 筆、my-crypto 唯一 1 筆有效資料）發現這個差額精確等於-(entry_fee + exit_fee)——交易所回報損益本來就是手續費前的毛數字，本地net_pnl 是手續費後的淨數字，相減從定義上就只會是負的手續費，不是任何異常訊號，聚合起來也永遠是同一個已知、良性的偏差。撤回原本「聚合偏離才升級成請求」的計畫：不建聚合邏輯，每筆持續寫進 fleet_event_log 純供稽核查閱。",
       "resume": "n/a",
-      "lands_in_phase": 3,
-      "rationale": "使用者已定調：交易所是權威資料，單筆差額的結論永遠是「以交易所為準」，包裝成錯誤不產生任何決策。這是整個專案範圍擴大的起點。Phase 3 改名（SAFE_HALT → RECONCILE_DELTA_EXCEEDED）並降 critical，因為現行名稱宣稱一個根本不存在的停機行為。"
+      "lands_in_phase": 4,
+      "rationale": "使用者已定調：交易所是權威資料，單筆差額的結論永遠是「以交易所為準」，包裝成錯誤不產生任何決策。這是整個專案範圍擴大的起點。Phase 3 改名（SAFE_HALT → RECONCILE_DELTA_EXCEEDED）並降 critical，因為現行名稱宣稱一個根本不存在的停機行為。 2026-09-15 補充：這個指標原本想抓的問題（本地價格記錄跟交易所現實脫節，會沿用進未來的移動停損計算）已經被同一支程式 2026-08-22 的另一個修正（`_fetch_order_info()` 改用交易所確認過的 `dealAvgPrice`/`totalFee` 入帳）從源頭堵住——這也是為什麼觀察到的差額 100% 只剩手續費、沒有任何殘留雜訊。Phase 4e 因此把 Phase 3 當時保留的「聚合偏離才升級」計畫撤回，改成單純寫入`trade_alerts.fleet_event_log`（見 §4.5），取代原本呼叫 `alerts.publish()`——後者在 my-crypto 端本來就已經是 2026-08-30 起的本地 no-op stub，這次替換純粹是把稽核紀錄放進機隊統一格式，不是關掉正在發送的通知。"
     },
     {
       "code": "MYC.RUNTIME_CYCLE_FAILED",
