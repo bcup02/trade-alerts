@@ -1,0 +1,113 @@
+commit f605cbb729f7ff61917ee314cfb5c895881692ca
+Author: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date:   Tue Sep 15 16:15:45 2026 +0800
+
+    docs: retire the reconciliation_delta aggregation plan (Phase 4e) (#19)
+    
+    Real trading-main ledger data (momentum's 17 consecutive trade_close events,
+    my-crypto's one valid data point) shows reconciliation_delta is exactly
+    -(entry_fee + exit_fee) every single time -- exchange_profit is reported
+    gross-of-fees, net_pnl is fee-deducted, so the two will always differ by
+    exactly the fees. It's not noise around a real signal; it's a known, benign,
+    always-same-direction artifact that no aggregation window would ever turn
+    into a meaningful "something is systematically wrong" alarm.
+    
+    The problem this metric was originally meant to catch (local entry/exit price
+    drifting from exchange reality, compounding into future stop-loss sizing) was
+    already closed at the source by my-crypto's 2026-08-22 fix that records
+    exchange-confirmed fill prices instead of estimates -- which is also why zero
+    outlier deltas have ever been observed.
+    
+    §4.5/4.6/4.7 updated to reflect the retraction: reconciliation_delta stays a
+    permanent event-log-only measurement, never feeds the error request queue.
+    
+    Co-authored-by: bcup02 <columnbb@gmail.com>
+    Co-authored-by: Claude Sonnet 5 <noreply@anthropic.com>
+
+diff --git a/catalog/fleet-error-catalog-v1.json b/catalog/fleet-error-catalog-v1.json
+index f84d0af..4dc1f87 100644
+--- a/catalog/fleet-error-catalog-v1.json
++++ b/catalog/fleet-error-catalog-v1.json
+@@ -476,20 +476,20 @@
+       "title": "本地帳本與交易所回報損益差額超過容忍值",
+       "project": "mycrypto",
+       "sources": [
+-        "mexc_futures_bot.py:686"
++        "mexc_futures_bot.py:713"
+       ],
+       "current": {
+         "latch": null,
+-        "notify": "RECONCILE_DELTA_EXCEEDED (log-only)",
++        "notify": "fleet_event_log measurement (audit-only, never notifies)",
+         "unit_exit": null
+       },
+       "verdict": "MECHANICAL",
+       "risk_tier": "R0",
+       "auto_action": "以交易所為權威記錄差額，不改變交易行為。",
+-      "human_action": "無。只有聚合偏離（連續同向 N 筆／移動平均偏離零）才升級成請求。",
++      "human_action": "無，永久不會升級。2026-09-15（Phase 4e）盤查 trading-main 真實帳本（momentum 連續 17 筆、my-crypto 唯一 1 筆有效資料）發現這個差額精確等於-(entry_fee + exit_fee)——交易所回報損益本來就是手續費前的毛數字，本地net_pnl 是手續費後的淨數字，相減從定義上就只會是負的手續費，不是任何異常訊號，聚合起來也永遠是同一個已知、良性的偏差。撤回原本「聚合偏離才升級成請求」的計畫：不建聚合邏輯，每筆持續寫進 fleet_event_log 純供稽核查閱。",
+       "resume": "n/a",
+-      "lands_in_phase": 3,
+-      "rationale": "使用者已定調：交易所是權威資料，單筆差額的結論永遠是「以交易所為準」，包裝成錯誤不產生任何決策。這是整個專案範圍擴大的起點。Phase 3 改名（SAFE_HALT → RECONCILE_DELTA_EXCEEDED）並降 critical，因為現行名稱宣稱一個根本不存在的停機行為。"
++      "lands_in_phase": 4,
++      "rationale": "使用者已定調：交易所是權威資料，單筆差額的結論永遠是「以交易所為準」，包裝成錯誤不產生任何決策。這是整個專案範圍擴大的起點。Phase 3 改名（SAFE_HALT → RECONCILE_DELTA_EXCEEDED）並降 critical，因為現行名稱宣稱一個根本不存在的停機行為。 2026-09-15 補充：這個指標原本想抓的問題（本地價格記錄跟交易所現實脫節，會沿用進未來的移動停損計算）已經被同一支程式 2026-08-22 的另一個修正（`_fetch_order_info()` 改用交易所確認過的 `dealAvgPrice`/`totalFee` 入帳）從源頭堵住——這也是為什麼觀察到的差額 100% 只剩手續費、沒有任何殘留雜訊。Phase 4e 因此把 Phase 3 當時保留的「聚合偏離才升級」計畫撤回，改成單純寫入`trade_alerts.fleet_event_log`（見 §4.5），取代原本呼叫 `alerts.publish()`——後者在 my-crypto 端本來就已經是 2026-08-30 起的本地 no-op stub，這次替換純粹是把稽核紀錄放進機隊統一格式，不是關掉正在發送的通知。"
+     },
+     {
+       "code": "MYC.RUNTIME_CYCLE_FAILED",
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index 5a49601..688389f 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -111,7 +111,7 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障
+ 
+ | 錯誤碼 | 現行事件名 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+-| `MYC.RECONCILE_DELTA_EXCEEDED` | `SAFE_HALT`（誤導） | MECHANICAL | R0 | **P3** |
++| `MYC.RECONCILE_DELTA_EXCEEDED` | `SAFE_HALT`（誤導） | MECHANICAL | R0 | **P3** 改名 / **P4e** 定案不聚合 |
+ | `MYC.RUNTIME_CYCLE_FAILED` | `SAFE_HALT`（誤導） | JUDGEMENT | R1 | **P3** 改名 / P5 |
+ | `MYC.PROTECTION_PLACEMENT_REJECTED` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R4 | **P3** 改名 / P5 |
+ | `MYC.PROTECTION_PLACEMENT_NO_POSITION` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P6 |
+@@ -242,7 +242,8 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停
+ - 因為檔案是逐專案的，`code` 存**不帶前綴的條件名**（同 §4.2）；跨機隊聚合或 join 回本目錄時
+   由讀取端用 `catalog_code()` 補前綴。
+ - `evidence` / `details` 的分工同 §4.2。另有 `measurements` 放「這個條件本身只是一個指標」的
+-  數值：`reconciliation_delta` **每一筆都寫在這裡、且什麼都不升級**，只有聚合偏離才開請求。
++  數值：`reconciliation_delta` 寫在這裡、永遠不升級——**2026-09-15（Phase 4e）撤回「聚合偏離
++  才開請求」的計畫**，見 §4.7，這個指標永久停在事件日誌這一層，不會有東西讀它去開 §4.6 的請求。
+ - `risk_tier` 是可選的稽核欄位，記錄寫入當下從本目錄查到的等級。**這個模組自己從不決定等級、
+   也從不通知。**
+ - 讀取時遇到壞行會直接拋錯，不是跳過：這個檔案是證據，靜默丟掉一部分會讓稽核看起來完整而
+@@ -267,6 +268,33 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停
+   outcome 是「實際發生了什麼」的稽核紀錄，第二筆會讓歷史對「哪個修復真的跑了」變得有歧義。
+ - 格式在 `schemas/error-request-queue-v1.schema.json`。
+ 
++### 4.7 `reconciliation_delta`：撤回聚合計畫（Phase 4e，2026-09-15）
++
++§4.5/4.6 原本規劃 `reconciliation_delta` 是請求佇列的第一個生產者：每筆照存不觸發，只有**聚合
++偏離**（連續同向 N 筆 / 移動平均偏離零）才開請求。Phase 4e 開工盤查 trading-main 真實帳本後
++**撤回這個計畫**——不是實作方式的問題，是這個訊號本身已經不需要聚合邏輯。
++
++**盤查發現**：拉出 momentum 連續 17 筆、my-crypto 唯一 1 筆有效資料的 `reconciliation_delta`，
++每一筆都精確等於 `-(entry_fee + exit_fee)`，誤差在小數點第 6 位。原因：交易所回報的
++`exchange_profit` 是手續費前的毛損益，本地 `net_pnl` 是手續費後的淨損益，兩者相減從定義上就
++只會得到「負的手續費」——不是雜訊，是一個已知、良性、每筆都會出現、方向永遠一致的系統性偏差。
++不管怎麼調整比較公式（比毛損益還是想辦法比淨損益），聚合起來永遠是同一個已知原因，不會有真正
++需要人介入的訊號可抓。
++
++**為什麼觀察不到殘留雜訊**：這個指標最初想抓的問題（my-crypto 程式碼開頭第 13 點）是「本地記錄
++的進出場價格跟交易所現實脫節，錯誤會沿用進未來的移動停損計算」。這個問題已經被 my-crypto
++2026-08-22 的另一個修正（第 14 點：`_fetch_order_info()` 改用交易所確認過的
++`dealAvgPrice`/`totalFee` 入帳）從源頭堵住了——本地價格現在本來就是交易所確認過的數字，不會再
++脫節，所以 `reconciliation_delta` 剩下的就只有手續費這個已知常數，不會再出現代表真實問題的
++離群值。
++
++**結論**：`reconciliation_delta` 永久停在 §4.5 事件日誌這一層，**不建聚合邏輯、不接 §4.6 請求
++佇列**。my-crypto 端把原本呼叫的 `alerts.publish("RECONCILE_DELTA_EXCEEDED", ...)` 換成
++`append_fleet_event(...)`——後者在 my-crypto 本來就已經是 2026-08-30 起的本地 no-op stub（見
++`_LogOnlyAlerts`），這次替換是把稽核紀錄放進機隊統一格式，不是關掉一個正在發送的通知。momentum
++維持現狀不動（本來就只寫帳本、完全沒有事件產生）。§4.6 的請求佇列基礎設施留著，等以後真的出現
++需要它的訊號源再用。
++
+ ## 5. Phase 3 實際落地的程式改動
+ 
+ 本 Phase 以設計為主，程式改動限縮在「零風險的標記與命名修正」——不動任何 latch、resume 或交易
