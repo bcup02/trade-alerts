@@ -200,7 +200,7 @@
       },
       "verdict": "JUDGEMENT",
       "risk_tier": "R3",
-      "auto_action": "先記事件、寫 DEGRADED heartbeat、下一輪重試；連續 N 次（預設 3）同類失敗才 latch。latch 後逾時自動重試一次完整對帳。",
+      "auto_action": "先記事件、寫 DEGRADED heartbeat、下一輪重試；連續 N 次（預設 3）同類失敗才 latch。",
       "human_action": "Telegram 按鈕可提早重試，或手動處理。",
       "resume": "two_stage_fingerprint",
       "lands_in_phase": 4,
@@ -264,7 +264,7 @@
       "human_action": "Telegram 按鈕可提早解除，或看事件日誌決定是不是真的要人介入。",
       "resume": "two_stage_fingerprint",
       "lands_in_phase": 4,
-      "rationale": "這是本專案的核心工作項：一個桶子同時裝著純暫時性狀況與真正的災難，而且立刻 latch、沒有 resume 路徑。改成計數器後，暫時性抖動不再靜默停掉真倉策略，持續性故障仍然會停。其他八個原因碼在 catch-all 之前就已經各自 latch，不受計數器影響。"
+      "rationale": "這是本專案的核心工作項：一個桶子同時裝著純暫時性狀況與真正的災難，而且立刻 latch、沒有 resume 路徑。改成計數器後，暫時性抖動不再靜默停掉真倉策略，持續性故障仍然會停。其他七個原因碼在這兩處之前就已經各自 latch，不受計數器影響；SEY.RECONCILE_FAILED 額外套用同一套計數器邏輯（各自獨立計數，見該條目）。"
     },
     {
       "code": "SEY.CLOSE_FILL_PENDING",

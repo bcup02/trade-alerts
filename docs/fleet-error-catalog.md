@@ -213,17 +213,22 @@ seykota 從「無 resume 路徑」直接進到這一套完整閘門。`SEY.EXCHA
 它們擋的是設定／憑證層面的錯，改完設定重啟就該重新評估，提供一個「解除」動作反而會讓人誤以為
 不改設定也能放行。
 
-### 4.4 catch-all 計數器
+### 4.4 連續失敗計數器（2026-09-15 修正：範圍包含兩個原因碼，不是只有 catch-all）
 
-`SEY.RUNTIME_CYCLE_FAILED`（`bot.py:1376`）是本專案的核心工作項。改法：
+`SEY.RUNTIME_CYCLE_FAILED`（`bot.py` `run_forever` 的 catch-all）是本專案的核心工作項。改法：
 
 - 未分類例外 → 記事件 + 寫 `DEGRADED` heartbeat + 下一輪重試。
 - **連續 N 次（預設 3）** 同類例外才 latch。任何一次成功的循環把計數歸零。
 - latch 之後走 §4.3 的 resume 路徑。
 
-其餘八個原因碼在 catch-all 之前就已經各自 latch，不受計數器影響——計數器只作用在「連自己都不知道
-是什麼」的那一類。這直接修掉 2026-09-11 venv 競態事故的形狀：一次暫時性的 TLS 憑證讀取失敗，
-讓一支真倉策略靜默停止交易且無法遠端復原。
+`SEY.RECONCILE_FAILED`（`bot.py` `reconcile()` 排除暫時性網路錯誤後剩下的例外，主要是解析失敗、
+交易所回傳非預期結構）**額外套用同一套計數器邏輯，兩碼各自獨立計數**——這條路徑正是 2026-09-11
+venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停真倉策略的代價，跟 catch-all 的論證
+完全一樣。**其餘七個**原因碼在這兩處之前就已經各自 latch，不受計數器影響——計數器只作用在「連自己
+都不知道是什麼」的 catch-all，以及「多半是一次性、但無法歸類成上面任何一個具體原因碼」的
+`RECONCILE_FAILED`。（2026-09-15 之前的版本誤寫成「其餘八個」，把 `RECONCILE_FAILED` 也算進不受
+影響的那組——JSON 目錄裡 `SEY.RECONCILE_FAILED` 的 `auto_action` 其實從一開始就寫著計數器語言，
+兩處互相矛盾，Phase 4d 開工時拍板以此處修正為準。）
 
 ### 4.5 事件日誌（`trade_alerts.fleet_event_log`）
 
