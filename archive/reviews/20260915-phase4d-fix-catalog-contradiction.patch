@@ -1,0 +1,74 @@
+commit 1e56e4898b19586aa05ef29f70a9aac8fdb01cd0
+Author: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date:   Tue Sep 15 13:47:27 2026 +0800
+
+    docs: resolve §4.4 internal contradiction on the consecutive-failure counter's scope (#18)
+    
+    §4.4's prose said the counter only guards the catch-all (SEY.RUNTIME_CYCLE_FAILED),
+    but SEY.RECONCILE_FAILED's own auto_action already described the same counter
+    mechanism -- contradicting the "other eight codes latch immediately" claim right
+    next to it. Phase 4d needed this settled before implementing the counter in
+    ed-seykota. Fix: RECONCILE_FAILED keeps its own independent counter (its
+    rationale already cites the 2026-09-11 venv race as the motivating incident);
+    the prose in both places now says "other seven" and calls out RECONCILE_FAILED
+    as the second, independently-counted exception. Also drops a stray Phase 6/7
+    auto-retry clause that had leaked into RECONCILE_FAILED's auto_action ahead of
+    its actual phase.
+    
+    Co-authored-by: bcup02 <columnbb@gmail.com>
+    Co-authored-by: Claude Sonnet 5 <noreply@anthropic.com>
+
+diff --git a/catalog/fleet-error-catalog-v1.json b/catalog/fleet-error-catalog-v1.json
+index af73317..f84d0af 100644
+--- a/catalog/fleet-error-catalog-v1.json
++++ b/catalog/fleet-error-catalog-v1.json
+@@ -200,7 +200,7 @@
+       },
+       "verdict": "JUDGEMENT",
+       "risk_tier": "R3",
+-      "auto_action": "先記事件、寫 DEGRADED heartbeat、下一輪重試；連續 N 次（預設 3）同類失敗才 latch。latch 後逾時自動重試一次完整對帳。",
++      "auto_action": "先記事件、寫 DEGRADED heartbeat、下一輪重試；連續 N 次（預設 3）同類失敗才 latch。",
+       "human_action": "Telegram 按鈕可提早重試，或手動處理。",
+       "resume": "two_stage_fingerprint",
+       "lands_in_phase": 4,
+@@ -264,7 +264,7 @@
+       "human_action": "Telegram 按鈕可提早解除，或看事件日誌決定是不是真的要人介入。",
+       "resume": "two_stage_fingerprint",
+       "lands_in_phase": 4,
+-      "rationale": "這是本專案的核心工作項：一個桶子同時裝著純暫時性狀況與真正的災難，而且立刻 latch、沒有 resume 路徑。改成計數器後，暫時性抖動不再靜默停掉真倉策略，持續性故障仍然會停。其他八個原因碼在 catch-all 之前就已經各自 latch，不受計數器影響。"
++      "rationale": "這是本專案的核心工作項：一個桶子同時裝著純暫時性狀況與真正的災難，而且立刻 latch、沒有 resume 路徑。改成計數器後，暫時性抖動不再靜默停掉真倉策略，持續性故障仍然會停。其他七個原因碼在這兩處之前就已經各自 latch，不受計數器影響；SEY.RECONCILE_FAILED 額外套用同一套計數器邏輯（各自獨立計數，見該條目）。"
+     },
+     {
+       "code": "SEY.CLOSE_FILL_PENDING",
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index 46f5cc6..5a49601 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -213,17 +213,22 @@ seykota 從「無 resume 路徑」直接進到這一套完整閘門。`SEY.EXCHA
+ 它們擋的是設定／憑證層面的錯，改完設定重啟就該重新評估，提供一個「解除」動作反而會讓人誤以為
+ 不改設定也能放行。
+ 
+-### 4.4 catch-all 計數器
++### 4.4 連續失敗計數器（2026-09-15 修正：範圍包含兩個原因碼，不是只有 catch-all）
+ 
+-`SEY.RUNTIME_CYCLE_FAILED`（`bot.py:1376`）是本專案的核心工作項。改法：
++`SEY.RUNTIME_CYCLE_FAILED`（`bot.py` `run_forever` 的 catch-all）是本專案的核心工作項。改法：
+ 
+ - 未分類例外 → 記事件 + 寫 `DEGRADED` heartbeat + 下一輪重試。
+ - **連續 N 次（預設 3）** 同類例外才 latch。任何一次成功的循環把計數歸零。
+ - latch 之後走 §4.3 的 resume 路徑。
+ 
+-其餘八個原因碼在 catch-all 之前就已經各自 latch，不受計數器影響——計數器只作用在「連自己都不知道
+-是什麼」的那一類。這直接修掉 2026-09-11 venv 競態事故的形狀：一次暫時性的 TLS 憑證讀取失敗，
+-讓一支真倉策略靜默停止交易且無法遠端復原。
++`SEY.RECONCILE_FAILED`（`bot.py` `reconcile()` 排除暫時性網路錯誤後剩下的例外，主要是解析失敗、
++交易所回傳非預期結構）**額外套用同一套計數器邏輯，兩碼各自獨立計數**——這條路徑正是 2026-09-11
++venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停真倉策略的代價，跟 catch-all 的論證
++完全一樣。**其餘七個**原因碼在這兩處之前就已經各自 latch，不受計數器影響——計數器只作用在「連自己
++都不知道是什麼」的 catch-all，以及「多半是一次性、但無法歸類成上面任何一個具體原因碼」的
++`RECONCILE_FAILED`。（2026-09-15 之前的版本誤寫成「其餘八個」，把 `RECONCILE_FAILED` 也算進不受
++影響的那組——JSON 目錄裡 `SEY.RECONCILE_FAILED` 的 `auto_action` 其實從一開始就寫著計數器語言，
++兩處互相矛盾，Phase 4d 開工時拍板以此處修正為準。）
+ 
+ ### 4.5 事件日誌（`trade_alerts.fleet_event_log`）
+ 
