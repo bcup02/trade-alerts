@@ -1,0 +1,968 @@
+From 9676ca645911d569f0f022728b572950983187ad Mon Sep 17 00:00:00 2001
+From: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date: Thu, 17 Sep 2026 22:26:30 +0800
+Subject: [PATCH] feat: operator_message + ops_export for ops-notify relay
+ (Phase 7b, v0.18.0) (#25)
+
+The repair bot's notifications are silently dropped on both hosts: strategy
+envs keep ALERTS_ENABLED=false by policy, so its publish() calls reach zero
+channels. Phase 7b routes them through ops-notify instead -- the strategy
+writes a snapshot, ops-notify (which owns the maintenance channel) relays it.
+This is the shared half.
+
+- The fleet error catalog becomes package data (catalog/ ->
+  src/trade_alerts/catalog/, pyproject package-data). Strategy hosts install
+  trade-alerts non-editable from a git tag, so the repo-level file never
+  reached them. load_error_catalog() with no path reads the packaged copy.
+- Catalog entries gain an optional operator_message {what, direction,
+  steps[]}: plain-language text for the phone. Written for momentum's three
+  repair-bot conditions (R1/R2/R4). New invariants: all three parts
+  non-empty, never on R0, the momentum three must have one.
+- New trade_alerts.ops_export: build_ops_export() turns a strategy's fleet
+  event log + request queue into fleet-ops-export/v1 (R1-R4 notices of the
+  last 7 days with a fully rendered text, keyed by event_id; open requests
+  with the plain-language parts); write_ops_export() replaces it atomically
+  at 0644. Schema in schemas/fleet-ops-export-v1.schema.json.
+
+229 tests (206 -> +23).
+
+Co-authored-by: bcup02 <columnbb@gmail.com>
+Co-authored-by: Claude Opus 5 <noreply@anthropic.com>
+---
+ README.md                                     |  13 +-
+ docs/consumer-release-runbook.md              |  33 +++
+ docs/fleet-error-catalog.md                   |  33 ++-
+ docs/guides/README.md                         |   2 +-
+ pyproject.toml                                |   7 +-
+ schemas/fleet-error-catalog-v1.schema.json    |  14 +-
+ schemas/fleet-ops-export-v1.schema.json       |  51 +++++
+ src/trade_alerts/__init__.py                  |  14 +-
+ .../catalog}/fleet-error-catalog-v1.json      |  36 ++-
+ src/trade_alerts/fleet_event_log.py           |  22 +-
+ src/trade_alerts/ops_export.py                | 203 +++++++++++++++++
+ tests/test_error_request_queue.py             |   2 +-
+ tests/test_fleet_error_catalog.py             |  41 +++-
+ tests/test_fleet_event_log.py                 |   2 +-
+ tests/test_ops_export.py                      | 210 ++++++++++++++++++
+ tests/test_safe_halt_model.py                 |   2 +-
+ 16 files changed, 662 insertions(+), 23 deletions(-)
+ create mode 100644 schemas/fleet-ops-export-v1.schema.json
+ rename {catalog => src/trade_alerts/catalog}/fleet-error-catalog-v1.json (91%)
+ create mode 100644 src/trade_alerts/ops_export.py
+ create mode 100644 tests/test_ops_export.py
+
+diff --git a/README.md b/README.md
+index b282c20..d9f3993 100644
+--- a/README.md
++++ b/README.md
+@@ -65,14 +65,21 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
+ ## 交易機隊錯誤目錄 v1
+ 
+ 全機隊錯誤分類的權威來源位於 [`docs/fleet-error-catalog.md`](docs/fleet-error-catalog.md)，
+-機器可讀版本位於 [`catalog/fleet-error-catalog-v1.json`](catalog/fleet-error-catalog-v1.json)，
++機器可讀版本位於 [`src/trade_alerts/catalog/fleet-error-catalog-v1.json`](src/trade_alerts/catalog/fleet-error-catalog-v1.json)，
+ 其 JSON Schema 位於
+ [`schemas/fleet-error-catalog-v1.schema.json`](schemas/fleet-error-catalog-v1.schema.json)。
+ 
+ 目錄替四支策略每一條維運可見的錯誤條件記錄：現行程式的行為、依判準「這個錯誤讓人做出什麼、
+ 跟自動處理不一樣的決定？」判定的 `MECHANICAL`／`JUDGEMENT`、風險等級 R0–R4、自動與人工處置，
+-以及改動落在哪一個 Phase。它是**資料與契約，不是功能**——本套件沒有任何執行期程式碼讀取它，
+-所以新增或修改目錄不影響既有消費專案，也不需要重新釘選版本。
++以及改動落在哪一個 Phase。
++
++**Phase 7b 起目錄隨套件發佈、會在執行期被讀取**：`trade_alerts.ops_export` 從每個條件的
++`operator_message`（白話的「發生什麼事／解決方向／處理步驟」）組出送給維運者的訊息，所以
++`load_error_catalog()` 不帶路徑時讀的就是套件內那一份。改動通知文字＝發新版本並讓策略重新釘選。
++
++`trade_alerts.ops_export.build_ops_export()` + `write_ops_export()` 把一支策略的事件日誌與未結案
++請求整理成 `audit/ops_export.json`（格式 `schemas/fleet-ops-export-v1.schema.json`），由 ops-notify
++讀取後送到維運頻道；策略本身不推播。
+ 
+ `tests/test_fleet_error_catalog.py` 守住幾條不變式，其中最重要的一條是：判定為 `MECHANICAL`
+ 的條件不得落在任何會通知人的風險等級。
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index d85e84a..4ad96a3 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -504,3 +504,36 @@ trade-alerts：v0.17.1（Phase 6b 配套）
+           對 33 條全數通過。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.18.0（Phase 7b）
++變更摘要：修復 bot 的通知目前在兩台主機都被靜默丟棄（策略 env 維持
++          ALERTS_ENABLED=false）。本版提供「策略整理、ops-notify 代送」所需
++          的共用部分：
++          1. 錯誤目錄改為 package data：catalog/fleet-error-catalog-v1.json
++             移到 src/trade_alerts/catalog/（pyproject package-data），
++             load_error_catalog() 不帶路徑時讀套件內那份。策略主機是 pip 從
++             git tag 安裝（非 editable），先前根本讀不到這份檔案。已用乾淨
++             venv 非 editable 安裝驗證 site-packages 內可讀到 33 條。
++          2. 目錄 entry 新增可選欄位 operator_message {what, direction,
++             steps[]}（白話：發生什麼事／解決方向／處理步驟）；先寫 momentum
++             修復 bot 三條（MOM.VERIFIED_CLOSE_PROPOSED／AUTO_REPAIRED／
++             REPAIR_BLOCKED）。新不變式三條：三段皆非空、R0 不得有、momentum
++             三條必須有；另一條確認 load_error_catalog() 讀到的就是測試讀的檔。
++          3. 新模組 ops_export：build_ops_export(fleet_event_log,
++             request_queue, *, project, catalog=None, window_days=7) 產生
++             fleet-ops-export/v1（notices：近 7 天 R1–R4 事件，含組好的完整
++             訊息 text；open_requests：未結案請求附白話三段，
++             handling_started_at 本版恆 null、7e 才寫）；write_ops_export()
++             原子替換、0644。新 schema schemas/fleet-ops-export-v1.schema.json。
++          既有 API 簽章不變；load_error_catalog(path) 仍可傳路徑。
++受影響消費專案：momentum（Phase 7b 第二個 PR）pin 改為 v0.18.0 並寫
++          audit/ops_export.json；ops-notify 讀該檔（不 import 本套件的新 API，
++          不需要跟著 bump）。seykota／my-crypto／btc 不受影響。
++部署入口：無（純函式庫 + 目錄資料）。
++版本驗證：pyproject.toml version == 0.18.0；trade_alerts.__version__ ==
++          "0.18.0"。
++服務/工作流程驗證：trade-alerts pytest 229 全綠（206 → 229，+23：
++          ops_export 19 條、錯誤目錄不變式 4 條）。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index 5cdd246..0a57a4e 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -1,14 +1,14 @@
+ # 交易機隊錯誤目錄 v1
+ 
+ **狀態：Phase 3 產出，2026-09-12 定版。** 本文件是全機隊錯誤分類的權威來源；機器可讀版本在
+-[`catalog/fleet-error-catalog-v1.json`](../catalog/fleet-error-catalog-v1.json)，其形狀由
++[`src/trade_alerts/catalog/fleet-error-catalog-v1.json`](../src/trade_alerts/catalog/fleet-error-catalog-v1.json)，其形狀由
+ [`schemas/fleet-error-catalog-v1.schema.json`](../schemas/fleet-error-catalog-v1.schema.json)
+ 定義，不變式由 `tests/test_fleet_error_catalog.py` 守住。兩份內容不一致時，以 JSON 為準——
+ 它是 Phase 4 事件日誌與錯誤處理請求佇列的輸入。
+ 
+ 放在 `trade-alerts` 的理由：四支策略與 ops-notify 都已相依這個套件，錯誤碼需要一個所有消費者
+-都看得到、而且有版本標籤可以釘選的落點。本套件目前沒有任何執行期程式碼讀取這份目錄——它是資料
+-與契約，不是功能。
++都看得到、而且有版本標籤可以釘選的落點。Phase 7b 起這份 JSON 隨套件發佈（package data），
++`trade_alerts.ops_export` 在策略主機上執行期讀它的 `operator_message` 組通知文字，見 §4.8。
+ 
+ ---
+ 
+@@ -289,6 +289,30 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停
+   outcome 是「實際發生了什麼」的稽核紀錄，第二筆會讓歷史對「哪個修復真的跑了」變得有歧義。
+ - 格式在 `schemas/error-request-queue-v1.schema.json`。
+ 
++### 4.8 白話通知文字與維運匯出（Phase 7b，`trade_alerts.ops_export`）
++
++**策略不自己推播，ops-notify 代送。** 策略的 env 維持 `ALERTS_ENABLED=false`（2026-08-30 方針），
++所以修復 bot 以前呼叫 `publish` 的通知在兩台主機上其實都被靜默丟掉。Phase 7b 改成：策略把要讓人
++知道的事整理成 `audit/ops_export.json`，擁有維運頻道的 ops-notify 讀它、每筆只送一次。
++
++- **`operator_message`**（每條 entry 可選）：`{what, direction, steps[]}`＝發生什麼事、解決方向、
++  處理步驟，語氣比照機隊風險登記冊，不用術語。有這個欄位就三段都不得為空；R0 不得有（R0 不通知
++  任何人，寫了也沒人看得到）。先寫 momentum 修復 bot 的三條（R1／R2／R4），其餘條目在該策略接進
++  ops-notify 時補上——沒有的條目通知會退回只顯示目錄標題＋技術細節。
++- **`build_ops_export(fleet_event_log, request_queue, *, project, catalog=None, window_days=7)`**：
++  - `notices`：近 `window_days` 天、等級 R1–R4 的事件（R0 永遠不在內），以 `event_id` 為鍵讓讀取端
++    每筆只送一次。等級以事件上記錄的為準，沒記錄才查目錄。`text` 是完整訊息本體：等級標頭 →
++    目錄標題 → 白話三段 → 「技術細節」（事件 `details.notice_text`，沒有就用 `summary`）。
++    `critical` 恰好在 R4 時為真。
++  - `open_requests`：所有未結案請求，附目錄的白話三段；`handling_started_at` 本版恆為 `null`，
++    Phase 7e 的「開始處理」按鈕才會寫入（欄位先放進 v1，之後不用改格式版本）。
++  - 事件日誌或佇列有壞行時直接拋錯（同 §4.5），不輸出一份看起來完整其實缺一塊的匯出；呼叫端
++    best-effort 寫檔，匯出停止更新時由 ops-notify 報 `STALE`。
++- **`write_ops_export(path, export)`**：整份原子替換、`0644`。檔案由策略自己的服務帳號寫進
++  `audit/`；ops-notify／ops-control 只有群組讀權限，relay 端無法偽造要送的項目（與 §4.6 佇列放
++  `audit/` 同一個理由）。
++- 格式在 `schemas/fleet-ops-export-v1.schema.json`。
++
+ ### 4.7 `reconciliation_delta`：撤回聚合計畫（Phase 4e，2026-09-15）
+ 
+ §4.5/4.6 原本規劃 `reconciliation_delta` 是請求佇列的第一個生產者：每筆照存不觸發，只有**聚合
+@@ -348,3 +372,6 @@ log 行的 `event=` 與 `severity=` 欄位，不影響任何推播、下單或
+   （entry 不得規定沒有任何策略實作得出來的 resume 路徑）、
+   `test_error_request_queue.py::test_r0_conditions_can_never_open_a_request`
+   （逐筆拿目錄裡的 R0 條件去試開請求，必須全部被拒）。
++- Phase 7b 起另有三條白話文字的不變式：`operator_message` 三段皆非空、R0 不得有
++  `operator_message`、momentum 修復 bot 三條必須有。改通知文字就是改這份 JSON——它隨套件發佈，
++  策略重新釘選新版本才會生效。
+diff --git a/docs/guides/README.md b/docs/guides/README.md
+index 4a18ffb..b97d6c0 100644
+--- a/docs/guides/README.md
++++ b/docs/guides/README.md
+@@ -8,7 +8,7 @@ Perplexity／開發者看的工程規格與流程規則。這個目錄放**給
+ 
+ | 檔案 | 說明 | 對應資料源 |
+ |---|---|---|
+-| `fleet-risk-register.html` | 機隊風險登記冊——30 種已知錯誤情況，依五個風險等級白話說明，可依等級/策略篩選。 | `catalog/fleet-error-catalog-v1.json` |
++| `fleet-risk-register.html` | 機隊風險登記冊——30 種已知錯誤情況，依五個風險等級白話說明，可依等級/策略篩選。 | `src/trade_alerts/catalog/fleet-error-catalog-v1.json` |
+ 
+ ## 慣例
+ 
+diff --git a/pyproject.toml b/pyproject.toml
+index 9080471..54b259c 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.17.1"
++version = "0.18.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+@@ -16,6 +16,11 @@ test = ["pytest>=8.0", "responses>=0.25", "jsonschema>=4.0"]
+ [tool.setuptools.packages.find]
+ where = ["src"]
+ 
++# The fleet error catalog is read at runtime on strategy hosts (ops_export pulls
++# each condition's operator_message from it), so it ships inside the package.
++[tool.setuptools.package-data]
++trade_alerts = ["catalog/*.json"]
++
+ [tool.pytest.ini_options]
+ pythonpath = ["src"]
+ testpaths = ["tests"]
+diff --git a/schemas/fleet-error-catalog-v1.schema.json b/schemas/fleet-error-catalog-v1.schema.json
+index 2912182..c1e555b 100644
+--- a/schemas/fleet-error-catalog-v1.schema.json
++++ b/schemas/fleet-error-catalog-v1.schema.json
+@@ -88,7 +88,19 @@
+           "description": "How a latch for this condition is cleared. 'two_stage_fingerprint' is momentum's existing gate: --confirm must match the live latch fingerprint, and a matching ledger row makes a second clear a no-op."
+         },
+         "lands_in_phase": {"type": "integer", "minimum": 3, "maximum": 7},
+-        "rationale": {"type": "string", "minLength": 1}
++        "rationale": {"type": "string", "minLength": 1},
++        "operator_message": {"$ref": "#/definitions/operator_message"}
++      }
++    },
++    "operator_message": {
++      "type": "object",
++      "description": "Plain-language text sent to the operator when this condition notifies (Phase 7b): what happened, which way the fix goes, and the concrete steps. Optional per entry -- written when a strategy's notifications are wired to ops-notify -- but when present all three parts must be non-empty. Never on an R0 entry, which notifies nobody.",
++      "required": ["what", "direction", "steps"],
++      "additionalProperties": false,
++      "properties": {
++        "what": {"type": "string", "minLength": 1, "description": "發生什麼事"},
++        "direction": {"type": "string", "minLength": 1, "description": "解決方向"},
++        "steps": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "description": "處理步驟, in order"}
+       }
+     }
+   }
+diff --git a/schemas/fleet-ops-export-v1.schema.json b/schemas/fleet-ops-export-v1.schema.json
+new file mode 100644
+index 0000000..140c4c8
+--- /dev/null
++++ b/schemas/fleet-ops-export-v1.schema.json
+@@ -0,0 +1,51 @@
++{
++  "$schema": "http://json-schema.org/draft-07/schema#",
++  "$id": "https://github.com/bcup02/trade-alerts/schemas/fleet-ops-export-v1.schema.json",
++  "title": "Fleet ops export v1",
++  "description": "One strategy's snapshot of what its operator should hear about, rewritten whole by trade_alerts.ops_export.write_ops_export into the strategy's audit/ops_export.json and relayed by ops-notify. notices are the notifying (R1-R4) fleet events of the last window_days, keyed by event_id so a reader sends each exactly once; open_requests is every still-open error request.",
++  "type": "object",
++  "required": ["export_version", "project", "generated_at", "window_days", "notices", "open_requests"],
++  "additionalProperties": false,
++  "properties": {
++    "export_version": {"const": "fleet-ops-export/v1"},
++    "project": {"type": "string", "enum": ["seykota", "momentum", "mycrypto", "btc-competition", "fleet"]},
++    "generated_at": {"type": "string", "format": "date-time", "description": "UTC; a reader treats an export that stops refreshing as STALE."},
++    "window_days": {"type": "integer", "minimum": 1},
++    "notices": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": ["event_id", "recorded_at", "code", "risk_tier", "critical", "text"],
++        "additionalProperties": false,
++        "properties": {
++          "event_id": {"type": "string", "minLength": 1},
++          "recorded_at": {"type": ["string", "null"]},
++          "code": {"type": "string", "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"},
++          "risk_tier": {"enum": ["R1", "R2", "R3", "R4"]},
++          "critical": {"type": "boolean", "description": "true exactly when risk_tier is R4."},
++          "text": {"type": "string", "minLength": 1, "description": "Complete plain-language message body; the reader adds only the strategy label and times."}
++        }
++      }
++    },
++    "open_requests": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": ["request_id", "fingerprint", "code", "risk_tier", "opened_at", "summary", "what", "direction", "steps", "handling_started_at"],
++        "additionalProperties": false,
++        "properties": {
++          "request_id": {"type": "string", "minLength": 1},
++          "fingerprint": {"type": "string", "minLength": 1},
++          "code": {"type": "string", "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"},
++          "risk_tier": {"enum": ["R1", "R2", "R3", "R4"]},
++          "opened_at": {"type": "string"},
++          "summary": {"type": "string"},
++          "what": {"type": ["string", "null"], "description": "Catalog operator_message.what, or null when the entry has none yet."},
++          "direction": {"type": ["string", "null"]},
++          "steps": {"type": "array", "items": {"type": "string"}},
++          "handling_started_at": {"type": ["string", "null"], "description": "Always null in this version; Phase 7e sets it when an operator presses 開始處理."}
++        }
++      }
++    }
++  }
++}
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 6443fb6..b03fdc2 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -41,6 +41,13 @@ from .error_request_queue import (
+     record_request_outcome,
+     request_fingerprint,
+ )
++from .ops_export import (
++    NOTIFYING_TIERS,
++    OPS_EXPORT_VERSION,
++    build_ops_export,
++    render_notice_text,
++    write_ops_export,
++)
+ from .safe_halt_model import (
+     FINGERPRINT_LENGTH,
+     RESUME_PATHS,
+@@ -197,6 +204,11 @@ __all__ = [
+     "outstanding_error_requests",
+     "record_request_outcome",
+     "request_fingerprint",
++    "NOTIFYING_TIERS",
++    "OPS_EXPORT_VERSION",
++    "build_ops_export",
++    "render_notice_text",
++    "write_ops_export",
+     "FINGERPRINT_LENGTH",
+     "RESUME_PATHS",
+     "SAFE_HALT_CLEARED_EVENT",
+@@ -263,4 +275,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.17.1"
++__version__ = "0.18.0"
+diff --git a/catalog/fleet-error-catalog-v1.json b/src/trade_alerts/catalog/fleet-error-catalog-v1.json
+similarity index 91%
+rename from catalog/fleet-error-catalog-v1.json
+rename to src/trade_alerts/catalog/fleet-error-catalog-v1.json
+index 820d559..364374a 100644
+--- a/catalog/fleet-error-catalog-v1.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v1.json
+@@ -412,7 +412,16 @@
+       "human_action": "無需決定。稽核通知只告知已寫入的交易與金額；證據檔、事件日誌與請求佇列（RESOLVED_AUTO）留有完整紀錄。投影排隊失敗時通知附 queue_projection_intent.py 補救指令。",
+       "resume": "n/a",
+       "lands_in_phase": 6,
+-      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平空、且本地算出的毛損益與交易所回報的已實現損益差額在容忍內，人來看也只會做同一件事——照交易所寫下去。沒有第二個選項，所以不該產生決策請求，只該產生一則事後稽核通知（§2.1）。開關預設關閉（關閉時一律走 MOM.VERIFIED_CLOSE_PROPOSED）。開關開啟時，判準不成立有兩條退路：帳本已留有這筆交易的修復痕跡（同 incident_id 或其他修復紀錄）轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED（R4，critical 停手、不重試）；其餘判準不成立（多筆同時分歧、非多單 SELL、成交早於開倉或缺時間戳、損益殘差超過容忍值）退回 MOM.VERIFIED_CLOSE_PROPOSED，通知附上未自動修復的原因。整批寫入失敗或讀回驗證不過同樣轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED。交易所上該 symbol 仍有部位時，在抓證據階段就中止（不記事件、不通知，下一輪再看），根本不會進入判準評估。"
++      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平空、且本地算出的毛損益與交易所回報的已實現損益差額在容忍內，人來看也只會做同一件事——照交易所寫下去。沒有第二個選項，所以不該產生決策請求，只該產生一則事後稽核通知（§2.1）。開關預設關閉（關閉時一律走 MOM.VERIFIED_CLOSE_PROPOSED）。開關開啟時，判準不成立有兩條退路：帳本已留有這筆交易的修復痕跡（同 incident_id 或其他修復紀錄）轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED（R4，critical 停手、不重試）；其餘判準不成立（多筆同時分歧、非多單 SELL、成交早於開倉或缺時間戳、損益殘差超過容忍值）退回 MOM.VERIFIED_CLOSE_PROPOSED，通知附上未自動修復的原因。整批寫入失敗或讀回驗證不過同樣轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED。交易所上該 symbol 仍有部位時，在抓證據階段就中止（不記事件、不通知，下一輪再看），根本不會進入判準評估。",
++      "operator_message": {
++        "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，確認沒有任何模糊地帶，已經自動把這筆平倉補寫進帳本。",
++        "direction": "不需要做任何決定。這是事後通知，讓你知道帳本剛剛被自動補寫過、補了什麼。",
++        "steps": [
++          "不需要任何動作。",
++          "想核對的話：看下方的交易編號、出場價和損益，跟交易所 App 上這筆比一下。",
++          "如果訊息最後有「Google 投影排入失敗」的提醒，照提醒裡附的那行指令補排一次，試算表才會出現這一列。"
++        ]
++      }
+     },
+     {
+       "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+@@ -432,7 +441,17 @@
+       "human_action": "核對提案後用手動流程（fetch_verified_close_evidence.py → append_reconciled_close.py → queue_projection_intent.py）寫入，或判定不修。",
+       "resume": "n/a",
+       "lands_in_phase": 5,
+-      "rationale": "補登 Phase 5 影子模式既有行為（該階段只在程式碼註解宣告 R1）。這條落在這裡代表機器沒把握：可能是自動模式關閉，也可能是有判準不成立（多筆同時分歧、損益對不上、證據缺時間戳等），這些情況照交易所寫下去不一定對，需要人決定。"
++      "rationale": "補登 Phase 5 影子模式既有行為（該階段只在程式碼註解宣告 R1）。這條落在這裡代表機器沒把握：可能是自動模式關閉，也可能是有判準不成立（多筆同時分歧、損益對不上、證據缺時間戳等），這些情況照交易所寫下去不一定對，需要人決定。",
++      "operator_message": {
++        "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了這筆平倉。修復機器人已經從交易所抓到成交紀錄、算好應該補寫的內容，但沒有自動寫入——可能是自動修復開關沒開，也可能是有判斷條件不符合（原因會列在下方）。",
++        "direction": "以交易所的成交紀錄為準，把這筆平倉補寫進本地帳本；如果核對後覺得提案內容不對，可以先不補。",
++        "steps": [
++          "核對下方提案：交易編號、數量、進場價、出場價、損益，跟交易所 App 上這筆的實際成交是否一致。",
++          "一致的話，到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」的三步指令補寫（抓證據 → 寫入帳本 → 排 Google 投影），每一步都先預覽、確認無誤再加 --apply。",
++          "不一致或有疑慮就先不要寫入；機器人不會對同一筆重複提案，之後再處理也可以。",
++          "補寫完成後，下一輪對帳（約 15 分鐘內）會自動變回正常，不需要另外回報。"
++        ]
++      }
+     },
+     {
+       "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+@@ -452,7 +471,18 @@
+       "human_action": "檢查 audit/trading_ledger.jsonl 裡這筆交易是否留有半套修復，對照 audit/error_requests.jsonl 與 fleet_event_log.jsonl，手動收斂後關閉請求。",
+       "resume": "n/a",
+       "lands_in_phase": 6,
+-      "rationale": "帳本裡已有這筆交易的修復紀錄（例如先前寫到一半）或這次寫入無法驗證，代表真實帳本的狀態已經不是「乾淨的孤兒開倉」。此時自動補完後半段等於猜，而猜錯會重複或錯記真實損益——這正是必須交給人的情況。"
++      "rationale": "帳本裡已有這筆交易的修復紀錄（例如先前寫到一半）或這次寫入無法驗證，代表真實帳本的狀態已經不是「乾淨的孤兒開倉」。此時自動補完後半段等於猜，而猜錯會重複或錯記真實損益——這正是必須交給人的情況。",
++      "operator_message": {
++        "what": "動能策略的修復機器人本來要把一筆漏記的平倉補進帳本，但發現帳本裡這筆交易已經有修復過的痕跡（可能之前補到一半），或是這次寫入失敗、無法確認寫進去的內容正確，所以立刻停手。機器人之後不會再自動碰這筆交易。",
++        "direction": "由人確認帳本裡這筆交易現在的樣子：缺的補齊、重複的不要再加，最後讓帳本跟交易所的成交紀錄一致。交易所的成交紀錄是標準答案。",
++        "steps": [
++          "記下這則訊息裡的交易編號（trade_id）和事件編號（incident_id）。",
++          "到電腦前打開 audit/trading_ledger.jsonl，搜尋這個 trade_id，看它目前有哪些紀錄：有沒有平倉（trade_close）、有沒有重複的補寫。",
++          "對照交易所 App 上這筆的實際成交（價格、數量、時間）。",
++          "如果只是還沒補：照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」的三步手動補寫。如果已經補了一半或有重複：先不要再寫入任何東西，請開發端協助收斂。",
++          "處理完後，下一輪對帳（約 15 分鐘內）應該變回正常；沒變回來代表帳本還沒對齊。"
++        ]
++      }
+     },
+     {
+       "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+diff --git a/src/trade_alerts/fleet_event_log.py b/src/trade_alerts/fleet_event_log.py
+index d6dc0b5..bfae634 100644
+--- a/src/trade_alerts/fleet_event_log.py
++++ b/src/trade_alerts/fleet_event_log.py
+@@ -22,6 +22,7 @@ import json
+ import os
+ from contextlib import contextmanager
+ from datetime import datetime, timezone
++from importlib import resources
+ from pathlib import Path
+ from typing import Any, Iterator, Mapping
+ from uuid import uuid4
+@@ -216,14 +217,23 @@ def read_fleet_events(path: str | Path) -> list[dict[str, Any]]:
+     return [record for record in read_jsonl(path) if record.get("kind") == FLEET_EVENT_KIND]
+ 
+ 
+-def load_error_catalog(path: str | Path) -> dict[str, Any]:
+-    """Read a published fleet error catalog document.
++PACKAGED_CATALOG_NAME = "fleet-error-catalog-v1.json"
+ 
+-    The catalog ships as repository data rather than package data, so the caller
+-    supplies the path it deployed.  Phase 4 needs it only to look a tier up;
+-    nothing in this library decides classifications of its own.
++
++def load_error_catalog(path: str | Path | None = None) -> dict[str, Any]:
++    """Read a fleet error catalog document -- by default the one shipped inside
++    this package, which is the single published copy.
++
++    Since Phase 7b the catalog is package data: a strategy host builds its ops
++    export from each condition's ``operator_message`` at runtime, and pinning a
++    ``trade-alerts`` tag is what pins the wording it sends.  Nothing in this
++    library decides classifications of its own; it only looks them up.
+     """
+-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
++    if path is None:
++        raw = resources.files("trade_alerts").joinpath("catalog", PACKAGED_CATALOG_NAME).read_text(encoding="utf-8")
++    else:
++        raw = Path(path).read_text(encoding="utf-8")
++    payload = json.loads(raw)
+     if not isinstance(payload, dict) or not isinstance(payload.get("entries"), list):
+         raise FleetEventLogError("catalog document is not a fleet error catalog")
+     return payload
+diff --git a/src/trade_alerts/ops_export.py b/src/trade_alerts/ops_export.py
+new file mode 100644
+index 0000000..f57c77b
+--- /dev/null
++++ b/src/trade_alerts/ops_export.py
+@@ -0,0 +1,203 @@
++"""What a strategy's operator should hear about, as one file ops-notify reads.
++
++Strategy hosts do not push these notifications themselves: a strategy's own
++env keeps ``ALERTS_ENABLED`` off, and ops-notify owns the maintenance channel.
++So each strategy writes this snapshot into its ``audit/`` directory from its
++fleet event log and request queue, and ops-notify relays it.
++
++The direction of trust is the same as for the request queue: the strategy's
++service account writes the file, while ops-notify and ops-control can only
++read it (``audit/`` is group-readable, never group-writable).  Nothing on the
++relay side can fabricate an item to send.
++
++The file is a full snapshot rewritten every time, not an append log, so a
++reader never has to reconcile partial writes: ``notices`` are the notifying
++events of the last ``window_days``, identified by ``event_id`` so the reader
++can send each exactly once, and ``open_requests`` is everything still open.
++"""
++from __future__ import annotations
++
++import json
++import os
++import tempfile
++from datetime import datetime, timedelta, timezone
++from pathlib import Path
++from typing import Any, Mapping
++
++from .error_request_queue import outstanding_error_requests
++from .fleet_event_log import (
++    RISK_TIERS,
++    FleetEventLogError,
++    catalog_code,
++    catalog_entry,
++    load_error_catalog,
++    read_fleet_events,
++    utc_now_iso,
++)
++
++OPS_EXPORT_VERSION = "fleet-ops-export/v1"
++DEFAULT_WINDOW_DAYS = 7
++#: R0 is "log only": the action after detection is fixed, so it never reaches
++#: the operator and never appears here.
++NOTIFYING_TIERS = tuple(tier for tier in RISK_TIERS if tier != "R0")
++_EXPORT_MODE = 0o644
++
++_TIER_HEADERS = {
++    "R1": "📋 修復提案（需要你決定）",
++    "R2": "✅ 已自動處理（事後通知，不需要動作）",
++    "R3": "⚠️ 中風險狀況（逾時會自動處理）",
++    "R4": "🔴 需要人工處理",
++}
++
++
++def _parse_iso(value: Any) -> datetime | None:
++    if not isinstance(value, str) or not value:
++        return None
++    try:
++        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
++    except ValueError:
++        return None
++    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
++
++
++def _entry_or_none(catalog: Mapping[str, Any], project: str, code: str) -> dict[str, Any] | None:
++    try:
++        return catalog_entry(catalog, project, code)
++    except FleetEventLogError:
++        return None
++
++
++def _resolve_tier(event: Mapping[str, Any], entry: Mapping[str, Any] | None) -> str | None:
++    """The tier recorded on the event wins -- it is what the strategy decided at
++    the time -- and the catalog fills in for an event written without one."""
++    recorded = event.get("risk_tier")
++    if recorded in RISK_TIERS:
++        return str(recorded)
++    tier = (entry or {}).get("risk_tier")
++    return str(tier) if tier in RISK_TIERS else None
++
++
++def render_notice_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None, risk_tier: str) -> str:
++    """Plain-language message for one event: tier header, catalog title, the
++    entry's ``operator_message`` when it has one, then the technical detail the
++    strategy attached (``details.notice_text``, else the event summary)."""
++    code = str(event.get("code") or "")
++    lines = [_TIER_HEADERS.get(risk_tier, risk_tier), str((entry or {}).get("title") or code)]
++
++    message = (entry or {}).get("operator_message")
++    if isinstance(message, Mapping):
++        lines += ["", "發生什麼事：", str(message["what"]), "", "解決方向：", str(message["direction"]),
++                  "", "處理步驟："]
++        lines += [f"{number}. {step}" for number, step in enumerate(message["steps"], start=1)]
++
++    details = event.get("details") if isinstance(event.get("details"), Mapping) else {}
++    technical = details.get("notice_text")
++    if not (isinstance(technical, str) and technical.strip()):
++        technical = event.get("summary")
++    if isinstance(technical, str) and technical.strip():
++        lines += ["", "技術細節：", technical.strip()]
++    return "\n".join(lines)
++
++
++def build_ops_export(
++    fleet_event_log: str | Path,
++    request_queue: str | Path,
++    *,
++    project: str,
++    catalog: Mapping[str, Any] | None = None,
++    window_days: int = DEFAULT_WINDOW_DAYS,
++    now: datetime | None = None,
++) -> dict[str, Any]:
++    """Build the ``fleet-ops-export/v1`` document for one strategy.
++
++    A malformed event log or request queue raises (see ``read_jsonl``): an
++    export that silently left part of the evidence out would read as complete.
++    The caller treats the write as best-effort, and ops-notify reports an
++    export that stops refreshing as ``STALE``.
++
++    ``open_requests[].handling_started_at`` is always ``null`` in this version;
++    Phase 7e fills it in when an operator presses 「開始處理」.  The field is
++    already part of v1 so that change needs no new format version.
++    """
++    if window_days < 1:
++        raise ValueError("window_days must be at least 1")
++    catalog = catalog if catalog is not None else load_error_catalog()
++    moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
++    cutoff = moment - timedelta(days=window_days)
++
++    notices: list[dict[str, Any]] = []
++    for event in read_fleet_events(fleet_event_log):
++        if event.get("project") != project:
++            continue
++        recorded = _parse_iso(event.get("recorded_at"))
++        # An unparseable timestamp is kept rather than dropped: the reader
++        # de-duplicates on event_id, so the cost is one stale line, while
++        # dropping it could hide an event nobody was ever told about.
++        if recorded is not None and recorded < cutoff:
++            continue
++        bare_code = str(event.get("code") or "")
++        entry = _entry_or_none(catalog, project, bare_code)
++        tier = _resolve_tier(event, entry)
++        if tier not in NOTIFYING_TIERS:
++            continue
++        notices.append({
++            "event_id": str(event.get("event_id") or ""),
++            "recorded_at": event.get("recorded_at"),
++            "code": catalog_code(project, bare_code),
++            "risk_tier": tier,
++            "critical": tier == "R4",
++            "text": render_notice_text(event, entry, tier),
++        })
++    notices.sort(key=lambda notice: (str(notice["recorded_at"] or ""), notice["event_id"]))
++
++    open_requests: list[dict[str, Any]] = []
++    for request in outstanding_error_requests(request_queue):
++        if request.get("project") != project:
++            continue
++        bare_code = str(request.get("code") or "")
++        entry = _entry_or_none(catalog, project, bare_code)
++        message = (entry or {}).get("operator_message")
++        message = message if isinstance(message, Mapping) else {}
++        open_requests.append({
++            "request_id": request.get("request_id"),
++            "fingerprint": request.get("fingerprint"),
++            "code": catalog_code(project, bare_code),
++            "risk_tier": request.get("risk_tier"),
++            "opened_at": request.get("opened_at"),
++            "summary": request.get("summary") or "",
++            "what": message.get("what"),
++            "direction": message.get("direction"),
++            "steps": list(message.get("steps") or []),
++            "handling_started_at": None,
++        })
++
++    return {
++        "export_version": OPS_EXPORT_VERSION,
++        "project": project,
++        "generated_at": utc_now_iso(moment),
++        "window_days": window_days,
++        "notices": notices,
++        "open_requests": open_requests,
++    }
++
++
++def write_ops_export(path: str | Path, export: Mapping[str, Any]) -> None:
++    """Atomically replace the export file (``0644``: the group-member readers
++    are other service accounts)."""
++    target = Path(path)
++    target.parent.mkdir(parents=True, exist_ok=True)
++    fd, tmp = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=target.parent)
++    try:
++        with os.fdopen(fd, "w", encoding="utf-8") as handle:
++            json.dump(dict(export), handle, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False)
++            handle.write("\n")
++            handle.flush()
++            os.fsync(handle.fileno())
++        os.chmod(tmp, _EXPORT_MODE)
++        os.replace(tmp, target)
++    except BaseException:
++        try:
++            os.unlink(tmp)
++        except FileNotFoundError:
++            pass
++        raise
+diff --git a/tests/test_error_request_queue.py b/tests/test_error_request_queue.py
+index d92c5d8..b375005 100644
+--- a/tests/test_error_request_queue.py
++++ b/tests/test_error_request_queue.py
+@@ -19,7 +19,7 @@ from trade_alerts.fleet_event_log import append_fleet_event, read_jsonl
+ from trade_alerts.safe_halt_model import build_safe_halt
+ 
+ REPO_ROOT = Path(__file__).resolve().parents[1]
+-CATALOG = json.loads((REPO_ROOT / "catalog" / "fleet-error-catalog-v1.json").read_text(encoding="utf-8"))
++CATALOG = json.loads((REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json").read_text(encoding="utf-8"))
+ SCHEMA = json.loads((REPO_ROOT / "schemas" / "error-request-queue-v1.schema.json").read_text(encoding="utf-8"))
+ 
+ jsonschema = pytest.importorskip("jsonschema")
+diff --git a/tests/test_fleet_error_catalog.py b/tests/test_fleet_error_catalog.py
+index 5541b26..47f8495 100644
+--- a/tests/test_fleet_error_catalog.py
++++ b/tests/test_fleet_error_catalog.py
+@@ -15,7 +15,7 @@ from pathlib import Path
+ import pytest
+ 
+ _ROOT = Path(__file__).resolve().parents[1]
+-CATALOG_PATH = _ROOT / "catalog" / "fleet-error-catalog-v1.json"
++CATALOG_PATH = _ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json"
+ SCHEMA_PATH = _ROOT / "schemas" / "fleet-error-catalog-v1.schema.json"
+ 
+ 
+@@ -115,3 +115,42 @@ def test_sources_look_like_file_line_references(catalog):
+         for source in entry["sources"]:
+             path, _, line = source.rpartition(":")
+             assert path and line.isdigit(), source
++
++
++def test_operator_messages_have_all_three_parts(catalog):
++    """An operator_message is what a phone shows when the condition pages
++    someone.  A missing "what", "direction" or step list would send a message
++    that says something is wrong without saying what to do -- exactly the
++    notification the whole project set out to stop sending.  Checked here as
++    well as in the schema because jsonschema is optional."""
++    for entry in catalog["entries"]:
++        message = entry.get("operator_message")
++        if message is None:
++            continue
++        assert set(message) == {"what", "direction", "steps"}, entry["code"]
++        assert isinstance(message["what"], str) and message["what"].strip(), entry["code"]
++        assert isinstance(message["direction"], str) and message["direction"].strip(), entry["code"]
++        assert isinstance(message["steps"], list) and message["steps"], entry["code"]
++        for step in message["steps"]:
++            assert isinstance(step, str) and step.strip(), entry["code"]
++
++
++def test_r0_conditions_carry_no_operator_message(catalog):
++    """R0 notifies nobody, so text written for it could never be read."""
++    for entry in catalog["entries"]:
++        if entry["risk_tier"] == "R0":
++            assert "operator_message" not in entry, entry["code"]
++
++
++def test_momentum_repair_bot_conditions_have_operator_messages(catalog):
++    """Phase 7b wires these three to ops-notify first; the export would fall
++    back to the bare catalog title without them."""
++    by_code = {entry["code"]: entry for entry in catalog["entries"]}
++    for code in ("MOM.VERIFIED_CLOSE_PROPOSED", "MOM.VERIFIED_CLOSE_AUTO_REPAIRED", "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"):
++        assert "operator_message" in by_code[code], code
++
++
++def test_packaged_catalog_is_the_file_the_tests_read():
++    from trade_alerts import load_error_catalog
++
++    assert load_error_catalog() == json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+diff --git a/tests/test_fleet_event_log.py b/tests/test_fleet_event_log.py
+index 5398f86..6ac51bc 100644
+--- a/tests/test_fleet_event_log.py
++++ b/tests/test_fleet_event_log.py
+@@ -18,7 +18,7 @@ from trade_alerts.fleet_event_log import (
+ )
+ 
+ REPO_ROOT = Path(__file__).resolve().parents[1]
+-CATALOG_PATH = REPO_ROOT / "catalog" / "fleet-error-catalog-v1.json"
++CATALOG_PATH = REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json"
+ CATALOG = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+ SCHEMA = json.loads((REPO_ROOT / "schemas" / "fleet-event-log-v1.schema.json").read_text(encoding="utf-8"))
+ 
+diff --git a/tests/test_ops_export.py b/tests/test_ops_export.py
+new file mode 100644
+index 0000000..90431b4
+--- /dev/null
++++ b/tests/test_ops_export.py
+@@ -0,0 +1,210 @@
++import json
++import stat
++from datetime import datetime, timedelta, timezone
++from pathlib import Path
++
++import pytest
++
++from trade_alerts.error_request_queue import open_error_request, record_request_outcome
++from trade_alerts.fleet_event_log import append_fleet_event, load_error_catalog
++from trade_alerts.ops_export import (
++    NOTIFYING_TIERS,
++    OPS_EXPORT_VERSION,
++    build_ops_export,
++    render_notice_text,
++    write_ops_export,
++)
++
++REPO_ROOT = Path(__file__).resolve().parents[1]
++SCHEMA_PATH = REPO_ROOT / "schemas" / "fleet-ops-export-v1.schema.json"
++NOW = datetime(2026, 9, 17, 12, 0, 0, tzinfo=timezone.utc)
++CATALOG = load_error_catalog()
++
++
++def _iso(moment):
++    return moment.isoformat(timespec="seconds").replace("+00:00", "Z")
++
++
++@pytest.fixture
++def paths(tmp_path):
++    return tmp_path / "fleet_event_log.jsonl", tmp_path / "error_requests.jsonl"
++
++
++def _event(log, *, code, risk_tier, age=timedelta(hours=1), project="momentum", **extra):
++    return append_fleet_event(
++        log, project=project, code=code, risk_tier=risk_tier, recorded_at=_iso(NOW - age), **extra,
++    )
++
++
++def _build(paths, **kwargs):
++    log, queue = paths
++    return build_ops_export(log, queue, project="momentum", catalog=CATALOG, now=NOW, **kwargs)
++
++
++def test_missing_files_give_an_empty_export(paths):
++    export = _build(paths)
++    assert export == {
++        "export_version": OPS_EXPORT_VERSION, "project": "momentum", "generated_at": "2026-09-17T12:00:00Z",
++        "window_days": 7, "notices": [], "open_requests": [],
++    }
++
++
++def test_r0_events_never_become_notices(paths):
++    log, _queue = paths
++    _event(log, code="RUNTIME_CYCLE_FAILED", risk_tier="R0")
++    assert "R0" not in NOTIFYING_TIERS
++    assert _build(paths)["notices"] == []
++
++
++def test_notifying_events_carry_header_plain_language_and_technical_detail(paths):
++    log, _queue = paths
++    event = _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4", summary="ledger write failed",
++                   details={"notice_text": "incident_id: abc\ntrade_id: t-1"})
++
++    [notice] = _build(paths)["notices"]
++
++    assert notice["event_id"] == event["event_id"]
++    assert notice["code"] == "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"
++    assert notice["risk_tier"] == "R4" and notice["critical"] is True
++    text = notice["text"]
++    assert text.startswith("🔴 需要人工處理\n自動修復停手")
++    assert "發生什麼事：" in text and "解決方向：" in text and "處理步驟：\n1. " in text
++    assert "技術細節：\nincident_id: abc\ntrade_id: t-1" in text
++    assert "ledger write failed" not in text  # notice_text wins over the summary
++
++
++def test_summary_is_the_technical_detail_when_no_notice_text(paths):
++    log, _queue = paths
++    _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R1", summary="proposal computed for trade_id=t-2")
++    [notice] = _build(paths)["notices"]
++    assert notice["critical"] is False
++    assert notice["text"].startswith("📋 修復提案（需要你決定）")
++    assert notice["text"].endswith("技術細節：\nproposal computed for trade_id=t-2")
++
++
++def test_r2_is_labelled_as_an_after_the_fact_notice(paths):
++    log, _queue = paths
++    _event(log, code="VERIFIED_CLOSE_AUTO_REPAIRED", risk_tier="R2")
++    [notice] = _build(paths)["notices"]
++    assert notice["text"].startswith("✅ 已自動處理（事後通知，不需要動作）")
++    assert notice["critical"] is False
++
++
++def test_events_older_than_the_window_are_dropped(paths):
++    log, _queue = paths
++    _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R1", age=timedelta(days=8), summary="old")
++    recent = _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R1", age=timedelta(days=6), summary="new")
++    assert [n["event_id"] for n in _build(paths)["notices"]] == [recent["event_id"]]
++    assert len(_build(paths, window_days=9)["notices"]) == 2
++
++
++def test_notices_are_oldest_first(paths):
++    log, _queue = paths
++    newer = _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R1", age=timedelta(hours=1))
++    older = _event(log, code="VERIFIED_CLOSE_AUTO_REPAIRED", risk_tier="R2", age=timedelta(hours=3))
++    assert [n["event_id"] for n in _build(paths)["notices"]] == [older["event_id"], newer["event_id"]]
++
++
++def test_tier_falls_back_to_the_catalog_when_the_event_has_none(paths):
++    log, _queue = paths
++    _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier=None)
++    [notice] = _build(paths)["notices"]
++    assert notice["risk_tier"] == "R4"
++
++
++def test_uncatalogued_event_with_a_recorded_tier_still_notifies_under_its_code(paths):
++    log, _queue = paths
++    _event(log, code="SOMETHING_NEW", risk_tier="R4", summary="brand new condition")
++    [notice] = _build(paths)["notices"]
++    assert notice["text"] == "🔴 需要人工處理\nSOMETHING_NEW\n\n技術細節：\nbrand new condition"
++
++
++def test_uncatalogued_event_without_a_tier_is_skipped(paths):
++    log, _queue = paths
++    _event(log, code="SOMETHING_NEW", risk_tier=None)
++    assert _build(paths)["notices"] == []
++
++
++def test_other_projects_events_are_ignored(paths):
++    log, _queue = paths
++    _event(log, code="PROTECTION_UNVERIFIED", risk_tier="R4", project="seykota")
++    assert _build(paths)["notices"] == []
++
++
++def test_open_requests_carry_the_operator_message_and_closed_ones_are_gone(paths):
++    _log, queue = paths
++    blocked = open_error_request(queue, project="momentum", code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4",
++                                 summary="ledger write failed", evidence={"trade_id": "t-1"},
++                                 opened_at="2026-09-17T11:00:00Z")
++    closed = open_error_request(queue, project="momentum", code="VERIFIED_CLOSE_AUTO_REPAIRED", risk_tier="R2",
++                                evidence={"trade_id": "t-2"})
++    record_request_outcome(queue, request_id=closed["request_id"], status="RESOLVED_AUTO")
++
++    [request] = _build(paths)["open_requests"]
++
++    entry = next(e for e in CATALOG["entries"] if e["code"] == "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED")
++    assert request == {
++        "request_id": blocked["request_id"], "fingerprint": blocked["fingerprint"],
++        "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED", "risk_tier": "R4", "opened_at": "2026-09-17T11:00:00Z",
++        "summary": "ledger write failed",
++        "what": entry["operator_message"]["what"], "direction": entry["operator_message"]["direction"],
++        "steps": entry["operator_message"]["steps"], "handling_started_at": None,
++    }
++
++
++def test_open_request_without_an_operator_message_has_nulls(paths):
++    _log, queue = paths
++    open_error_request(queue, project="seykota", code="PROTECTION_UNVERIFIED", risk_tier="R4", evidence={"x": 1})
++    log, _ = paths
++    [request] = build_ops_export(log, queue, project="seykota", catalog=CATALOG, now=NOW)["open_requests"]
++    assert request["what"] is None and request["direction"] is None and request["steps"] == []
++
++
++def test_defaults_to_the_packaged_catalog(paths):
++    log, queue = paths
++    _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4")
++    [notice] = build_ops_export(log, queue, project="momentum", now=NOW)["notices"]
++    assert "發生什麼事：" in notice["text"]
++
++
++def test_rejects_a_non_positive_window(paths):
++    with pytest.raises(ValueError):
++        _build(paths, window_days=0)
++
++
++def test_malformed_event_log_raises_instead_of_exporting_a_partial_view(paths):
++    log, _queue = paths
++    log.write_text("{not json\n", encoding="utf-8")
++    with pytest.raises(ValueError):
++        _build(paths)
++
++
++def test_render_notice_text_without_entry_or_detail():
++    assert render_notice_text({"code": "X"}, None, "R1") == "📋 修復提案（需要你決定）\nX"
++
++
++def test_write_is_atomic_world_readable_and_round_trips(paths, tmp_path):
++    log, _queue = paths
++    _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4", details={"notice_text": "詳細"})
++    export = _build(paths)
++    target = tmp_path / "audit" / "ops_export.json"
++
++    write_ops_export(target, export)
++    write_ops_export(target, export)  # replacing an existing file
++
++    assert json.loads(target.read_text(encoding="utf-8")) == export
++    assert stat.S_IMODE(target.stat().st_mode) == 0o644
++    assert [p.name for p in target.parent.iterdir()] == ["ops_export.json"]  # no temp file left behind
++
++
++def test_export_matches_its_json_schema(paths):
++    jsonschema = pytest.importorskip("jsonschema")
++    log, queue = paths
++    _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4", details={"notice_text": "x"})
++    _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R1")
++    open_error_request(queue, project="momentum", code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4",
++                       evidence={"trade_id": "t-1"})
++    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
++    jsonschema.Draft7Validator.check_schema(schema)
++    errors = list(jsonschema.Draft7Validator(schema).iter_errors(_build(paths)))
++    assert not errors, [f"{list(e.path)}: {e.message}" for e in errors]
+diff --git a/tests/test_safe_halt_model.py b/tests/test_safe_halt_model.py
+index 9d5f9e9..5aecdb4 100644
+--- a/tests/test_safe_halt_model.py
++++ b/tests/test_safe_halt_model.py
+@@ -20,7 +20,7 @@ from trade_alerts.safe_halt_model import (
+     safe_halt_fingerprint,
+ )
+ 
+-CATALOG = json.loads((Path(__file__).resolve().parents[1] / "catalog" / "fleet-error-catalog-v1.json").read_text(encoding="utf-8"))
++CATALOG = json.loads((Path(__file__).resolve().parents[1] / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json").read_text(encoding="utf-8"))
+ 
+ 
+ def _halt(**overrides):
+-- 
+2.43.0
+
