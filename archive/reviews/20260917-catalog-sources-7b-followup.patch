@@ -1,0 +1,114 @@
+From 3c90320e989fd51e5f0563e18bb121e273d26db0 Mon Sep 17 00:00:00 2001
+From: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date: Thu, 17 Sep 2026 23:17:13 +0800
+Subject: [PATCH] fix: catalog sources follow momentum repair_bot.py line moves
+ + two rationale clarifications (v0.18.1) (#27)
+
+momentum PR #90 moved the three MOM.VERIFIED_CLOSE_* call sites
+(123->128, 143->153, 217->228). Also resolves the two non-blocking wording
+notes left in the v0.17.1 review archive for AUTO_REPAIRED's rationale.
+Data only; no code change, no consumer re-pin needed.
+
+Co-authored-by: bcup02 <columnbb@gmail.com>
+Co-authored-by: Claude Opus 5 <noreply@anthropic.com>
+---
+ docs/consumer-release-runbook.md              | 20 +++++++++++++++++++
+ pyproject.toml                                |  2 +-
+ src/trade_alerts/__init__.py                  |  2 +-
+ .../catalog/fleet-error-catalog-v1.json       |  8 ++++----
+ 4 files changed, 26 insertions(+), 6 deletions(-)
+
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 4ad96a3..ac3d23d 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -537,3 +537,23 @@ trade-alerts：v0.18.0（Phase 7b）
+           ops_export 19 條、錯誤目錄不變式 4 條）。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.18.1（Phase 7b 配套，純目錄資料）
++變更摘要：1. 錯誤目錄三條 MOM.VERIFIED_CLOSE_* 的 sources 行號跟上 momentum
++             PR #90（scripts/repair_bot.py：PROPOSED :123→:128、REPAIR_BLOCKED
++             :143→:153、AUTO_REPAIRED :217→:228；以 momentum development
++             44524e0 grep 驗證）。
++          2. 補 v0.17.1 歸檔留下的兩條非阻擋觀察（MOM.VERIFIED_CLOSE_AUTO_REPAIRED
++             rationale）：「其餘判準不成立」清單加上「缺 trade_id／incident_id
++             等」，不再讀起來像窮舉；抓證據階段靜默中止的原因補上「證據結構不足
++             以算出修復事件（build_repair_events 拋 VerifiedCloseError）」。
++          程式碼零變更。
++受影響消費專案：無執行期影響；momentum 維持 v0.18.0 即可（sources／rationale
++          不參與通知文字）。
++部署入口：無。
++版本驗證：pyproject.toml version == 0.18.1；trade_alerts.__version__ ==
++          "0.18.1"。
++服務/工作流程驗證：trade-alerts pytest 229 全綠（無新增測試）。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index 54b259c..2acbe49 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.18.0"
++version = "0.18.1"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index b03fdc2..07bd72b 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -275,4 +275,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.18.0"
++__version__ = "0.18.1"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v1.json b/src/trade_alerts/catalog/fleet-error-catalog-v1.json
+index 364374a..e0ab2e3 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v1.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v1.json
+@@ -399,7 +399,7 @@
+       "title": "無歧義的孤兒平倉已自動補寫進帳本",
+       "project": "momentum",
+       "sources": [
+-        "scripts/repair_bot.py:217"
++        "scripts/repair_bot.py:228"
+       ],
+       "current": {
+         "latch": null,
+@@ -412,7 +412,7 @@
+       "human_action": "無需決定。稽核通知只告知已寫入的交易與金額；證據檔、事件日誌與請求佇列（RESOLVED_AUTO）留有完整紀錄。投影排隊失敗時通知附 queue_projection_intent.py 補救指令。",
+       "resume": "n/a",
+       "lands_in_phase": 6,
+-      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平空、且本地算出的毛損益與交易所回報的已實現損益差額在容忍內，人來看也只會做同一件事——照交易所寫下去。沒有第二個選項，所以不該產生決策請求，只該產生一則事後稽核通知（§2.1）。開關預設關閉（關閉時一律走 MOM.VERIFIED_CLOSE_PROPOSED）。開關開啟時，判準不成立有兩條退路：帳本已留有這筆交易的修復痕跡（同 incident_id 或其他修復紀錄）轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED（R4，critical 停手、不重試）；其餘判準不成立（多筆同時分歧、非多單 SELL、成交早於開倉或缺時間戳、損益殘差超過容忍值）退回 MOM.VERIFIED_CLOSE_PROPOSED，通知附上未自動修復的原因。整批寫入失敗或讀回驗證不過同樣轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED。交易所上該 symbol 仍有部位時，在抓證據階段就中止（不記事件、不通知，下一輪再看），根本不會進入判準評估。",
++      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平空、且本地算出的毛損益與交易所回報的已實現損益差額在容忍內，人來看也只會做同一件事——照交易所寫下去。沒有第二個選項，所以不該產生決策請求，只該產生一則事後稽核通知（§2.1）。開關預設關閉（關閉時一律走 MOM.VERIFIED_CLOSE_PROPOSED）。開關開啟時，判準不成立有兩條退路：帳本已留有這筆交易的修復痕跡（同 incident_id 或其他修復紀錄）轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED（R4，critical 停手、不重試）；其餘判準不成立（多筆同時分歧、非多單 SELL、成交早於開倉或缺時間戳、損益殘差超過容忍值、缺 trade_id／incident_id 等）退回 MOM.VERIFIED_CLOSE_PROPOSED，通知附上未自動修復的原因。整批寫入失敗或讀回驗證不過同樣轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED。交易所上該 symbol 仍有部位、或證據結構不足以算出修復事件（build_repair_events 拋 VerifiedCloseError）時，在抓證據階段就中止（不記事件、不通知，下一輪再看），根本不會進入判準評估。",
+       "operator_message": {
+         "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，確認沒有任何模糊地帶，已經自動把這筆平倉補寫進帳本。",
+         "direction": "不需要做任何決定。這是事後通知，讓你知道帳本剛剛被自動補寫過、補了什麼。",
+@@ -428,7 +428,7 @@
+       "title": "孤兒平倉已算出修復方案，附提案通知",
+       "project": "momentum",
+       "sources": [
+-        "scripts/repair_bot.py:123"
++        "scripts/repair_bot.py:128"
+       ],
+       "current": {
+         "latch": null,
+@@ -458,7 +458,7 @@
+       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+       "project": "momentum",
+       "sources": [
+-        "scripts/repair_bot.py:143"
++        "scripts/repair_bot.py:153"
+       ],
+       "current": {
+         "latch": null,
+-- 
+2.43.0
+
