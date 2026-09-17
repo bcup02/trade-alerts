@@ -473,3 +473,30 @@ trade-alerts：v0.17.0（Phase 6a）
           （不依賴 incident_id 相符）。修正前以舊程式碼跑新測試確認 4 條紅。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.17.1（Phase 6b 配套）
+變更摘要：1. 錯誤目錄補登 momentum 修復 bot 的三條條件（sources 指向
+          AI-for-column/mexc-4h-momentum-trailing-stop PR #88 的
+          scripts/repair_bot.py）：
+          - MOM.VERIFIED_CLOSE_AUTO_REPAIRED — MECHANICAL／R2／P6：開關開啟
+            且判準全部成立才自動寫帳本，事後稽核通知。
+          - MOM.VERIFIED_CLOSE_PROPOSED — JUDGEMENT／R1／P5：補登 Phase 5
+            影子模式既有行為（當時只在程式碼註解宣告 R1）。
+          - MOM.VERIFIED_CLOSE_REPAIR_BLOCKED — JUDGEMENT／R4／P6：帳本已有修復
+            痕跡或整批寫入失敗 → 停手、critical 一次；「重複提醒」節奏屬 Phase 7。
+          目錄 30 → 33 條，docs/fleet-error-catalog.md §3 計數與 §3.2 表同步。
+          既有不變式一條未改，三條新條目全部通過。
+          2. assess_auto_repair 內兩處 trade_id 比對補上 str()（找 trade_open
+          與同交易其他修復痕跡），與同段其他檢查一致。PR #21 複審的遺留非阻擋
+          觀察；現行 trade_id 全為字串，不可觸發。
+受影響消費專案：momentum PR #88 pin 由 v0.17.0 改為 v0.17.1。其餘不受影響。
+部署入口：無（純函式庫 + 目錄資料）。
+版本驗證：pyproject.toml version == 0.17.1；trade_alerts.__version__ ==
+          "0.17.1"。
+服務/工作流程驗證：trade-alerts pytest 206 全綠（205 → 206，+1：
+          test_assess_matches_trade_ids_across_str_and_int，以 v0.17.0 程式碼
+          執行確認會紅）。錯誤目錄不變式（含雙向治理不變式、audit_notice 兩條）
+          對 33 條全數通過。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

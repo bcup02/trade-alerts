@@ -578,3 +578,21 @@ def test_assess_residual_is_exact_on_a_large_high_priced_position():
     assert Decimal(evidence["trade"]["close"]["exchange_profit"]) == gross
     assert Decimal(result["checks"]["exchange_pnl_residual"]) == 0
     assert result["eligible"] is True, result["blockers"]
+
+
+def test_assess_matches_trade_ids_across_str_and_int():
+    """Review note on #21: the trade-level checks compared trade_id without the
+    str() the neighbouring checks use, so an int id in evidence would silently
+    miss a string id in the ledger. Every trade_id comparison in the assessment
+    now agrees on str()."""
+    evidence = build_evidence(
+        open_event=_open_event(trade_id="12345"), sell_fills=[_sell_fill(side="sell")],
+        trailing_order_id=None, artifact_name="x",
+    )
+    evidence["trade"]["trade_id"] = 12345
+    earlier = {"event_type": "fill", "trade_id": "12345", "reconciliation": {"incident_id": "an-earlier-repair"}}
+
+    result = _assess(evidence, events=[_open_event(trade_id="12345"), earlier])
+
+    assert any("different repair" in blocker for blocker in result["blockers"])
+    assert not any("no event_epoch_ms" in blocker for blocker in result["blockers"])
