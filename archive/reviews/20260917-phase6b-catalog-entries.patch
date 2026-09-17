@@ -1,0 +1,241 @@
+diff --git a/catalog/fleet-error-catalog-v1.json b/catalog/fleet-error-catalog-v1.json
+index 4a2893a..820d559 100644
+--- a/catalog/fleet-error-catalog-v1.json
++++ b/catalog/fleet-error-catalog-v1.json
+@@ -394,6 +394,66 @@
+       "lands_in_phase": 3,
+       "rationale": "momentum 對 catch-all 的處置正是 seykota 要改成的樣子，列進目錄當作對照基準。"
+     },
++    {
++      "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
++      "title": "無歧義的孤兒平倉已自動補寫進帳本",
++      "project": "momentum",
++      "sources": [
++        "scripts/repair_bot.py:217"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "VERIFIED_CLOSE_AUTO_REPAIRED (critical=False，事後稽核通知)",
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R2",
++      "auto_action": "MOMENTUM_REPAIR_AUTO_APPLY=true 且 assess_auto_repair 判定無歧義（本輪候選恰好 1、交易所已無部位、成交全為多單 SELL 且不早於 trade_open、帳本無修復痕跡、本地毛損益與交易所已實現損益差額 ≤ 0.01）時：證據檔落地、開 R2 請求、以 momentum 自己的 TradeLedger staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、請求標 RESOLVED_AUTO，事後發稽核通知。一輪最多一筆。",
++      "human_action": "無需決定。稽核通知只告知已寫入的交易與金額；證據檔、事件日誌與請求佇列（RESOLVED_AUTO）留有完整紀錄。投影排隊失敗時通知附 queue_projection_intent.py 補救指令。",
++      "resume": "n/a",
++      "lands_in_phase": 6,
++      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平空、且本地算出的毛損益與交易所回報的已實現損益差額在容忍內，人來看也只會做同一件事——照交易所寫下去。沒有第二個選項，所以不該產生決策請求，只該產生一則事後稽核通知（§2.1）。開關預設關閉（關閉時一律走 MOM.VERIFIED_CLOSE_PROPOSED）。開關開啟時，判準不成立有兩條退路：帳本已留有這筆交易的修復痕跡（同 incident_id 或其他修復紀錄）轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED（R4，critical 停手、不重試）；其餘判準不成立（多筆同時分歧、非多單 SELL、成交早於開倉或缺時間戳、損益殘差超過容忍值）退回 MOM.VERIFIED_CLOSE_PROPOSED，通知附上未自動修復的原因。整批寫入失敗或讀回驗證不過同樣轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED。交易所上該 symbol 仍有部位時，在抓證據階段就中止（不記事件、不通知，下一輪再看），根本不會進入判準評估。"
++    },
++    {
++      "code": "MOM.VERIFIED_CLOSE_PROPOSED",
++      "title": "孤兒平倉已算出修復方案，附提案通知",
++      "project": "momentum",
++      "sources": [
++        "scripts/repair_bot.py:123"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "VERIFIED_CLOSE_PROPOSED (critical=False)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R1",
++      "auto_action": "不寫帳本。唯讀抓交易所證據、算出完整修復事件，記事件日誌後發一次附提案的通知；同一 trade_id 不重複提案、不重複查交易所。自動模式開啟但判準不成立時，通知附上未自動修復的原因。",
++      "human_action": "核對提案後用手動流程（fetch_verified_close_evidence.py → append_reconciled_close.py → queue_projection_intent.py）寫入，或判定不修。",
++      "resume": "n/a",
++      "lands_in_phase": 5,
++      "rationale": "補登 Phase 5 影子模式既有行為（該階段只在程式碼註解宣告 R1）。這條落在這裡代表機器沒把握：可能是自動模式關閉，也可能是有判準不成立（多筆同時分歧、損益對不上、證據缺時間戳等），這些情況照交易所寫下去不一定對，需要人決定。"
++    },
++    {
++      "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
++      "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
++      "project": "momentum",
++      "sources": [
++        "scripts/repair_bot.py:143"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "VERIFIED_CLOSE_REPAIR_BLOCKED (critical=True)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R4",
++      "auto_action": "不寫、不重試。開 R4 請求、記事件日誌、發一次 critical 通知；此 trade_id 之後一律跳過。（「重複提醒直到有人處理」的節奏屬 Phase 7，本階段只發一次。）",
++      "human_action": "檢查 audit/trading_ledger.jsonl 裡這筆交易是否留有半套修復，對照 audit/error_requests.jsonl 與 fleet_event_log.jsonl，手動收斂後關閉請求。",
++      "resume": "n/a",
++      "lands_in_phase": 6,
++      "rationale": "帳本裡已有這筆交易的修復紀錄（例如先前寫到一半）或這次寫入無法驗證，代表真實帳本的狀態已經不是「乾淨的孤兒開倉」。此時自動補完後半段等於猜，而猜錯會重複或錯記真實損益——這正是必須交給人的情況。"
++    },
+     {
+       "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+       "title": "出現負／不可能的餘額，本地帳本本身不可信",
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 9659890..d85e84a 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -473,3 +473,34 @@ trade-alerts：v0.17.0（Phase 6a）
+           （不依賴 incident_id 相符）。修正前以舊程式碼跑新測試確認 4 條紅。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.17.1（Phase 6b 配套）
++變更摘要：1. 錯誤目錄補登 momentum 修復 bot 的三條條件（sources 指向
++          AI-for-column/mexc-4h-momentum-trailing-stop PR #88 的
++          scripts/repair_bot.py）：
++          - MOM.VERIFIED_CLOSE_AUTO_REPAIRED — MECHANICAL／R2／P6：開關開啟
++            且判準全部成立才自動寫帳本，事後稽核通知。
++          - MOM.VERIFIED_CLOSE_PROPOSED — JUDGEMENT／R1／P5：補登 Phase 5
++            影子模式既有行為（當時只在程式碼註解宣告 R1）。
++          - MOM.VERIFIED_CLOSE_REPAIR_BLOCKED — JUDGEMENT／R4／P6：帳本已有修復
++            痕跡或整批寫入失敗 → 停手、critical 一次；「重複提醒」節奏屬 Phase 7。
++          目錄 30 → 33 條，docs/fleet-error-catalog.md §3 計數與 §3.2 表同步。
++          Perplexity 首審 BLOCK：AUTO_REPAIRED 的 rationale 原寫「任何一條判準
++          不成立都退回 PROPOSED」，漏掉「帳本已有修復痕跡 → REPAIR_BLOCKED（R4，
++          critical）」這條分流。已改寫成完整列出三條退路，並補上「交易所仍有部位
++          時在抓證據階段就中止、不通知」。
++          既有不變式一條未改，三條新條目全部通過。
++          2. assess_auto_repair 內兩處 trade_id 比對補上 str()（找 trade_open
++          與同交易其他修復痕跡），與同段其他檢查一致。PR #21 複審的遺留非阻擋
++          觀察；現行 trade_id 全為字串，不可觸發。
++受影響消費專案：momentum PR #88 pin 由 v0.17.0 改為 v0.17.1。其餘不受影響。
++部署入口：無（純函式庫 + 目錄資料）。
++版本驗證：pyproject.toml version == 0.17.1；trade_alerts.__version__ ==
++          "0.17.1"。
++服務/工作流程驗證：trade-alerts pytest 206 全綠（205 → 206，+1：
++          test_assess_matches_trade_ids_across_str_and_int，以 v0.17.0 程式碼
++          執行確認會紅）。錯誤目錄不變式（含雙向治理不變式、audit_notice 兩條）
++          對 33 條全數通過。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index b695a07..5cdd246 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -56,21 +56,21 @@ R1／R3／R4 一律保留給 `JUDGEMENT`。
+ 
+ ## 3. 目錄總覽
+ 
+-Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（盤查原始的 57 條路徑裡，6 條是死碼已在
++Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（Phase 6 另補 3 條 momentum 修復 bot 條件，目前合計 **33 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
+ 
+ | 判定 | 條數 | 佔比 |
+ |---|---|---|
+-| `MECHANICAL`（動作固定） | 10 | 33% |
+-| `JUDGEMENT`（真的要人判斷） | 20 | 67% |
++| `MECHANICAL`（動作固定） | 11 | 33% |
++| `JUDGEMENT`（真的要人判斷） | 22 | 67% |
+ 
+ | 風險等級 | 條數 |
+ |---|---|
+ | R0 日誌 | 9 |
+-| R1 提案 | 4 |
+-| R2 自動執行 | 1 |
++| R1 提案 | 5 |
++| R2 自動執行 | 2 |
+ | R3 逾時自動 | 6 |
+-| R4 必須人工 | 10 |
++| R4 必須人工 | 11 |
+ 
+ ### 3.1 ed-seykota（14 條）
+ 
+@@ -96,18 +96,26 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ 極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R2 自動清 latch）；平倉也失敗代表真倉
+ 有裸露部位而且程式的補救手段已經失敗過一次（→ R4，全機隊風險最高的一類）。
+ 
+-### 3.2 momentum（3 條）
++### 3.2 momentum（6 條）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+ | `MOM.PROTECTION_UNVERIFIED` | latch dict，3 觸發點共用 | JUDGEMENT | R4 | P4 |
+ | `MOM.STATE_REPAIRED_SAFE_HALT` | 人工工具寫入的 latch | JUDGEMENT | R4 | P4 |
+ | `MOM.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重試 | MECHANICAL | R0 | — |
++| `MOM.VERIFIED_CLOSE_PROPOSED` | 修復 bot 提案通知 | JUDGEMENT | R1 | P5 |
++| `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R2 | **P6** |
++| `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R4 | **P6** |
+ 
+ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
+ 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
+ 正是 seykota 要改成的樣子。
+ 
++後三條是 Phase 6 的 verified-close-backfill 修復 bot（`scripts/repair_bot.py`）。同一個偵測結果依
++判準分流到三個等級：無歧義 → R2 自動寫；有疑慮 → R1 提案；帳本已不乾淨 → R4 停手。自動寫入的
++開關（`MOMENTUM_REPAIR_AUTO_APPLY`）預設關閉，關閉時一律走 R1。seykota 不在範圍內，維持 Phase 5
++影子模式。
++
+ ### 3.3 btc-competition（4 條）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+diff --git a/pyproject.toml b/pyproject.toml
+index e233db0..9080471 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.17.0"
++version = "0.17.1"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 6e22da4..6443fb6 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -263,4 +263,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.17.0"
++__version__ = "0.17.1"
+diff --git a/src/trade_alerts/verified_close_backfill.py b/src/trade_alerts/verified_close_backfill.py
+index 8cfcb8c..a61e67e 100644
+--- a/src/trade_alerts/verified_close_backfill.py
++++ b/src/trade_alerts/verified_close_backfill.py
+@@ -532,7 +532,7 @@ def assess_auto_repair(
+ 
+     open_epoch_ms = 0
+     for event in ledger_events:
+-        if event.get("event_type") == "trade_open" and event.get("trade_id") == trade_id:
++        if event.get("event_type") == "trade_open" and str(event.get("trade_id")) == str(trade_id):
+             open_epoch_ms = int(event.get("event_epoch_ms") or 0)
+     deal_times = [int(deal.get("time_ms") or 0) for deal in deals]
+     checks["earliest_deal_ms"] = min(deal_times) if deal_times else None
+@@ -560,7 +560,7 @@ def assess_auto_repair(
+     trade_traces = [
+         event for event in ledger_events
+         if trade_id
+-        and event.get("trade_id") == trade_id
++        and str(event.get("trade_id")) == str(trade_id)
+         and isinstance(event.get("reconciliation"), dict)
+         and event not in traces
+     ]
+diff --git a/tests/test_verified_close_backfill.py b/tests/test_verified_close_backfill.py
+index 28eb3b7..ea6064b 100644
+--- a/tests/test_verified_close_backfill.py
++++ b/tests/test_verified_close_backfill.py
+@@ -578,3 +578,21 @@ def test_assess_residual_is_exact_on_a_large_high_priced_position():
+     assert Decimal(evidence["trade"]["close"]["exchange_profit"]) == gross
+     assert Decimal(result["checks"]["exchange_pnl_residual"]) == 0
+     assert result["eligible"] is True, result["blockers"]
++
++
++def test_assess_matches_trade_ids_across_str_and_int():
++    """Review note on #21: the trade-level checks compared trade_id without the
++    str() the neighbouring checks use, so an int id in evidence would silently
++    miss a string id in the ledger. Every trade_id comparison in the assessment
++    now agrees on str()."""
++    evidence = build_evidence(
++        open_event=_open_event(trade_id="12345"), sell_fills=[_sell_fill(side="sell")],
++        trailing_order_id=None, artifact_name="x",
++    )
++    evidence["trade"]["trade_id"] = 12345
++    earlier = {"event_type": "fill", "trade_id": "12345", "reconciliation": {"incident_id": "an-earlier-repair"}}
++
++    result = _assess(evidence, events=[_open_event(trade_id="12345"), earlier])
++
++    assert any("different repair" in blocker for blocker in result["blockers"])
++    assert not any("no event_epoch_ms" in blocker for blocker in result["blockers"])
