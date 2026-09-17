@@ -532,7 +532,7 @@ def assess_auto_repair(
 
     open_epoch_ms = 0
     for event in ledger_events:
-        if event.get("event_type") == "trade_open" and event.get("trade_id") == trade_id:
+        if event.get("event_type") == "trade_open" and str(event.get("trade_id")) == str(trade_id):
             open_epoch_ms = int(event.get("event_epoch_ms") or 0)
     deal_times = [int(deal.get("time_ms") or 0) for deal in deals]
     checks["earliest_deal_ms"] = min(deal_times) if deal_times else None
@@ -560,7 +560,7 @@ def assess_auto_repair(
     trade_traces = [
         event for event in ledger_events
         if trade_id
-        and event.get("trade_id") == trade_id
+        and str(event.get("trade_id")) == str(trade_id)
         and isinstance(event.get("reconciliation"), dict)
         and event not in traces
     ]

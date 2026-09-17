@@ -56,21 +56,21 @@ R1／R3／R4 一律保留給 `JUDGEMENT`。
 
 ## 3. 目錄總覽
 
-Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（盤查原始的 57 條路徑裡，6 條是死碼已在
+Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（Phase 6 另補 3 條 momentum 修復 bot 條件，目前合計 **33 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
 Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
 
 | 判定 | 條數 | 佔比 |
 |---|---|---|
-| `MECHANICAL`（動作固定） | 10 | 33% |
-| `JUDGEMENT`（真的要人判斷） | 20 | 67% |
+| `MECHANICAL`（動作固定） | 11 | 33% |
+| `JUDGEMENT`（真的要人判斷） | 22 | 67% |
 
 | 風險等級 | 條數 |
 |---|---|
 | R0 日誌 | 9 |
-| R1 提案 | 4 |
-| R2 自動執行 | 1 |
+| R1 提案 | 5 |
+| R2 自動執行 | 2 |
 | R3 逾時自動 | 6 |
-| R4 必須人工 | 10 |
+| R4 必須人工 | 11 |
 
 ### 3.1 ed-seykota（14 條）
 
@@ -96,17 +96,25 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R2 自動清 latch）；平倉也失敗代表真倉
 有裸露部位而且程式的補救手段已經失敗過一次（→ R4，全機隊風險最高的一類）。
 
-### 3.2 momentum（3 條）
+### 3.2 momentum（6 條）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
 | `MOM.PROTECTION_UNVERIFIED` | latch dict，3 觸發點共用 | JUDGEMENT | R4 | P4 |
 | `MOM.STATE_REPAIRED_SAFE_HALT` | 人工工具寫入的 latch | JUDGEMENT | R4 | P4 |
 | `MOM.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重試 | MECHANICAL | R0 | — |
+| `MOM.VERIFIED_CLOSE_PROPOSED` | 修復 bot 提案通知 | JUDGEMENT | R1 | P5 |
+| `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R2 | **P6** |
+| `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R4 | **P6** |
 
 momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
 正是 seykota 要改成的樣子。
+
+後三條是 Phase 6 的 verified-close-backfill 修復 bot（`scripts/repair_bot.py`）。同一個偵測結果依
+判準分流到三個等級：無歧義 → R2 自動寫；有疑慮 → R1 提案；帳本已不乾淨 → R4 停手。自動寫入的
+開關（`MOMENTUM_REPAIR_AUTO_APPLY`）預設關閉，關閉時一律走 R1。seykota 不在範圍內，維持 Phase 5
+影子模式。
 
 ### 3.3 btc-competition（4 條）
 

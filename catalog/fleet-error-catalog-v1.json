@@ -395,6 +395,66 @@
       "rationale": "momentum 對 catch-all 的處置正是 seykota 要改成的樣子，列進目錄當作對照基準。"
     },
     {
+      "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "title": "無歧義的孤兒平倉已自動補寫進帳本",
+      "project": "momentum",
+      "sources": [
+        "scripts/repair_bot.py:217"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "VERIFIED_CLOSE_AUTO_REPAIRED (critical=False，事後稽核通知)",
+        "unit_exit": null
+      },
+      "verdict": "MECHANICAL",
+      "risk_tier": "R2",
+      "auto_action": "MOMENTUM_REPAIR_AUTO_APPLY=true 且 assess_auto_repair 判定無歧義（本輪候選恰好 1、交易所已無部位、成交全為多單 SELL 且不早於 trade_open、帳本無修復痕跡、本地毛損益與交易所已實現損益差額 ≤ 0.01）時：證據檔落地、開 R2 請求、以 momentum 自己的 TradeLedger staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、請求標 RESOLVED_AUTO，事後發稽核通知。一輪最多一筆。",
+      "human_action": "無需決定。稽核通知只告知已寫入的交易與金額；證據檔、事件日誌與請求佇列（RESOLVED_AUTO）留有完整紀錄。投影排隊失敗時通知附 queue_projection_intent.py 補救指令。",
+      "resume": "n/a",
+      "lands_in_phase": 6,
+      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平空、且本地算出的毛損益與交易所回報的已實現損益差額在容忍內，人來看也只會做同一件事——照交易所寫下去。沒有第二個選項，所以不該產生決策請求，只該產生一則事後稽核通知（§2.1）。開關預設關閉（關閉時一律走 MOM.VERIFIED_CLOSE_PROPOSED）。開關開啟時，判準不成立有兩條退路：帳本已留有這筆交易的修復痕跡（同 incident_id 或其他修復紀錄）轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED（R4，critical 停手、不重試）；其餘判準不成立（多筆同時分歧、非多單 SELL、成交早於開倉或缺時間戳、損益殘差超過容忍值）退回 MOM.VERIFIED_CLOSE_PROPOSED，通知附上未自動修復的原因。整批寫入失敗或讀回驗證不過同樣轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED。交易所上該 symbol 仍有部位時，在抓證據階段就中止（不記事件、不通知，下一輪再看），根本不會進入判準評估。"
+    },
+    {
+      "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+      "title": "孤兒平倉已算出修復方案，附提案通知",
+      "project": "momentum",
+      "sources": [
+        "scripts/repair_bot.py:123"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "VERIFIED_CLOSE_PROPOSED (critical=False)",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R1",
+      "auto_action": "不寫帳本。唯讀抓交易所證據、算出完整修復事件，記事件日誌後發一次附提案的通知；同一 trade_id 不重複提案、不重複查交易所。自動模式開啟但判準不成立時，通知附上未自動修復的原因。",
+      "human_action": "核對提案後用手動流程（fetch_verified_close_evidence.py → append_reconciled_close.py → queue_projection_intent.py）寫入，或判定不修。",
+      "resume": "n/a",
+      "lands_in_phase": 5,
+      "rationale": "補登 Phase 5 影子模式既有行為（該階段只在程式碼註解宣告 R1）。這條落在這裡代表機器沒把握：可能是自動模式關閉，也可能是有判準不成立（多筆同時分歧、損益對不上、證據缺時間戳等），這些情況照交易所寫下去不一定對，需要人決定。"
+    },
+    {
+      "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+      "project": "momentum",
+      "sources": [
+        "scripts/repair_bot.py:143"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "VERIFIED_CLOSE_REPAIR_BLOCKED (critical=True)",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R4",
+      "auto_action": "不寫、不重試。開 R4 請求、記事件日誌、發一次 critical 通知；此 trade_id 之後一律跳過。（「重複提醒直到有人處理」的節奏屬 Phase 7，本階段只發一次。）",
+      "human_action": "檢查 audit/trading_ledger.jsonl 裡這筆交易是否留有半套修復，對照 audit/error_requests.jsonl 與 fleet_event_log.jsonl，手動收斂後關閉請求。",
+      "resume": "n/a",
+      "lands_in_phase": 6,
+      "rationale": "帳本裡已有這筆交易的修復紀錄（例如先前寫到一半）或這次寫入無法驗證，代表真實帳本的狀態已經不是「乾淨的孤兒開倉」。此時自動補完後半段等於猜，而猜錯會重複或錯記真實損益——這正是必須交給人的情況。"
+    },
+    {
       "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
       "title": "出現負／不可能的餘額，本地帳本本身不可信",
       "project": "btc-competition",
