@@ -7,30 +7,35 @@
       "label": "LOG",
       "notifies": false,
       "auto_executes": false,
+      "audit_notice": false,
       "description": "Event log only. The action after detection is fixed, so a notification produces no decision a human could make differently."
     },
     "R1": {
       "label": "PROPOSE",
       "notifies": true,
       "auto_executes": false,
+      "audit_notice": false,
       "description": "Notify (LINE) only once a concrete remedy has been computed, and attach it as a proposal. Never executed without a human."
     },
     "R2": {
       "label": "AUTO_LOW",
       "notifies": false,
       "auto_executes": true,
-      "description": "Low risk: execute the remedy automatically, record it in the event log afterwards."
+      "audit_notice": true,
+      "description": "Low risk: execute the remedy automatically, record it in the event log afterwards, and send an after-the-fact audit notice. The notice asks nothing of the reader -- it reports what already happened -- so it is not a decision request and does not make this a notifying tier."
     },
     "R3": {
       "label": "AUTO_TIMEOUT",
       "notifies": true,
       "auto_executes": true,
+      "audit_notice": false,
       "description": "Medium risk: open a request, offer a Telegram button to approve early, and execute anyway once the timeout expires."
     },
     "R4": {
       "label": "HUMAN_REQUIRED",
       "notifies": true,
       "auto_executes": false,
+      "audit_notice": false,
       "description": "High risk: repeat the notification until a human acts. Never auto-executed."
     }
   },

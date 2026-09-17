@@ -14,6 +14,9 @@ from pathlib import Path
 import pytest
 
 from trade_alerts import (
+    append_repair_from_evidence,
+    assess_auto_repair,
+    incident_traces,
     REPAIR_EVENT_TYPES,
     VerifiedCloseError,
     append_repair,
@@ -342,3 +345,146 @@ def test_render_repair_proposal_text_includes_the_key_decision_fields():
     assert f"{trade_close['net_pnl']:.6f}" in text
     assert f"{trade_close['exchange_profit']:.6f}" in text
     assert trade_close["reconciliation"]["method"] in text
+
+
+# --------------------------------------------------------------------------- #
+# Phase 6: assess_auto_repair / incident_traces / append_repair_from_evidence
+#
+# These gate an *unattended* ledger write, so each blocker gets its own test:
+# a check that silently stops firing would not fail anything else here.
+# --------------------------------------------------------------------------- #
+def _clean_evidence(**fill_overrides):
+    fill = _sell_fill(side="sell", **fill_overrides)
+    return build_evidence(
+        open_event=_open_event(), sell_fills=[fill],
+        trailing_order_id=None, artifact_name="binance_user_trades:PUFFERUSDT",
+    )
+
+
+def _assess(evidence, events=None, **kwargs):
+    kwargs.setdefault("candidate_count", 1)
+    kwargs.setdefault("still_open_checked", True)
+    return assess_auto_repair(evidence, events if events is not None else [_open_event()], **kwargs)
+
+
+def test_assess_accepts_an_unambiguous_single_long_close():
+    result = _assess(_clean_evidence())
+    assert result["eligible"] is True
+    assert result["blockers"] == []
+    assert result["checks"]["closing_sides"] == ["SELL"]
+
+
+def test_assess_bounds_the_gap_between_our_gross_pnl_and_the_exchanges_not_the_fee_delta():
+    """reconciliation_delta is *expected* to be about -(entry_fee + exit_fee) --
+    roughly -0.49 here. Bounding that number directly by a small tolerance
+    would reject every genuine repair; what must stay near zero is the part
+    the fees do not explain."""
+    result = _assess(_clean_evidence())
+    assert Decimal(result["checks"]["reconciliation_delta"]) < Decimal("-0.4")
+    assert Decimal(result["checks"]["exchange_pnl_residual"]) == Decimal("0")
+
+
+def test_assess_refuses_when_the_exchange_disagrees_about_realized_pnl():
+    result = _assess(_clean_evidence(realized_pnl="-20.0"))
+    assert result["eligible"] is False
+    assert any("disagree about this close" in blocker for blocker in result["blockers"])
+
+
+def test_assess_refuses_more_than_one_candidate_this_round():
+    result = _assess(_clean_evidence(), candidate_count=2)
+    assert result["eligible"] is False
+    assert any("more than one divergence" in blocker for blocker in result["blockers"])
+
+
+def test_assess_refuses_when_the_exchange_was_not_confirmed_flat():
+    result = _assess(_clean_evidence(), still_open_checked=False)
+    assert result["eligible"] is False
+    assert any("not confirmed flat" in blocker for blocker in result["blockers"])
+
+
+def test_assess_refuses_a_short_close_because_auto_repair_is_long_only():
+    evidence = build_evidence(
+        open_event=_open_event(), sell_fills=[_sell_fill(side="buy")],
+        trailing_order_id=None, artifact_name="x",
+    )
+    result = _assess(evidence)
+    assert result["eligible"] is False
+    assert any("long-only" in blocker for blocker in result["blockers"])
+
+
+def test_assess_refuses_a_fill_that_predates_the_trade_open():
+    evidence = _clean_evidence(time_ms=_open_event()["event_epoch_ms"] - 1)
+    result = _assess(evidence)
+    assert result["eligible"] is False
+    assert any("predates the trade_open" in blocker for blocker in result["blockers"])
+
+
+def test_assess_refuses_legacy_evidence_without_per_deal_timestamps():
+    evidence = _clean_evidence()
+    for deal in evidence["trade"]["close"]["deals"]:
+        deal.pop("time_ms")
+    result = _assess(evidence)
+    assert result["eligible"] is False
+    assert any("predates per-deal timestamps" in blocker for blocker in result["blockers"])
+
+
+def test_assess_refuses_when_a_previous_repair_left_traces():
+    evidence = _clean_evidence()
+    half_applied = {
+        "event_type": "fill", "trade_id": "T1",
+        "reconciliation": {"incident_id": evidence["incident_id"]},
+    }
+    result = _assess(evidence, events=[_open_event(), half_applied])
+    assert result["eligible"] is False
+    assert any("left traces" in blocker for blocker in result["blockers"])
+
+
+def test_assess_refuses_when_the_trade_already_has_a_close():
+    result = _assess(_clean_evidence(), events=[_open_event(), {"event_type": "trade_close", "trade_id": "T1"}])
+    assert result["eligible"] is False
+    assert any("already has a trade_close" in blocker for blocker in result["blockers"])
+
+
+def test_assess_reports_malformed_evidence_as_a_blocker_rather_than_raising():
+    result = _assess({"trade": {"close": {"deals": []}}})
+    assert result["eligible"] is False
+    assert result["blockers"]
+
+
+def test_incident_traces_sees_a_half_applied_repair_that_the_terminal_check_misses():
+    """_existing_repair only looks at trade_close / position_reconciled_closed.
+    A batch that stopped after the fills leaves neither -- the exact state an
+    unattended repair must never write the rest of."""
+    incident = "verified-close-backfill-abc"
+    events = [
+        {"event_type": "reconciliation_evidence_recorded", "trade_id": "T1",
+         "reconciliation": {"incident_id": incident}},
+        {"event_type": "fill", "trade_id": "T1", "reconciliation": {"incident_id": incident}},
+    ]
+    assert len(incident_traces(events, incident_id=incident)) == 2
+    assert incident_traces(events, incident_id="some-other-incident") == []
+
+
+def test_append_repair_from_evidence_matches_the_file_based_path(tmp_path):
+    from_file = tmp_path / "from_file.jsonl"
+    from_dict = tmp_path / "from_dict.jsonl"
+    _write_open_trade(from_file)
+    _write_open_trade(from_dict)
+
+    file_result = append_repair(from_file, EVIDENCE, ledger_append=_FakeLedger(from_file).append, apply=True)
+    dict_result = append_repair_from_evidence(
+        from_dict, load_evidence(EVIDENCE), ledger_append=_FakeLedger(from_dict).append, apply=True,
+    )
+
+    assert file_result == dict_result
+    assert from_file.read_text(encoding="utf-8") == from_dict.read_text(encoding="utf-8")
+
+
+def test_append_repair_from_evidence_validates_the_dict_like_load_evidence_does(tmp_path):
+    ledger_path = tmp_path / "ledger.jsonl"
+    _write_open_trade(ledger_path)
+    with pytest.raises(VerifiedCloseError, match="unsupported or malformed"):
+        append_repair_from_evidence(
+            ledger_path, {"audit_schema_version": "0.9"},
+            ledger_append=_FakeLedger(ledger_path).append, apply=False,
+        )

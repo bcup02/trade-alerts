@@ -18,12 +18,13 @@
       "patternProperties": {
         "^R[0-4]$": {
           "type": "object",
-          "required": ["label", "notifies", "auto_executes", "description"],
+          "required": ["label", "notifies", "auto_executes", "audit_notice", "description"],
           "additionalProperties": false,
           "properties": {
             "label": {"type": "string"},
-            "notifies": {"type": "boolean"},
+            "notifies": {"type": "boolean", "description": "Sends a DECISION REQUEST: the human is being asked to choose something. Never true together with audit_notice."},
             "auto_executes": {"type": "boolean"},
+            "audit_notice": {"type": "boolean", "description": "Sends an AFTER-THE-FACT AUDIT NOTICE: tells the human what was already done, asks nothing of them. Only meaningful for a tier that executes automatically without notifying."},
             "description": {"type": "string"}
           }
         }

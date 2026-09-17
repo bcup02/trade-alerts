@@ -412,3 +412,59 @@ trade-alerts：v0.16.0（Phase 5a）
           render_repair_proposal_text 1 條）。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.17.0（Phase 6a）
+變更摘要：Phase 6「低風險自動執行」的共用核心，全部是純函式庫改動，無任何
+          執行期副作用；本版本自己不會讓任何東西自動寫帳本，只是把「能不能
+          自動寫」這個判斷跟「要寫就整批一次寫」的機制準備好。
+          1. verified_close_backfill.assess_auto_repair(evidence,
+          ledger_events, *, candidate_count, still_open_checked,
+          max_exchange_pnl_residual)——「完全無歧義」的唯一判定點，回傳
+          {"eligible", "blockers", "checks"}。任何無法判斷的輸入都是 blocker
+          而不是例外，因為每個 blocker 的意思都一樣：退回提案、不要自己動手。
+          七條檢查：本輪候選數必須恰好 1、交易所必須已確認無部位、平倉成交
+          必須全部是多單 SELL 方向、每筆成交時間不得早於 trade_open、證據必須
+          帶 per-deal 時間戳、帳本不得留有同 incident_id 的痕跡、本地毛損益與
+          交易所回報的已實現損益差額不得超過容忍值（預設 0.01 USDT）。
+          **容忍值比的不是 reconciliation_delta 本身**：Phase 4e 實測該值恆
+          等於 -(entry_fee + exit_fee)，一般約 -0.5 USDT，直接用小容忍值去比
+          會擋掉每一筆真實修復；真正該接近零的是手續費解釋不掉的那部分。
+          2. verified_close_backfill.incident_traces()——比既有 _existing_repair
+          更廣：後者只看 trade_close／position_reconciled_closed 兩個終端事件，
+          但一批寫到一半停掉會只留下 reconciliation_evidence_recorded 跟 fill，
+          對終端檢查完全隱形。有任何痕跡就交給人判斷，絕不自己補完後半段。
+          3. 新模組 atomic_ledger_append：append_lines_atomically(path, lines)
+          把整批事件在 exclusive_log_lock 內一次 write + flush + fsync，寫完
+          re-read 驗證每一行都在。行內容由呼叫端自己的 TradeLedger 產生
+          （staging 寫到暫存檔後用 stage_lines 讀回），所以帳本格式仍然由各專案
+          自己擁有、不會 drift。刻意不做失敗回捲：這裡的鎖是 sibling .lock，
+          而策略 bot 自己的 TradeLedger.append 完全不上鎖，truncate 回捲可能
+          砍掉 bot 併發寫進去的事件。
+          4. build_evidence 的每筆 deal 新增 time_ms（additive，舊證據檔沒有
+          這個欄位就會被 assess_auto_repair 當成「視窗無法驗證」而擋下自動修復，
+          退回提案模式）。
+          5. append_repair_from_evidence()——吃記憶體裡的 evidence dict，既有
+          append_repair() 改為 load_evidence 後委派，簽章與行為完全不變。
+          6. 錯誤目錄 risk_tiers 新增 audit_notice 欄位（只有 R2 為 true）+
+          §2.1 明文定義「事後稽核通知」與「決策請求通知」是兩件事，前者只告知
+          已完成的動作、不問任何問題。既有那條治理不變式
+          test_mechanical_verdicts_never_reach_a_notifying_tier 一個字都沒改
+          （它只讀 notifies，R2 仍是 false），另加兩條新不變式守住兩者不得同時
+          為真、且只有會自動執行的等級才可能有事後稽核。
+受影響消費專案：無立即影響（純新增 + 一個 additive 證據欄位）。Phase 6b 的
+          momentum 自動修復會 bump pin 到這個版本；seykota／my-crypto／btc
+          照舊運作，seykota 明確維持影子模式不變。
+部署入口：無（純函式庫，未觸發任何部署）。
+版本驗證：pyproject.toml version == 0.17.0；trade_alerts.__version__ ==
+          "0.17.0"。
+服務/工作流程驗證：trade-alerts pytest 195 全綠（169 → 195，+26：
+          assess_auto_repair 11 條（每個 blocker 各一條，避免某條檢查默默失效
+          時沒有任何測試會紅）、incident_traces 1 條、append_repair_from_evidence
+          2 條、atomic_ledger_append 10 條、錯誤目錄新不變式 2 條）。
+          其中 test_a_torn_trailing_line_from_an_earlier_crash_reads_as_nothing
+          在開發過程中抓到一個真實缺陷：帳本最後一行若因先前崩潰而斷尾（無換行
+          結尾），直接 append 會把新批次第一筆黏進斷行、同時毀掉兩筆；已修成
+          先補一個換行，讓斷尾自成一行被 read_ledger 跳過。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

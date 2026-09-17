@@ -140,6 +140,12 @@ def build_evidence(
             "price": str(_as_decimal(f.get("price"), field="fill.price")),
             "fee": str(_as_decimal(f.get("commission") or "0", field="fill.commission")),
             "profit": str(_as_decimal(f.get("realized_pnl") or "0", field="fill.realized_pnl")),
+            # Per-deal timestamp, so a later reader can check every deal lands
+            # inside the trade's own lifetime without re-querying the exchange
+            # (``close.occurred_at`` only carries the last one). Evidence files
+            # written before this field exists simply lack it; readers that
+            # need it must treat "absent" as unknown, never as "in range".
+            "time_ms": int(f.get("time_ms") or 0),
             # Each fill's own side, not a hardcoded "SELL" -- a short
             # position's real closing fills are BUY-side. Falls back to
             # "SELL" only when the caller's normalization left it unset
@@ -193,7 +199,13 @@ def build_evidence(
 # stage 2: append the evidence-backed repair to the local ledger
 # --------------------------------------------------------------------------- #
 def load_evidence(path: str | Path) -> dict[str, Any]:
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    return validate_evidence(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+def validate_evidence(payload: Any) -> dict[str, Any]:
+    """The schema checks ``load_evidence`` applies, on evidence already in
+    memory -- so an in-process caller gets exactly the same refusals as one
+    reading the artefact back from disk, rather than a second, laxer path."""
     if not isinstance(payload, dict) or payload.get("audit_schema_version") != _SCHEMA_VERSION:
         raise VerifiedCloseError("unsupported or malformed reconciliation evidence")
     source = payload.get("source")
@@ -223,6 +235,24 @@ def _existing_repair(events: list[dict[str, Any]], *, trade_id: str, incident_id
 
 def _existing_close(events: list[dict[str, Any]], *, trade_id: str) -> bool:
     return any(event.get("event_type") == "trade_close" and event.get("trade_id") == trade_id for event in events)
+
+
+def incident_traces(events: list[dict[str, Any]], *, incident_id: str) -> list[dict[str, Any]]:
+    """Every ledger event already carrying this repair's ``incident_id``.
+
+    Broader on purpose than ``_existing_repair``, which only looks at the two
+    terminal event types. A repair is 4+ events; a batch that stopped part way
+    can leave ``reconciliation_evidence_recorded`` and some ``fill`` events
+    with no ``trade_close`` -- invisible to the terminal-type check, and the
+    exact state an unattended repair must never write "the rest of" on a guess.
+    Any trace at all means a human decides what happened.
+    """
+    return [
+        event
+        for event in events
+        if isinstance(event.get("reconciliation"), dict)
+        and event["reconciliation"].get("incident_id") == incident_id
+    ]
 
 
 def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
@@ -435,21 +465,133 @@ def render_repair_proposal_text(
     return "\n".join(lines)
 
 
-def append_repair(
+# --------------------------------------------------------------------------- #
+# Phase 6: is this repair unambiguous enough to write without a human?
+# --------------------------------------------------------------------------- #
+#: Default ceiling, in quote currency, on how far our own gross P&L may sit
+#: from the exchange's reported realized P&L.
+#:
+#: Note this is *not* a bound on ``reconciliation_delta`` itself. Phase 4e
+#: measured that delta to be exactly ``-(entry_fee + exit_fee)`` on every real
+#: sample -- for a typical trade that is ~0.5 USDT, so bounding it directly by
+#: a small number would reject every genuine repair. What a human actually
+#: checks by eye is the part the fees do not explain: ``gross_pnl`` against the
+#: exchange's own ``realized_pnl``. Those two describe the same quantity from
+#: two sources, so anything past rounding noise means the evidence and the
+#: local arithmetic disagree about what happened -- and that is a human's call.
+DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL = Decimal("0.01")
+
+
+def assess_auto_repair(
+    evidence: dict[str, Any],
+    ledger_events: list[dict[str, Any]],
+    *,
+    candidate_count: int,
+    still_open_checked: bool,
+    max_exchange_pnl_residual: Decimal = DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL,
+) -> dict[str, Any]:
+    """Decide whether one computed repair is unambiguous enough to append
+    without a human, returning ``{"eligible", "blockers", "checks"}``.
+
+    This is the single place that answers that question -- callers must not
+    assemble their own version of it. It never raises on a "no": an input that
+    cannot be assessed is a blocker, because every blocker means the same
+    thing, which is fall back to proposing rather than doing.
+    """
+    blockers: list[str] = []
+    checks: dict[str, Any] = {}
+
+    checks["candidate_count"] = candidate_count
+    if candidate_count != 1:
+        blockers.append(
+            f"{candidate_count} repair candidates this round -- more than one divergence at "
+            "once means something else is wrong, and neither is safe to fix unattended"
+        )
+
+    checks["still_open_checked"] = bool(still_open_checked)
+    if not still_open_checked:
+        blockers.append("the exchange was not confirmed flat for this symbol")
+
+    trade = evidence.get("trade") or {}
+    close = trade.get("close") or {}
+    deals = close.get("deals") or []
+    trade_id = trade.get("trade_id")
+    incident_id = evidence.get("incident_id")
+
+    sides = {str(deal.get("exchange_side") or "").upper() for deal in deals}
+    checks["closing_sides"] = sorted(sides)
+    if sides != {"SELL"}:
+        blockers.append(
+            f"closing fills are not unambiguously long-side SELL ({sorted(sides)}) -- "
+            "auto-repair is long-only, a short's P&L sign is not decided here"
+        )
+
+    open_epoch_ms = 0
+    for event in ledger_events:
+        if event.get("event_type") == "trade_open" and event.get("trade_id") == trade_id:
+            open_epoch_ms = int(event.get("event_epoch_ms") or 0)
+    deal_times = [int(deal.get("time_ms") or 0) for deal in deals]
+    checks["earliest_deal_ms"] = min(deal_times) if deal_times else None
+    checks["trade_open_ms"] = open_epoch_ms or None
+    if not deal_times or not all(deal_times):
+        blockers.append("evidence predates per-deal timestamps, so the fetch window cannot be verified")
+    elif not open_epoch_ms:
+        blockers.append("the trade_open carries no event_epoch_ms to bound the fetch window against")
+    elif min(deal_times) < open_epoch_ms:
+        blockers.append(
+            "a closing fill predates the trade_open, so the fetch window caught a fill "
+            "belonging to some earlier position"
+        )
+
+    traces = incident_traces(ledger_events, incident_id=str(incident_id)) if incident_id else []
+    checks["incident_trace_count"] = len(traces)
+    if traces:
+        blockers.append(
+            f"{len(traces)} ledger events already carry this incident_id -- a previous repair "
+            "left traces; do not write the rest of it on a guess"
+        )
+    if trade_id and _existing_close(ledger_events, trade_id=str(trade_id)):
+        blockers.append("the trade already has a trade_close")
+
+    try:
+        repair_events = build_repair_events(evidence)
+    except (VerifiedCloseError, KeyError, TypeError) as exc:
+        blockers.append(f"the repair does not compute cleanly: {exc}")
+        repair_events = []
+
+    if repair_events:
+        trade_close = next(fields for event_type, fields in repair_events if event_type == "trade_close")
+        gross_pnl = _as_decimal(trade_close["gross_pnl"], field="gross_pnl")
+        exchange_profit = _as_decimal(trade_close["exchange_profit"], field="exchange_profit")
+        residual = abs(gross_pnl - exchange_profit)
+        checks["reconciliation_delta"] = str(trade_close["reconciliation_delta"])
+        checks["exchange_pnl_residual"] = str(residual)
+        checks["max_exchange_pnl_residual"] = str(max_exchange_pnl_residual)
+        if residual > max_exchange_pnl_residual:
+            blockers.append(
+                f"our gross P&L and the exchange's realized P&L differ by {residual}, past the "
+                f"{max_exchange_pnl_residual} tolerance -- the two sources disagree about this close"
+            )
+
+    return {"eligible": not blockers, "blockers": blockers, "checks": checks}
+
+
+def append_repair_from_evidence(
     ledger_path: str | Path,
-    evidence_path: str | Path,
+    evidence: dict[str, Any],
     *,
     ledger_append: Callable[..., str],
     apply: bool = False,
 ) -> dict[str, Any]:
-    """Preview or append one idempotent reconciliation repair; never touches
-    strategy state.
+    """``append_repair`` for evidence already in memory.
 
-    ``ledger_append`` is the caller's own ``TradeLedger.append`` (or
-    equivalent) bound method -- this module never constructs a ledger writer
-    itself, since every project in this toolkit family has its own
-    ``TradeLedger`` class."""
-    evidence = load_evidence(evidence_path)
+    The repair bot computes evidence and decides in one pass; making it write
+    the dict to disk purely to read it straight back would add a failure mode
+    (a half-written evidence file) to the path that is supposed to be the
+    careful one. The caller still persists the evidence as the audit artefact
+    -- this just stops that copy being load-bearing.
+    """
+    validate_evidence(evidence)
     trade = evidence["trade"]
     events = read_ledger(ledger_path)
     if _existing_repair(events, trade_id=trade["trade_id"], incident_id=evidence["incident_id"]):
@@ -469,3 +611,25 @@ def append_repair(
     if apply:
         result["appended_event_ids"] = [ledger_append(event_type, **fields) for event_type, fields in repair_events]
     return result
+
+
+def append_repair(
+    ledger_path: str | Path,
+    evidence_path: str | Path,
+    *,
+    ledger_append: Callable[..., str],
+    apply: bool = False,
+) -> dict[str, Any]:
+    """Preview or append one idempotent reconciliation repair; never touches
+    strategy state.
+
+    ``ledger_append`` is the caller's own ``TradeLedger.append`` (or
+    equivalent) bound method -- this module never constructs a ledger writer
+    itself, since every project in this toolkit family has its own
+    ``TradeLedger`` class."""
+    return append_repair_from_evidence(
+        ledger_path,
+        load_evidence(evidence_path),
+        ledger_append=ledger_append,
+        apply=apply,
+    )
