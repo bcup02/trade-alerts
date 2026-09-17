@@ -537,3 +537,23 @@ trade-alerts：v0.18.0（Phase 7b）
           ops_export 19 條、錯誤目錄不變式 4 條）。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.18.1（Phase 7b 配套，純目錄資料）
+變更摘要：1. 錯誤目錄三條 MOM.VERIFIED_CLOSE_* 的 sources 行號跟上 momentum
+             PR #90（scripts/repair_bot.py：PROPOSED :123→:128、REPAIR_BLOCKED
+             :143→:153、AUTO_REPAIRED :217→:228；以 momentum development
+             44524e0 grep 驗證）。
+          2. 補 v0.17.1 歸檔留下的兩條非阻擋觀察（MOM.VERIFIED_CLOSE_AUTO_REPAIRED
+             rationale）：「其餘判準不成立」清單加上「缺 trade_id／incident_id
+             等」，不再讀起來像窮舉；抓證據階段靜默中止的原因補上「證據結構不足
+             以算出修復事件（build_repair_events 拋 VerifiedCloseError）」。
+          程式碼零變更。
+受影響消費專案：無執行期影響；momentum 維持 v0.18.0 即可（sources／rationale
+          不參與通知文字）。
+部署入口：無。
+版本驗證：pyproject.toml version == 0.18.1；trade_alerts.__version__ ==
+          "0.18.1"。
+服務/工作流程驗證：trade-alerts pytest 229 全綠（無新增測試）。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```
