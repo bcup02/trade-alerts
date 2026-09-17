@@ -41,6 +41,13 @@ from .error_request_queue import (
     record_request_outcome,
     request_fingerprint,
 )
+from .ops_export import (
+    NOTIFYING_TIERS,
+    OPS_EXPORT_VERSION,
+    build_ops_export,
+    render_notice_text,
+    write_ops_export,
+)
 from .safe_halt_model import (
     FINGERPRINT_LENGTH,
     RESUME_PATHS,
@@ -197,6 +204,11 @@ __all__ = [
     "outstanding_error_requests",
     "record_request_outcome",
     "request_fingerprint",
+    "NOTIFYING_TIERS",
+    "OPS_EXPORT_VERSION",
+    "build_ops_export",
+    "render_notice_text",
+    "write_ops_export",
     "FINGERPRINT_LENGTH",
     "RESUME_PATHS",
     "SAFE_HALT_CLEARED_EVENT",
@@ -263,4 +275,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.17.1"
+__version__ = "0.18.0"

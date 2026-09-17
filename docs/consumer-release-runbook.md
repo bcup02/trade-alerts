@@ -504,3 +504,36 @@ trade-alerts：v0.17.1（Phase 6b 配套）
           對 33 條全數通過。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.18.0（Phase 7b）
+變更摘要：修復 bot 的通知目前在兩台主機都被靜默丟棄（策略 env 維持
+          ALERTS_ENABLED=false）。本版提供「策略整理、ops-notify 代送」所需
+          的共用部分：
+          1. 錯誤目錄改為 package data：catalog/fleet-error-catalog-v1.json
+             移到 src/trade_alerts/catalog/（pyproject package-data），
+             load_error_catalog() 不帶路徑時讀套件內那份。策略主機是 pip 從
+             git tag 安裝（非 editable），先前根本讀不到這份檔案。已用乾淨
+             venv 非 editable 安裝驗證 site-packages 內可讀到 33 條。
+          2. 目錄 entry 新增可選欄位 operator_message {what, direction,
+             steps[]}（白話：發生什麼事／解決方向／處理步驟）；先寫 momentum
+             修復 bot 三條（MOM.VERIFIED_CLOSE_PROPOSED／AUTO_REPAIRED／
+             REPAIR_BLOCKED）。新不變式三條：三段皆非空、R0 不得有、momentum
+             三條必須有；另一條確認 load_error_catalog() 讀到的就是測試讀的檔。
+          3. 新模組 ops_export：build_ops_export(fleet_event_log,
+             request_queue, *, project, catalog=None, window_days=7) 產生
+             fleet-ops-export/v1（notices：近 7 天 R1–R4 事件，含組好的完整
+             訊息 text；open_requests：未結案請求附白話三段，
+             handling_started_at 本版恆 null、7e 才寫）；write_ops_export()
+             原子替換、0644。新 schema schemas/fleet-ops-export-v1.schema.json。
+          既有 API 簽章不變；load_error_catalog(path) 仍可傳路徑。
+受影響消費專案：momentum（Phase 7b 第二個 PR）pin 改為 v0.18.0 並寫
+          audit/ops_export.json；ops-notify 讀該檔（不 import 本套件的新 API，
+          不需要跟著 bump）。seykota／my-crypto／btc 不受影響。
+部署入口：無（純函式庫 + 目錄資料）。
+版本驗證：pyproject.toml version == 0.18.0；trade_alerts.__version__ ==
+          "0.18.0"。
+服務/工作流程驗證：trade-alerts pytest 229 全綠（206 → 229，+23：
+          ops_export 19 條、錯誤目錄不變式 4 條）。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

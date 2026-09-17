@@ -20,7 +20,7 @@ from trade_alerts.safe_halt_model import (
     safe_halt_fingerprint,
 )
 
-CATALOG = json.loads((Path(__file__).resolve().parents[1] / "catalog" / "fleet-error-catalog-v1.json").read_text(encoding="utf-8"))
+CATALOG = json.loads((Path(__file__).resolve().parents[1] / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json").read_text(encoding="utf-8"))
 
 
 def _halt(**overrides):

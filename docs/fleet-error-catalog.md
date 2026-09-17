@@ -1,14 +1,14 @@
 # 交易機隊錯誤目錄 v1
 
 **狀態：Phase 3 產出，2026-09-12 定版。** 本文件是全機隊錯誤分類的權威來源；機器可讀版本在
-[`catalog/fleet-error-catalog-v1.json`](../catalog/fleet-error-catalog-v1.json)，其形狀由
+[`src/trade_alerts/catalog/fleet-error-catalog-v1.json`](../src/trade_alerts/catalog/fleet-error-catalog-v1.json)，其形狀由
 [`schemas/fleet-error-catalog-v1.schema.json`](../schemas/fleet-error-catalog-v1.schema.json)
 定義，不變式由 `tests/test_fleet_error_catalog.py` 守住。兩份內容不一致時，以 JSON 為準——
 它是 Phase 4 事件日誌與錯誤處理請求佇列的輸入。
 
 放在 `trade-alerts` 的理由：四支策略與 ops-notify 都已相依這個套件，錯誤碼需要一個所有消費者
-都看得到、而且有版本標籤可以釘選的落點。本套件目前沒有任何執行期程式碼讀取這份目錄——它是資料
-與契約，不是功能。
+都看得到、而且有版本標籤可以釘選的落點。Phase 7b 起這份 JSON 隨套件發佈（package data），
+`trade_alerts.ops_export` 在策略主機上執行期讀它的 `operator_message` 組通知文字，見 §4.8。
 
 ---
 
@@ -289,6 +289,30 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
   outcome 是「實際發生了什麼」的稽核紀錄，第二筆會讓歷史對「哪個修復真的跑了」變得有歧義。
 - 格式在 `schemas/error-request-queue-v1.schema.json`。
 
+### 4.8 白話通知文字與維運匯出（Phase 7b，`trade_alerts.ops_export`）
+
+**策略不自己推播，ops-notify 代送。** 策略的 env 維持 `ALERTS_ENABLED=false`（2026-08-30 方針），
+所以修復 bot 以前呼叫 `publish` 的通知在兩台主機上其實都被靜默丟掉。Phase 7b 改成：策略把要讓人
+知道的事整理成 `audit/ops_export.json`，擁有維運頻道的 ops-notify 讀它、每筆只送一次。
+
+- **`operator_message`**（每條 entry 可選）：`{what, direction, steps[]}`＝發生什麼事、解決方向、
+  處理步驟，語氣比照機隊風險登記冊，不用術語。有這個欄位就三段都不得為空；R0 不得有（R0 不通知
+  任何人，寫了也沒人看得到）。先寫 momentum 修復 bot 的三條（R1／R2／R4），其餘條目在該策略接進
+  ops-notify 時補上——沒有的條目通知會退回只顯示目錄標題＋技術細節。
+- **`build_ops_export(fleet_event_log, request_queue, *, project, catalog=None, window_days=7)`**：
+  - `notices`：近 `window_days` 天、等級 R1–R4 的事件（R0 永遠不在內），以 `event_id` 為鍵讓讀取端
+    每筆只送一次。等級以事件上記錄的為準，沒記錄才查目錄。`text` 是完整訊息本體：等級標頭 →
+    目錄標題 → 白話三段 → 「技術細節」（事件 `details.notice_text`，沒有就用 `summary`）。
+    `critical` 恰好在 R4 時為真。
+  - `open_requests`：所有未結案請求，附目錄的白話三段；`handling_started_at` 本版恆為 `null`，
+    Phase 7e 的「開始處理」按鈕才會寫入（欄位先放進 v1，之後不用改格式版本）。
+  - 事件日誌或佇列有壞行時直接拋錯（同 §4.5），不輸出一份看起來完整其實缺一塊的匯出；呼叫端
+    best-effort 寫檔，匯出停止更新時由 ops-notify 報 `STALE`。
+- **`write_ops_export(path, export)`**：整份原子替換、`0644`。檔案由策略自己的服務帳號寫進
+  `audit/`；ops-notify／ops-control 只有群組讀權限，relay 端無法偽造要送的項目（與 §4.6 佇列放
+  `audit/` 同一個理由）。
+- 格式在 `schemas/fleet-ops-export-v1.schema.json`。
+
 ### 4.7 `reconciliation_delta`：撤回聚合計畫（Phase 4e，2026-09-15）
 
 §4.5/4.6 原本規劃 `reconciliation_delta` 是請求佇列的第一個生產者：每筆照存不觸發，只有**聚合
@@ -348,3 +372,6 @@ log 行的 `event=` 與 `severity=` 欄位，不影響任何推播、下單或�
   （entry 不得規定沒有任何策略實作得出來的 resume 路徑）、
   `test_error_request_queue.py::test_r0_conditions_can_never_open_a_request`
   （逐筆拿目錄裡的 R0 條件去試開請求，必須全部被拒）。
+- Phase 7b 起另有三條白話文字的不變式：`operator_message` 三段皆非空、R0 不得有
+  `operator_message`、momentum 修復 bot 三條必須有。改通知文字就是改這份 JSON——它隨套件發佈，
+  策略重新釘選新版本才會生效。
