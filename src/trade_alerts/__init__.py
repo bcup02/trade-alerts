@@ -85,16 +85,22 @@ from .ledger_integrity import (
     verify_signed_request,
 )
 from .binance_reconcile_fetch import BinanceReconcileParams, fill_rows, momentum_ledger_symbol, position_rows
+from .atomic_ledger_append import AtomicAppendError, append_lines_atomically, stage_lines
 from .verified_close_backfill import (
+    DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL,
     REPAIR_EVENT_TYPES,
     VerifiedCloseError,
     append_repair,
+    append_repair_from_evidence,
+    assess_auto_repair,
     build_evidence,
     build_repair_events,
     detect_repair_candidates,
     find_open_event,
+    incident_traces,
     load_evidence,
     render_repair_proposal_text,
+    validate_evidence,
 )
 from .ledger_reconcile import (
     CLOSE_MARKERS,
@@ -151,15 +157,23 @@ __all__ = [
     "fill_rows",
     "momentum_ledger_symbol",
     "position_rows",
+    "DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL",
     "REPAIR_EVENT_TYPES",
     "VerifiedCloseError",
+    "AtomicAppendError",
+    "append_lines_atomically",
+    "stage_lines",
     "append_repair",
+    "append_repair_from_evidence",
+    "assess_auto_repair",
     "build_evidence",
     "build_repair_events",
     "detect_repair_candidates",
     "find_open_event",
+    "incident_traces",
     "load_evidence",
     "render_repair_proposal_text",
+    "validate_evidence",
     "FLEET_EVENT_KIND",
     "PROJECT_CODE_PREFIXES",
     "RISK_TIERS",
@@ -249,4 +263,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.16.0"
+__version__ = "0.17.0"

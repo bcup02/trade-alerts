@@ -65,6 +65,26 @@ def test_mechanical_verdicts_never_reach_a_notifying_tier(catalog):
             assert tier["notifies"], entry["code"]
 
 
+def test_an_audit_notice_never_doubles_as_a_decision_request(catalog):
+    """Phase 6 draws a line the governing test above depends on: a tier may
+    tell a human what it already did (``audit_notice``) without that counting
+    as asking them to decide (``notifies``).  The line only holds while the
+    two can never be true at once -- otherwise any tier could notify freely by
+    calling it an audit notice, and MECHANICAL conditions would be back to
+    paging people."""
+    for name, tier in catalog["risk_tiers"].items():
+        if tier["audit_notice"]:
+            assert not tier["notifies"], name
+            assert tier["auto_executes"], name
+
+
+def test_only_an_automatic_tier_reports_after_the_fact(catalog):
+    """An audit notice reports a completed action, so a tier that executes
+    nothing has nothing to report."""
+    reporting = {name for name, tier in catalog["risk_tiers"].items() if tier["audit_notice"]}
+    assert reporting == {"R2"}
+
+
 def test_only_judgement_conditions_latch_after_phase_4(catalog):
     """A latch stops a strategy from trading.  Nothing whose verdict is
     MECHANICAL may keep one."""
