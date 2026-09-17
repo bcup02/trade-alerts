@@ -412,7 +412,7 @@
       "human_action": "無需決定。稽核通知只告知已寫入的交易與金額；證據檔、事件日誌與請求佇列（RESOLVED_AUTO）留有完整紀錄。投影排隊失敗時通知附 queue_projection_intent.py 補救指令。",
       "resume": "n/a",
       "lands_in_phase": 6,
-      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平空、且本地算出的毛損益與交易所回報的已實現損益差額在容忍內，人來看也只會做同一件事——照交易所寫下去。沒有第二個選項，所以不該產生決策請求，只該產生一則事後稽核通知（§2.1）。開關預設關閉，任何一條判準不成立都退回 MOM.VERIFIED_CLOSE_PROPOSED。"
+      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平空、且本地算出的毛損益與交易所回報的已實現損益差額在容忍內，人來看也只會做同一件事——照交易所寫下去。沒有第二個選項，所以不該產生決策請求，只該產生一則事後稽核通知（§2.1）。開關預設關閉（關閉時一律走 MOM.VERIFIED_CLOSE_PROPOSED）。開關開啟時，判準不成立有兩條退路：帳本已留有這筆交易的修復痕跡（同 incident_id 或其他修復紀錄）轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED（R4，critical 停手、不重試）；其餘判準不成立（多筆同時分歧、非多單 SELL、成交早於開倉或缺時間戳、損益殘差超過容忍值）退回 MOM.VERIFIED_CLOSE_PROPOSED，通知附上未自動修復的原因。整批寫入失敗或讀回驗證不過同樣轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED。交易所上該 symbol 仍有部位時，在抓證據階段就中止（不記事件、不通知，下一輪再看），根本不會進入判準評估。"
     },
     {
       "code": "MOM.VERIFIED_CLOSE_PROPOSED",

@@ -486,6 +486,10 @@ trade-alerts：v0.17.1（Phase 6b 配套）
           - MOM.VERIFIED_CLOSE_REPAIR_BLOCKED — JUDGEMENT／R4／P6：帳本已有修復
             痕跡或整批寫入失敗 → 停手、critical 一次；「重複提醒」節奏屬 Phase 7。
           目錄 30 → 33 條，docs/fleet-error-catalog.md §3 計數與 §3.2 表同步。
+          Perplexity 首審 BLOCK：AUTO_REPAIRED 的 rationale 原寫「任何一條判準
+          不成立都退回 PROPOSED」，漏掉「帳本已有修復痕跡 → REPAIR_BLOCKED（R4，
+          critical）」這條分流。已改寫成完整列出三條退路，並補上「交易所仍有部位
+          時在抓證據階段就中止、不通知」。
           既有不變式一條未改，三條新條目全部通過。
           2. assess_auto_repair 內兩處 trade_id 比對補上 str()（找 trade_open
           與同交易其他修復痕跡），與同段其他檢查一致。PR #21 複審的遺留非阻擋
