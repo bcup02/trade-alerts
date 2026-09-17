@@ -479,6 +479,10 @@ def render_repair_proposal_text(
 #: exchange's own ``realized_pnl``. Those two describe the same quantity from
 #: two sources, so anything past rounding noise means the evidence and the
 #: local arithmetic disagree about what happened -- and that is a human's call.
+#: The bound is absolute, not a fraction of notional: both sides are Decimal
+#: sums over the same deals, so an agreeing exchange yields a residual of
+#: exactly zero at any position size; the slack only absorbs exchange-side
+#: rounding of each fill's realized P&L. The bound is inclusive.
 DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL = Decimal("0.01")
 
 
@@ -543,12 +547,34 @@ def assess_auto_repair(
             "belonging to some earlier position"
         )
 
+    # Identity first: without both ids the trace and close checks below cannot
+    # run, and a check that cannot run must block rather than pass by silence.
+    if not trade_id:
+        blockers.append("evidence carries no trade_id, so the ledger cannot be checked for this trade")
+    if not incident_id:
+        blockers.append("evidence carries no incident_id, so the ledger cannot be checked for repair traces")
+
     traces = incident_traces(ledger_events, incident_id=str(incident_id)) if incident_id else []
+    # Also any reconciliation-carrying event for this trade under *another*
+    # incident_id: a differently-labelled earlier repair is still a repair.
+    trade_traces = [
+        event for event in ledger_events
+        if trade_id
+        and event.get("trade_id") == trade_id
+        and isinstance(event.get("reconciliation"), dict)
+        and event not in traces
+    ]
     checks["incident_trace_count"] = len(traces)
+    checks["other_repair_trace_count"] = len(trade_traces)
     if traces:
         blockers.append(
             f"{len(traces)} ledger events already carry this incident_id -- a previous repair "
             "left traces; do not write the rest of it on a guess"
+        )
+    if trade_traces:
+        blockers.append(
+            f"{len(trade_traces)} ledger events for this trade carry a different repair's "
+            "reconciliation record -- an earlier repair under another incident_id"
         )
     if trade_id and _existing_close(ledger_events, trade_id=str(trade_id)):
         blockers.append("the trade already has a trade_close")

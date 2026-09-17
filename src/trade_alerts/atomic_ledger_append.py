@@ -25,6 +25,13 @@ What this does and does not promise:
     rollback by truncation could discard a concurrent append from the bot.
     A caller that finds a partial batch must treat it as evidence and stop,
     never silently resume: see ``verified_close_backfill.incident_traces``.
+  * The read-back can report a **false failure**. Because the strategy bot's
+    own writer takes no lock, it can append a line between our ``fsync`` and
+    the read-back; the tail then no longer matches even though the whole
+    batch landed. That errs toward the safe side: the batch is on disk, so
+    the next attempt at the same incident is blocked by ``incident_traces``
+    and a human confirms -- no duplicate write, no silent loss, just one
+    unnecessary escalation.
 """
 from __future__ import annotations
 

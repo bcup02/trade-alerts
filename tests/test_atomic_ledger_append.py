@@ -72,17 +72,22 @@ def test_refuses_a_batch_line_that_is_not_one_json_object(tmp_path, bad_line, ma
     assert ledger.read_text(encoding="utf-8") == before
 
 
-def test_raises_when_the_read_back_does_not_show_the_batch(tmp_path, monkeypatch):
+def test_raises_when_the_file_changes_between_write_and_read_back(tmp_path, monkeypatch):
     """The read-back is the only thing standing between a partial write and a
-    caller that believes the repair landed."""
+    caller that believes the repair landed.
+
+    ``os.fsync`` is only the injection point here, not the failure being
+    modelled -- a real fsync failure raises OSError, which propagates on its
+    own. What this simulates is the file's content no longer ending with the
+    batch by the time it is read back, whatever the cause."""
     ledger = tmp_path / "trading_ledger.jsonl"
     real_fsync = os.fsync
 
-    def truncating_fsync(fd):
+    def fsync_then_file_changes_underneath(fd):
         real_fsync(fd)
         ledger.write_text("", encoding="utf-8")
 
-    monkeypatch.setattr("trade_alerts.atomic_ledger_append.os.fsync", truncating_fsync)
+    monkeypatch.setattr("trade_alerts.atomic_ledger_append.os.fsync", fsync_then_file_changes_underneath)
 
     with pytest.raises(AtomicAppendError, match="do not retry automatically"):
         append_lines_atomically(ledger, _batch())

@@ -488,3 +488,93 @@ def test_append_repair_from_evidence_validates_the_dict_like_load_evidence_does(
             ledger_path, {"audit_schema_version": "0.9"},
             ledger_append=_FakeLedger(ledger_path).append, apply=False,
         )
+
+
+def test_assess_refuses_when_no_trade_open_bounds_the_window():
+    """Deal timestamps are all present, but there is nothing to compare them to."""
+    missing_open = _assess(_clean_evidence(), events=[])
+    assert missing_open["eligible"] is False
+    assert any("no event_epoch_ms" in blocker for blocker in missing_open["blockers"])
+
+    open_without_epoch = dict(_open_event())
+    open_without_epoch.pop("event_epoch_ms")
+    no_epoch = _assess(_clean_evidence(), events=[open_without_epoch])
+    assert no_epoch["eligible"] is False
+    assert any("no event_epoch_ms" in blocker for blocker in no_epoch["blockers"])
+
+
+@pytest.mark.parametrize("incident_id", ["", None])
+def test_assess_refuses_evidence_without_an_incident_id(incident_id):
+    """Review repro (PR #21): with an empty incident_id the trace check used to
+    be skipped outright, so a half-applied repair already in the ledger could
+    not block anything."""
+    evidence = _clean_evidence()
+    evidence["incident_id"] = incident_id
+    half_applied = {"event_type": "fill", "trade_id": "T1", "reconciliation": {"incident_id": "whatever"}}
+
+    result = _assess(evidence, events=[_open_event(), half_applied])
+
+    assert result["eligible"] is False
+    assert any("no incident_id" in blocker for blocker in result["blockers"])
+
+
+def test_assess_refuses_evidence_without_a_trade_id():
+    evidence = _clean_evidence()
+    evidence["trade"]["trade_id"] = ""
+    result = _assess(evidence)
+    assert result["eligible"] is False
+    assert any("no trade_id" in blocker for blocker in result["blockers"])
+
+
+def test_assess_refuses_an_earlier_repair_of_this_trade_under_another_incident_id():
+    earlier = {
+        "event_type": "reconciliation_evidence_recorded", "trade_id": "T1",
+        "reconciliation": {"incident_id": "some-earlier-manual-repair"},
+    }
+    result = _assess(_clean_evidence(), events=[_open_event(), earlier])
+    assert result["eligible"] is False
+    assert any("different repair" in blocker for blocker in result["blockers"])
+
+
+def test_assess_ignores_repair_records_that_belong_to_other_trades():
+    other = {"event_type": "fill", "trade_id": "T9", "reconciliation": {"incident_id": "other"}}
+    assert _assess(_clean_evidence(), events=[_open_event(), other])["eligible"] is True
+
+
+@pytest.mark.parametrize(
+    "realized_pnl, eligible",
+    [
+        ("-23.81212", True),    # residual 0.005: inside the absolute tolerance
+        ("-23.80712", True),    # residual exactly 0.01: the bound is inclusive
+        ("-23.80711", False),   # residual 0.01001: just past it
+    ],
+)
+def test_assess_exchange_pnl_residual_boundary(realized_pnl, eligible):
+    result = _assess(_clean_evidence(realized_pnl=realized_pnl))
+    assert result["eligible"] is eligible, result["blockers"]
+
+
+def test_assess_residual_is_exact_on_a_large_high_priced_position():
+    """The residual compares two Decimal sums over the same deals, so it does
+    not grow with notional: a ~1.3M USDT BTC-sized close still reconciles to
+    exactly zero when the exchange agrees. The 0.01 tolerance is therefore
+    absolute by design -- it absorbs exchange-side rounding of realized_pnl,
+    not a percentage of position size."""
+    open_event = _open_event(symbol="BTC_USDT", volume=12.5, price=104250.7, fee=651.566875)
+    gross = (Decimal("105012.3") - Decimal("104250.7")) * Decimal("12.5")
+    evidence = build_evidence(
+        open_event=open_event,
+        sell_fills=[
+            _sell_fill(trade_id="1", price="105012.3", quantity="7.5", commission="393.79612",
+                       realized_pnl=str((Decimal("105012.3") - Decimal("104250.7")) * Decimal("7.5")),
+                       side="sell"),
+            _sell_fill(trade_id="2", price="105012.3", quantity="5", commission="262.53075",
+                       realized_pnl=str((Decimal("105012.3") - Decimal("104250.7")) * Decimal("5")),
+                       time_ms=1788410434000, side="sell"),
+        ],
+        trailing_order_id=None, artifact_name="x",
+    )
+    result = assess_auto_repair(evidence, [open_event], candidate_count=1, still_open_checked=True)
+    assert Decimal(evidence["trade"]["close"]["exchange_profit"]) == gross
+    assert Decimal(result["checks"]["exchange_pnl_residual"]) == 0
+    assert result["eligible"] is True, result["blockers"]

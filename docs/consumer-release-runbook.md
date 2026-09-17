@@ -458,13 +458,18 @@ trade-alerts：v0.17.0（Phase 6a）
 部署入口：無（純函式庫，未觸發任何部署）。
 版本驗證：pyproject.toml version == 0.17.0；trade_alerts.__version__ ==
           "0.17.0"。
-服務/工作流程驗證：trade-alerts pytest 195 全綠（169 → 195，+26：
-          assess_auto_repair 11 條（每個 blocker 各一條，避免某條檢查默默失效
-          時沒有任何測試會紅）、incident_traces 1 條、append_repair_from_evidence
-          2 條、atomic_ledger_append 10 條、錯誤目錄新不變式 2 條）。
+服務/工作流程驗證：trade-alerts pytest 205 全綠（169 → 205，+36：
+          assess_auto_repair 21 條（每個 blocker 各一條，避免某條檢查默默失效
+          時沒有任何測試會紅；含殘差容忍值邊界三點與大額高價部位殘差恆為零）、
+          incident_traces 1 條、append_repair_from_evidence 2 條、
+          atomic_ledger_append 10 條、錯誤目錄新不變式 2 條）。
           其中 test_a_torn_trailing_line_from_an_earlier_crash_reads_as_nothing
           在開發過程中抓到一個真實缺陷：帳本最後一行若因先前崩潰而斷尾（無換行
           結尾），直接 append 會把新批次第一筆黏進斷行、同時毀掉兩筆；已修成
           先補一個換行，讓斷尾自成一行被 read_ledger 跳過。
+          Perplexity 首審 BLOCK（incident_id 為空字串時痕跡檢查被靜默跳過）→
+          修正為「缺 trade_id／incident_id 本身即 blocker」，並加一條更廣的
+          檢查：同一 trade_id 下帶任何其他 reconciliation 紀錄的事件也擋下
+          （不依賴 incident_id 相符）。修正前以舊程式碼跑新測試確認 4 條紅。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
