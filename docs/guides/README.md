@@ -8,7 +8,7 @@ Perplexity／開發者看的工程規格與流程規則。這個目錄放**給�
 
 | 檔案 | 說明 | 對應資料源 |
 |---|---|---|
-| `fleet-risk-register.html` | 機隊風險登記冊——30 種已知錯誤情況，依五個風險等級白話說明，可依等級/策略篩選。 | `catalog/fleet-error-catalog-v1.json` |
+| `fleet-risk-register.html` | 機隊風險登記冊——30 種已知錯誤情況，依五個風險等級白話說明，可依等級/策略篩選。 | `src/trade_alerts/catalog/fleet-error-catalog-v1.json` |
 
 ## 慣例
 

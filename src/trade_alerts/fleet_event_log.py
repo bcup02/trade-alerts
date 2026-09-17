@@ -22,6 +22,7 @@ import json
 import os
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from importlib import resources
 from pathlib import Path
 from typing import Any, Iterator, Mapping
 from uuid import uuid4
@@ -216,14 +217,23 @@ def read_fleet_events(path: str | Path) -> list[dict[str, Any]]:
     return [record for record in read_jsonl(path) if record.get("kind") == FLEET_EVENT_KIND]
 
 
-def load_error_catalog(path: str | Path) -> dict[str, Any]:
-    """Read a published fleet error catalog document.
+PACKAGED_CATALOG_NAME = "fleet-error-catalog-v1.json"
 
-    The catalog ships as repository data rather than package data, so the caller
-    supplies the path it deployed.  Phase 4 needs it only to look a tier up;
-    nothing in this library decides classifications of its own.
+
+def load_error_catalog(path: str | Path | None = None) -> dict[str, Any]:
+    """Read a fleet error catalog document -- by default the one shipped inside
+    this package, which is the single published copy.
+
+    Since Phase 7b the catalog is package data: a strategy host builds its ops
+    export from each condition's ``operator_message`` at runtime, and pinning a
+    ``trade-alerts`` tag is what pins the wording it sends.  Nothing in this
+    library decides classifications of its own; it only looks them up.
     """
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if path is None:
+        raw = resources.files("trade_alerts").joinpath("catalog", PACKAGED_CATALOG_NAME).read_text(encoding="utf-8")
+    else:
+        raw = Path(path).read_text(encoding="utf-8")
+    payload = json.loads(raw)
     if not isinstance(payload, dict) or not isinstance(payload.get("entries"), list):
         raise FleetEventLogError("catalog document is not a fleet error catalog")
     return payload

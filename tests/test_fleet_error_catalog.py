@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 _ROOT = Path(__file__).resolve().parents[1]
-CATALOG_PATH = _ROOT / "catalog" / "fleet-error-catalog-v1.json"
+CATALOG_PATH = _ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json"
 SCHEMA_PATH = _ROOT / "schemas" / "fleet-error-catalog-v1.schema.json"
 
 
@@ -115,3 +115,42 @@ def test_sources_look_like_file_line_references(catalog):
         for source in entry["sources"]:
             path, _, line = source.rpartition(":")
             assert path and line.isdigit(), source
+
+
+def test_operator_messages_have_all_three_parts(catalog):
+    """An operator_message is what a phone shows when the condition pages
+    someone.  A missing "what", "direction" or step list would send a message
+    that says something is wrong without saying what to do -- exactly the
+    notification the whole project set out to stop sending.  Checked here as
+    well as in the schema because jsonschema is optional."""
+    for entry in catalog["entries"]:
+        message = entry.get("operator_message")
+        if message is None:
+            continue
+        assert set(message) == {"what", "direction", "steps"}, entry["code"]
+        assert isinstance(message["what"], str) and message["what"].strip(), entry["code"]
+        assert isinstance(message["direction"], str) and message["direction"].strip(), entry["code"]
+        assert isinstance(message["steps"], list) and message["steps"], entry["code"]
+        for step in message["steps"]:
+            assert isinstance(step, str) and step.strip(), entry["code"]
+
+
+def test_r0_conditions_carry_no_operator_message(catalog):
+    """R0 notifies nobody, so text written for it could never be read."""
+    for entry in catalog["entries"]:
+        if entry["risk_tier"] == "R0":
+            assert "operator_message" not in entry, entry["code"]
+
+
+def test_momentum_repair_bot_conditions_have_operator_messages(catalog):
+    """Phase 7b wires these three to ops-notify first; the export would fall
+    back to the bare catalog title without them."""
+    by_code = {entry["code"]: entry for entry in catalog["entries"]}
+    for code in ("MOM.VERIFIED_CLOSE_PROPOSED", "MOM.VERIFIED_CLOSE_AUTO_REPAIRED", "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"):
+        assert "operator_message" in by_code[code], code
+
+
+def test_packaged_catalog_is_the_file_the_tests_read():
+    from trade_alerts import load_error_catalog
+
+    assert load_error_catalog() == json.loads(CATALOG_PATH.read_text(encoding="utf-8"))

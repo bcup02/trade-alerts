@@ -18,7 +18,7 @@ from trade_alerts.fleet_event_log import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CATALOG_PATH = REPO_ROOT / "catalog" / "fleet-error-catalog-v1.json"
+CATALOG_PATH = REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json"
 CATALOG = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
 SCHEMA = json.loads((REPO_ROOT / "schemas" / "fleet-event-log-v1.schema.json").read_text(encoding="utf-8"))
 

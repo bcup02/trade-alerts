@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trade-alerts"
-version = "0.17.1"
+version = "0.18.0"
 description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,6 +15,11 @@ test = ["pytest>=8.0", "responses>=0.25", "jsonschema>=4.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# The fleet error catalog is read at runtime on strategy hosts (ops_export pulls
+# each condition's operator_message from it), so it ships inside the package.
+[tool.setuptools.package-data]
+trade_alerts = ["catalog/*.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

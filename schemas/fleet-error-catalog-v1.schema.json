@@ -88,7 +88,19 @@
           "description": "How a latch for this condition is cleared. 'two_stage_fingerprint' is momentum's existing gate: --confirm must match the live latch fingerprint, and a matching ledger row makes a second clear a no-op."
         },
         "lands_in_phase": {"type": "integer", "minimum": 3, "maximum": 7},
-        "rationale": {"type": "string", "minLength": 1}
+        "rationale": {"type": "string", "minLength": 1},
+        "operator_message": {"$ref": "#/definitions/operator_message"}
+      }
+    },
+    "operator_message": {
+      "type": "object",
+      "description": "Plain-language text sent to the operator when this condition notifies (Phase 7b): what happened, which way the fix goes, and the concrete steps. Optional per entry -- written when a strategy's notifications are wired to ops-notify -- but when present all three parts must be non-empty. Never on an R0 entry, which notifies nobody.",
+      "required": ["what", "direction", "steps"],
+      "additionalProperties": false,
+      "properties": {
+        "what": {"type": "string", "minLength": 1, "description": "發生什麼事"},
+        "direction": {"type": "string", "minLength": 1, "description": "解決方向"},
+        "steps": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "description": "處理步驟, in order"}
       }
     }
   }
