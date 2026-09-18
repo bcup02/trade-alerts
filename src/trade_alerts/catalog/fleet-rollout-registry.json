@@ -971,10 +971,10 @@
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "ops_export.writer",
-      "project": "momentum",
-      "note": "今天 F3 資金費修復整支重新部署，順帶把這支也帶上了真倉；scripts/repair_bot.py:278 refresh_ops_export 每輪都在改寫 audit/ops_export.json（目前內容是空的）。"
+      "kind": "rule",
+      "id": "SEY.VERIFIED_CLOSE_PROPOSED",
+      "type": "added",
+      "note": "使用者核對 5b/5c 時發現趨勢策略的修復機器人完全找不到對應紀錄——查出是 v1 目錄漏登，已補上跟動能策略對等的一條（目前仍是「未做」，因為機器人用的是舊版標籤）。"
     }
   ]
 }

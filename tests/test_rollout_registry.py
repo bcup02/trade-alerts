@@ -352,7 +352,38 @@ def test_recent_change_on_a_rule_without_aspect_is_caught(registry, catalog):
     assert any("aspect" in p for p in problems)
 
 
+def test_recent_change_type_added_does_not_need_a_done_cell(registry, catalog):
+    """A brand-new row has nothing to point a done/n-a check at yet -- type=added
+    must not be held to the same rule as type=completed, and doesn't even need
+    a project (the whole row is new, not one strategy's cell)."""
+    capability = registry["capabilities"][0]
+    problems = _problems_after(registry, catalog, lambda r: r.update(recent_changes=[
+        {"kind": "cap", "id": capability["id"], "type": "added", "note": "x"},
+    ]))
+    assert problems == []
+
+
+def test_recent_change_type_added_still_needs_a_real_id(registry, catalog):
+    problems = _problems_after(registry, catalog, lambda r: r.update(recent_changes=[
+        {"kind": "cap", "id": "nonexistent.capability", "type": "added", "note": "x"},
+    ]))
+    assert any("not found" in p for p in problems)
+
+
+def test_recent_change_type_added_with_a_bogus_project_is_caught(registry, catalog):
+    capability = registry["capabilities"][0]
+    problems = _problems_after(registry, catalog, lambda r: r.update(recent_changes=[
+        {"kind": "cap", "id": capability["id"], "type": "added", "project": "not-a-real-project", "note": "x"},
+    ]))
+    assert any("not a known strategy" in p for p in problems)
+
+
 def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog):
+    """Both flavours of recent_changes entry -- type=completed (an existing cell
+    just flipped to done/n-a) and type=added (a brand-new row, no cell to flip
+    yet) -- must surface as "what changed" on the page, with no visible
+    distinction between them (the person reading the page doesn't care which
+    kind it was, only that this is what the latest edit touched)."""
     render_guides = _render_guides()
     items = {i["anchor"]: i for i in render_guides.rollout_items(catalog, registry)}
     change = registry.get("recent_changes")
@@ -360,8 +391,11 @@ def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog
     for entry in change:
         anchor_prefix = "cap-" if entry["kind"] == "cap" else "rule-"
         item = items[anchor_prefix + entry["id"]]
-        assert item["dots"][entry["project"]] == "recent"
-        assert item["has_recent"] is True
+        if entry.get("type", "completed") == "added":
+            assert item["added_recent"] is True
+        else:
+            assert item["dots"][entry["project"]] == "recent"
+            assert item["has_recent"] is True
     pages = {path.name: html for path, html in render_guides.rendered_pages().items()}
-    assert "dot-recent" in pages["fleet-rollout-register.html"]
     assert "recent_summary" in pages["fleet-rollout-register.html"]
+    assert "最新變動" in pages["fleet-rollout-register.html"]
