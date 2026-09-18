@@ -322,3 +322,46 @@ def test_rollout_page_groups_items_by_whether_any_cell_is_pending(registry, cata
     for row in registry["catalog"]:
         pending = any(s["state"] == "pending" for key in ("behaviour", "emits_event") for s in row[key].values())
         assert items[f"rule-{row['code']}"]["complete"] is not pending
+
+
+def test_recent_change_pointing_at_a_still_pending_cell_is_caught(registry, catalog):
+    def break_it(r):
+        capability = r["capabilities"][0]
+        pending_project = next(p for p, s in capability["status"].items() if s["state"] != "done")
+        capability["status"][pending_project] = {
+            "state": "pending", "phase": next(iter(r["phases"])), "reason": "test",
+        }
+        r["recent_changes"] = [{"kind": "cap", "id": capability["id"], "project": pending_project, "note": "x"}]
+
+    problems = _problems_after(registry, catalog, break_it)
+    assert any("not done/n-a" in p for p in problems)
+
+
+def test_recent_change_pointing_at_an_unknown_id_is_caught(registry, catalog):
+    problems = _problems_after(registry, catalog, lambda r: r.update(recent_changes=[
+        {"kind": "cap", "id": "nonexistent.capability", "project": "momentum", "note": "x"},
+    ]))
+    assert any("not found" in p for p in problems)
+
+
+def test_recent_change_on_a_rule_without_aspect_is_caught(registry, catalog):
+    code = registry["catalog"][0]["code"]
+    problems = _problems_after(registry, catalog, lambda r: r.update(recent_changes=[
+        {"kind": "rule", "id": code, "project": "momentum", "note": "x"},
+    ]))
+    assert any("aspect" in p for p in problems)
+
+
+def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog):
+    render_guides = _render_guides()
+    items = {i["anchor"]: i for i in render_guides.rollout_items(catalog, registry)}
+    change = registry.get("recent_changes")
+    assert change, "fixture registry should carry at least one recent_changes entry"
+    for entry in change:
+        anchor_prefix = "cap-" if entry["kind"] == "cap" else "rule-"
+        item = items[anchor_prefix + entry["id"]]
+        assert item["dots"][entry["project"]] == "recent"
+        assert item["has_recent"] is True
+    pages = {path.name: html for path, html in render_guides.rendered_pages().items()}
+    assert "dot-recent" in pages["fleet-rollout-register.html"]
+    assert "recent_summary" in pages["fleet-rollout-register.html"]

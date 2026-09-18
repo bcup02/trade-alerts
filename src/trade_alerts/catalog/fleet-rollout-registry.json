@@ -951,5 +951,13 @@
         }
       }
     }
+  ],
+  "recent_changes": [
+    {
+      "kind": "cap",
+      "id": "ops_export.writer",
+      "project": "momentum",
+      "note": "今天 F3 資金費修復整支重新部署，順帶把這支也帶上了真倉；scripts/repair_bot.py:278 refresh_ops_export 每輪都在改寫 audit/ops_export.json（目前內容是空的）。"
+    }
   ]
 }

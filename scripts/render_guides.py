@@ -51,6 +51,7 @@ _CSS = """
     --done:#357357; --done-bg:#DEEAE3;
     --pending:#8C6317; --pending-bg:#F1E6C9;
     --na:#6B7566; --na-bg:#E7EAE0;
+    --recent:#A6800A; --recent-bg:#FFF3B0;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -60,6 +61,7 @@ _CSS = """
       --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
       --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
       --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
+      --recent:#FFE066; --recent-bg:#4A3B05;
     }
   }
   :root[data-theme="dark"]{
@@ -69,6 +71,7 @@ _CSS = """
     --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
     --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
     --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
+    --recent:#FFE066; --recent-bg:#4A3B05;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans TC","IBM Plex Mono",sans-serif;padding:40px 20px 64px;}
@@ -227,8 +230,17 @@ _ROLLOUT_CSS = """
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--dc);border:1px solid var(--dc);}
   .dot-done{--dc:var(--done);} .dot-pending{--dc:var(--pending);} .dot-na{--dc:var(--na);opacity:.55;}
   .dot-none{--dc:var(--line);background:transparent;}
+  .dot-recent{--dc:var(--recent);box-shadow:0 0 0 2px var(--recent-bg);}
   .dot-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-faint);margin:0 0 4px;}
   .dot-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .new-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.03em;color:var(--recent);background:var(--recent-bg);border-radius:999px;padding:1px 7px;margin-inline-start:4px;white-space:nowrap;vertical-align:middle;}
+  .recent-box{border:1px solid var(--recent);border-radius:3px;background:var(--recent-bg);padding:12px 14px;margin-bottom:14px;}
+  .recent-box h3{margin:0 0 8px;font-size:13px;color:var(--recent);}
+  .recent-box ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .recent-box li a{color:inherit;text-decoration:none;font-weight:700;font-size:13.5px;}
+  .recent-box li a:hover,.recent-box li a:focus-visible{text-decoration:underline;}
+  .recent-box .proj{font-weight:600;font-size:11.5px;color:var(--ink-soft);margin-inline-start:6px;}
+  .recent-box .note{display:block;font-weight:400;font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
   .group-head{display:flex;align-items:baseline;gap:10px;margin:40px 0 4px;padding-bottom:8px;border-block-end:2px solid var(--c);}
   .group-head h2{margin:0;color:var(--c);}
   .group-head .n{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:13px;color:var(--ink-faint);}
@@ -265,13 +277,14 @@ _ROLLOUT_CSS = """
 """
 
 _ROLLOUT_JS = _JS_HELPERS + r"""
-var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"不相關"};
+var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"不相關","recent":"剛完成"};
 var KINDS=[["cap","機隊功能"],["rule","錯誤處理規則"]];
 function dots(item){
   var s=el("span","dots"); s.setAttribute("aria-hidden","true");
   DATA.project_order.forEach(function(p){ var d=el("span","dot dot-"+item.dots[p]); d.title=DATA.projects[p]+"："+DOT_LABEL[item.dots[p]]; s.appendChild(d); });
   return s;
 }
+function newBadge(){ var b=el("span","new-badge","🆕 最新"); b.title="這次更新剛變成已做／不適用"; return b; }
 function table(item){
   var g=el("div","sl");
   item.rows.forEach(function(r){
@@ -293,13 +306,16 @@ function table(item){
 function pendingCard(item){
   var c=el("div","card item"); c.id=item.anchor;
   var head=el("div","item-head"), h=el("div","h");
-  h.appendChild(el("h3",null,item.title)); h.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub));
+  h.appendChild(el("h3",null,item.title)); if(item.has_recent) h.appendChild(newBadge());
+  h.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub));
   head.appendChild(h); head.appendChild(dots(item)); c.appendChild(head);
   c.appendChild(table(item)); return c;
 }
 function doneCard(item){
   var d=el("details","card item done-card"); d.id=item.anchor;
-  var s=el("summary"); s.appendChild(el("span","ok","✓")); s.appendChild(el("span","t",item.title)); s.appendChild(dots(item));
+  var s=el("summary"); s.appendChild(el("span","ok","✓")); s.appendChild(el("span","t",item.title));
+  if(item.has_recent) s.appendChild(newBadge());
+  s.appendChild(dots(item));
   d.appendChild(s);
   var body=el("div","body"); body.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub)); body.appendChild(table(item));
   d.appendChild(body); return d;
@@ -321,7 +337,8 @@ function tocColumn(group, title){
     var ul=el("ul");
     list.forEach(function(i){
       var li=el("li"), a=el("a"); a.href="#"+i.anchor;
-      a.appendChild(el("span","t",i.title)); a.appendChild(dots(i));
+      a.appendChild(el("span","t",i.title)); if(i.has_recent) a.appendChild(newBadge());
+      a.appendChild(dots(i));
       a.addEventListener("click",function(ev){ ev.preventDefault(); go(i.anchor); });
       li.appendChild(a); ul.appendChild(li);
     });
@@ -335,6 +352,18 @@ function fillGroup(host, group){
     host.appendChild(el("h3","kind",k[1]+"（"+list.length+"）"));
     list.forEach(function(i){ host.appendChild(group==="done"?doneCard(i):pendingCard(i)); });
   });
+}
+var recentBox=document.getElementById("recentBox"), recentList=document.getElementById("recentList");
+if(DATA.recent_summary && DATA.recent_summary.length){
+  DATA.recent_summary.forEach(function(r){
+    var li=el("li"), a=el("a"); a.href="#"+r.anchor;
+    a.appendChild(document.createTextNode(r.title));
+    a.appendChild(el("span","proj",r.project));
+    a.appendChild(el("span","note",r.note));
+    a.addEventListener("click",function(ev){ ev.preventDefault(); go(r.anchor); });
+    li.appendChild(a); recentList.appendChild(li);
+  });
+  recentBox.hidden=false;
 }
 var toc=document.getElementById("toc");
 toc.appendChild(tocColumn("pending","未完成")); toc.appendChild(tocColumn("done","已完成"));
@@ -441,7 +470,10 @@ def _dot(states: set[str]) -> str:
 
 def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dict[str, Any]]:
     """Every capability and catalog row as one page item.  ``complete`` means no
-    cell is pending -- every applicable strategy is done or n/a, nothing left to do."""
+    cell is pending -- every applicable strategy is done or n/a, nothing left to do.
+    ``recent_changes`` (see the registry schema) overlays a "recent" dot on top of
+    an otherwise done/n-a cell for exactly the (kind, id, project) triples it lists;
+    it never affects ``complete``, which always reflects the real pending/done/n-a state."""
     projects, phases = registry["projects"], registry["phases"]
     titles = {entry["code"]: (entry["risk_tier"], entry["title"]) for entry in catalog["entries"]}
     items = []
@@ -449,7 +481,7 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
         rows = [{"label": projects[p], "lines": [_line(capability["status"][p], None, phases)]}
                 for p in STRATEGY_PROJECTS if p in capability["status"]]
         states = {p: {capability["status"][p]["state"]} if p in capability["status"] else set() for p in STRATEGY_PROJECTS}
-        items.append({"kind": "cap", "anchor": f"cap-{capability['id']}", "title": capability["title"],
+        items.append({"kind": "cap", "id": capability["id"], "anchor": f"cap-{capability['id']}", "title": capability["title"],
                       "sub": capability["description"], "rows": rows, "states": states})
     for row in registry["catalog"]:
         tier, title = titles[row["code"]]
@@ -458,12 +490,17 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
                                                  _line(row["emits_event"][p], "白話通知", phases)]} for p in present]
         states = {p: ({row["behaviour"][p]["state"], row["emits_event"][p]["state"]} if p in present else set())
                   for p in STRATEGY_PROJECTS}
-        items.append({"kind": "rule", "anchor": f"rule-{row['code']}", "title": f"{tier}｜{title}",
+        items.append({"kind": "rule", "id": row["code"], "anchor": f"rule-{row['code']}", "title": f"{tier}｜{title}",
                       "sub": row["code"], "rows": rows, "states": states})
+    recent_set = {(c["kind"], c["id"], c["project"]) for c in registry.get("recent_changes") or []}
     for item in items:
         states = item.pop("states")
         item["dots"] = {p: _dot(s) for p, s in states.items()}
         item["complete"] = "pending" not in set().union(*states.values())
+        for p in STRATEGY_PROJECTS:
+            if item["dots"][p] in ("done", "na") and (item["kind"], item["id"], p) in recent_set:
+                item["dots"][p] = "recent"
+        item["has_recent"] = any(v == "recent" for v in item["dots"].values())
     return items
 
 
@@ -481,9 +518,18 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
     items = rollout_items(catalog, registry)
     n_done = sum(1 for i in items if i["complete"])
     n_pending = len(items) - n_done
+    by_key = {(i["kind"], i["id"]): i for i in items}
+    recent_summary = []
+    for change in registry.get("recent_changes") or []:
+        item = by_key.get((change["kind"], change["id"]))
+        if item is None:
+            continue
+        recent_summary.append({"anchor": item["anchor"], "title": item["title"],
+                                "project": projects[change["project"]], "note": change["note"]})
     data = {
         "projects": projects, "project_order": list(STRATEGY_PROJECTS), "phases": phases,
         "phase_order": list(phases), "phase_counts": phase_counts, "totals": totals, "items": items,
+        "recent_summary": recent_summary,
     }
     sources = "；".join(
         f"{html.escape(registry['projects'][p])} <code>{html.escape(s['repo'])}@{html.escape(s['branch'])} {html.escape(s['commit'][:7])}</code>"
@@ -507,7 +553,12 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
     <span>每項右邊的四個點依序是 {order}：</span>
     <span><i class="dot dot-done"></i>已做</span><span><i class="dot dot-pending"></i>未做</span>
     <span><i class="dot dot-na"></i>不適用</span><span><i class="dot dot-none"></i>跟這支無關</span>
+    <span><i class="dot dot-recent"></i>🆕 最新完成——這次更新才變成已做／不適用</span>
   </p>
+  <div class="recent-box" id="recentBox" hidden>
+    <h3>🆕 最近變動——確認這次更新真的生效了</h3>
+    <ul id="recentList"></ul>
+  </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
   <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">{n_pending} 項</span></div>
