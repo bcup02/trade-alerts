@@ -8,7 +8,7 @@ Perplexity／開發者看的工程規格與流程規則。這個目錄放**給�
 
 | 檔案 | 說明 | 對應資料源 |
 |---|---|---|
-| `fleet-risk-register.html` | 機隊風險登記冊——33 種已知錯誤情況，依四個風險等級（v2）白話說明、處理步驟與給 AI 的追查指令，並標示各策略實際做到了沒有；可依等級／策略／未做完篩選。 | `src/trade_alerts/catalog/fleet-error-catalog-v2.json`＋`fleet-rollout-registry.json` |
+| `fleet-risk-register.html` | 機隊風險登記冊——34 種已知錯誤情況，依四個風險等級（v2）白話說明、處理步驟與給 AI 的追查指令，並標示各策略實際做到了沒有；可依等級／策略／未做完篩選。 | `src/trade_alerts/catalog/fleet-error-catalog-v2.json`＋`fleet-rollout-registry.json` |
 | `fleet-rollout-register.html` | 機隊一致性登記冊——每項機隊功能與每條錯誤規則在四支策略的已做／未做（含預定哪一關）／不適用（含理由）；分「未完成／已完成」兩組，最上方目錄可點擊跳到該項，已完成項目預設摺疊，右下角有回到最上方按鈕。JSON 的 `recent_changes` 可以標出這次更新剛變成已做／不適用的格子，頁面用「🆕 最新完成」黃色標示並列在最上方的「最近變動」欄，同時兼作「這次更新有沒有真的生效」的視覺確認。 | `src/trade_alerts/catalog/fleet-rollout-registry.json` |
 
 ## 慣例

@@ -164,7 +164,7 @@
     「未做」會寫預定在哪一關做，「不適用」會寫理由，漏寫 CI 會擋下來。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>38</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>39</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>8</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -180,7 +180,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">38 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">39 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -2218,6 +2218,40 @@
    ],
    "sub": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
    "title": "R0｜帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）"
+  },
+  {
+   "anchor": "rule-SEY.VERIFIED_CLOSE_PROPOSED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "SEY.VERIFIED_CLOSE_PROPOSED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+       "state": "pending",
+       "text": "2026-09-18 補登目錄缺口：真倉（operations）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟 momentum 5b 同一設計原封不動移植），每輪都會偵測孤兒平倉並算出提案，但 v2 目標行為是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提案、從不寫帳本，不符合 v2 目標，升到共用修復執行器（v2-W4）才算做到。"
+      },
+      {
+       "aspect": "白話通知",
+       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+       "state": "pending",
+       "text": "真倉（operations）Phase 5c 影子版 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代時換成 v2 標籤。"
+      }
+     ]
+    }
+   ],
+   "sub": "SEY.VERIFIED_CLOSE_PROPOSED",
+   "title": "R2｜孤兒平倉已算出修復方案，附提案通知"
   }
  ],
  "phase_counts": {
@@ -2228,7 +2262,7 @@
   "binance-funding-sync": 2,
   "v2-W2": 0,
   "v2-W3": 8,
-  "v2-W4": 3,
+  "v2-W4": 5,
   "v2-W6": 4
  },
  "phase_order": [
@@ -2292,7 +2326,7 @@
   "seykota": {
    "done": 17,
    "n/a": 2,
-   "pending": 26
+   "pending": 28
   }
  }
 }

@@ -60,24 +60,26 @@
 
 ## 3. 目錄總覽
 
-Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（Phase 6 另補 3 條 momentum 修復 bot 條件，目前合計 **33 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（Phase 6 另補 3 條 momentum 修復 bot 條件，當時合計 **33 條**；
+2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 影子 bot 從部署起就一直在發這個事件，卻從未登記進目錄，
+導致一致性登記冊上這支策略的修復 bot 完全看不到對應紀錄，見下方 §3.1，目前合計 **34 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
 Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
 
 | 判定 | 條數 | 佔比 |
 |---|---|---|
-| `MECHANICAL`（動作固定） | 11 | 33% |
-| `JUDGEMENT`（真的要人判斷） | 22 | 67% |
+| `MECHANICAL`（動作固定） | 11 | 32% |
+| `JUDGEMENT`（真的要人判斷） | 23 | 68% |
 
 | 風險等級（v2） | 條數 |
 |---|---|
 | R0 只記錄 | 9 |
 | R1 自動、不通知 | 2 |
-| R2 自動嘗試、失敗才通知 | 11 |
+| R2 自動嘗試、失敗才通知 | 12 |
 | R3 必須人工 | 11 |
 
 下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
 
-### 3.1 ed-seykota（14 條）
+### 3.1 ed-seykota（15 條）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
@@ -95,6 +97,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `SEY.CLOSE_FILL_PENDING` | 誤標 critical | MECHANICAL | R0 | **P3** |
 | `SEY.TRADE_EXIT` | 誤標 critical | MECHANICAL | R0 | **P3** |
 | `SEY.ENTRY_SKIPPED_MIN_CAPITAL` | 誤標 critical | MECHANICAL | R0 | **P3** |
+| `SEY.VERIFIED_CLOSE_PROPOSED` | 修復 bot 提案通知（2026-09-18 補登，見下方說明） | JUDGEMENT | R2 | P8（v2） |
 
 **`protective_stop_failed` 拆成兩碼**是本節最重要的改動。現行程式在「停損掛單失敗」之後會立刻
 嘗試緊急市價平倉，但不論平倉成功或失敗，都收斂成同一個 latch 原因碼。這兩種結果的真倉風險相差
@@ -119,8 +122,9 @@ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原�
 後三條是 Phase 6 的 verified-close-backfill 修復 bot（`scripts/repair_bot.py`）。v2 起：無歧義 → R1 自動寫、不通知；
 以交易所為準仍能對應 → 照交易所補寫；只有結構上對不上才重試並升格（R2，`MOM.VERIFIED_CLOSE_PROPOSED` 的呼叫點
 由共用修復執行器取代時退役）；帳本已不乾淨 → R3 停手。v1 的過渡開關 `MOMENTUM_REPAIR_AUTO_APPLY`（只有 momentum
-有、33 條只管 1 條、沒有任何機制會評估並打開它）在 v2 移除；seykota 的影子 bot 發出的
-`SEY.VERIFIED_CLOSE_PROPOSED` 從未登記進 v1 目錄，v2 列入 `retired_codes`，seykota 改用同一個共用執行器。
+有、當時 33 條只管 1 條、沒有任何機制會評估並打開它）在 v2 移除；seykota 的影子 bot（§3.1 最後一條
+`SEY.VERIFIED_CLOSE_PROPOSED`）發出這個事件從未登記進 v1 目錄，2026-09-18 補登進 v2 目錄——跟 momentum 對等的處置、
+同一個理由、同樣列進 `retired_codes`，seykota 升到共用修復執行器（v2-W4）時一起取代退役。
 
 ### 3.3 btc-competition（4 條）
 

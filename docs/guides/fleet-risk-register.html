@@ -95,9 +95,9 @@
   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>33 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    四支策略目前所有已知的「出問題」情況，共 <b>34 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>30 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>31 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -1037,6 +1037,35 @@
    "tier": "R0",
    "title": "帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）",
    "what": "本地帳本跟共用的 Google 表格對不上時，對帳程式故意讓自己的服務顯示紅色失敗。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
+   "behaviour": {
+    "phase": "v2-W4",
+    "reason": "2026-09-18 補登目錄缺口：真倉（operations）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟 momentum 5b 同一設計原封不動移植），每輪都會偵測孤兒平倉並算出提案，但 v2 目標行為是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提案、從不寫帳本，不符合 v2 目標，升到共用修復執行器（v2-W4）才算做到。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.VERIFIED_CLOSE_PROPOSED",
+   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
+   "emits_event": {
+    "phase": "v2-W4",
+    "reason": "真倉（operations）Phase 5c 影子版 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代時換成 v2 標籤。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 2026-09-18 補登目錄缺口：真倉（operations）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟 momentum 5b 同一設計原封不動移植），每輪都會偵測孤兒平倉並算出提案，但 v2 目標行為是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提案、從不寫帳本，不符合 v2 目標，升到共用修復執行器（v2-W4）才算做到。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
+    "白話通知未做 — 真倉（operations）Phase 5c 影子版 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代時換成 v2 標籤。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
+   ],
+   "open": true,
+   "steps": [
+    "治標：到電腦前照 ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+    "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "孤兒平倉已算出修復方案，附提案通知",
+   "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
   }
  ],
  "tiers": [
