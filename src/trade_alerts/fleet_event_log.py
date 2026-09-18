@@ -28,7 +28,9 @@ from typing import Any, Iterator, Mapping
 from uuid import uuid4
 
 FLEET_EVENT_KIND = "fleet_event_v1"
-RISK_TIERS = ("R0", "R1", "R2", "R3", "R4")
+#: fleet-error-catalog/v2 (2026-09-18): R0 log / R1 auto, silent / R2 auto-retry,
+#: escalate after N failures / R3 human required.
+RISK_TIERS = ("R0", "R1", "R2", "R3")
 
 #: Catalog code prefix per project key.  The project keys are the ones
 #: ``ops-notify`` already uses as notification target keys, so an event joins to
@@ -217,7 +219,7 @@ def read_fleet_events(path: str | Path) -> list[dict[str, Any]]:
     return [record for record in read_jsonl(path) if record.get("kind") == FLEET_EVENT_KIND]
 
 
-PACKAGED_CATALOG_NAME = "fleet-error-catalog-v1.json"
+PACKAGED_CATALOG_NAME = "fleet-error-catalog-v2.json"
 
 
 def load_error_catalog(path: str | Path | None = None) -> dict[str, Any]:

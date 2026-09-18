@@ -19,7 +19,7 @@ from trade_alerts.fleet_event_log import append_fleet_event, read_jsonl
 from trade_alerts.safe_halt_model import build_safe_halt
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CATALOG = json.loads((REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json").read_text(encoding="utf-8"))
+CATALOG = json.loads((REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v2.json").read_text(encoding="utf-8"))
 SCHEMA = json.loads((REPO_ROOT / "schemas" / "error-request-queue-v1.schema.json").read_text(encoding="utf-8"))
 
 jsonschema = pytest.importorskip("jsonschema")
@@ -31,7 +31,7 @@ def _open(path, **overrides):
     payload = {
         "project": "seykota",
         "code": "PROTECTION_UNVERIFIED",
-        "risk_tier": "R4",
+        "risk_tier": "R3",
         "summary": "交易所存在部位，但沒有可唯一確認的原生保護單",
         "evidence": EVIDENCE,
     }
@@ -44,7 +44,7 @@ def test_opening_a_request_records_code_tier_and_evidence(tmp_path):
     request = _open(path, measurements={"observed_stops": 0})
     assert request["project"] == "seykota"
     assert request["code"] == "PROTECTION_UNVERIFIED"
-    assert request["risk_tier"] == "R4"
+    assert request["risk_tier"] == "R3"
     assert request["evidence"] == EVIDENCE
     assert request["measurements"] == {"observed_stops": 0}
     assert request["fingerprint"] == request_fingerprint("seykota", "PROTECTION_UNVERIFIED", EVIDENCE)
@@ -52,20 +52,23 @@ def test_opening_a_request_records_code_tier_and_evidence(tmp_path):
     assert find_error_request(path, request["request_id"]) == request
 
 
-def test_r0_conditions_can_never_open_a_request(tmp_path):
-    """The catalog's R0 tier means the action after detection is fixed."""
+def test_r0_and_r1_conditions_can_never_open_a_request(tmp_path):
+    """v2: R0 means the action after detection is fixed and R1 that it was
+    already executed automatically -- neither leaves anything for a request to
+    be about.  Only R2 (on escalation) and R3 open requests."""
     path = tmp_path / "queue.jsonl"
     with pytest.raises(ErrorRequestError, match="never open a request"):
         _open(path, code="TRADE_EXIT", risk_tier="R0")
     assert not path.exists()
 
-    r0_codes = [entry for entry in CATALOG["entries"] if entry["risk_tier"] == "R0"]
-    assert r0_codes, "the catalog is expected to classify some conditions as log-only"
-    for entry in r0_codes:
+    silent = [entry for entry in CATALOG["entries"] if entry["risk_tier"] in ("R0", "R1")]
+    assert {entry["risk_tier"] for entry in silent} == {"R0", "R1"}
+    for entry in silent:
         bare = entry["code"].split(".", 1)[1]
         with pytest.raises(ErrorRequestError, match="never open a request"):
-            open_error_request(path, project=entry["project"], code=bare, risk_tier="R0")
-    assert "R0" not in REQUESTABLE_TIERS
+            open_error_request(path, project=entry["project"], code=bare, risk_tier=entry["risk_tier"])
+    assert not path.exists()
+    assert REQUESTABLE_TIERS == {"R2", "R3"}
 
 
 def test_the_same_problem_across_many_cycles_is_one_request(tmp_path):
@@ -155,7 +158,7 @@ def test_a_request_opened_from_a_latch_shares_the_latch_evidence(tmp_path):
         event_log,
         project="seykota",
         code=halt["code"],
-        risk_tier="R4",
+        risk_tier="R3",
         evidence=halt["evidence"],
         details=halt["details"],
     )

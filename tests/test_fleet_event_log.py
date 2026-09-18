@@ -18,7 +18,7 @@ from trade_alerts.fleet_event_log import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CATALOG_PATH = REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json"
+CATALOG_PATH = REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v2.json"
 CATALOG = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
 SCHEMA = json.loads((REPO_ROOT / "schemas" / "fleet-event-log-v1.schema.json").read_text(encoding="utf-8"))
 
@@ -52,7 +52,7 @@ def test_every_stored_event_validates_against_the_published_schema(tmp_path):
         project="momentum",
         code="PROTECTION_UNVERIFIED",
         summary="原生移動停損無法驗證",
-        risk_tier="R4",
+        risk_tier="R3",
         evidence={"trade_id": "t-1", "symbol": "BTC_USDT"},
         details={"expected_order_id": "o-9"},
         measurements={"observed_orders": 0},
@@ -123,7 +123,7 @@ def test_prefix_table_reproduces_every_published_catalog_code():
 
 def test_catalog_lookup_resolves_a_tier_from_a_bare_condition_name():
     catalog = load_error_catalog(CATALOG_PATH)
-    assert risk_tier_for(catalog, "seykota", "PROTECTION_UNVERIFIED") == "R4"
+    assert risk_tier_for(catalog, "seykota", "PROTECTION_UNVERIFIED") == "R3"
     assert risk_tier_for(catalog, "seykota", "TRADE_EXIT") == "R0"
     assert catalog_entry(catalog, "seykota", "PROTECTION_PLACEMENT_FAILED_FLATTENED")["resume"] == "automatic"
     with pytest.raises(FleetEventLogError, match="no catalog entry"):

@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bcup02/trade-alerts/schemas/fleet-ops-export-v2.schema.json",
+  "title": "Fleet ops export v2",
+  "description": "One strategy's snapshot of what its operator should hear about, rewritten whole by trade_alerts.ops_export.write_ops_export into the strategy's audit/ops_export.json and relayed by ops-notify. notices are the fleet events that need a human (every R3, and R2 only once escalated -- fleet-error-catalog/v2) of the last window_days, keyed by event_id so a reader sends each exactly once; open_requests is every still-open error request.",
+  "type": "object",
+  "required": [
+    "export_version",
+    "project",
+    "generated_at",
+    "window_days",
+    "notices",
+    "open_requests"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "export_version": {
+      "const": "fleet-ops-export/v2"
+    },
+    "project": {
+      "type": "string",
+      "enum": [
+        "seykota",
+        "momentum",
+        "mycrypto",
+        "btc-competition",
+        "fleet"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC; a reader treats an export that stops refreshing as STALE."
+    },
+    "window_days": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "notices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "recorded_at",
+          "code",
+          "risk_tier",
+          "critical",
+          "text"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recorded_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
+          },
+          "risk_tier": {
+            "enum": [
+              "R2",
+              "R3"
+            ]
+          },
+          "critical": {
+            "type": "boolean",
+            "description": "true exactly when risk_tier is R3."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Complete plain-language message body including, when the catalog has one, the AI root-cause prompt with this event's identifiers; the reader adds only the strategy label and times."
+          }
+        }
+      }
+    },
+    "open_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "fingerprint",
+          "code",
+          "risk_tier",
+          "opened_at",
+          "summary",
+          "what",
+          "direction",
+          "steps",
+          "ai_prompt",
+          "handling_started_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fingerprint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
+          },
+          "risk_tier": {
+            "enum": [
+              "R2",
+              "R3"
+            ]
+          },
+          "opened_at": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "what": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Catalog operator_message.what, or null when the entry has none yet."
+          },
+          "direction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "handling_started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Always null in this version; Phase 7e sets it when an operator presses 開始處理."
+          },
+          "ai_prompt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Catalog operator_message.ai_prompt, or null."
+          }
+        }
+      }
+    }
+  }
+}

@@ -557,3 +557,35 @@ trade-alerts：v0.18.1（Phase 7b 配套，純目錄資料）
 服務/工作流程驗證：trade-alerts pytest 229 全綠（無新增測試）。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.19.0（風險分級 v2，W1a）
+變更摘要：使用者 2026-09-18 拍板把錯誤分級由五級改四級（計畫 W1）。
+          1. 錯誤目錄升 fleet-error-catalog/v2（檔名 -v2.json，v1 移除）：
+             R0 只記錄／R1 自動、不通知（舊 R2）／R2 自動嘗試、連續
+             escalate_after（3）次失敗才升格通知（舊 R1＋舊 R3）／R3 必須
+             人工（舊 R4）。v1 的「提案」「逾時自動執行＋Telegram 提早核准」
+             「事後稽核通知 audit_notice」全部取消。33 條逐條重新分級（R0 9／
+             R1 2／R2 11／R3 11），被改變語意的條目同步改寫 auto_action／
+             human_action／rationale（含 seykota 孤兒停損單自動取消的兩道安全
+             條件）。新增 retired_codes：MOM.VERIFIED_CLOSE_PROPOSED（呼叫點由
+             共用修復執行器取代時退役）、SEY.VERIFIED_CLOSE_PROPOSED（seykota
+             影子 bot 一直在發、v1 卻從未登記）。
+          2. 33 條全部補 operator_message（v1 只有 3 條），R2／R3 另帶
+             ai_prompt（給 AI 的根因追查指令）。
+          3. 程式：RISK_TIERS 改四級；REQUESTABLE_TIERS 只剩 R2／R3；
+             ops_export 只匯出 R3 與 details.escalated 為真的 R2（needs_human），
+             訊息附 ai_prompt＋本次事件的錯誤碼／事件編號／evidence；
+             fleet-ops-export 升 v2（open_requests 多 ai_prompt）。
+             事件日誌／請求佇列兩份 schema 的等級列舉同步。
+          兩台主機的 fleet_event_log／error_requests 目前都不存在（已實測），
+          改變等級語意不需要搬資料。
+受影響消費專案：momentum（目前 v0.18.0，寫的是 v1 等級；W3 改用共用執行器
+          時一併升級）、ops-notify（讀 fleet-ops-export/v1；W5 升級）。
+          兩者在升級前都不會讀到 v2 的任何東西。seykota／my-crypto／btc 不受影響。
+部署入口：無（純函式庫 + 目錄資料）。
+版本驗證：pyproject.toml version == 0.19.0；trade_alerts.__version__ ==
+          "0.19.0"。
+服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

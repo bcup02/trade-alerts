@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/bcup02/trade-alerts/schemas/error-request-queue-v1.schema.json",
   "title": "Error-handling request queue record v1",
-  "description": "One line of a strategy's append-only error-handling request queue, kept in the strategy's audit/ directory (never in /var/lib/*-control, which ops-control can write). A request names one condition that crossed a threshold and stays open until an outcome closes it. Opening a request notifies nobody; R0 conditions can never open one.",
+  "description": "One line of a strategy's append-only error-handling request queue, kept in the strategy's audit/ directory (never in /var/lib/*-control, which ops-control can write). A request names one condition that crossed a threshold and stays open until an outcome closes it. Opening a request notifies nobody; Only R2 (once escalated) and R3 conditions can open one (fleet-error-catalog/v2).",
   "type": "object",
   "required": ["kind"],
   "oneOf": [
@@ -39,8 +39,8 @@
           "not": {"pattern": "\\."}
         },
         "risk_tier": {
-          "description": "R0 is absent by construction: its action after detection is fixed, so there is nothing for a request to be about.",
-          "enum": ["R1", "R2", "R3", "R4"]
+          "description": "fleet-error-catalog/v2 tiers. R0 and R1 are absent by construction: the action after detection is fixed or was already executed automatically, so there is nothing for a request to be about.",
+          "enum": ["R2", "R3"]
         },
         "fingerprint": {
           "type": "string",

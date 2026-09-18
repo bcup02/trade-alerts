@@ -24,7 +24,7 @@
     "summary": {"type": "string"},
     "risk_tier": {
       "description": "The catalog tier as resolved when the event was written, or null when the writer did not resolve one. Recorded for audit only; this log never decides a tier.",
-      "oneOf": [{"type": "null"}, {"enum": ["R0", "R1", "R2", "R3", "R4"]}]
+      "oneOf": [{"type": "null"}, {"enum": ["R0", "R1", "R2", "R3"]}]
     },
     "evidence": {
       "type": "object",
