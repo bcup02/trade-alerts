@@ -311,3 +311,14 @@ def test_pages_never_inject_html_from_data():
     for html in _render_guides().rendered_pages().values():
         assert "innerHTML" not in html
         assert "insertAdjacentHTML" not in html
+
+
+def test_rollout_page_groups_items_by_whether_any_cell_is_pending(registry, catalog):
+    items = {i["anchor"]: i for i in _render_guides().rollout_items(catalog, registry)}
+    assert len(items) == len(registry["capabilities"]) + len(registry["catalog"])
+    for capability in registry["capabilities"]:
+        pending = any(s["state"] == "pending" for s in capability["status"].values())
+        assert items[f"cap-{capability['id']}"]["complete"] is not pending
+    for row in registry["catalog"]:
+        pending = any(s["state"] == "pending" for key in ("behaviour", "emits_event") for s in row[key].values())
+        assert items[f"rule-{row['code']}"]["complete"] is not pending
