@@ -284,7 +284,7 @@ function dots(item){
   DATA.project_order.forEach(function(p){ var d=el("span","dot dot-"+item.dots[p]); d.title=DATA.projects[p]+"："+DOT_LABEL[item.dots[p]]; s.appendChild(d); });
   return s;
 }
-function newBadge(){ var b=el("span","new-badge","🆕 最新"); b.title="這次更新剛變成已做／不適用"; return b; }
+function newBadge(){ var b=el("span","new-badge","🆕 最新變動"); b.title="這次更新才有的變化"; return b; }
 function table(item){
   var g=el("div","sl");
   item.rows.forEach(function(r){
@@ -306,7 +306,7 @@ function table(item){
 function pendingCard(item){
   var c=el("div","card item"); c.id=item.anchor;
   var head=el("div","item-head"), h=el("div","h");
-  h.appendChild(el("h3",null,item.title)); if(item.has_recent) h.appendChild(newBadge());
+  h.appendChild(el("h3",null,item.title)); if(item.has_recent||item.added_recent) h.appendChild(newBadge());
   h.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub));
   head.appendChild(h); head.appendChild(dots(item)); c.appendChild(head);
   c.appendChild(table(item)); return c;
@@ -314,7 +314,7 @@ function pendingCard(item){
 function doneCard(item){
   var d=el("details","card item done-card"); d.id=item.anchor;
   var s=el("summary"); s.appendChild(el("span","ok","✓")); s.appendChild(el("span","t",item.title));
-  if(item.has_recent) s.appendChild(newBadge());
+  if(item.has_recent||item.added_recent) s.appendChild(newBadge());
   s.appendChild(dots(item));
   d.appendChild(s);
   var body=el("div","body"); body.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub)); body.appendChild(table(item));
@@ -337,7 +337,7 @@ function tocColumn(group, title){
     var ul=el("ul");
     list.forEach(function(i){
       var li=el("li"), a=el("a"); a.href="#"+i.anchor;
-      a.appendChild(el("span","t",i.title)); if(i.has_recent) a.appendChild(newBadge());
+      a.appendChild(el("span","t",i.title)); if(i.has_recent||i.added_recent) a.appendChild(newBadge());
       a.appendChild(dots(i));
       a.addEventListener("click",function(ev){ ev.preventDefault(); go(i.anchor); });
       li.appendChild(a); ul.appendChild(li);
@@ -358,7 +358,7 @@ if(DATA.recent_summary && DATA.recent_summary.length){
   DATA.recent_summary.forEach(function(r){
     var li=el("li"), a=el("a"); a.href="#"+r.anchor;
     a.appendChild(document.createTextNode(r.title));
-    a.appendChild(el("span","proj",r.project));
+    if(r.project) a.appendChild(el("span","proj",r.project));
     a.appendChild(el("span","note",r.note));
     a.addEventListener("click",function(ev){ ev.preventDefault(); go(r.anchor); });
     li.appendChild(a); recentList.appendChild(li);
@@ -471,9 +471,12 @@ def _dot(states: set[str]) -> str:
 def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dict[str, Any]]:
     """Every capability and catalog row as one page item.  ``complete`` means no
     cell is pending -- every applicable strategy is done or n/a, nothing left to do.
-    ``recent_changes`` (see the registry schema) overlays a "recent" dot on top of
-    an otherwise done/n-a cell for exactly the (kind, id, project) triples it lists;
-    it never affects ``complete``, which always reflects the real pending/done/n-a state."""
+    ``recent_changes`` (see the registry schema) overlays a page-only "recent" marker
+    for whatever the latest edit touched, in two flavours that never affect ``complete``
+    (which always reflects the real pending/done/n-a state): a ``completed`` entry turns
+    an otherwise done/n-a cell's dot gold for exactly the (kind, id, project) it names;
+    an ``added`` entry (a brand-new row this edit introduced, which has no done/n-a cell
+    to point at yet) just flags the whole item so it still shows up as "what changed"."""
     projects, phases = registry["projects"], registry["phases"]
     titles = {entry["code"]: (entry["risk_tier"], entry["title"]) for entry in catalog["entries"]}
     items = []
@@ -492,15 +495,18 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
                   for p in STRATEGY_PROJECTS}
         items.append({"kind": "rule", "id": row["code"], "anchor": f"rule-{row['code']}", "title": f"{tier}｜{title}",
                       "sub": row["code"], "rows": rows, "states": states})
-    recent_set = {(c["kind"], c["id"], c["project"]) for c in registry.get("recent_changes") or []}
+    changes = registry.get("recent_changes") or []
+    completed_set = {(c["kind"], c["id"], c["project"]) for c in changes if c.get("type", "completed") == "completed"}
+    added_set = {(c["kind"], c["id"]) for c in changes if c.get("type") == "added"}
     for item in items:
         states = item.pop("states")
         item["dots"] = {p: _dot(s) for p, s in states.items()}
         item["complete"] = "pending" not in set().union(*states.values())
         for p in STRATEGY_PROJECTS:
-            if item["dots"][p] in ("done", "na") and (item["kind"], item["id"], p) in recent_set:
+            if item["dots"][p] in ("done", "na") and (item["kind"], item["id"], p) in completed_set:
                 item["dots"][p] = "recent"
         item["has_recent"] = any(v == "recent" for v in item["dots"].values())
+        item["added_recent"] = (item["kind"], item["id"]) in added_set
     return items
 
 
@@ -524,8 +530,11 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
         item = by_key.get((change["kind"], change["id"]))
         if item is None:
             continue
-        recent_summary.append({"anchor": item["anchor"], "title": item["title"],
-                                "project": projects[change["project"]], "note": change["note"]})
+        project = change.get("project")
+        recent_summary.append({
+            "anchor": item["anchor"], "title": item["title"],
+            "project": projects[project] if project else None, "note": change["note"],
+        })
     data = {
         "projects": projects, "project_order": list(STRATEGY_PROJECTS), "phases": phases,
         "phase_order": list(phases), "phase_counts": phase_counts, "totals": totals, "items": items,
@@ -553,10 +562,10 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
     <span>每項右邊的四個點依序是 {order}：</span>
     <span><i class="dot dot-done"></i>已做</span><span><i class="dot dot-pending"></i>未做</span>
     <span><i class="dot dot-na"></i>不適用</span><span><i class="dot dot-none"></i>跟這支無關</span>
-    <span><i class="dot dot-recent"></i>🆕 最新完成——這次更新才變成已做／不適用</span>
+    <span><i class="dot dot-recent"></i>🆕 最新變動</span>
   </p>
   <div class="recent-box" id="recentBox" hidden>
-    <h3>🆕 最近變動——確認這次更新真的生效了</h3>
+    <h3>🆕 最新變動</h3>
     <ul id="recentList"></ul>
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>

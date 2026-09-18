@@ -156,28 +156,45 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
         if not isinstance(change, Mapping):
             problems.append(f"{where}: not an object")
             continue
-        kind, cid, project = change.get("kind"), change.get("id"), change.get("project")
+        kind, cid = change.get("kind"), change.get("id")
+        change_type = change.get("type", "completed")
+        if change_type not in ("completed", "added"):
+            problems.append(f"{where}: type must be completed or added, got {change_type!r}")
+            continue
         if kind == "cap":
-            capability = cap_by_id.get(cid)
-            if capability is None:
-                problems.append(f"{where}: capability {cid!r} not found")
-                continue
-            state = ((capability.get("status") or {}).get(project) or {}).get("state")
+            row_or_cap = cap_by_id.get(cid)
+            missing_msg = f"{where}: capability {cid!r} not found"
         elif kind == "rule":
-            row = rows.get(cid)
-            aspect = change.get("aspect")
-            if row is None:
-                problems.append(f"{where}: catalog code {cid!r} not found")
-                continue
-            if aspect not in ("behaviour", "emits_event"):
-                problems.append(f"{where}: rule entries need aspect behaviour/emits_event, got {aspect!r}")
-                continue
-            state = ((row.get(aspect) or {}).get(project) or {}).get("state")
+            row_or_cap = rows.get(cid)
+            missing_msg = f"{where}: catalog code {cid!r} not found"
         else:
             problems.append(f"{where}: kind must be cap or rule, got {kind!r}")
             continue
+        if row_or_cap is None:
+            problems.append(missing_msg)
+            continue
+        if change_type == "added":
+            # A brand-new row/capability this edit introduced -- nothing to
+            # check it against yet, only that it (and its optional project)
+            # are real.
+            project = change.get("project")
+            if project is not None and project not in STRATEGY_PROJECTS:
+                problems.append(f"{where}: project {project!r} is not a known strategy")
+            continue
+        project = change.get("project")
+        if project not in STRATEGY_PROJECTS:
+            problems.append(f"{where}: type=completed needs a valid project, got {project!r}")
+            continue
+        if kind == "cap":
+            state = ((row_or_cap.get("status") or {}).get(project) or {}).get("state")
+        else:
+            aspect = change.get("aspect")
+            if aspect not in ("behaviour", "emits_event"):
+                problems.append(f"{where}: type=completed rule entries need aspect behaviour/emits_event, got {aspect!r}")
+                continue
+            state = ((row_or_cap.get(aspect) or {}).get(project) or {}).get("state")
         if state not in ("done", "n/a"):
-            problems.append(f"{where}: {cid} / {project} is {state!r}, not done/n-a -- recent_changes must point at what just became true")
+            problems.append(f"{where}: {cid} / {project} is {state!r}, not done/n-a -- a type=completed entry must point at what just became true")
     return problems
 
 

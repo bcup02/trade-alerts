@@ -239,13 +239,12 @@
     },
     "recent_changes": {
       "type": "array",
-      "description": "Cells that flipped to done or n/a in the most recent registry edit. Replaced wholesale each time the registry changes -- never appended to -- so the highlighted set on the human page always reflects only the latest edit, giving a visual 'did my update actually land' signal. Omit or set to [] when nothing recent remains.",
+      "description": "What the most recent registry edit touched -- replaced wholesale each time the registry changes, never appended to, so the highlighted set on the human page always reflects only the latest edit (a visual 'did my update actually land' signal). Two kinds of entry: type=completed (default) is a cell that flipped to done/n-a, checked against the live registry so it can't point at something still pending; type=added is a brand-new capability or catalog row this edit introduced, which by definition has no project-specific done/n-a cell to check yet -- both render in the 'recently changed' summary, completed cells additionally get the gold 'recent' dot. Omit or set to [] when nothing from the latest edit remains current.",
       "items": {
         "type": "object",
         "required": [
           "kind",
           "id",
-          "project",
           "note"
         ],
         "additionalProperties": false,
@@ -261,20 +260,29 @@
             "minLength": 1,
             "description": "capability id (kind=cap) or catalog code (kind=rule)."
           },
+          "type": {
+            "enum": [
+              "completed",
+              "added"
+            ],
+            "default": "completed",
+            "description": "completed: an existing cell just flipped to done/n-a (needs project, checked against current state). added: this whole capability/catalog row is new in this edit (no cell check, project optional)."
+          },
           "project": {
             "enum": [
               "momentum",
               "seykota",
               "mycrypto",
               "btc-competition"
-            ]
+            ],
+            "description": "Which strategy's cell/row this is about. Required for type=completed; optional for type=added."
           },
           "aspect": {
             "enum": [
               "behaviour",
               "emits_event"
             ],
-            "description": "kind=rule only: which cell of that row changed."
+            "description": "type=completed, kind=rule only: which cell of that row changed."
           },
           "note": {
             "type": "string",
@@ -285,11 +293,46 @@
         "allOf": [
           {
             "if": {
-              "properties": {
-                "kind": {
-                  "const": "rule"
-                }
+              "not": {
+                "properties": {
+                  "type": {
+                    "const": "added"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
               }
+            },
+            "then": {
+              "required": [
+                "project"
+              ]
+            }
+          },
+          {
+            "if": {
+              "allOf": [
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "rule"
+                    }
+                  }
+                },
+                {
+                  "not": {
+                    "properties": {
+                      "type": {
+                        "const": "added"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  }
+                }
+              ]
             },
             "then": {
               "required": [
