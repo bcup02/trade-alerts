@@ -1,0 +1,930 @@
+{
+  "registry_version": "fleet-rollout-registry/v1",
+  "catalog_version": "fleet-error-catalog/v2",
+  "updated_at": "2026-09-18",
+  "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
+  "projects": {
+    "momentum": "動能策略",
+    "seykota": "趨勢策略",
+    "mycrypto": "加密策略",
+    "btc-competition": "競賽策略"
+  },
+  "phases": {
+    "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
+    "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+    "v2-W4": "分級 v2：趨勢策略的修復機器人升到完整版",
+    "v2-W6": "分級 v2：部署到測試機與真倉",
+    "8-momentum": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
+    "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
+    "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
+    "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試"
+  },
+  "sources": {
+    "momentum": {
+      "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
+      "branch": "operations",
+      "commit": "520cb9e18f84fac8061d8d41ab5a9ca1d9093961"
+    },
+    "seykota": {
+      "repo": "AI-for-column/ed-seykota-systematic-trend-following",
+      "branch": "operations",
+      "commit": "0213a01f4695af7b7820136ecb818f748e861810"
+    },
+    "mycrypto": {
+      "repo": "AI-for-column/my-crypto-bot",
+      "branch": "operations",
+      "commit": "1efbdc01c80a6d0444152d6098e9cb3a95618265"
+    },
+    "btc-competition": {
+      "repo": "AI-for-column/btc-bull-market-competition",
+      "branch": "operations",
+      "commit": "b8eda43089a21cd71200e9fcf090a5a0de229c4a"
+    }
+  },
+  "capabilities": [
+    {
+      "id": "latch.unified_model",
+      "title": "統一格式的暫停（latch）",
+      "description": "出事時用同一套欄位（原因碼＋證據＋指紋）把策略停住，四支才能用同一套解除與通知流程。",
+      "status": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/strategy.py:1067 build_safe_halt（Phase 4c）"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:386 build_safe_halt（Phase 4c）"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/runner.py:347 build_safe_halt（Phase 4c）"
+        }
+      }
+    },
+    {
+      "id": "latch.resume_tool",
+      "title": "兩段式解除工具",
+      "description": "先預覽拿確認碼、再帶確認碼解除，避免清掉的不是眼前這一次的暫停。",
+      "status": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/safe_halt_resume.py（--apply --confirm --exchange-verified）"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "seykota-resume（src/seykota_bot/safe_halt_resume.py）"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "btc-competition-resume（src/btc_competition/safe_halt_resume.py）"
+        }
+      }
+    },
+    {
+      "id": "latch.restart_only_clear",
+      "title": "「改好設定重啟」就能解除的暫停真的會被清掉",
+      "description": "設定錯誤類的暫停（例如連錯交易所）不能用解除工具清，只能改好設定後重啟；重啟後系統要自己確認設定正確並解除。",
+      "status": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "沒有「改設定重啟」這一類暫停。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "沒有「改設定重啟」這一類暫停。"
+        }
+      }
+    },
+    {
+      "id": "latch.consecutive_failure_counter",
+      "title": "連續失敗 3 次才升格（不因一次意外就停）",
+      "description": "暫時性的錯誤先自動重試，連續失敗才停下或通知人。",
+      "status": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "未分類例外不暫停：寫錯誤心跳、下一輪重試（R0）。"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:123 Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "MYC.RUNTIME_CYCLE_FAILED 目前每次都照常重試但沒有計數，v2 要求連續 3 次失敗才升格通知。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "未分類例外不暫停：寫錯誤心跳、隔天重試（R0）。"
+        }
+      }
+    },
+    {
+      "id": "runtime.status_snapshot",
+      "title": "策略運行狀態（維運通知的第四軸）",
+      "description": "每支策略定時寫出自己「正常／暫停／出錯」的狀態，維運通知據此提醒。",
+      "status": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/portfolio_snapshot_adapter.py strategy.runtime_status"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/portfolio_snapshot_adapter.py strategy.runtime_status"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "portfolio_snapshot_adapter.py:75 _runtime_status（strategy.runtime_status）"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/portfolio_snapshot_adapter.py strategy.runtime_status"
+        }
+      }
+    },
+    {
+      "id": "reconcile.ledger_status",
+      "title": "帳本↔交易所對帳狀態檔",
+      "description": "定時比對本地帳本與交易所，寫出 audit/ledger_status.json 給維運通知讀。",
+      "status": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/reconcile_compare.py"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/reconcile/compare.py"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "reconcile_compare.py:101 main"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/reconcile_compare.py"
+        }
+      }
+    },
+    {
+      "id": "reconcile.google_status",
+      "title": "帳本↔Google 表對帳狀態檔",
+      "description": "定時比對本地帳本與 Google 表，寫出 audit/google_reconcile_status.json 給維運通知讀。",
+      "status": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/google_reconcile.py"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/reconcile/google_reconcile.py"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "google_reconcile.py:135 main"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/reconcile_google.py"
+        }
+      }
+    },
+    {
+      "id": "repair_bot.verified_close",
+      "title": "漏記平倉自動修復機器人",
+      "description": "交易所已平倉但本地帳本漏記時，以交易所成交為準自動補寫；結構對不上才重試並升格。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "真倉（operations）只有 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py；會自動補寫的 v1 版 scripts/repair_bot.py（Phase 6b，受過渡開關 MOMENTUM_REPAIR_AUTO_APPLY 控制）只在 development／測試機。v2 由共用執行器取代。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "只有 Phase 5 只提案的影子版，而且發出的 SEY.VERIFIED_CLOSE_PROPOSED 從未登記進 v1 目錄。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "有同樣的漏記平倉形狀（reconcile_compare 會產生 position_diffs），目前只有一次性手修腳本；需要先做 MEXC 成交查詢轉接器。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "現貨再平衡策略，沒有開倉／平倉配對，不會有漏記平倉。"
+        }
+      }
+    },
+    {
+      "id": "repair_bot.pause_brake",
+      "title": "修復機器人緊急煞車",
+      "description": "一個設定就讓修復機器人完全停手（不偵測、不查交易所、不寫帳本）。所有修復機器人同名同行為。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 有 MOMENTUM_REPAIR_PAUSED，真倉（operations）仍是 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py，沒有煞車。改用共用執行器時保留煞車，W6 一起上真倉。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "影子版沒有煞車；升到共用執行器時一起加 SEYKOTA_REPAIR_PAUSED。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "跟著修復機器人一起做。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "沒有修復機器人（見上一列）。"
+        }
+      }
+    },
+    {
+      "id": "ops_export.writer",
+      "title": "把要通知的事寫成匯出檔",
+      "description": "策略自己不推播，把需要人知道的事寫成 audit/ops_export.json，交給維運通知代送。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "只在 development／測試機（Phase 7b，src/ops_export_refresh.py），寫的是 fleet-ops-export/v1；真倉（operations）還沒有。改用共用執行器時升 v2，W6 一起上真倉。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "還沒有；升到共用修復執行器時一起寫。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "目前沒有任何會通知人的事件來源。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "8-btc-competition",
+          "reason": "目前沒有任何會通知人的事件來源。"
+        }
+      }
+    },
+    {
+      "id": "ops_notify.export_relay_enabled",
+      "title": "維運通知已開啟匯出轉送（部署設定）",
+      "description": "維運主機的 ops-notify 設定檔對這支策略開了 OPS_NOTIFY_<KEY>_OPS_EXPORT=on。部署狀態，無法由 CI 檢查，每次部署後人工更新。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W6",
+          "reason": "測試機已開（2026-09-17，閘門驗證通過）；真倉等 v2 一起推。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W6",
+          "reason": "兩台都還沒開。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "還沒有匯出檔。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "8-btc-competition",
+          "reason": "還沒有匯出檔。"
+        }
+      }
+    },
+    {
+      "id": "ops_notify.units_axis",
+      "title": "維運通知盯背景服務有沒有掛掉（部署設定）",
+      "description": "維運主機的 ops-notify 設定檔列出這支策略要盯的 systemd unit。部署狀態，每次部署後人工更新。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W6",
+          "reason": "測試機已設定（盯修復機器人 unit／timer）；真倉還沒設定。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W6",
+          "reason": "兩台都還沒設定；修復機器人升級後一起盯。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "還沒決定要盯哪些背景服務。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "8-btc-competition",
+          "reason": "還沒決定要盯哪些背景服務。"
+        }
+      }
+    }
+  ],
+  "catalog": [
+    {
+      "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
+      "behaviour": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:399 _clear_automatic_safe_halt 確認已平倉後自動解除"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
+      "behaviour": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:671 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.PROTECTION_REPLACE_FAILED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.PROTECTION_UNVERIFIED",
+      "behaviour": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:883 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.POSITION_AMBIGUOUS",
+      "behaviour": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:1035 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.RECONCILE_FAILED",
+      "behaviour": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.EXCHANGE_TARGET_UNSAFE",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.RUNTIME_CYCLE_FAILED",
+      "behaviour": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.CLOSE_FILL_PENDING",
+      "behaviour": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:1227 只記錄、下一輪再確認成交（Phase 3）"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.TRADE_EXIT",
+      "behaviour": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:1262 只記錄出場（Phase 3）"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
+      "behaviour": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:1342 資金不足跳過進場、只記錄（Phase 3）"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "MOM.PROTECTION_UNVERIFIED",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "8-momentum",
+          "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "MOM.STATE_REPAIRED_SAFE_HALT",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/safe_halt_state_repair.py:148 修完主動暫停，等人解除"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "8-momentum",
+          "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "MOM.RUNTIME_CYCLE_FAILED",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/main.py 寫錯誤心跳、下一輪重試（Phase 3）"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "8-momentum",
+          "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "只在 development／測試機（Phase 6b，受過渡開關控制、成功後還會發事後通知）；真倉只提案不補寫。v2 移除開關、成功不通知。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。"
+        }
+      }
+    },
+    {
+      "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "真倉（operations）Phase 5 影子版 scripts/repair_bot_shadow.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代。"
+        }
+      }
+    },
+    {
+      "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 遇到帳本已有半套修復或寫入失敗即停手、開請求、不重試；真倉（operations）的影子版只提案、不寫帳本，不會發生這種情況。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。"
+        }
+      }
+    },
+    {
+      "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+      "behaviour": {
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/runner.py:347 暫停並等人以 btc-competition-resume 解除"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "8-btc-competition",
+          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+      "behaviour": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "8-btc-competition",
+          "reason": "目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "8-btc-competition",
+          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "BTC.REBALANCE_PENDING",
+      "behaviour": {
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/runner.py pending_target_weights 下一輪續做（Phase 3）"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "8-btc-competition",
+          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "BTC.RUNTIME_CYCLE_FAILED",
+      "behaviour": {
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/runner.py 寫錯誤心跳、隔天重試（Phase 3）"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "8-btc-competition",
+          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "MYC.RECONCILE_DELTA_EXCEEDED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "done",
+          "evidence": "mexc_futures_bot.py:713 只記錄差額，不影響交易（Phase 4e 定案）"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "done",
+          "evidence": "mexc_futures_bot.py:713 append_fleet_event（R0）"
+        }
+      }
+    },
+    {
+      "code": "MYC.RUNTIME_CYCLE_FAILED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "目前：每次都照常重試，但沒有計數、連續失敗也不會升格。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "MYC.PROTECTION_PLACEMENT_REJECTED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "done",
+          "evidence": "mexc_futures_bot.py:1304 只通知、不自動下單（現行行為即符合 v2）"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "MYC.PROTECTION_PLACEMENT_ERROR",
+      "behaviour": {
+        "mycrypto": {
+          "state": "done",
+          "evidence": "mexc_futures_bot.py:1317 只通知、不自動下單（現行行為即符合 v2）"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "MYC.PROTECTION_REPLACE_FAILED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "下一輪會自動重掛（已符合），但連續失敗不會升格通知。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
+      "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/reconcile_compare.py:107 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/reconcile/compare.py:250 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "reconcile_compare.py:101 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/reconcile_compare.py:228 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
+        }
+      }
+    },
+    {
+      "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/reconcile/google_reconcile.py:137 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/reconcile_google.py:283 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
+        }
+      }
+    }
+  ]
+}

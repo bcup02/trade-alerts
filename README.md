@@ -62,7 +62,7 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
 
 既有專案不必一次重構：可以繼續呼叫 `publish()`，先把 `schema_version=1.0`、`project_id` 與 `execution_mode=DRY_RUN` 放入 `fields`；新版則使用 `contract_event()` 與 `AlertDispatcher.publish_contract()`。接收端對未知選填欄位採忽略但保留原始資料的策略。
 
-## 交易機隊錯誤目錄 v1
+## 交易機隊錯誤目錄 v2
 
 全機隊錯誤分類的權威來源位於 [`docs/fleet-error-catalog.md`](docs/fleet-error-catalog.md)，
 機器可讀版本位於 [`src/trade_alerts/catalog/fleet-error-catalog-v2.json`](src/trade_alerts/catalog/fleet-error-catalog-v2.json)，
@@ -83,6 +83,23 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
 
 `tests/test_fleet_error_catalog.py` 守住幾條不變式，其中最重要的一條是：判定為 `MECHANICAL`
 的條件不得落在任何會通知人的風險等級。
+
+## 機隊一致性登記冊
+
+[`src/trade_alerts/catalog/fleet-rollout-registry.json`](src/trade_alerts/catalog/fleet-rollout-registry.json)
+（格式 [`schemas/fleet-rollout-registry-v1.schema.json`](schemas/fleet-rollout-registry-v1.schema.json)）
+記錄每一項機隊功能、錯誤目錄每一條的行為與事件日誌，在四支策略裡**實際做到了沒有**：`done` 附證據、
+`pending` 附預定 phase 與理由、`n/a` 附理由。**`done` 指真倉已經在跑**：`sources` 記錄每支策略的
+repo、真倉部署來源分支（`operations`）與 commit，證據的「檔案:行號」都對應那個 commit；只合併到
+development 或只在測試機上的算 `pending`。證據是否真的指到程式碼要跨 repo 才查得到，送審前在本機執行
+`python scripts/verify_registry_evidence.py`（對四個 repo 的 clone 逐條檢查，不在 CI 裡）。
+規則是「四支一起做，否則寫在這裡」——
+`trade_alerts.registry_problems()` 是這條規則的可執行版本，`tests/test_rollout_registry.py` 讓 CI 擋下
+漏列、缺理由、目錄與登記冊對不上的情況；策略 repo 的測試可用 `project_rows()` 檢查登記冊對自己的宣稱。
+
+給人看的兩頁 `docs/guides/fleet-risk-register.html`（由錯誤目錄產生）與
+`docs/guides/fleet-rollout-register.html`（由登記冊產生）都由 `scripts/render_guides.py` 產生，
+不可手改：改完 JSON 後執行 `python scripts/render_guides.py`，CI 會比對 repo 內的頁面與重新產生的結果。
 
 ## 共用 Google Apps Script
 

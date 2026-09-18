@@ -49,6 +49,13 @@ from .ops_export import (
     render_notice_text,
     write_ops_export,
 )
+from .rollout_registry import (
+    REGISTRY_VERSION,
+    STRATEGY_PROJECTS,
+    load_rollout_registry,
+    project_rows,
+    registry_problems,
+)
 from .safe_halt_model import (
     FINGERPRINT_LENGTH,
     RESUME_PATHS,
@@ -211,6 +218,11 @@ __all__ = [
     "needs_human",
     "render_notice_text",
     "write_ops_export",
+    "REGISTRY_VERSION",
+    "STRATEGY_PROJECTS",
+    "load_rollout_registry",
+    "project_rows",
+    "registry_problems",
     "FINGERPRINT_LENGTH",
     "RESUME_PATHS",
     "SAFE_HALT_CLEARED_EVENT",
@@ -277,4 +289,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.19.0"
+__version__ = "0.20.0"
