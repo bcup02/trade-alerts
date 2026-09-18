@@ -1,0 +1,1201 @@
+<title>機隊一致性登記冊</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root{
+    --paper:#F1F3EC; --paper-raised:#FAFBF6; --line:#DBE0D0;
+    --ink:#1F2A22; --ink-soft:#57604E; --ink-faint:#8A9080;
+    --accent:#5B3A5C; --accent-bg:#EDE3EC; --accent-line:#C9AECB;
+    --R3:#963025; --R3-bg:#F4E1DD;
+    --R2:#8C6317; --R2-bg:#F1E6C9;
+    --R1:#357357; --R1-bg:#DEEAE3;
+    --R0:#6B7566; --R0-bg:#E7EAE0;
+    --done:#357357; --done-bg:#DEEAE3;
+    --pending:#8C6317; --pending-bg:#F1E6C9;
+    --na:#6B7566; --na-bg:#E7EAE0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#18150F; --paper-raised:#211D16; --line:#332D22;
+      --ink:#EDE6D8; --ink-soft:#B7AF9C; --ink-faint:#847C6C;
+      --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
+      --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
+      --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
+      --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#18150F; --paper-raised:#211D16; --line:#332D22;
+    --ink:#EDE6D8; --ink-soft:#B7AF9C; --ink-faint:#847C6C;
+    --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
+    --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
+    --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
+    --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans TC","IBM Plex Mono",sans-serif;padding:40px 20px 64px;}
+  .wrap{max-width:860px;margin-inline:auto;}
+  .eyebrow{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);}
+  h1{font-family:"Noto Serif TC",serif;font-weight:900;font-size:clamp(28px,5vw,40px);line-height:1.25;margin:6px 0 12px;}
+  h2{font-family:"Noto Serif TC",serif;font-weight:700;font-size:20px;margin:36px 0 12px;}
+  .lede{font-size:15.5px;line-height:1.75;color:var(--ink-soft);max-width:60ch;margin:0 0 24px;}
+  .lede b{color:var(--ink);}
+  .legend{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-bottom:24px;}
+  .legend-item{background:var(--paper-raised);padding:14px 12px 12px;display:flex;flex-direction:column;gap:6px;}
+  .legend-code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-weight:600;font-size:12px;}
+  .legend-name{font-size:13px;font-weight:700;line-height:1.3;}
+  .legend-sub{font-size:11.5px;color:var(--ink-faint);line-height:1.5;}
+  .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+  .chip{font:inherit;font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--paper-raised);color:var(--ink-soft);cursor:pointer;}
+  .chip[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent);font-weight:700;}
+  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .chip .n{font-family:"IBM Plex Mono","Noto Sans TC",monospace;opacity:.75;margin-inline-start:4px;}
+  .tier-head{display:flex;align-items:baseline;gap:12px;padding:14px 16px;border-radius:3px 3px 0 0;border-inline-start:4px solid var(--edge);background:var(--bg);margin-top:20px;}
+  .tier-code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-weight:600;font-size:13px;color:var(--edge);}
+  .tier-title{font-family:"Noto Serif TC",serif;font-weight:700;font-size:17px;}
+  .tier-count{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;color:var(--ink-faint);margin-inline-start:auto;}
+  .rows{border-inline-start:4px solid var(--line);border-block-end:1px solid var(--line);}
+  .row{display:grid;grid-template-columns:104px 1fr;gap:16px;padding:14px 16px;border-block-start:1px solid var(--line);}
+  .row-bot{font-size:11.5px;font-weight:700;color:var(--ink-soft);padding:3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--paper-raised);text-align:center;align-self:start;white-space:nowrap;}
+  .row-body p{margin:0;font-size:14.5px;line-height:1.7;}
+  .row-title{font-weight:700;}
+  .row-what{color:var(--ink);margin-top:2px !important;}
+  .row-how{color:var(--ink-soft);margin-top:5px !important;}
+  .code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;color:var(--ink-faint);}
+  .card p.desc{margin-top:2px;}
+  .status{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .st{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;color:var(--c);background:var(--cb);}
+  .st-done{--c:var(--done);--cb:var(--done-bg);} .st-pending{--c:var(--pending);--cb:var(--pending-bg);} .st-na{--c:var(--na);--cb:var(--na-bg);}
+  .note{font-size:13px;color:var(--ink-soft);margin-top:6px !important;line-height:1.6;}
+  details{margin-top:8px;font-size:13.5px;}
+  details summary{cursor:pointer;color:var(--accent);font-weight:700;}
+  details ol{margin:6px 0 0;padding-inline-start:22px;line-height:1.7;}
+  details pre{white-space:pre-wrap;background:var(--paper-raised);border:1px solid var(--line);border-radius:3px;padding:10px;font-size:12.5px;line-height:1.6;}
+  .card{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:14px 16px;margin-bottom:12px;}
+  .card h3{margin:0 0 4px;font-size:15.5px;}
+  .card p{margin:0;font-size:13.5px;color:var(--ink-soft);line-height:1.6;}
+  .grid{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;margin-top:10px;font-size:13.5px;line-height:1.6;}
+  .grid .who{font-weight:700;color:var(--ink-soft);}
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;}
+  .summary div{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:10px 12px;font-size:13px;line-height:1.7;}
+  .summary b{display:block;font-size:14px;}
+  [hidden]{display:none !important;}
+  @media (max-width:560px){
+    .legend,.summary{grid-template-columns:1fr 1fr;}
+    .row{grid-template-columns:1fr;} .row-bot{justify-self:start;}
+    .grid{grid-template-columns:1fr;}
+    body{padding-inline:16px;}
+  }
+  .foot{margin-top:36px;font-size:12px;color:var(--ink-faint);line-height:1.7;border-block-start:1px solid var(--line);padding-top:16px;}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">交易機隊 · 四支策略做到哪裡了</div>
+  <h1>機隊一致性登記冊</h1>
+  <p class="lede">
+    每一項機隊功能、每一條錯誤處理規則，在四支策略裡<b>實際做到了沒有</b>。規則只有一條：
+    沒做的一定要寫在這裡——<b>「未做」要寫目前狀況和預定在哪一關做</b>，<b>「不適用」要寫理由</b>。
+    漏寫的話，自動檢查（CI）會擋下來，不會再有「只做了一支、沒人記得」。
+  </p>
+  <div class="summary" id="summary"></div>
+  <div id="filters"></div>
+  <h2>機隊功能</h2>
+  <div id="capabilities"></div>
+  <h2>錯誤處理規則（依錯誤目錄逐條）</h2>
+  <p class="lede">「行為」：這條錯誤發生時，策略有沒有照錯誤目錄說的處理。「白話通知」：有沒有寫進共用事件日誌——只有寫進去的，才會變成你手機上的白話通知。</p>
+  <div id="entries"></div>
+  <h2>預定的關卡</h2>
+  <div id="phases"></div>
+  <div class="foot">
+    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-18 對四個 repo 逐項盤點）與 <code>fleet-error-catalog/v2</code>。
+    本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+  </div>
+</div>
+
+<script type="application/json" id="data">
+{
+ "capabilities": [
+  {
+   "description": "出事時用同一套欄位（原因碼＋證據＋指紋）把策略停住，四支才能用同一套解除與通知流程。",
+   "id": "latch.unified_model",
+   "status": {
+    "btc-competition": {
+     "evidence": "src/btc_competition/runner.py:347 build_safe_halt（Phase 4c）",
+     "state": "done"
+    },
+    "momentum": {
+     "evidence": "src/strategy.py:1067 build_safe_halt（Phase 4c）",
+     "state": "done"
+    },
+    "mycrypto": {
+     "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。",
+     "state": "n/a"
+    },
+    "seykota": {
+     "evidence": "src/seykota_bot/bot.py:386 build_safe_halt（Phase 4c）",
+     "state": "done"
+    }
+   },
+   "title": "統一格式的暫停（latch）"
+  },
+  {
+   "description": "先預覽拿確認碼、再帶確認碼解除，避免清掉的不是眼前這一次的暫停。",
+   "id": "latch.resume_tool",
+   "status": {
+    "btc-competition": {
+     "evidence": "btc-competition-resume（src/btc_competition/safe_halt_resume.py）",
+     "state": "done"
+    },
+    "momentum": {
+     "evidence": "src/safe_halt_resume.py（--apply --confirm --exchange-verified）",
+     "state": "done"
+    },
+    "mycrypto": {
+     "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。",
+     "state": "n/a"
+    },
+    "seykota": {
+     "evidence": "seykota-resume（src/seykota_bot/safe_halt_resume.py）",
+     "state": "done"
+    }
+   },
+   "title": "兩段式解除工具"
+  },
+  {
+   "description": "設定錯誤類的暫停（例如連錯交易所）不能用解除工具清，只能改好設定後重啟；重啟後系統要自己確認設定正確並解除。",
+   "id": "latch.restart_only_clear",
+   "status": {
+    "btc-competition": {
+     "reason": "沒有「改設定重啟」這一類暫停。",
+     "state": "n/a"
+    },
+    "momentum": {
+     "reason": "沒有「改設定重啟」這一類暫停。",
+     "state": "n/a"
+    },
+    "mycrypto": {
+     "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。",
+     "state": "n/a"
+    },
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（safe_halt_resume.py:103），目前只能手改 state 檔。",
+     "state": "pending"
+    }
+   },
+   "title": "「改好設定重啟」就能解除的暫停真的會被清掉"
+  },
+  {
+   "description": "暫時性的錯誤先自動重試，連續失敗才停下或通知人。",
+   "id": "latch.consecutive_failure_counter",
+   "status": {
+    "btc-competition": {
+     "reason": "未分類例外不暫停：寫錯誤心跳、隔天重試（R0）。",
+     "state": "n/a"
+    },
+    "momentum": {
+     "reason": "未分類例外不暫停：寫錯誤心跳、下一輪重試（R0）。",
+     "state": "n/a"
+    },
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "MYC.RUNTIME_CYCLE_FAILED 目前每次都照常重試但沒有計數，v2 要求連續 3 次失敗才升格通知。",
+     "state": "pending"
+    },
+    "seykota": {
+     "evidence": "src/seykota_bot/bot.py:123 Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）",
+     "state": "done"
+    }
+   },
+   "title": "連續失敗 3 次才升格（不因一次意外就停）"
+  },
+  {
+   "description": "每支策略定時寫出自己「正常／暫停／出錯」的狀態，維運通知據此提醒。",
+   "id": "runtime.status_snapshot",
+   "status": {
+    "btc-competition": {
+     "evidence": "src/btc_competition/portfolio_snapshot_adapter.py strategy.runtime_status",
+     "state": "done"
+    },
+    "momentum": {
+     "evidence": "src/portfolio_snapshot_adapter.py strategy.runtime_status",
+     "state": "done"
+    },
+    "mycrypto": {
+     "evidence": "portfolio_snapshot_adapter.py strategy.runtime_status",
+     "state": "done"
+    },
+    "seykota": {
+     "evidence": "src/seykota_bot/portfolio_snapshot_adapter.py strategy.runtime_status",
+     "state": "done"
+    }
+   },
+   "title": "策略運行狀態（維運通知的第四軸）"
+  },
+  {
+   "description": "定時比對本地帳本與交易所，寫出 audit/ledger_status.json 給維運通知讀。",
+   "id": "reconcile.ledger_status",
+   "status": {
+    "btc-competition": {
+     "evidence": "src/btc_competition/reconcile_compare.py",
+     "state": "done"
+    },
+    "momentum": {
+     "evidence": "src/reconcile_compare.py",
+     "state": "done"
+    },
+    "mycrypto": {
+     "evidence": "reconcile_compare.py",
+     "state": "done"
+    },
+    "seykota": {
+     "evidence": "src/seykota_bot/reconcile/compare.py",
+     "state": "done"
+    }
+   },
+   "title": "帳本↔交易所對帳狀態檔"
+  },
+  {
+   "description": "定時比對本地帳本與 Google 表，寫出 audit/google_reconcile_status.json 給維運通知讀。",
+   "id": "reconcile.google_status",
+   "status": {
+    "btc-competition": {
+     "evidence": "src/btc_competition/reconcile_google.py",
+     "state": "done"
+    },
+    "momentum": {
+     "evidence": "src/google_reconcile.py",
+     "state": "done"
+    },
+    "mycrypto": {
+     "evidence": "google_reconcile.py",
+     "state": "done"
+    },
+    "seykota": {
+     "evidence": "src/seykota_bot/reconcile/google_reconcile.py",
+     "state": "done"
+    }
+   },
+   "title": "帳本↔Google 表對帳狀態檔"
+  },
+  {
+   "description": "交易所已平倉但本地帳本漏記時，以交易所成交為準自動補寫；結構對不上才重試並升格。",
+   "id": "repair_bot.verified_close",
+   "status": {
+    "btc-competition": {
+     "reason": "現貨再平衡策略，沒有開倉／平倉配對，不會有漏記平倉。",
+     "state": "n/a"
+    },
+    "momentum": {
+     "phase": "v2-W3",
+     "reason": "有，但是 v1 版：受過渡開關 MOMENTUM_REPAIR_AUTO_APPLY 控制（測試機開、真倉仍是 Phase 5 只提案版），無歧義以外的情況只提案。",
+     "state": "pending"
+    },
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "有同樣的漏記平倉形狀（reconcile_compare 會產生 position_diffs），目前只有一次性手修腳本；需要先做 MEXC 成交查詢轉接器。",
+     "state": "pending"
+    },
+    "seykota": {
+     "phase": "v2-W4",
+     "reason": "只有 Phase 5 只提案的影子版，而且發出的 SEY.VERIFIED_CLOSE_PROPOSED 從未登記進 v1 目錄。",
+     "state": "pending"
+    }
+   },
+   "title": "漏記平倉自動修復機器人"
+  },
+  {
+   "description": "一個設定就讓修復機器人完全停手（不偵測、不查交易所、不寫帳本）。所有修復機器人同名同行為。",
+   "id": "repair_bot.pause_brake",
+   "status": {
+    "btc-competition": {
+     "reason": "沒有修復機器人（見上一列）。",
+     "state": "n/a"
+    },
+    "momentum": {
+     "evidence": "MOMENTUM_REPAIR_PAUSED（scripts/repair_bot.py:90）",
+     "state": "done"
+    },
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "跟著修復機器人一起做。",
+     "state": "pending"
+    },
+    "seykota": {
+     "phase": "v2-W4",
+     "reason": "影子版沒有煞車；升到共用執行器時一起加 SEYKOTA_REPAIR_PAUSED。",
+     "state": "pending"
+    }
+   },
+   "title": "修復機器人緊急煞車"
+  },
+  {
+   "description": "策略自己不推播，把需要人知道的事寫成 audit/ops_export.json，交給維運通知代送。",
+   "id": "ops_export.writer",
+   "status": {
+    "btc-competition": {
+     "phase": "8-btc-competition",
+     "reason": "目前沒有任何會通知人的事件來源。",
+     "state": "pending"
+    },
+    "momentum": {
+     "phase": "v2-W3",
+     "reason": "有（7b），但寫的是 fleet-ops-export/v1；改用共用執行器時升 v2。",
+     "state": "pending"
+    },
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "目前沒有任何會通知人的事件來源。",
+     "state": "pending"
+    },
+    "seykota": {
+     "phase": "v2-W4",
+     "reason": "還沒有；升到共用修復執行器時一起寫。",
+     "state": "pending"
+    }
+   },
+   "title": "把要通知的事寫成匯出檔"
+  },
+  {
+   "description": "維運主機的 ops-notify 設定檔對這支策略開了 OPS_NOTIFY_<KEY>_OPS_EXPORT=on。部署狀態，無法由 CI 檢查，每次部署後人工更新。",
+   "id": "ops_notify.export_relay_enabled",
+   "status": {
+    "btc-competition": {
+     "phase": "8-btc-competition",
+     "reason": "還沒有匯出檔。",
+     "state": "pending"
+    },
+    "momentum": {
+     "phase": "v2-W6",
+     "reason": "測試機已開（2026-09-17，閘門驗證通過）；真倉等 v2 一起推。",
+     "state": "pending"
+    },
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "還沒有匯出檔。",
+     "state": "pending"
+    },
+    "seykota": {
+     "phase": "v2-W6",
+     "reason": "兩台都還沒開。",
+     "state": "pending"
+    }
+   },
+   "title": "維運通知已開啟匯出轉送（部署設定）"
+  },
+  {
+   "description": "維運主機的 ops-notify 設定檔列出這支策略要盯的 systemd unit。部署狀態，每次部署後人工更新。",
+   "id": "ops_notify.units_axis",
+   "status": {
+    "btc-competition": {
+     "phase": "8-btc-competition",
+     "reason": "還沒決定要盯哪些背景服務。",
+     "state": "pending"
+    },
+    "momentum": {
+     "phase": "v2-W6",
+     "reason": "測試機已設定（盯修復機器人 unit／timer）；真倉還沒設定。",
+     "state": "pending"
+    },
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "還沒決定要盯哪些背景服務。",
+     "state": "pending"
+    },
+    "seykota": {
+     "phase": "v2-W6",
+     "reason": "兩台都還沒設定；修復機器人升級後一起盯。",
+     "state": "pending"
+    }
+   },
+   "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
+  }
+ ],
+ "catalog": [
+  {
+   "behaviour": {
+    "seykota": {
+     "evidence": "src/seykota_bot/bot.py:399 _clear_automatic_safe_halt 確認已平倉後自動解除",
+     "state": "done"
+    }
+   },
+   "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R1",
+   "title": "開倉後停損掛單失敗，緊急市價平倉成功"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）",
+     "state": "done"
+    }
+   },
+   "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。",
+     "state": "pending"
+    }
+   },
+   "code": "SEY.PROTECTION_REPLACE_FAILED",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "移動停損換單失敗，舊停損單已取消，部位目前無交易所端保護"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。",
+     "state": "pending"
+    }
+   },
+   "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "換單時舊停損單取消失敗，可能殘留在交易所"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。",
+     "state": "pending"
+    }
+   },
+   "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "平倉後停損單取消失敗，可能還掛在交易所"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）",
+     "state": "done"
+    }
+   },
+   "code": "SEY.PROTECTION_UNVERIFIED",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "交易所存在部位，但沒有可唯一確認的原生保護單"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）",
+     "state": "done"
+    }
+   },
+   "code": "SEY.POSITION_AMBIGUOUS",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "交易所部位資料無法唯一辨識"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）",
+     "state": "done"
+    }
+   },
+   "code": "SEY.RECONCILE_FAILED",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "非暫時性的持倉同步失敗"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。",
+     "state": "pending"
+    }
+   },
+   "code": "SEY.EXCHANGE_TARGET_UNSAFE",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。",
+     "state": "pending"
+    }
+   },
+   "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "真倉固定訂單識別能力不足"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）",
+     "state": "done"
+    }
+   },
+   "code": "SEY.RUNTIME_CYCLE_FAILED",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "未分類的執行期例外（run_forever catch-all）"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "evidence": "程式已照目錄描述處理（Phase 3）",
+     "state": "done"
+    }
+   },
+   "code": "SEY.CLOSE_FILL_PENDING",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R0",
+   "title": "交易所部位已消失，等待平倉成交資料回填"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "evidence": "程式已照目錄描述處理（Phase 3）",
+     "state": "done"
+    }
+   },
+   "code": "SEY.TRADE_EXIT",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R0",
+   "title": "原生停損觸發的正常平倉"
+  },
+  {
+   "behaviour": {
+    "seykota": {
+     "evidence": "程式已照目錄描述處理（Phase 3）",
+     "state": "done"
+    }
+   },
+   "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
+   "emits_event": {
+    "seykota": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R0",
+   "title": "權益低於最低下單資金，跳過本次進場"
+  },
+  {
+   "behaviour": {
+    "momentum": {
+     "evidence": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除",
+     "state": "done"
+    }
+   },
+   "code": "MOM.PROTECTION_UNVERIFIED",
+   "emits_event": {
+    "momentum": {
+     "phase": "8-momentum",
+     "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "原生移動停損無法驗證"
+  },
+  {
+   "behaviour": {
+    "momentum": {
+     "evidence": "src/safe_halt_state_repair.py:148 修完主動暫停，等人解除",
+     "state": "done"
+    }
+   },
+   "code": "MOM.STATE_REPAIRED_SAFE_HALT",
+   "emits_event": {
+    "momentum": {
+     "phase": "8-momentum",
+     "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "工具修復本地 state 後主動 latch，等人明確解除"
+  },
+  {
+   "behaviour": {
+    "momentum": {
+     "evidence": "src/main.py 寫錯誤心跳、下一輪重試（Phase 3）",
+     "state": "done"
+    }
+   },
+   "code": "MOM.RUNTIME_CYCLE_FAILED",
+   "emits_event": {
+    "momentum": {
+     "phase": "8-momentum",
+     "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R0",
+   "title": "run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）"
+  },
+  {
+   "behaviour": {
+    "momentum": {
+     "phase": "v2-W3",
+     "reason": "目前受過渡開關控制、成功後還會發事後通知；v2 移除開關、成功不通知。",
+     "state": "pending"
+    }
+   },
+   "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+   "emits_event": {
+    "momentum": {
+     "phase": "v2-W3",
+     "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。",
+     "state": "pending"
+    }
+   },
+   "tier": "R1",
+   "title": "無歧義的孤兒平倉已自動補寫進帳本"
+  },
+  {
+   "behaviour": {
+    "momentum": {
+     "phase": "v2-W3",
+     "reason": "退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。",
+     "state": "pending"
+    }
+   },
+   "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+   "emits_event": {
+    "momentum": {
+     "phase": "v2-W3",
+     "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "孤兒平倉已算出修復方案，附提案通知"
+  },
+  {
+   "behaviour": {
+    "momentum": {
+     "evidence": "scripts/repair_bot.py:153 帳本已有半套修復或寫入失敗即停手、開請求、不重試",
+     "state": "done"
+    }
+   },
+   "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+   "emits_event": {
+    "momentum": {
+     "phase": "v2-W3",
+     "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+  },
+  {
+   "behaviour": {
+    "btc-competition": {
+     "evidence": "src/btc_competition/runner.py:347 暫停並等人以 btc-competition-resume 解除",
+     "state": "done"
+    }
+   },
+   "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+   "emits_event": {
+    "btc-competition": {
+     "phase": "8-btc-competition",
+     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "出現負／不可能的餘額，本地帳本本身不可信"
+  },
+  {
+   "behaviour": {
+    "btc-competition": {
+     "phase": "8-btc-competition",
+     "reason": "目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。",
+     "state": "pending"
+    }
+   },
+   "code": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+   "emits_event": {
+    "btc-competition": {
+     "phase": "8-btc-competition",
+     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "連續 3 天該再平衡卻零成交"
+  },
+  {
+   "behaviour": {
+    "btc-competition": {
+     "evidence": "src/btc_competition/runner.py pending_target_weights 下一輪續做（Phase 3）",
+     "state": "done"
+    }
+   },
+   "code": "BTC.REBALANCE_PENDING",
+   "emits_event": {
+    "btc-competition": {
+     "phase": "8-btc-competition",
+     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R0",
+   "title": "部分成交，目標權重尚未達成"
+  },
+  {
+   "behaviour": {
+    "btc-competition": {
+     "evidence": "src/btc_competition/runner.py 寫錯誤心跳、隔天重試（Phase 3）",
+     "state": "done"
+    }
+   },
+   "code": "BTC.RUNTIME_CYCLE_FAILED",
+   "emits_event": {
+    "btc-competition": {
+     "phase": "8-btc-competition",
+     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R0",
+   "title": "runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）"
+  },
+  {
+   "behaviour": {
+    "mycrypto": {
+     "evidence": "mexc_futures_bot.py:713 只記錄差額，不影響交易（Phase 4e 定案）",
+     "state": "done"
+    }
+   },
+   "code": "MYC.RECONCILE_DELTA_EXCEEDED",
+   "emits_event": {
+    "mycrypto": {
+     "evidence": "mexc_futures_bot.py:713 append_fleet_event（R0）",
+     "state": "done"
+    }
+   },
+   "tier": "R0",
+   "title": "本地帳本與交易所回報損益差額超過容忍值"
+  },
+  {
+   "behaviour": {
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "目前：每次都照常重試，但沒有計數、連續失敗也不會升格。",
+     "state": "pending"
+    }
+   },
+   "code": "MYC.RUNTIME_CYCLE_FAILED",
+   "emits_event": {
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "未分類的執行期例外（catch-all）"
+  },
+  {
+   "behaviour": {
+    "mycrypto": {
+     "evidence": "不自動下單（現行行為即符合 v2）",
+     "state": "done"
+    }
+   },
+   "code": "MYC.PROTECTION_PLACEMENT_REJECTED",
+   "emits_event": {
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "開倉停損單被交易所拒絕，部位可能沒有交易所端保護"
+  },
+  {
+   "behaviour": {
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。",
+     "state": "pending"
+    }
+   },
+   "code": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
+   "emits_event": {
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "開倉後查不到部位資訊，無法掛停損單"
+  },
+  {
+   "behaviour": {
+    "mycrypto": {
+     "evidence": "不自動下單（現行行為即符合 v2）",
+     "state": "done"
+    }
+   },
+   "code": "MYC.PROTECTION_PLACEMENT_ERROR",
+   "emits_event": {
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R3",
+   "title": "掛停損單時拋出例外，部位本身已開"
+  },
+  {
+   "behaviour": {
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "下一輪會自動重掛（已符合），但連續失敗不會升格通知。",
+     "state": "pending"
+    }
+   },
+   "code": "MYC.PROTECTION_REPLACE_FAILED",
+   "emits_event": {
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "搬移移動停損單失敗，交易所端目前沒有停損保護"
+  },
+  {
+   "behaviour": {
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。",
+     "state": "pending"
+    }
+   },
+   "code": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
+   "emits_event": {
+    "mycrypto": {
+     "phase": "8-mycrypto",
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    }
+   },
+   "tier": "R2",
+   "title": "平倉後取消殘留停損單失敗"
+  },
+  {
+   "behaviour": {
+    "btc-competition": {
+     "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知",
+     "state": "done"
+    },
+    "momentum": {
+     "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知",
+     "state": "done"
+    },
+    "mycrypto": {
+     "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知",
+     "state": "done"
+    },
+    "seykota": {
+     "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知",
+     "state": "done"
+    }
+   },
+   "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
+   "emits_event": {
+    "btc-competition": {
+     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
+     "state": "n/a"
+    },
+    "momentum": {
+     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
+     "state": "n/a"
+    },
+    "mycrypto": {
+     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
+     "state": "n/a"
+    },
+    "seykota": {
+     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
+     "state": "n/a"
+    }
+   },
+   "tier": "R0",
+   "title": "帳本↔交易所對帳 DIVERGED 時故意讓 unit 變紅（exit 2）"
+  },
+  {
+   "behaviour": {
+    "btc-competition": {
+     "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知",
+     "state": "done"
+    },
+    "momentum": {
+     "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知",
+     "state": "done"
+    },
+    "mycrypto": {
+     "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知",
+     "state": "done"
+    },
+    "seykota": {
+     "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知",
+     "state": "done"
+    }
+   },
+   "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
+   "emits_event": {
+    "btc-competition": {
+     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
+     "state": "n/a"
+    },
+    "momentum": {
+     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
+     "state": "n/a"
+    },
+    "mycrypto": {
+     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
+     "state": "n/a"
+    },
+    "seykota": {
+     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
+     "state": "n/a"
+    }
+   },
+   "tier": "R0",
+   "title": "帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）"
+  }
+ ],
+ "phase_counts": {
+  "8-btc-competition": 8,
+  "8-momentum": 3,
+  "8-mycrypto": 16,
+  "8-seykota": 20,
+  "v2-W2": 0,
+  "v2-W3": 7,
+  "v2-W4": 3,
+  "v2-W6": 4
+ },
+ "phase_order": [
+  "v2-W2",
+  "v2-W3",
+  "v2-W4",
+  "v2-W6",
+  "8-momentum",
+  "8-seykota",
+  "8-mycrypto",
+  "8-btc-competition"
+ ],
+ "phases": {
+  "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
+  "8-momentum": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
+  "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
+  "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
+  "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
+  "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+  "v2-W4": "分級 v2：趨勢策略的修復機器人升到完整版",
+  "v2-W6": "分級 v2：部署到測試機與真倉"
+ },
+ "project_order": [
+  "seykota",
+  "momentum",
+  "mycrypto",
+  "btc-competition"
+ ],
+ "projects": {
+  "btc-competition": "競賽策略",
+  "momentum": "動能策略",
+  "mycrypto": "加密策略",
+  "seykota": "趨勢策略"
+ },
+ "totals": {
+  "btc-competition": {
+   "done": 10,
+   "n/a": 6,
+   "pending": 8
+  },
+  "momentum": {
+   "done": 12,
+   "n/a": 4,
+   "pending": 12
+  },
+  "mycrypto": {
+   "done": 9,
+   "n/a": 5,
+   "pending": 16
+  },
+  "seykota": {
+   "done": 17,
+   "n/a": 2,
+   "pending": 25
+  }
+ }
+}
+</script>
+<script>
+
+var DATA = JSON.parse(document.getElementById("data").textContent);
+function el(tag, cls, text){ var n=document.createElement(tag); if(cls) n.className=cls; if(text!==undefined) n.textContent=text; return n; }
+var STATE_LABEL = {"done":"已做","pending":"未做","n/a":"不適用"};
+var STATE_CLASS = {"done":"st-done","pending":"st-pending","n/a":"st-na"};
+function chipGroup(host, values, onPick){
+  var buttons=[];
+  values.forEach(function(v){
+    var b=el("button","chip"); b.type="button"; b.setAttribute("aria-pressed", v.id==="all"?"true":"false");
+    b.appendChild(document.createTextNode(v.label)); b.appendChild(el("span","n",String(v.n)));
+    b.addEventListener("click", function(){ buttons.forEach(function(x){x.setAttribute("aria-pressed","false");}); b.setAttribute("aria-pressed","true"); onPick(v.id); });
+    buttons.push(b); host.appendChild(b);
+  });
+}
+function statusText(s, phases){
+  if(s.state==="done") return "已做："+s.evidence;
+  if(s.state==="n/a") return "不適用："+s.reason;
+  return "未做："+s.reason+"（預定："+(phases[s.phase]||s.phase)+"）";
+}
+
+var pick={project:"all",state:"all"};
+var items=[];
+function card(host, title, sub, subClass, statuses){
+  var c=el("div","card"); c.appendChild(el("h3",null,title)); if(sub) c.appendChild(el("p",subClass,sub));
+  var g=el("div","grid");
+  statuses.forEach(function(s){
+    var who=el("span","who",s.label); var what=el("span");
+    what.appendChild(el("span","st "+STATE_CLASS[s.status.state],STATE_LABEL[s.status.state]));
+    what.appendChild(document.createTextNode(" "+statusText(s.status,DATA.phases)));
+    who.dataset.project=s.project; who.dataset.state=s.status.state; what.dataset.project=s.project; what.dataset.state=s.status.state;
+    g.appendChild(who); g.appendChild(what); items.push(who); items.push(what);
+  });
+  c.appendChild(g); host.appendChild(c); return c;
+}
+var cards=[];
+var capHost=document.getElementById("capabilities");
+DATA.capabilities.forEach(function(cap){
+  var c=card(capHost, cap.title, cap.description, "desc", DATA.project_order.map(function(p){return {project:p,label:DATA.projects[p],status:cap.status[p]};}));
+  cards.push(c);
+});
+var entryHost=document.getElementById("entries");
+DATA.catalog.forEach(function(row){
+  var statuses=[];
+  Object.keys(row.behaviour).sort(function(a,b){return DATA.project_order.indexOf(a)-DATA.project_order.indexOf(b);}).forEach(function(p){
+    statuses.push({project:p,label:DATA.projects[p]+"｜行為",status:row.behaviour[p]});
+    statuses.push({project:p,label:DATA.projects[p]+"｜白話通知",status:row.emits_event[p]});
+  });
+  cards.push(card(entryHost, row.tier+"｜"+row.title, row.code, "code", statuses));
+});
+var phaseHost=document.getElementById("phases");
+DATA.phase_order.forEach(function(k){
+  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜待做 "+DATA.phase_counts[k]+" 項")); phaseHost.appendChild(c);
+});
+var sum=document.getElementById("summary");
+DATA.project_order.forEach(function(p){
+  var d=el("div"); d.appendChild(el("b",null,DATA.projects[p]));
+  var t=DATA.totals[p]; d.appendChild(document.createTextNode("已做 "+t.done+"｜未做 "+t.pending+"｜不適用 "+t["n/a"])); sum.appendChild(d);
+});
+function apply(){
+  items.forEach(function(n){ n.hidden=!((pick.project==="all"||n.dataset.project===pick.project)&&(pick.state==="all"||n.dataset.state===pick.state)); });
+  cards.forEach(function(c){ c.hidden=!Array.prototype.some.call(c.querySelectorAll(".grid > span"),function(n){return !n.hidden;}); });
+}
+var f=document.getElementById("filters"), a=el("div","filters"), b=el("div","filters"); f.appendChild(a); f.appendChild(b);
+function rowsOf(p, s){ var t=DATA.totals[p]; return s ? t[s] : t.done+t.pending+t["n/a"]; }
+function allRows(s){ return DATA.project_order.reduce(function(n,p){return n+rowsOf(p,s);},0); }
+chipGroup(a,[{id:"all",label:"全部策略",n:allRows()}].concat(DATA.project_order.map(function(p){return {id:p,label:DATA.projects[p],n:rowsOf(p)};})),function(v){pick.project=v;apply();});
+chipGroup(b,[{id:"all",label:"全部狀態",n:allRows()},{id:"pending",label:"只看未做",n:allRows("pending")},{id:"done",label:"已做",n:allRows("done")},{id:"n/a",label:"不適用",n:allRows("n/a")}],function(v){pick.state=v;apply();});
+
+</script>

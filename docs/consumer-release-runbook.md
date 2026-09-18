@@ -589,3 +589,31 @@ trade-alerts：v0.19.0（風險分級 v2，W1a）
 服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.20.0（風險分級 v2，W1b：機隊一致性登記冊）
+變更摘要：1. 新 src/trade_alerts/catalog/fleet-rollout-registry.json（隨套件發佈）
+             ＋ schemas/fleet-rollout-registry-v1.schema.json：12 項機隊功能 ×
+             四支策略，以及錯誤目錄 33 條各自的「行為」與「寫進事件日誌」
+             在所屬策略的狀態——done（附證據）／pending（附預定 phase＋理由）
+             ／n/a（附理由）。種子內容 2026-09-18 對四個 repo 逐項實查填入。
+          2. 新模組 trade_alerts.rollout_registry：load_rollout_registry()、
+             registry_problems()（規則的可執行版：四支列滿、pending 有登記過的
+             phase 與理由、done 有證據、目錄與登記冊逐條對得上、退役碼只能是
+             pending）、project_rows()（給策略 repo 自我檢查）。
+          3. 新 scripts/render_guides.py：由錯誤目錄＋登記冊產生
+             docs/guides/fleet-risk-register.html（改為 v2 四級、33 條、各策略
+             實作狀態），由登記冊產生新頁 docs/guides/fleet-rollout-register.html。
+             兩頁不可手改，CI 比對重新產生的結果。
+          4. 新 tests/test_rollout_registry.py（30 條）：打包登記冊一致、每條規則
+             各有一個反例、兩頁＝重新產生、頁面不以 innerHTML 注入資料。
+          兩頁已用無頭 Chromium 在桌機／400px 手機 × 淺色／深色實測：無主控台
+          錯誤、無橫向捲動、篩選按鈕行為正確。
+受影響消費專案：無執行期影響（登記冊只有測試與頁面產生器讀取）。
+          策略 repo 之後可升級並以 project_rows() 加自我檢查（計畫 W3/W4）。
+部署入口：無（純函式庫 + 資料 + 靜態頁）。
+版本驗證：pyproject.toml version == 0.20.0；trade_alerts.__version__ ==
+          "0.20.0"。
+服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

@@ -2,455 +2,1132 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
   :root{
-    --paper:#F1F3EC;
-    --paper-raised:#FAFBF6;
-    --line:#DBE0D0;
-    --ink:#1F2A22;
-    --ink-soft:#57604E;
-    --ink-faint:#8A9080;
-    --accent:#5B3A5C;
-    --accent-bg:#EDE3EC;
-    --accent-line:#C9AECB;
-
-    --r4:#963025; --r4-bg:#F4E1DD; --r4-line:#DBAA9F;
-    --r3:#8C6317; --r3-bg:#F1E6C9; --r3-line:#D8BE84;
-    --r2:#357357; --r2-bg:#DEEAE3; --r2-line:#A9CBBA;
-    --r1:#33547A; --r1-bg:#DEE6EE; --r1-line:#A8BFD7;
-    --r0:#6B7566; --r0-bg:#E7EAE0; --r0-line:#C3C9B6;
-
-    --shadow: 0 1px 0 rgba(31,42,34,.06);
+    --paper:#F1F3EC; --paper-raised:#FAFBF6; --line:#DBE0D0;
+    --ink:#1F2A22; --ink-soft:#57604E; --ink-faint:#8A9080;
+    --accent:#5B3A5C; --accent-bg:#EDE3EC; --accent-line:#C9AECB;
+    --R3:#963025; --R3-bg:#F4E1DD;
+    --R2:#8C6317; --R2-bg:#F1E6C9;
+    --R1:#357357; --R1-bg:#DEEAE3;
+    --R0:#6B7566; --R0-bg:#E7EAE0;
+    --done:#357357; --done-bg:#DEEAE3;
+    --pending:#8C6317; --pending-bg:#F1E6C9;
+    --na:#6B7566; --na-bg:#E7EAE0;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --paper:#18150F;
-      --paper-raised:#211D16;
-      --line:#332D22;
-      --ink:#EDE6D8;
-      --ink-soft:#B7AF9C;
-      --ink-faint:#847C6C;
-      --accent:#C6A0C8;
-      --accent-bg:#302733;
-      --accent-line:#5A455C;
-
-      --r4:#E58A7C; --r4-bg:#3A241F; --r4-line:#5C332B;
-      --r3:#D9B364; --r3-bg:#382D18; --r3-line:#5A4623;
-      --r2:#7FC6A2; --r2-bg:#1D3227; --r2-line:#2E4F3C;
-      --r1:#8FB4DD; --r1-bg:#1F2E3E; --r1-line:#2D4560;
-      --r0:#A6AD97; --r0-bg:#292B21; --r0-line:#3E4234;
+      --paper:#18150F; --paper-raised:#211D16; --line:#332D22;
+      --ink:#EDE6D8; --ink-soft:#B7AF9C; --ink-faint:#847C6C;
+      --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
+      --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
+      --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
+      --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
     }
   }
   :root[data-theme="dark"]{
-    --paper:#18150F;
-    --paper-raised:#211D16;
-    --line:#332D22;
-    --ink:#EDE6D8;
-    --ink-soft:#B7AF9C;
-    --ink-faint:#847C6C;
-    --accent:#C6A0C8;
-    --accent-bg:#302733;
-    --accent-line:#5A455C;
-
-    --r4:#E58A7C; --r4-bg:#3A241F; --r4-line:#5C332B;
-    --r3:#D9B364; --r3-bg:#382D18; --r3-line:#5A4623;
-    --r2:#7FC6A2; --r2-bg:#1D3227; --r2-line:#2E4F3C;
-    --r1:#8FB4DD; --r1-bg:#1F2E3E; --r1-line:#2D4560;
-    --r0:#A6AD97; --r0-bg:#292B21; --r0-line:#3E4234;
+    --paper:#18150F; --paper-raised:#211D16; --line:#332D22;
+    --ink:#EDE6D8; --ink-soft:#B7AF9C; --ink-faint:#847C6C;
+    --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
+    --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
+    --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
+    --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
   }
-
   *{box-sizing:border-box;}
-  body{
-    margin:0;
-    background:var(--paper);
-    color:var(--ink);
-    font-family:"Noto Sans TC","IBM Plex Mono",sans-serif;
-    padding-inline:20px;
-    padding-block:40px 64px;
-  }
-  .wrap{max-width:840px;margin-inline:auto;}
-
-  .eyebrow{
-    font-family:"IBM Plex Mono",monospace;
-    font-size:12px;
-    font-weight:600;
-    letter-spacing:.12em;
-    text-transform:uppercase;
-    color:var(--ink-faint);
-  }
-  h1{
-    font-family:"Noto Serif TC",serif;
-    font-weight:900;
-    font-size:clamp(28px,5vw,40px);
-    line-height:1.25;
-    margin:6px 0 12px;
-    text-wrap:balance;
-    letter-spacing:.01em;
-  }
-  .lede{
-    font-size:15.5px;
-    line-height:1.75;
-    color:var(--ink-soft);
-    max-width:56ch;
-    margin:0 0 28px;
-  }
-  .lede b{color:var(--ink);font-weight:700;}
-
-  /* ---- legend strip: the "stamp key" on the inside cover ---- */
-  .legend{
-    display:grid;
-    grid-template-columns:repeat(5,1fr);
-    gap:1px;
-    background:var(--line);
-    border:1px solid var(--line);
-    border-radius:3px;
-    overflow:hidden;
-    margin-bottom:28px;
-  }
-  .legend-item{
-    background:var(--paper-raised);
-    padding:14px 12px 12px;
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-  }
-  .legend-code{
-    font-family:"IBM Plex Mono",monospace;
-    font-weight:600;
-    font-size:12px;
-    letter-spacing:.06em;
-    display:inline-flex;
-    align-items:center;
-    gap:5px;
-  }
-  .legend-code::before{
-    content:"";
-    width:8px;height:8px;border-radius:50%;
-    background:var(--dot);
-    flex:none;
-  }
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans TC","IBM Plex Mono",sans-serif;padding:40px 20px 64px;}
+  .wrap{max-width:860px;margin-inline:auto;}
+  .eyebrow{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);}
+  h1{font-family:"Noto Serif TC",serif;font-weight:900;font-size:clamp(28px,5vw,40px);line-height:1.25;margin:6px 0 12px;}
+  h2{font-family:"Noto Serif TC",serif;font-weight:700;font-size:20px;margin:36px 0 12px;}
+  .lede{font-size:15.5px;line-height:1.75;color:var(--ink-soft);max-width:60ch;margin:0 0 24px;}
+  .lede b{color:var(--ink);}
+  .legend{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-bottom:24px;}
+  .legend-item{background:var(--paper-raised);padding:14px 12px 12px;display:flex;flex-direction:column;gap:6px;}
+  .legend-code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-weight:600;font-size:12px;}
   .legend-name{font-size:13px;font-weight:700;line-height:1.3;}
   .legend-sub{font-size:11.5px;color:var(--ink-faint);line-height:1.5;}
-
-  .lg-r4{--dot:var(--r4);} .lg-r4 .legend-code{color:var(--r4);}
-  .lg-r3{--dot:var(--r3);} .lg-r3 .legend-code{color:var(--r3);}
-  .lg-r2{--dot:var(--r2);} .lg-r2 .legend-code{color:var(--r2);}
-  .lg-r1{--dot:var(--r1);} .lg-r1 .legend-code{color:var(--r1);}
-  .lg-r0{--dot:var(--r0);} .lg-r0 .legend-code{color:var(--r0);}
-
-  /* ---- filter chips ---- */
-  .filters{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-    margin-bottom:32px;
-  }
-  .chip{
-    font-family:"Noto Sans TC",sans-serif;
-    font-size:13px;
-    font-weight:500;
-    padding:7px 14px;
-    border-radius:999px;
-    border:1px solid var(--line);
-    background:var(--paper-raised);
-    color:var(--ink-soft);
-    cursor:pointer;
-    transition:background .15s,color .15s,border-color .15s;
-  }
-  .chip:hover{border-color:var(--accent-line);color:var(--ink);}
+  .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+  .chip{font:inherit;font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--paper-raised);color:var(--ink-soft);cursor:pointer;}
+  .chip[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent);font-weight:700;}
   .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-  .chip[aria-pressed="true"]{
-    background:var(--accent-bg);
-    border-color:var(--accent-line);
-    color:var(--accent);
-    font-weight:700;
-  }
-  .chip .n{
-    font-family:"IBM Plex Mono",monospace;
-    font-variant-numeric:tabular-nums;
-    opacity:.75;
-    margin-inline-start:2px;
-  }
-
-  /* ---- register sections ---- */
-  section.tier{margin-bottom:8px;}
-  .tier-head{
-    display:flex;
-    align-items:baseline;
-    gap:12px;
-    padding:14px 16px;
-    border-radius:3px 3px 0 0;
-    border-inline-start:4px solid var(--edge);
-  }
-  .tier-code{
-    font-family:"IBM Plex Mono",monospace;
-    font-weight:600;
-    font-size:13px;
-    letter-spacing:.08em;
-    color:var(--txt);
-    flex:none;
-  }
-  .tier-title{
-    font-family:"Noto Serif TC",serif;
-    font-weight:700;
-    font-size:17px;
-    color:var(--ink);
-  }
-  .tier-count{
-    font-family:"IBM Plex Mono",monospace;
-    font-variant-numeric:tabular-nums;
-    font-size:12px;
-    color:var(--ink-faint);
-    margin-inline-start:auto;
-    flex:none;
-    white-space:nowrap;
-  }
-
-  .t-r4{--edge:var(--r4);--bg:var(--r4-bg);--txt:var(--r4);}
-  .t-r3{--edge:var(--r3);--bg:var(--r3-bg);--txt:var(--r3);}
-  .t-r2{--edge:var(--r2);--bg:var(--r2-bg);--txt:var(--r2);}
-  .t-r1{--edge:var(--r1);--bg:var(--r1-bg);--txt:var(--r1);}
-  .t-r0{--edge:var(--r0);--bg:var(--r0-bg);--txt:var(--r0);}
-  .tier-head{background:var(--bg);}
-
-  .rows{
-    border-inline-start:4px solid var(--line);
-    border-block-end:1px solid var(--line);
-  }
-  .row{
-    display:grid;
-    grid-template-columns:104px 1fr;
-    gap:16px;
-    padding:14px 16px;
-    border-block-start:1px solid var(--line);
-  }
-  .row-bot{
-    font-size:11.5px;
-    font-weight:700;
-    color:var(--ink-soft);
-    padding:3px 8px;
-    border:1px solid var(--line);
-    border-radius:999px;
-    background:var(--paper-raised);
-    text-align:center;
-    align-self:start;
-    white-space:nowrap;
-  }
-  .row-body p{
-    margin:0;
-    font-size:14.5px;
-    line-height:1.7;
-  }
-  .row-what{color:var(--ink);font-weight:500;}
-  .row-how{color:var(--ink-soft);margin-top:5px;}
-  .row-how b{color:var(--ink);font-weight:700;}
-
-  section.tier[hidden]{display:none;}
-  .row[hidden]{display:none;}
-
-  @media (max-width:520px){
-    .legend{grid-template-columns:1fr 1fr;}
-    .row{grid-template-columns:1fr;}
-    .row-bot{justify-self:start;}
+  .chip .n{font-family:"IBM Plex Mono","Noto Sans TC",monospace;opacity:.75;margin-inline-start:4px;}
+  .tier-head{display:flex;align-items:baseline;gap:12px;padding:14px 16px;border-radius:3px 3px 0 0;border-inline-start:4px solid var(--edge);background:var(--bg);margin-top:20px;}
+  .tier-code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-weight:600;font-size:13px;color:var(--edge);}
+  .tier-title{font-family:"Noto Serif TC",serif;font-weight:700;font-size:17px;}
+  .tier-count{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;color:var(--ink-faint);margin-inline-start:auto;}
+  .rows{border-inline-start:4px solid var(--line);border-block-end:1px solid var(--line);}
+  .row{display:grid;grid-template-columns:104px 1fr;gap:16px;padding:14px 16px;border-block-start:1px solid var(--line);}
+  .row-bot{font-size:11.5px;font-weight:700;color:var(--ink-soft);padding:3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--paper-raised);text-align:center;align-self:start;white-space:nowrap;}
+  .row-body p{margin:0;font-size:14.5px;line-height:1.7;}
+  .row-title{font-weight:700;}
+  .row-what{color:var(--ink);margin-top:2px !important;}
+  .row-how{color:var(--ink-soft);margin-top:5px !important;}
+  .code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;color:var(--ink-faint);}
+  .card p.desc{margin-top:2px;}
+  .status{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .st{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;color:var(--c);background:var(--cb);}
+  .st-done{--c:var(--done);--cb:var(--done-bg);} .st-pending{--c:var(--pending);--cb:var(--pending-bg);} .st-na{--c:var(--na);--cb:var(--na-bg);}
+  .note{font-size:13px;color:var(--ink-soft);margin-top:6px !important;line-height:1.6;}
+  details{margin-top:8px;font-size:13.5px;}
+  details summary{cursor:pointer;color:var(--accent);font-weight:700;}
+  details ol{margin:6px 0 0;padding-inline-start:22px;line-height:1.7;}
+  details pre{white-space:pre-wrap;background:var(--paper-raised);border:1px solid var(--line);border-radius:3px;padding:10px;font-size:12.5px;line-height:1.6;}
+  .card{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:14px 16px;margin-bottom:12px;}
+  .card h3{margin:0 0 4px;font-size:15.5px;}
+  .card p{margin:0;font-size:13.5px;color:var(--ink-soft);line-height:1.6;}
+  .grid{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;margin-top:10px;font-size:13.5px;line-height:1.6;}
+  .grid .who{font-weight:700;color:var(--ink-soft);}
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;}
+  .summary div{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:10px 12px;font-size:13px;line-height:1.7;}
+  .summary b{display:block;font-size:14px;}
+  [hidden]{display:none !important;}
+  @media (max-width:560px){
+    .legend,.summary{grid-template-columns:1fr 1fr;}
+    .row{grid-template-columns:1fr;} .row-bot{justify-self:start;}
+    .grid{grid-template-columns:1fr;}
     body{padding-inline:16px;}
   }
-
-  .foot{
-    margin-top:36px;
-    font-size:12px;
-    color:var(--ink-faint);
-    line-height:1.7;
-    border-block-start:1px solid var(--line);
-    padding-top:16px;
-  }
+  .foot{margin-top:36px;font-size:12px;color:var(--ink-faint);line-height:1.7;border-block-start:1px solid var(--line);padding-top:16px;}
 </style>
 
 <div class="wrap">
-  <div class="eyebrow">交易機隊 · 錯誤處理設計</div>
+  <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>30 種</b>，依照「系統會不會自己處理、要不要通知人」分成五個等級。
-    點下面的等級或策略可以篩選；一般情況下你只需要在意最上面的紅色那一段。
+    四支策略目前所有已知的「出問題」情況，共 <b>33 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>30 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
-
   <div class="legend">
-    <div class="legend-item lg-r4">
-      <span class="legend-code">R4</span>
-      <span class="legend-name">一定要人處理</span>
-      <span class="legend-sub">系統絕不自己動手</span>
-    </div>
-    <div class="legend-item lg-r3">
-      <span class="legend-code">R3</span>
-      <span class="legend-name">先通知，晚一點自動做</span>
-      <span class="legend-sub">你沒空理，過一陣子系統自己做</span>
-    </div>
-    <div class="legend-item lg-r2">
-      <span class="legend-code">R2</span>
-      <span class="legend-name">自動處理，幾乎沒風險</span>
-      <span class="legend-sub">不特別通知，事後可查</span>
-    </div>
-    <div class="legend-item lg-r1">
-      <span class="legend-code">R1</span>
-      <span class="legend-name">想出辦法才通知你</span>
-      <span class="legend-sub">是建議，等你核准</span>
-    </div>
-    <div class="legend-item lg-r0">
-      <span class="legend-code">R0</span>
-      <span class="legend-name">只是記一筆</span>
-      <span class="legend-sub">不通知任何人</span>
-    </div>
+    <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+    <div class="legend-item"><span class="legend-code" style="color:var(--R2)">R2</span><span class="legend-name">系統先自己試，試不起來才找你</span><span class="legend-sub">連續失敗 3 次才通知一次，附給 AI 的追查指令</span></div>
+    <div class="legend-item"><span class="legend-code" style="color:var(--R1)">R1</span><span class="legend-name">自動處理，不通知</span><span class="legend-sub">沒有第二個選項，做完留紀錄</span></div>
+    <div class="legend-item"><span class="legend-code" style="color:var(--R0)">R0</span><span class="legend-name">只是記一筆</span><span class="legend-sub">不需要處理，不通知任何人</span></div>
   </div>
-
-  <div class="filters" id="filters" role="group" aria-label="依風險等級或策略篩選"></div>
-
+  <div id="filters"></div>
   <div id="register"></div>
-
   <div class="foot">
-    資料來源：機隊共用的錯誤分類清單（trade-alerts <code>fleet-error-catalog-v1</code>）。<br>
-    「趨勢策略」「動能策略」「競賽策略」「加密策略」各自獨立運作；「全機隊」是四支共用的同一種機制。
+    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-09-18 盤點）。
+    本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
   </div>
 </div>
 
+<script type="application/json" id="data">
+{
+ "bots": [
+  {
+   "id": "seykota",
+   "label": "趨勢策略"
+  },
+  {
+   "id": "momentum",
+   "label": "動能策略"
+  },
+  {
+   "id": "mycrypto",
+   "label": "加密策略"
+  },
+  {
+   "id": "btc-competition",
+   "label": "競賽策略"
+  },
+  {
+   "id": "fleet",
+   "label": "全機隊"
+  }
+ ],
+ "entries": [
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "evidence": "src/seykota_bot/bot.py:399 _clear_automatic_safe_halt 確認已平倉後自動解除",
+    "state": "done"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
+   "direction": "不需要做任何決定：倉位已經平掉，交易所上沒有沒保護的部位。系統會自己解除暫停，下一輪照常評估進場。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [],
+   "tier": "R1",
+   "title": "開倉後停損掛單失敗，緊急市價平倉成功",
+   "what": "開倉後想掛停損單失敗，但系統立刻用市價把這筆倉位整個平掉，而且成功了。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次「停損掛單失敗、緊急市價平倉也失敗」的根本原因：讀 src/seykota_bot/bot.py 開倉後掛保護單與緊急平倉的流程，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是下單規則、API 權限、餘額還是網路問題，說明交易所上現在的部位狀態該怎麼確認，並提出治本修正。",
+   "behaviour": {
+    "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）",
+    "state": "done"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
+   "direction": "這是全機隊最嚴重的一種。系統已經停下來，不會自動下任何單。交易所上的實際部位是標準答案，要人立刻去處理。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [
+    "立刻到交易所 App 查這個交易對有沒有倉位。",
+    "有倉位：手動平倉，或補掛一張停損單。",
+    "確認交易所上沒有沒保護的倉位。確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）",
+   "what": "開倉後想掛停損單失敗，緊急用市價平倉也失敗——交易所上可能還留著完全沒有保護的真實倉位。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損換單失敗、且自動重掛也連續失敗的根本原因：讀 src/seykota_bot/bot.py 換單流程（取消舊單→掛新單）與重掛邏輯，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是價格／數量規則、API 錯誤還是網路問題，並提出治本修正。",
+   "behaviour": {
+    "phase": "8-seykota",
+    "reason": "目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.PROTECTION_REPLACE_FAILED",
+   "direction": "系統會立刻用原本的停損價重掛一張保護單，最多試 3 次；3 次都失敗才通知你。收到通知代表倉位此刻仍沒有交易所端的停損保護，要盡快處理。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [
+    "到交易所 App 確認這筆倉位目前有沒有停損單。",
+    "沒有的話，手動掛一張停損單（價格用訊息裡的停損價），或直接平倉。",
+    "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "移動停損換單失敗，舊停損單已取消，部位目前無交易所端保護",
+   "what": "要把移動停損換到新價位，舊單已經取消，但新單沒掛上——這段時間倉位是沒有保護的。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查換單時舊停損單取消失敗、且自動重試也失敗的原因：讀 src/seykota_bot/bot.py 取消舊單的流程與錯誤處理，對照 journal 與交易所錯誤碼，判斷是單已不存在、權限還是 API 問題，並提出治本修正。",
+   "behaviour": {
+    "phase": "8-seykota",
+    "reason": "目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
+   "direction": "系統只會取消它自己記錄的那張舊停損單，而且會先確認新的保護單已經掛上才動手，最多試 3 次；條件不成立或都失敗才通知你。殘留的停損單如果被觸發，可能提早平掉目前的倉位。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [
+    "到交易所 App 的委託清單找訊息裡那張停損單編號。",
+    "確認它不是目前倉位正在用的保護單後，手動取消。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "換單時舊停損單取消失敗，可能殘留在交易所",
+   "what": "換停損單時，舊單本該被取消卻取消失敗，可能還留在交易所上。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查平倉後停損單取消失敗、且自動重試也失敗的原因：讀 src/seykota_bot/bot.py 平倉後清理保護單的流程，對照 journal 與交易所錯誤碼，並提出治本修正。",
+   "behaviour": {
+    "phase": "8-seykota",
+    "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
+   "direction": "系統會先確認倉位真的已經平掉，再取消它自己記錄的那張停損單，最多試 3 次；條件不成立或都失敗才通知你。殘留的單通常不會成交，但留著可能在之後開新倉時造成誤判。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [
+    "到交易所 App 的委託清單找訊息裡那張停損單編號。",
+    "還在的話手動取消；已經不在（自行失效）就不用處理。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "平倉後停損單取消失敗，可能還掛在交易所",
+   "what": "平倉後要收掉停損單卻收不掉，可能還掛著。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼系統無法唯一確認這個倉位的原生保護單：讀 src/seykota_bot/bot.py 的保護單核對邏輯（_verified_exchange_protective_stop 一帶），對照交易所目前的委託清單，判斷是保護單不存在、有多張、還是欄位對不上，並提出治本修正。",
+   "behaviour": {
+    "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）",
+    "state": "done"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.PROTECTION_UNVERIFIED",
+   "direction": "系統先停下來、不新增任何風險。交易所的實際委託是標準答案：要確認這個倉位有沒有、有幾張保護單。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [
+    "到交易所 App 查這個交易對的倉位與委託清單。",
+    "沒有停損單：補掛一張；有多張：取消多餘的，只留一張。",
+    "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "交易所存在部位，但沒有可唯一確認的原生保護單",
+   "what": "交易所上有倉位，但系統找不到能確定屬於這個倉位的停損單。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼交易所回報的部位無法唯一辨識：讀 src/seykota_bot/bot.py 的 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了，並提出治本修正。",
+   "behaviour": {
+    "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）",
+    "state": "done"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.POSITION_AMBIGUOUS",
+   "direction": "系統停下來，等人確認交易所上的實際部位。交易所資料是標準答案。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [
+    "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）。",
+    "如果有不該存在的倉位（例如手動開的），先處理掉。",
+    "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "交易所部位資料無法唯一辨識",
+   "what": "交易所回報的倉位資料，系統看不懂或認不出來是哪一筆。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。",
+   "behaviour": {
+    "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）",
+    "state": "done"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.RECONCILE_FAILED",
+   "direction": "系統每一輪會自動重試，連續 3 次都失敗才暫停策略並通知你。常見原因是交易所 API 故障或金鑰權限變動。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的錯誤原因。",
+    "確認交易所連線與 API 金鑰權限正常。",
+    "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "非暫時性的持倉同步失敗",
+   "what": "跟交易所對帳反覆失敗，不是網路暫時斷線那種小問題。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「執行模式與交易所目標不符」：先確認目前設定與交易所目標各是什麼、為什麼會不一致；再檢查 src/seykota_bot/safe_halt_resume.py 為什麼拒絕清除這一類暫停（已知缺陷：改好設定重啟後仍清不掉），提出讓「改好設定＋重啟」就能恢復的修正。",
+   "behaviour": {
+    "phase": "8-seykota",
+    "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.EXCHANGE_TARGET_UNSAFE",
+   "direction": "整支策略立刻全部停擺、拒絕任何操作。一定要先把設定改對，不能直接解除。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [
+    "檢查 seykota 的執行模式設定與交易所連線目標，改成一致。",
+    "改好後重啟 seykota-bot 服務。",
+    "注意：目前有已知缺陷——改好設定重啟後，暫停狀態可能仍清不掉（解除工具會拒絕這一類）。遇到時把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）",
+   "what": "系統本來設定要連模擬帳戶，卻接到了真實帳戶（或反過來）——設定跟目標不一致。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「真倉固定訂單識別能力不足」：讀 src/seykota_bot/bot.py 的 _require_live_fixed_identifier_contract 看它檢查什麼、為什麼沒通過；並檢查 src/seykota_bot/safe_halt_resume.py 為什麼拒絕清除這一類暫停（已知缺陷），提出治本修正。",
+   "behaviour": {
+    "phase": "8-seykota",
+    "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+   "direction": "系統停下來，拒絕所有真倉操作。要先確認交易所帳號與 API 能力沒問題，不能直接解除。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [
+    "確認交易所帳號權限與 API 設定（是否支援自訂訂單編號）。",
+    "確認沒問題後重啟 seykota-bot 服務。",
+    "注意：目前有已知缺陷——重啟後暫停狀態可能仍清不掉（解除工具會拒絕這一類）。遇到時把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "真倉固定訂單識別能力不足",
+   "what": "在真倉模式下，系統沒辦法精確辨識自己下的每一張單。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這個未分類的執行期例外：從 seykota-bot 的 journal 找出連續失敗的例外訊息與堆疊，定位 src/seykota_bot/ 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。",
+   "behaviour": {
+    "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）",
+    "state": "done"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.RUNTIME_CYCLE_FAILED",
+   "direction": "系統每一輪會自動重試，連續 3 次都失敗才暫停策略並通知你。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的錯誤內容。",
+    "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "未分類的執行期例外（run_forever catch-all）",
+   "what": "程式運作中出現一個沒被特別分類過的錯誤（各種意外狀況都算）。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "evidence": "程式已照目錄描述處理（Phase 3）",
+    "state": "done"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.CLOSE_FILL_PENDING",
+   "direction": "系統已經把倉位標成已平倉，下一輪會自己把成交細節補進紀錄。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [],
+   "tier": "R0",
+   "title": "交易所部位已消失，等待平倉成交資料回填",
+   "what": "交易所上的倉位已經消失（代表已經平倉了），只是成交細節還沒補進記錄。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "evidence": "程式已照目錄描述處理（Phase 3）",
+    "state": "done"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.TRADE_EXIT",
+   "direction": "正常平倉，系統已經記錄並結算。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [],
+   "tier": "R0",
+   "title": "原生停損觸發的正常平倉",
+   "what": "原生停損正常觸發，倉位正常平掉。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "evidence": "程式已照目錄描述處理（Phase 3）",
+    "state": "done"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
+   "direction": "下一次訊號再評估。要不要加本金是投資決定，不是錯誤處理。",
+   "emits_event": {
+    "phase": "8-seykota",
+    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+   ],
+   "open": true,
+   "steps": [],
+   "tier": "R0",
+   "title": "權益低於最低下單資金，跳過本次進場",
+   "what": "帳戶裡的資金不夠最低下單金額，這次先跳過不進場。"
+  },
+  {
+   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼移動停損單無法驗證：讀 src/strategy.py 的 _ensure_native_trailing_stop 與相關核對函式，對照交易所目前的委託清單與 state/state.json，判斷是單不存在、有多張、還是單號與 state 不一致，並提出治本修正。",
+   "behaviour": {
+    "evidence": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除",
+    "state": "done"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.PROTECTION_UNVERIFIED",
+   "direction": "系統停下來，等人確認交易所上的實際委託。交易所資料是標準答案。",
+   "emits_event": {
+    "phase": "8-momentum",
+    "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知）"
+   ],
+   "open": true,
+   "steps": [
+    "到交易所 App 查這個交易對的倉位與委託清單，確認有恰好一張相符的移動停損單。",
+    "沒有就補掛；有多張就取消多餘的。",
+    "確認後解除暫停：在 momentum 主機 /opt/mexc-4h-momentum-trailing-stop 執行 `python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl` 取得確認碼，再加上 `--apply --confirm <確認碼> --exchange-verified` 執行一次。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "原生移動停損無法驗證",
+   "what": "交易所上的移動停損單，系統驗證不出它到底存不存在。"
+  },
+  {
+   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 協助確認一次 state 修復是否正確：讀 src/safe_halt_state_repair.py 的修復紀錄與 audit/ 下對應的證據，比對 audit/trading_ledger.jsonl 與交易所歷史成交，列出不一致的地方；並追查當初為什麼需要手動修 state。",
+   "behaviour": {
+    "evidence": "src/safe_halt_state_repair.py:148 修完主動暫停，等人解除",
+    "state": "done"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.STATE_REPAIRED_SAFE_HALT",
+   "direction": "這是刻意設計：工具改過帳目，一定要等人確認改得對，系統才能繼續跑。",
+   "emits_event": {
+    "phase": "8-momentum",
+    "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知）"
+   ],
+   "open": true,
+   "steps": [
+    "對照交易所的歷史成交，確認工具修過的那幾筆平倉紀錄正確。",
+    "確認後解除暫停：在 momentum 主機 /opt/mexc-4h-momentum-trailing-stop 執行 `python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl` 取得確認碼，再加上 `--apply --confirm <確認碼> --exchange-verified` 執行一次。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "工具修復本地 state 後主動 latch，等人明確解除",
+   "what": "有人用工具手動修過本地紀錄，工具修完後故意讓系統停下來。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "evidence": "src/main.py 寫錯誤心跳、下一輪重試（Phase 3）",
+    "state": "done"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.RUNTIME_CYCLE_FAILED",
+   "direction": "系統記一筆「有狀況」的標記，下一輪照常重試，不會停下來。",
+   "emits_event": {
+    "phase": "8-momentum",
+    "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知）"
+   ],
+   "open": true,
+   "steps": [],
+   "tier": "R0",
+   "title": "run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）",
+   "what": "程式運作中出現一個沒被特別分類過的錯誤。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "phase": "v2-W3",
+    "reason": "目前受過渡開關控制、成功後還會發事後通知；v2 移除開關、成功不通知。",
+    "state": "pending"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+   "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
+   "emits_event": {
+    "phase": "v2-W3",
+    "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 目前受過渡開關控制、成功後還會發事後通知；v2 移除開關、成功不通知。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
+    "白話通知未做 — 有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+   ],
+   "open": true,
+   "steps": [],
+   "tier": "R1",
+   "title": "無歧義的孤兒平倉已自動補寫進帳本",
+   "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。"
+  },
+  {
+   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
+   "behaviour": {
+    "phase": "v2-W3",
+    "reason": "退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。",
+    "state": "pending"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
+   "emits_event": {
+    "phase": "v2-W3",
+    "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
+    "白話通知未做 — 有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+   ],
+   "open": true,
+   "steps": [
+    "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」的三步，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+    "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "孤兒平倉已算出修復方案，附提案通知",
+   "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
+  },
+  {
+   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
+   "behaviour": {
+    "evidence": "scripts/repair_bot.py:153 帳本已有半套修復或寫入失敗即停手、開請求、不重試",
+    "state": "done"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+   "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
+   "emits_event": {
+    "phase": "v2-W3",
+    "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+   ],
+   "open": true,
+   "steps": [
+    "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
+    "確認修正步驟後照做（手動流程見momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
+    "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
+   ],
+   "tier": "R3",
+   "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+   "what": "動能策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。"
+  },
+  {
+   "ai_prompt": "請在 btc-bull-market-competition 追查為什麼本地帳本出現負的或不可能的餘額：讀 src/btc_competition/runner.py 的 _holdings_unverified 與 executor.fetch_balances，比對本地 state/帳本與交易所實際餘額，找出差異從哪一筆交易開始，提出讓本地與交易所一致的修正步驟（先給我確認再執行）與治本修正。",
+   "behaviour": {
+    "evidence": "src/btc_competition/runner.py:347 暫停並等人以 btc-competition-resume 解除",
+    "state": "done"
+   },
+   "bot": "btc-competition",
+   "bot_label": "競賽策略",
+   "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+   "direction": "系統停下來。交易所的實際餘額是標準答案，要先讓本地記錄跟交易所一致。",
+   "emits_event": {
+    "phase": "8-btc-competition",
+    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+   ],
+   "open": true,
+   "steps": [
+    "到交易所 App 查每個資產的實際餘額。",
+    "對照本地記錄，找出是哪個資產、差多少。",
+    "確認後解除暫停：在 btc 主機執行 `btc-competition-resume preview` 取得確認碼，再執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "出現負／不可能的餘額，本地帳本本身不可信",
+   "what": "帳上出現負的、或不可能存在的金額——代表這份本地記錄本身已經不能信了。"
+  },
+  {
+   "ai_prompt": "請在 btc-bull-market-competition 追查再平衡為什麼連續零成交、自動重試也失敗：讀 src/btc_competition/runner.py 與 executor 的下單流程，對照日誌與交易所回應，判斷是下單量低於最小值、餘額、價格保護還是 API 問題，並提出治本修正。",
+   "behaviour": {
+    "phase": "8-btc-competition",
+    "reason": "目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。",
+    "state": "pending"
+   },
+   "bot": "btc-competition",
+   "bot_label": "競賽策略",
+   "code": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+   "direction": "系統會自動重新取價、重算下單量再試一次完整的調整，最多 3 次；都失敗才通知你。",
+   "emits_event": {
+    "phase": "8-btc-competition",
+    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）",
+    "白話通知未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的失敗原因（常見：交易所最小下單量、餘額不足、交易對暫停交易）。",
+    "確認交易所帳戶餘額與交易對狀態正常。",
+    "確認後解除暫停：在 btc 主機執行 `btc-competition-resume preview` 取得確認碼，再執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "連續 3 天該再平衡卻零成交",
+   "what": "連續 3 天該重新調整持倉比例，卻完全成交不了任何一筆。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "evidence": "src/btc_competition/runner.py pending_target_weights 下一輪續做（Phase 3）",
+    "state": "done"
+   },
+   "bot": "btc-competition",
+   "bot_label": "競賽策略",
+   "code": "BTC.REBALANCE_PENDING",
+   "direction": "剩下的部分下一輪會自動繼續做。",
+   "emits_event": {
+    "phase": "8-btc-competition",
+    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+   ],
+   "open": true,
+   "steps": [],
+   "tier": "R0",
+   "title": "部分成交，目標權重尚未達成",
+   "what": "這次調整持倉只成交了一部分，目標比例還沒完全達到。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "evidence": "src/btc_competition/runner.py 寫錯誤心跳、隔天重試（Phase 3）",
+    "state": "done"
+   },
+   "bot": "btc-competition",
+   "bot_label": "競賽策略",
+   "code": "BTC.RUNTIME_CYCLE_FAILED",
+   "direction": "系統記一筆「有狀況」的標記，隔天自動重試。",
+   "emits_event": {
+    "phase": "8-btc-competition",
+    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+   ],
+   "open": true,
+   "steps": [],
+   "tier": "R0",
+   "title": "runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）",
+   "what": "程式運作中出現一個沒被特別分類過的錯誤。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "evidence": "mexc_futures_bot.py:713 只記錄差額，不影響交易（Phase 4e 定案）",
+    "state": "done"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.RECONCILE_DELTA_EXCEEDED",
+   "direction": "這個落差就是手續費：交易所回報的是扣手續費前的數字，本地記的是扣完的淨額。不是異常，只記錄備查。",
+   "emits_event": {
+    "evidence": "mexc_futures_bot.py:713 append_fleet_event（R0）",
+    "state": "done"
+   },
+   "notes": [],
+   "open": false,
+   "steps": [],
+   "tier": "R0",
+   "title": "本地帳本與交易所回報損益差額超過容忍值",
+   "what": "本地帳本算出來的賺賠，跟交易所回報的賺賠有落差。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot 追查這個連續發生的未分類例外：從 my-crypto 的日誌找出例外訊息與堆疊，定位 mexc_futures_bot.py 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。",
+   "behaviour": {
+    "phase": "8-mycrypto",
+    "reason": "目前：每次都照常重試，但沒有計數、連續失敗也不會升格。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.RUNTIME_CYCLE_FAILED",
+   "direction": "系統下一輪會自動重試，連續 3 次都失敗才通知你。",
+   "emits_event": {
+    "phase": "8-mycrypto",
+    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 目前：每次都照常重試，但沒有計數、連續失敗也不會升格。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
+    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的錯誤內容與 my-crypto 的日誌。",
+    "確認 my-crypto 服務仍在運作、交易所連線與設定正常。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "未分類的執行期例外（catch-all）",
+   "what": "程式運作中出現一個沒被特別分類過的錯誤。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot 追查為什麼開倉後的停損單被交易所拒絕：讀 mexc_futures_bot.py 掛保護單的流程與交易所回傳的錯誤碼，判斷是價格／數量規則、槓桿設定還是 API 參數問題，並提出治本修正。",
+   "behaviour": {
+    "evidence": "不自動下單（現行行為即符合 v2）",
+    "state": "done"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.PROTECTION_PLACEMENT_REJECTED",
+   "direction": "系統不會自動下單。交易所上的實際部位是標準答案，要人立刻確認倉位有沒有保護。",
+   "emits_event": {
+    "phase": "8-mycrypto",
+    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+   ],
+   "open": true,
+   "steps": [
+    "立刻到交易所 App 查這個交易對的倉位與停損單。",
+    "沒有停損：手動補掛一張，或直接平倉。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "開倉停損單被交易所拒絕，部位可能沒有交易所端保護",
+   "what": "開倉後想掛的停損單被交易所直接拒絕，這筆倉位可能完全沒有保護。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot 追查開倉後查不到部位、補掛停損也失敗的原因：讀 mexc_futures_bot.py 開倉後查部位（fetch_positions）與掛保護單的流程，對照日誌與交易所回應，並提出治本修正。",
+   "behaviour": {
+    "phase": "8-mycrypto",
+    "reason": "目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
+   "direction": "系統會自動重查部位並補掛停損，最多 3 次；都失敗才通知你。收到通知代表倉位此刻可能沒有停損保護。",
+   "emits_event": {
+    "phase": "8-mycrypto",
+    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
+    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+   ],
+   "open": true,
+   "steps": [
+    "到交易所 App 確認這筆倉位與停損單。",
+    "沒有停損：手動補掛一張，或直接平倉。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "開倉後查不到部位資訊，無法掛停損單",
+   "what": "剛開完倉，卻查不到這筆倉位的資訊，沒辦法掛停損單。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot 追查掛停損單時拋出的例外：讀 mexc_futures_bot.py 掛保護單的流程，對照 my-crypto 的日誌找出例外訊息與堆疊，判斷原因並提出治本修正。",
+   "behaviour": {
+    "evidence": "不自動下單（現行行為即符合 v2）",
+    "state": "done"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.PROTECTION_PLACEMENT_ERROR",
+   "direction": "系統不會自動下單。要人立刻確認交易所上的倉位有沒有保護。",
+   "emits_event": {
+    "phase": "8-mycrypto",
+    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+   ],
+   "open": true,
+   "steps": [
+    "立刻到交易所 App 查這個交易對的倉位與停損單。",
+    "沒有停損：手動補掛一張，或直接平倉。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "掛停損單時拋出例外，部位本身已開",
+   "what": "掛停損單的過程中程式出錯，但倉位本身已經開了，一樣沒有保護。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot 追查移動停損搬移連續失敗的原因：讀 mexc_futures_bot.py 搬移停損單的流程與錯誤處理，對照日誌與交易所錯誤碼，並提出治本修正。",
+   "behaviour": {
+    "phase": "8-mycrypto",
+    "reason": "下一輪會自動重掛（已符合），但連續失敗不會升格通知。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.PROTECTION_REPLACE_FAILED",
+   "direction": "系統下一輪會自動重掛，連續 3 輪都失敗才通知你。收到通知代表倉位此刻沒有交易所端的停損保護。",
+   "emits_event": {
+    "phase": "8-mycrypto",
+    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 下一輪會自動重掛（已符合），但連續失敗不會升格通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
+    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+   ],
+   "open": true,
+   "steps": [
+    "到交易所 App 確認這筆倉位目前有沒有停損單。",
+    "沒有的話手動補掛一張，或直接平倉。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "搬移移動停損單失敗，交易所端目前沒有停損保護",
+   "what": "要把移動停損單搬到新價位卻失敗，交易所端目前沒有停損保護。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot 追查平倉後殘留停損單取消失敗、且自動重試也失敗的原因：讀 mexc_futures_bot.py 平倉後清理保護單的流程，對照日誌與交易所錯誤碼，並提出治本修正。",
+   "behaviour": {
+    "phase": "8-mycrypto",
+    "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
+   "direction": "系統會先確認倉位真的已經平掉，再取消它自己記錄的那張停損單，最多試 3 次；條件不成立或都失敗才通知你。殘留的單通常不會成交，但留著可能在之後開新倉時造成誤判。",
+   "emits_event": {
+    "phase": "8-mycrypto",
+    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
+    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+   ],
+   "open": true,
+   "steps": [
+    "到交易所 App 的委託清單找訊息裡那張停損單編號。",
+    "還在的話手動取消。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "平倉後取消殘留停損單失敗",
+   "what": "平倉後要取消殘留的停損單卻取消失敗。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "state": "done"
+   },
+   "bot": "fleet",
+   "bot_label": "全機隊",
+   "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
+   "direction": "不需要另外處理這個紅燈：同一件事維運通知的「帳本↔交易所」會通知你，照那則處理。",
+   "emits_event": {
+    "state": "n/a"
+   },
+   "notes": [],
+   "open": false,
+   "steps": [],
+   "tier": "R0",
+   "title": "帳本↔交易所對帳 DIVERGED 時故意讓 unit 變紅（exit 2）",
+   "what": "本地帳本跟交易所對不上時，對帳程式故意讓自己的服務顯示紅色失敗。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "state": "done"
+   },
+   "bot": "fleet",
+   "bot_label": "全機隊",
+   "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
+   "direction": "不需要另外處理這個紅燈：同一件事維運通知的「帳本↔Google 表」會通知你，照那則處理。",
+   "emits_event": {
+    "state": "n/a"
+   },
+   "notes": [],
+   "open": false,
+   "steps": [],
+   "tier": "R0",
+   "title": "帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）",
+   "what": "本地帳本跟共用的 Google 表格對不上時，對帳程式故意讓自己的服務顯示紅色失敗。"
+  }
+ ],
+ "tiers": [
+  {
+   "id": "R3",
+   "sub": "系統絕不自己動手，會一直提醒到有人處理",
+   "title": "一定要人處理"
+  },
+  {
+   "id": "R2",
+   "sub": "連續失敗 3 次才通知一次，附給 AI 的追查指令",
+   "title": "系統先自己試，試不起來才找你"
+  },
+  {
+   "id": "R1",
+   "sub": "沒有第二個選項，做完留紀錄",
+   "title": "自動處理，不通知"
+  },
+  {
+   "id": "R0",
+   "sub": "不需要處理，不通知任何人",
+   "title": "只是記一筆"
+  }
+ ]
+}
+</script>
 <script>
-(function(){
-  var BOTS = {
-    seykota:  {label:"趨勢策略", full:"BTC 趨勢策略"},
-    momentum: {label:"動能策略", full:"動能輪動策略"},
-    btc:      {label:"競賽策略", full:"BTC 競賽策略"},
-    mycrypto: {label:"加密策略", full:"加密貨幣策略"},
-    fleet:    {label:"全機隊",   full:"全機隊共用機制"}
-  };
 
-  var TIERS = [
-    {id:"r4", code:"R4", title:"一定要人處理"},
-    {id:"r3", code:"R3", title:"先通知，晚一點自動做"},
-    {id:"r2", code:"R2", title:"自動處理，幾乎沒風險"},
-    {id:"r1", code:"R1", title:"想出辦法才通知你"},
-    {id:"r0", code:"R0", title:"只是記一筆"}
-  ];
-
-  var ENTRIES = [
-    // ---- R4：一定要人處理 ----
-    {tier:"r4", bot:"seykota", what:"開倉後想掛停損單失敗，緊急用市價平倉也失敗——交易所上可能還留著完全沒有保護的真實倉位。", how:"這是全機隊最嚴重的一種。系統整個停下來、不再新增任何風險，<b>必須立刻</b>到交易所人工檢查，處理完才能解除。"},
-    {tier:"r4", bot:"seykota", what:"交易所上有倉位，但系統找不到能確定屬於這個倉位的停損單。", how:"系統先停下來，等人到交易所核對清楚部位跟保護單，補齊或確認後才解除。"},
-    {tier:"r4", bot:"seykota", what:"交易所回報的倉位資料，系統看不懂或認不出來是哪一筆。", how:"系統停下來，等人工核對交易所實際部位後才解除。"},
-    {tier:"r4", bot:"seykota", what:"系統本來設定要連模擬帳戶，卻接到了真實帳戶（或反過來）——設定跟目標不一致。", how:"整支策略立刻全部停擺、拒絕任何操作。要改好設定檔再重新啟動，不能只按一下解除。"},
-    {tier:"r4", bot:"seykota", what:"在真倉模式下，系統沒辦法精確辨識自己下的每一張單。", how:"停下來，拒絕所有真倉操作。要先確認交易所帳號權限沒問題，再重新啟動。"},
-    {tier:"r4", bot:"momentum", what:"交易所上的移動停損單，系統驗證不出它到底存不存在。", how:"停下來，等人核對交易所實際委託後才解除。"},
-    {tier:"r4", bot:"momentum", what:"有人用工具手動修過本地紀錄，工具修完後故意讓系統停下來。", how:"這是刻意設計成這樣：工具改過帳目，就一定要等人親自確認改得對，才能讓系統繼續跑。"},
-    {tier:"r4", bot:"btc", what:"帳上出現負的、或不可能存在的金額——代表這份本地記錄本身已經不能信了。", how:"停下來，等人核對交易所實際餘額跟本地記錄，確認沒問題後才解除。"},
-    {tier:"r4", bot:"mycrypto", what:"開倉後想掛的停損單被交易所直接拒絕，這筆倉位可能完全沒有保護。", how:"系統不會自動下單。要立刻到交易所確認部位跟保護單狀態。"},
-    {tier:"r4", bot:"mycrypto", what:"掛停損單的過程中程式出錯，但倉位本身已經開了，一樣沒有保護。", how:"系統不會自動下單。要立刻到交易所確認部位跟保護單狀態。"},
-
-    // ---- R3：先通知，晚一點自動做 ----
-    {tier:"r3", bot:"seykota", what:"要把移動停損換到新價位，舊單已經取消，但新單沒掛上——這段時間倉位是沒有保護的。", how:"過一段時間系統會<b>自動用原來的價位</b>重新掛一張，成功就沒事。你也可以提早按確認讓它馬上做。"},
-    {tier:"r3", bot:"seykota", what:"跟交易所對帳反覆失敗，不是網路暫時斷線那種小問題。", how:"先重試幾次，連續失敗到一定次數才真的停下；停下後過一陣子系統會<b>自動再對一次帳</b>。你也可以提早按確認。"},
-    {tier:"r3", bot:"seykota", what:"程式運作中出現一個沒被特別分類過的錯誤（各種意外狀況都算）。", how:"先重試，連續失敗多次才真的停下；停下後系統一樣會<b>自動嘗試恢復</b>，你也可以提早按確認。"},
-    {tier:"r3", bot:"btc", what:"連續 3 天該重新調整持倉比例，卻完全成交不了任何一筆。", how:"過一段時間系統會<b>自動整個重試一次</b>（重新報價、重算下單量）。如果連試兩次都還是零成交，才會升級成一定要人處理。"},
-    {tier:"r3", bot:"mycrypto", what:"剛開完倉，卻查不到這筆倉位的資訊，沒辦法掛停損單。", how:"過一段時間系統會<b>自動重新查一次</b>並補掛停損，你也可以提早按確認讓它馬上查。"},
-    {tier:"r3", bot:"mycrypto", what:"要把移動停損單搬到新價位卻失敗，交易所端目前沒有停損保護。", how:"下一輪本來就會<b>自動重新掛上</b>；如果連續好幾輪都不行，才會真正升級成要人處理。"},
-
-    // ---- R2：自動處理，幾乎沒風險 ----
-    {tier:"r2", bot:"seykota", what:"開倉後想掛停損單失敗，但系統立刻用市價把這筆倉位整個平掉，而且成功了。", how:"因為倉位已經平掉、交易所上沒有任何裸露風險，系統<b>自動繼續</b>，不用人管，事後可以在記錄裡查到這一筆。"},
-
-    // ---- R1：想出辦法才通知你 ----
-    {tier:"r1", bot:"seykota", what:"換停損單時，舊單本該被取消卻取消失敗，可能還留在交易所上。", how:"系統會去查清楚到底是哪一張多出來的單，<b>寫成一個「建議取消」的提案通知你</b>，但不會自己送出取消。"},
-    {tier:"r1", bot:"seykota", what:"平倉後要收掉停損單卻收不掉，可能還掛著。", how:"同上：系統算出確切是哪一張，<b>通知你核准取消</b>，或者你確認那張單其實已經自己失效了。"},
-    {tier:"r1", bot:"mycrypto", what:"程式運作中出現一個沒被特別分類過的錯誤。", how:"先自動重試；如果連續發生，系統<b>想出處理辦法後才通知你</b>，由你決定要不要介入。"},
-    {tier:"r1", bot:"mycrypto", what:"平倉後要取消殘留的停損單卻取消失敗。", how:"系統算出確切是哪一張，<b>寫成提案通知你核准取消</b>，不會自己送出。"},
-
-    // ---- R0：只是記一筆 ----
-    {tier:"r0", bot:"seykota", what:"交易所上的倉位已經消失（代表已經平倉了），只是成交細節還沒補進記錄。", how:"系統自己標記成「已平倉」，下一輪自動把細節補齊。不用管，也不會通知你。"},
-    {tier:"r0", bot:"seykota", what:"原生停損正常觸發，倉位正常平掉。", how:"這就是策略本來該做的事，不是問題。系統正常記錄結算，不用管。"},
-    {tier:"r0", bot:"seykota", what:"帳戶裡的資金不夠最低下單金額，這次先跳過不進場。", how:"系統自動跳過這一次，下次訊號再重新評估。要不要加碼本金是你的投資決定，這不算錯誤，不用管。"},
-    {tier:"r0", bot:"momentum", what:"程式運作中出現一個沒被特別分類過的錯誤。", how:"系統記一筆「有狀況」的標記，下一輪照常重試，<b>不會真的停下來</b>。不用管。"},
-    {tier:"r0", bot:"btc", what:"這次調整持倉只成交了一部分，目標比例還沒完全達到。", how:"這是正常過程，系統下一輪會<b>自動接著補上</b>剩下的部分。不用管。"},
-    {tier:"r0", bot:"btc", what:"程式運作中出現一個沒被特別分類過的錯誤。", how:"系統記一筆，明天排程一到會<b>自動重試一次</b>。不用管。"},
-    {tier:"r0", bot:"mycrypto", what:"本地帳本算出來的賺賠，跟交易所回報的賺賠有落差，但落差不算大。", how:"交易所的數字才是準的，這只是<b>記一筆備查</b>，不影響任何操作、不用管。（只有連續好幾筆都偏同一個方向，才會真的升級成要處理的問題。）"},
-    {tier:"r0", bot:"fleet", what:"本地帳本跟交易所對不上時，畫面故意顯示一個紅色警示。", how:"這只是重複通知——同一件事已經用其他方式（像 LINE）通知過你了。<b>這個紅色警示本身看到不用緊張</b>，不用再處理一次。"},
-    {tier:"r0", bot:"fleet", what:"本地帳本跟共用的 Google 表格對不上時，畫面故意顯示一個紅色警示。", how:"跟上面完全一樣，只是對照的對象換成 Google 表格。<b>看到不用緊張</b>，不用再處理一次。"}
-  ];
-
-  var counts = {all:ENTRIES.length};
-  TIERS.forEach(function(t){ counts[t.id] = 0; });
-  Object.keys(BOTS).forEach(function(b){ counts[b] = 0; });
-  ENTRIES.forEach(function(e){ counts[e.tier]++; counts[e.bot]++; });
-
-  var registerEl = document.getElementById("register");
-  TIERS.forEach(function(t){
-    var section = document.createElement("section");
-    section.className = "tier";
-    section.dataset.tier = t.id;
-
-    var head = document.createElement("div");
-    head.className = "tier-head t-" + t.id;
-    head.innerHTML =
-      '<span class="tier-code">' + t.code + '</span>' +
-      '<span class="tier-title">' + t.title + '</span>' +
-      '<span class="tier-count">' + counts[t.id] + ' 種</span>';
-    section.appendChild(head);
-
-    var rows = document.createElement("div");
-    rows.className = "rows";
-    ENTRIES.filter(function(e){ return e.tier === t.id; }).forEach(function(e){
-      var row = document.createElement("div");
-      row.className = "row";
-      row.dataset.bot = e.bot;
-      row.innerHTML =
-        '<span class="row-bot">' + BOTS[e.bot].label + '</span>' +
-        '<div class="row-body">' +
-          '<p class="row-what">' + e.what + '</p>' +
-          '<p class="row-how">' + e.how + '</p>' +
-        '</div>';
-      rows.appendChild(row);
-    });
-    section.appendChild(rows);
-    registerEl.appendChild(section);
+var DATA = JSON.parse(document.getElementById("data").textContent);
+function el(tag, cls, text){ var n=document.createElement(tag); if(cls) n.className=cls; if(text!==undefined) n.textContent=text; return n; }
+var STATE_LABEL = {"done":"已做","pending":"未做","n/a":"不適用"};
+var STATE_CLASS = {"done":"st-done","pending":"st-pending","n/a":"st-na"};
+function chipGroup(host, values, onPick){
+  var buttons=[];
+  values.forEach(function(v){
+    var b=el("button","chip"); b.type="button"; b.setAttribute("aria-pressed", v.id==="all"?"true":"false");
+    b.appendChild(document.createTextNode(v.label)); b.appendChild(el("span","n",String(v.n)));
+    b.addEventListener("click", function(){ buttons.forEach(function(x){x.setAttribute("aria-pressed","false");}); b.setAttribute("aria-pressed","true"); onPick(v.id); });
+    buttons.push(b); host.appendChild(b);
   });
+}
+function statusText(s, phases){
+  if(s.state==="done") return "已做："+s.evidence;
+  if(s.state==="n/a") return "不適用："+s.reason;
+  return "未做："+s.reason+"（預定："+(phases[s.phase]||s.phase)+"）";
+}
 
-  var filtersEl = document.getElementById("filters");
-  var state = {tier:"all", bot:"all"};
-
-  function chip(id, label, n, group){
-    var b = document.createElement("button");
-    b.type = "button";
-    b.className = "chip";
-    b.dataset.group = group;
-    b.dataset.value = id;
-    b.setAttribute("aria-pressed", id === "all" ? "true" : "false");
-    b.innerHTML = label + '<span class="n">' + n + '</span>';
-    b.addEventListener("click", function(){
-      state[group] = id;
-      document.querySelectorAll('.chip[data-group="' + group + '"]').forEach(function(c){
-        c.setAttribute("aria-pressed", c.dataset.value === id ? "true" : "false");
-      });
-      applyFilter();
+var register=document.getElementById("register"), filters=document.getElementById("filters");
+var pick={tier:"all",bot:"all",open:"all"};
+var rows=[];
+DATA.tiers.forEach(function(t){
+  var entries=DATA.entries.filter(function(e){return e.tier===t.id;});
+  var section=el("section"); section.dataset.tier=t.id;
+  var head=el("div","tier-head"); head.style.setProperty("--edge","var(--"+t.id+")"); head.style.setProperty("--bg","var(--"+t.id+"-bg)");
+  head.appendChild(el("span","tier-code",t.id)); head.appendChild(el("span","tier-title",t.title)); head.appendChild(el("span","tier-count",entries.length+" 種"));
+  section.appendChild(head);
+  var box=el("div","rows");
+  entries.forEach(function(e){
+    var row=el("div","row"); row.dataset.bot=e.bot; row.dataset.open=e.open?"yes":"no";
+    row.appendChild(el("span","row-bot",e.bot_label));
+    var body=el("div","row-body");
+    body.appendChild(el("p","row-title",e.title));
+    body.appendChild(el("p","code",e.code));
+    body.appendChild(el("p","row-what",e.what));
+    body.appendChild(el("p","row-how",e.direction));
+    var st=el("div","status");
+    [["行為",e.behaviour],["白話通知",e.emits_event]].forEach(function(pair){
+      var s=el("span","st "+STATE_CLASS[pair[1].state],pair[0]+"："+STATE_LABEL[pair[1].state]); st.appendChild(s);
     });
-    return b;
-  }
+    body.appendChild(st);
+    e.notes.forEach(function(n){ body.appendChild(el("p","note",n)); });
+    if(e.steps.length){
+      var d=el("details"); d.appendChild(el("summary",null,"處理步驟"+(e.ai_prompt?"與給 AI 的追查指令":"")));
+      var ol=el("ol"); e.steps.forEach(function(s){ ol.appendChild(el("li",null,s)); }); d.appendChild(ol);
+      if(e.ai_prompt){ d.appendChild(el("p","note","給 AI 的追查指令（實際通知會再附上當次的錯誤碼、事件編號與事件資料）：")); d.appendChild(el("pre",null,e.ai_prompt)); }
+      body.appendChild(d);
+    }
+    row.appendChild(body); box.appendChild(row); rows.push(row);
+  });
+  section.appendChild(box); register.appendChild(section);
+});
+function apply(){
+  rows.forEach(function(r){
+    var okBot=pick.bot==="all"||r.dataset.bot===pick.bot, okOpen=pick.open==="all"||r.dataset.open==="yes";
+    var okTier=pick.tier==="all"||r.parentNode.parentNode.dataset.tier===pick.tier;
+    r.hidden=!(okBot&&okOpen&&okTier);
+  });
+  document.querySelectorAll("#register section").forEach(function(s){
+    s.hidden=!Array.prototype.some.call(s.querySelectorAll(".row"),function(r){return !r.hidden;});
+  });
+}
+function count(f){return DATA.entries.filter(f).length;}
+var tierHost=el("div","filters"), botHost=el("div","filters"), openHost=el("div","filters");
+filters.appendChild(tierHost); filters.appendChild(botHost); filters.appendChild(openHost);
+chipGroup(tierHost,[{id:"all",label:"全部等級",n:DATA.entries.length}].concat(DATA.tiers.map(function(t){return {id:t.id,label:t.id+" "+t.title,n:count(function(e){return e.tier===t.id;})};})),function(v){pick.tier=v;apply();});
+chipGroup(botHost,[{id:"all",label:"全部策略",n:DATA.entries.length}].concat(DATA.bots.map(function(b){return {id:b.id,label:b.label,n:count(function(e){return e.bot===b.id;})};})),function(v){pick.bot=v;apply();});
+chipGroup(openHost,[{id:"all",label:"全部",n:DATA.entries.length},{id:"open",label:"只看還沒做完的",n:count(function(e){return e.open;})}],function(v){pick.open=v;apply();});
 
-  filtersEl.appendChild(chip("all", "全部等級", counts.all, "tier"));
-  TIERS.forEach(function(t){ filtersEl.appendChild(chip(t.id, t.code, counts[t.id], "tier")); });
-
-  var sep = document.createElement("span");
-  sep.style.width = "1px";
-  sep.style.background = "var(--line)";
-  sep.style.margin = "4px 4px";
-  filtersEl.appendChild(sep);
-
-  filtersEl.appendChild(chip("all", "全部策略", counts.all, "bot"));
-  Object.keys(BOTS).forEach(function(b){ filtersEl.appendChild(chip(b, BOTS[b].label, counts[b], "bot")); });
-
-  function applyFilter(){
-    document.querySelectorAll("section.tier").forEach(function(section){
-      var tierMatch = state.tier === "all" || section.dataset.tier === state.tier;
-      var visibleRows = 0;
-      section.querySelectorAll(".row").forEach(function(row){
-        var botMatch = state.bot === "all" || row.dataset.bot === state.bot;
-        var show = tierMatch && botMatch;
-        row.hidden = !show;
-        if (show) visibleRows++;
-      });
-      section.hidden = visibleRows === 0;
-    });
-  }
-})();
 </script>
