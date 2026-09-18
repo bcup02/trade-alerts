@@ -1,0 +1,4967 @@
+diff --git a/README.md b/README.md
+index a2a26d8..0b9fcdf 100644
+--- a/README.md
++++ b/README.md
+@@ -62,7 +62,7 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
+ 
+ 既有專案不必一次重構：可以繼續呼叫 `publish()`，先把 `schema_version=1.0`、`project_id` 與 `execution_mode=DRY_RUN` 放入 `fields`；新版則使用 `contract_event()` 與 `AlertDispatcher.publish_contract()`。接收端對未知選填欄位採忽略但保留原始資料的策略。
+ 
+-## 交易機隊錯誤目錄 v1
++## 交易機隊錯誤目錄 v2
+ 
+ 全機隊錯誤分類的權威來源位於 [`docs/fleet-error-catalog.md`](docs/fleet-error-catalog.md)，
+ 機器可讀版本位於 [`src/trade_alerts/catalog/fleet-error-catalog-v2.json`](src/trade_alerts/catalog/fleet-error-catalog-v2.json)，
+@@ -84,6 +84,23 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
+ `tests/test_fleet_error_catalog.py` 守住幾條不變式，其中最重要的一條是：判定為 `MECHANICAL`
+ 的條件不得落在任何會通知人的風險等級。
+ 
++## 機隊一致性登記冊
++
++[`src/trade_alerts/catalog/fleet-rollout-registry.json`](src/trade_alerts/catalog/fleet-rollout-registry.json)
++（格式 [`schemas/fleet-rollout-registry-v1.schema.json`](schemas/fleet-rollout-registry-v1.schema.json)）
++記錄每一項機隊功能、錯誤目錄每一條的行為與事件日誌，在四支策略裡**實際做到了沒有**：`done` 附證據、
++`pending` 附預定 phase 與理由、`n/a` 附理由。**`done` 指真倉已經在跑**：`sources` 記錄每支策略的
++repo、真倉部署來源分支（`operations`）與 commit，證據的「檔案:行號」都對應那個 commit；只合併到
++development 或只在測試機上的算 `pending`。證據是否真的指到程式碼要跨 repo 才查得到，送審前在本機執行
++`python scripts/verify_registry_evidence.py`（對四個 repo 的 clone 逐條檢查，不在 CI 裡）。
++規則是「四支一起做，否則寫在這裡」——
++`trade_alerts.registry_problems()` 是這條規則的可執行版本，`tests/test_rollout_registry.py` 讓 CI 擋下
++漏列、缺理由、目錄與登記冊對不上的情況；策略 repo 的測試可用 `project_rows()` 檢查登記冊對自己的宣稱。
++
++給人看的兩頁 `docs/guides/fleet-risk-register.html`（由錯誤目錄產生）與
++`docs/guides/fleet-rollout-register.html`（由登記冊產生）都由 `scripts/render_guides.py` 產生，
++不可手改：改完 JSON 後執行 `python scripts/render_guides.py`，CI 會比對 repo 內的頁面與重新產生的結果。
++
+ ## 共用 Google Apps Script
+ 
+ `apps_script/google_ledger_receiver.gs` 是綁在「AI自動程式交易紀錄」試算表上的**共用 Apps Script Web App 的權威源**（一個部署服所有專案分頁，靠 payload 的 `sheet_name` 選分頁）。它同時處理 legacy 協定（`SHARED_SECRET` + `append` / `update_by_trade_id` / `update_by_key` / `list_by_sheet` 唯讀）與 `google-ledger-projection-v2`（per-source HMAC + provenance）。欄位 schema、部署步驟、`list_by_sheet` 契約與呼叫端轉址告警都在該檔檔頭。`apps_script/google_ledger_receiver_v2.gs` 是 v2-only 的參考源，非部署對象。**部署（貼進 Apps Script 編輯器 → 管理部署作業 → 新版本）是手動、需另行核准的動作，不在版本標籤的自動範圍內。**
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 970d27a..1fe8dda 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -589,3 +589,38 @@ trade-alerts：v0.19.0（風險分級 v2，W1a）
+ 服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.20.0（風險分級 v2，W1b：機隊一致性登記冊）
++變更摘要：1. 新 src/trade_alerts/catalog/fleet-rollout-registry.json（隨套件發佈）
++             ＋ schemas/fleet-rollout-registry-v1.schema.json：12 項機隊功能 ×
++             四支策略，以及錯誤目錄 33 條各自的「行為」與「寫進事件日誌」
++             在所屬策略的狀態——done（附證據）／pending（附預定 phase＋理由）
++             ／n/a（附理由）。種子內容 2026-09-18 對四個 repo 逐項實查填入。
++             done＝真倉已經在跑：sources 記錄每支策略的 repo、operations
++             分支與 commit，所有 done 證據都是該 commit 的「檔案:行號」。
++             （首審 BLOCK：momentum 有 6 格把只在 development 的 Phase 6b
++             repair_bot.py 當成 done 或當成現況，已改為 pending 並寫明。）
++          2. 新模組 trade_alerts.rollout_registry：load_rollout_registry()、
++             registry_problems()（規則的可執行版：四支列滿、pending 有登記過的
++             phase 與理由、done 有證據、目錄與登記冊逐條對得上、退役碼只能是
++             pending）、project_rows()（給策略 repo 自我檢查）。
++          3. 新 scripts/render_guides.py：由錯誤目錄＋登記冊產生
++             docs/guides/fleet-risk-register.html（改為 v2 四級、33 條、各策略
++             實作狀態），由登記冊產生新頁 docs/guides/fleet-rollout-register.html。
++             兩頁不可手改，CI 比對重新產生的結果。
++          4. 新 tests/test_rollout_registry.py（39 條）：打包登記冊一致、每條規則
++             各有一個反例（含 sources）、每個 done 都引用檔案、兩頁＝重新產生、
++             頁面不以 innerHTML 注入資料。
++          5. 新 scripts/verify_registry_evidence.py：對本機四個 repo 在 sources
++             commit 逐條檢查證據（跨 repo，手動執行、不在 CI）。
++          兩頁已用無頭 Chromium 在桌機／400px 手機 × 淺色／深色實測：無主控台
++          錯誤、無橫向捲動、篩選按鈕行為正確。
++受影響消費專案：無執行期影響（登記冊只有測試與頁面產生器讀取）。
++          策略 repo 之後可升級並以 project_rows() 加自我檢查（計畫 W3/W4）。
++部署入口：無（純函式庫 + 資料 + 靜態頁）。
++版本驗證：pyproject.toml version == 0.20.0；trade_alerts.__version__ ==
++          "0.20.0"。
++服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/guides/README.md b/docs/guides/README.md
+index b97d6c0..8a65217 100644
+--- a/docs/guides/README.md
++++ b/docs/guides/README.md
+@@ -8,13 +8,17 @@ Perplexity／開發者看的工程規格與流程規則。這個目錄放**給
+ 
+ | 檔案 | 說明 | 對應資料源 |
+ |---|---|---|
+-| `fleet-risk-register.html` | 機隊風險登記冊——30 種已知錯誤情況，依五個風險等級白話說明，可依等級/策略篩選。 | `src/trade_alerts/catalog/fleet-error-catalog-v1.json` |
++| `fleet-risk-register.html` | 機隊風險登記冊——33 種已知錯誤情況，依四個風險等級（v2）白話說明、處理步驟與給 AI 的追查指令，並標示各策略實際做到了沒有；可依等級／策略／未做完篩選。 | `src/trade_alerts/catalog/fleet-error-catalog-v2.json`＋`fleet-rollout-registry.json` |
++| `fleet-rollout-register.html` | 機隊一致性登記冊——每項機隊功能與每條錯誤規則在四支策略的已做／未做（含預定哪一關）／不適用（含理由）；可依策略／狀態篩選。 | `src/trade_alerts/catalog/fleet-rollout-registry.json` |
+ 
+ ## 慣例
+ 
+ - 純 HTML／Markdown，靜態頁面即可開啟，不依賴任何後端。
+ - 每份文件盡量在檔案開頭或這份 README 的表格裡標注「對應到哪個資料源」，資料源更新後回頭核對這份文件
+   有沒有跟著過期。
++- **上表兩個 HTML 頁面由 `scripts/render_guides.py` 從 JSON 產生，不可手改**（v1 風險登記冊就是因為
++  手寫第二份而漏掉 3 條）。改資料源後執行 `python scripts/render_guides.py`；
++  `tests/test_rollout_registry.py` 會比對 repo 內的頁面與重新產生的結果，不一致 CI 就紅。
+ - 這裡是**版本控管的備份**，不是即時互動版。互動版（可篩選、有 hover 效果的那個）發布在 Claude 的
+   Artifact 平台，連結由開發時的對話記錄保存；這裡的檔案是同一份內容的靜態快照，供離線查閱與 git 歷史
+   追蹤。
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index e9441d2..9b7910d 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -2,455 +2,1134 @@
+ <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+ <style>
+   :root{
+-    --paper:#F1F3EC;
+-    --paper-raised:#FAFBF6;
+-    --line:#DBE0D0;
+-    --ink:#1F2A22;
+-    --ink-soft:#57604E;
+-    --ink-faint:#8A9080;
+-    --accent:#5B3A5C;
+-    --accent-bg:#EDE3EC;
+-    --accent-line:#C9AECB;
+-
+-    --r4:#963025; --r4-bg:#F4E1DD; --r4-line:#DBAA9F;
+-    --r3:#8C6317; --r3-bg:#F1E6C9; --r3-line:#D8BE84;
+-    --r2:#357357; --r2-bg:#DEEAE3; --r2-line:#A9CBBA;
+-    --r1:#33547A; --r1-bg:#DEE6EE; --r1-line:#A8BFD7;
+-    --r0:#6B7566; --r0-bg:#E7EAE0; --r0-line:#C3C9B6;
+-
+-    --shadow: 0 1px 0 rgba(31,42,34,.06);
++    --paper:#F1F3EC; --paper-raised:#FAFBF6; --line:#DBE0D0;
++    --ink:#1F2A22; --ink-soft:#57604E; --ink-faint:#8A9080;
++    --accent:#5B3A5C; --accent-bg:#EDE3EC; --accent-line:#C9AECB;
++    --R3:#963025; --R3-bg:#F4E1DD;
++    --R2:#8C6317; --R2-bg:#F1E6C9;
++    --R1:#357357; --R1-bg:#DEEAE3;
++    --R0:#6B7566; --R0-bg:#E7EAE0;
++    --done:#357357; --done-bg:#DEEAE3;
++    --pending:#8C6317; --pending-bg:#F1E6C9;
++    --na:#6B7566; --na-bg:#E7EAE0;
+   }
+   @media (prefers-color-scheme: dark){
+     :root:not([data-theme="light"]){
+-      --paper:#18150F;
+-      --paper-raised:#211D16;
+-      --line:#332D22;
+-      --ink:#EDE6D8;
+-      --ink-soft:#B7AF9C;
+-      --ink-faint:#847C6C;
+-      --accent:#C6A0C8;
+-      --accent-bg:#302733;
+-      --accent-line:#5A455C;
+-
+-      --r4:#E58A7C; --r4-bg:#3A241F; --r4-line:#5C332B;
+-      --r3:#D9B364; --r3-bg:#382D18; --r3-line:#5A4623;
+-      --r2:#7FC6A2; --r2-bg:#1D3227; --r2-line:#2E4F3C;
+-      --r1:#8FB4DD; --r1-bg:#1F2E3E; --r1-line:#2D4560;
+-      --r0:#A6AD97; --r0-bg:#292B21; --r0-line:#3E4234;
++      --paper:#18150F; --paper-raised:#211D16; --line:#332D22;
++      --ink:#EDE6D8; --ink-soft:#B7AF9C; --ink-faint:#847C6C;
++      --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
++      --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
++      --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
++      --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
+     }
+   }
+   :root[data-theme="dark"]{
+-    --paper:#18150F;
+-    --paper-raised:#211D16;
+-    --line:#332D22;
+-    --ink:#EDE6D8;
+-    --ink-soft:#B7AF9C;
+-    --ink-faint:#847C6C;
+-    --accent:#C6A0C8;
+-    --accent-bg:#302733;
+-    --accent-line:#5A455C;
+-
+-    --r4:#E58A7C; --r4-bg:#3A241F; --r4-line:#5C332B;
+-    --r3:#D9B364; --r3-bg:#382D18; --r3-line:#5A4623;
+-    --r2:#7FC6A2; --r2-bg:#1D3227; --r2-line:#2E4F3C;
+-    --r1:#8FB4DD; --r1-bg:#1F2E3E; --r1-line:#2D4560;
+-    --r0:#A6AD97; --r0-bg:#292B21; --r0-line:#3E4234;
++    --paper:#18150F; --paper-raised:#211D16; --line:#332D22;
++    --ink:#EDE6D8; --ink-soft:#B7AF9C; --ink-faint:#847C6C;
++    --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
++    --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
++    --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
++    --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
+   }
+-
+   *{box-sizing:border-box;}
+-  body{
+-    margin:0;
+-    background:var(--paper);
+-    color:var(--ink);
+-    font-family:"Noto Sans TC","IBM Plex Mono",sans-serif;
+-    padding-inline:20px;
+-    padding-block:40px 64px;
+-  }
+-  .wrap{max-width:840px;margin-inline:auto;}
+-
+-  .eyebrow{
+-    font-family:"IBM Plex Mono",monospace;
+-    font-size:12px;
+-    font-weight:600;
+-    letter-spacing:.12em;
+-    text-transform:uppercase;
+-    color:var(--ink-faint);
+-  }
+-  h1{
+-    font-family:"Noto Serif TC",serif;
+-    font-weight:900;
+-    font-size:clamp(28px,5vw,40px);
+-    line-height:1.25;
+-    margin:6px 0 12px;
+-    text-wrap:balance;
+-    letter-spacing:.01em;
+-  }
+-  .lede{
+-    font-size:15.5px;
+-    line-height:1.75;
+-    color:var(--ink-soft);
+-    max-width:56ch;
+-    margin:0 0 28px;
+-  }
+-  .lede b{color:var(--ink);font-weight:700;}
+-
+-  /* ---- legend strip: the "stamp key" on the inside cover ---- */
+-  .legend{
+-    display:grid;
+-    grid-template-columns:repeat(5,1fr);
+-    gap:1px;
+-    background:var(--line);
+-    border:1px solid var(--line);
+-    border-radius:3px;
+-    overflow:hidden;
+-    margin-bottom:28px;
+-  }
+-  .legend-item{
+-    background:var(--paper-raised);
+-    padding:14px 12px 12px;
+-    display:flex;
+-    flex-direction:column;
+-    gap:6px;
+-  }
+-  .legend-code{
+-    font-family:"IBM Plex Mono",monospace;
+-    font-weight:600;
+-    font-size:12px;
+-    letter-spacing:.06em;
+-    display:inline-flex;
+-    align-items:center;
+-    gap:5px;
+-  }
+-  .legend-code::before{
+-    content:"";
+-    width:8px;height:8px;border-radius:50%;
+-    background:var(--dot);
+-    flex:none;
+-  }
++  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans TC","IBM Plex Mono",sans-serif;padding:40px 20px 64px;}
++  .wrap{max-width:860px;margin-inline:auto;}
++  .eyebrow{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);}
++  h1{font-family:"Noto Serif TC",serif;font-weight:900;font-size:clamp(28px,5vw,40px);line-height:1.25;margin:6px 0 12px;}
++  h2{font-family:"Noto Serif TC",serif;font-weight:700;font-size:20px;margin:36px 0 12px;}
++  .lede{font-size:15.5px;line-height:1.75;color:var(--ink-soft);max-width:60ch;margin:0 0 24px;}
++  .lede b{color:var(--ink);}
++  .legend{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-bottom:24px;}
++  .legend-item{background:var(--paper-raised);padding:14px 12px 12px;display:flex;flex-direction:column;gap:6px;}
++  .legend-code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-weight:600;font-size:12px;}
+   .legend-name{font-size:13px;font-weight:700;line-height:1.3;}
+   .legend-sub{font-size:11.5px;color:var(--ink-faint);line-height:1.5;}
+-
+-  .lg-r4{--dot:var(--r4);} .lg-r4 .legend-code{color:var(--r4);}
+-  .lg-r3{--dot:var(--r3);} .lg-r3 .legend-code{color:var(--r3);}
+-  .lg-r2{--dot:var(--r2);} .lg-r2 .legend-code{color:var(--r2);}
+-  .lg-r1{--dot:var(--r1);} .lg-r1 .legend-code{color:var(--r1);}
+-  .lg-r0{--dot:var(--r0);} .lg-r0 .legend-code{color:var(--r0);}
+-
+-  /* ---- filter chips ---- */
+-  .filters{
+-    display:flex;
+-    flex-wrap:wrap;
+-    gap:8px;
+-    margin-bottom:32px;
+-  }
+-  .chip{
+-    font-family:"Noto Sans TC",sans-serif;
+-    font-size:13px;
+-    font-weight:500;
+-    padding:7px 14px;
+-    border-radius:999px;
+-    border:1px solid var(--line);
+-    background:var(--paper-raised);
+-    color:var(--ink-soft);
+-    cursor:pointer;
+-    transition:background .15s,color .15s,border-color .15s;
+-  }
+-  .chip:hover{border-color:var(--accent-line);color:var(--ink);}
++  .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
++  .chip{font:inherit;font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--paper-raised);color:var(--ink-soft);cursor:pointer;}
++  .chip[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent);font-weight:700;}
+   .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+-  .chip[aria-pressed="true"]{
+-    background:var(--accent-bg);
+-    border-color:var(--accent-line);
+-    color:var(--accent);
+-    font-weight:700;
+-  }
+-  .chip .n{
+-    font-family:"IBM Plex Mono",monospace;
+-    font-variant-numeric:tabular-nums;
+-    opacity:.75;
+-    margin-inline-start:2px;
+-  }
+-
+-  /* ---- register sections ---- */
+-  section.tier{margin-bottom:8px;}
+-  .tier-head{
+-    display:flex;
+-    align-items:baseline;
+-    gap:12px;
+-    padding:14px 16px;
+-    border-radius:3px 3px 0 0;
+-    border-inline-start:4px solid var(--edge);
+-  }
+-  .tier-code{
+-    font-family:"IBM Plex Mono",monospace;
+-    font-weight:600;
+-    font-size:13px;
+-    letter-spacing:.08em;
+-    color:var(--txt);
+-    flex:none;
+-  }
+-  .tier-title{
+-    font-family:"Noto Serif TC",serif;
+-    font-weight:700;
+-    font-size:17px;
+-    color:var(--ink);
+-  }
+-  .tier-count{
+-    font-family:"IBM Plex Mono",monospace;
+-    font-variant-numeric:tabular-nums;
+-    font-size:12px;
+-    color:var(--ink-faint);
+-    margin-inline-start:auto;
+-    flex:none;
+-    white-space:nowrap;
+-  }
+-
+-  .t-r4{--edge:var(--r4);--bg:var(--r4-bg);--txt:var(--r4);}
+-  .t-r3{--edge:var(--r3);--bg:var(--r3-bg);--txt:var(--r3);}
+-  .t-r2{--edge:var(--r2);--bg:var(--r2-bg);--txt:var(--r2);}
+-  .t-r1{--edge:var(--r1);--bg:var(--r1-bg);--txt:var(--r1);}
+-  .t-r0{--edge:var(--r0);--bg:var(--r0-bg);--txt:var(--r0);}
+-  .tier-head{background:var(--bg);}
+-
+-  .rows{
+-    border-inline-start:4px solid var(--line);
+-    border-block-end:1px solid var(--line);
+-  }
+-  .row{
+-    display:grid;
+-    grid-template-columns:104px 1fr;
+-    gap:16px;
+-    padding:14px 16px;
+-    border-block-start:1px solid var(--line);
+-  }
+-  .row-bot{
+-    font-size:11.5px;
+-    font-weight:700;
+-    color:var(--ink-soft);
+-    padding:3px 8px;
+-    border:1px solid var(--line);
+-    border-radius:999px;
+-    background:var(--paper-raised);
+-    text-align:center;
+-    align-self:start;
+-    white-space:nowrap;
+-  }
+-  .row-body p{
+-    margin:0;
+-    font-size:14.5px;
+-    line-height:1.7;
+-  }
+-  .row-what{color:var(--ink);font-weight:500;}
+-  .row-how{color:var(--ink-soft);margin-top:5px;}
+-  .row-how b{color:var(--ink);font-weight:700;}
+-
+-  section.tier[hidden]{display:none;}
+-  .row[hidden]{display:none;}
+-
+-  @media (max-width:520px){
+-    .legend{grid-template-columns:1fr 1fr;}
+-    .row{grid-template-columns:1fr;}
+-    .row-bot{justify-self:start;}
++  .chip .n{font-family:"IBM Plex Mono","Noto Sans TC",monospace;opacity:.75;margin-inline-start:4px;}
++  .tier-head{display:flex;align-items:baseline;gap:12px;padding:14px 16px;border-radius:3px 3px 0 0;border-inline-start:4px solid var(--edge);background:var(--bg);margin-top:20px;}
++  .tier-code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-weight:600;font-size:13px;color:var(--edge);}
++  .tier-title{font-family:"Noto Serif TC",serif;font-weight:700;font-size:17px;}
++  .tier-count{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;color:var(--ink-faint);margin-inline-start:auto;}
++  .rows{border-inline-start:4px solid var(--line);border-block-end:1px solid var(--line);}
++  .row{display:grid;grid-template-columns:104px 1fr;gap:16px;padding:14px 16px;border-block-start:1px solid var(--line);}
++  .row-bot{font-size:11.5px;font-weight:700;color:var(--ink-soft);padding:3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--paper-raised);text-align:center;align-self:start;white-space:nowrap;}
++  .row-body p{margin:0;font-size:14.5px;line-height:1.7;}
++  .row-title{font-weight:700;}
++  .row-what{color:var(--ink);margin-top:2px !important;}
++  .row-how{color:var(--ink-soft);margin-top:5px !important;}
++  .code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;color:var(--ink-faint);}
++  .card p.desc{margin-top:2px;}
++  .status{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
++  .st{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;color:var(--c);background:var(--cb);}
++  .st-done{--c:var(--done);--cb:var(--done-bg);} .st-pending{--c:var(--pending);--cb:var(--pending-bg);} .st-na{--c:var(--na);--cb:var(--na-bg);}
++  .note{font-size:13px;color:var(--ink-soft);margin-top:6px !important;line-height:1.6;}
++  details{margin-top:8px;font-size:13.5px;}
++  details summary{cursor:pointer;color:var(--accent);font-weight:700;}
++  details ol{margin:6px 0 0;padding-inline-start:22px;line-height:1.7;}
++  details pre{white-space:pre-wrap;background:var(--paper-raised);border:1px solid var(--line);border-radius:3px;padding:10px;font-size:12.5px;line-height:1.6;}
++  .card{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:14px 16px;margin-bottom:12px;}
++  .card h3{margin:0 0 4px;font-size:15.5px;}
++  .card p{margin:0;font-size:13.5px;color:var(--ink-soft);line-height:1.6;}
++  .grid{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;margin-top:10px;font-size:13.5px;line-height:1.6;}
++  .grid .who{font-weight:700;color:var(--ink-soft);}
++  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;}
++  .summary div{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:10px 12px;font-size:13px;line-height:1.7;}
++  .summary b{display:block;font-size:14px;}
++  [hidden]{display:none !important;}
++  @media (max-width:560px){
++    .legend,.summary{grid-template-columns:1fr 1fr;}
++    .row{grid-template-columns:1fr;} .row-bot{justify-self:start;}
++    .grid{grid-template-columns:1fr;}
+     body{padding-inline:16px;}
+   }
+-
+-  .foot{
+-    margin-top:36px;
+-    font-size:12px;
+-    color:var(--ink-faint);
+-    line-height:1.7;
+-    border-block-start:1px solid var(--line);
+-    padding-top:16px;
+-  }
++  .foot{margin-top:36px;font-size:12px;color:var(--ink-faint);line-height:1.7;border-block-start:1px solid var(--line);padding-top:16px;}
+ </style>
+ 
+ <div class="wrap">
+-  <div class="eyebrow">交易機隊 · 錯誤處理設計</div>
++  <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>30 種</b>，依照「系統會不會自己處理、要不要通知人」分成五個等級。
+-    點下面的等級或策略可以篩選；一般情況下你只需要在意最上面的紅色那一段。
++    四支策略目前所有已知的「出問題」情況，共 <b>33 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>30 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+-
+   <div class="legend">
+-    <div class="legend-item lg-r4">
+-      <span class="legend-code">R4</span>
+-      <span class="legend-name">一定要人處理</span>
+-      <span class="legend-sub">系統絕不自己動手</span>
+-    </div>
+-    <div class="legend-item lg-r3">
+-      <span class="legend-code">R3</span>
+-      <span class="legend-name">先通知，晚一點自動做</span>
+-      <span class="legend-sub">你沒空理，過一陣子系統自己做</span>
+-    </div>
+-    <div class="legend-item lg-r2">
+-      <span class="legend-code">R2</span>
+-      <span class="legend-name">自動處理，幾乎沒風險</span>
+-      <span class="legend-sub">不特別通知，事後可查</span>
+-    </div>
+-    <div class="legend-item lg-r1">
+-      <span class="legend-code">R1</span>
+-      <span class="legend-name">想出辦法才通知你</span>
+-      <span class="legend-sub">是建議，等你核准</span>
+-    </div>
+-    <div class="legend-item lg-r0">
+-      <span class="legend-code">R0</span>
+-      <span class="legend-name">只是記一筆</span>
+-      <span class="legend-sub">不通知任何人</span>
+-    </div>
++    <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
++    <div class="legend-item"><span class="legend-code" style="color:var(--R2)">R2</span><span class="legend-name">系統先自己試，試不起來才找你</span><span class="legend-sub">連續失敗 3 次才通知一次，附給 AI 的追查指令</span></div>
++    <div class="legend-item"><span class="legend-code" style="color:var(--R1)">R1</span><span class="legend-name">自動處理，不通知</span><span class="legend-sub">沒有第二個選項，做完留紀錄</span></div>
++    <div class="legend-item"><span class="legend-code" style="color:var(--R0)">R0</span><span class="legend-name">只是記一筆</span><span class="legend-sub">不需要處理，不通知任何人</span></div>
+   </div>
+-
+-  <div class="filters" id="filters" role="group" aria-label="依風險等級或策略篩選"></div>
+-
++  <div id="filters"></div>
+   <div id="register"></div>
+-
+   <div class="foot">
+-    資料來源：機隊共用的錯誤分類清單（trade-alerts <code>fleet-error-catalog-v1</code>）。<br>
+-    「趨勢策略」「動能策略」「競賽策略」「加密策略」各自獨立運作；「全機隊」是四支共用的同一種機制。
++    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-09-18 盤點）。
++    本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
+   </div>
+ </div>
+ 
++<script type="application/json" id="data">
++{
++ "bots": [
++  {
++   "id": "seykota",
++   "label": "趨勢策略"
++  },
++  {
++   "id": "momentum",
++   "label": "動能策略"
++  },
++  {
++   "id": "mycrypto",
++   "label": "加密策略"
++  },
++  {
++   "id": "btc-competition",
++   "label": "競賽策略"
++  },
++  {
++   "id": "fleet",
++   "label": "全機隊"
++  }
++ ],
++ "entries": [
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "evidence": "src/seykota_bot/bot.py:399 _clear_automatic_safe_halt 確認已平倉後自動解除",
++    "state": "done"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
++   "direction": "不需要做任何決定：倉位已經平掉，交易所上沒有沒保護的部位。系統會自己解除暫停，下一輪照常評估進場。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [],
++   "tier": "R1",
++   "title": "開倉後停損掛單失敗，緊急市價平倉成功",
++   "what": "開倉後想掛停損單失敗，但系統立刻用市價把這筆倉位整個平掉，而且成功了。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次「停損掛單失敗、緊急市價平倉也失敗」的根本原因：讀 src/seykota_bot/bot.py 開倉後掛保護單與緊急平倉的流程，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是下單規則、API 權限、餘額還是網路問題，說明交易所上現在的部位狀態該怎麼確認，並提出治本修正。",
++   "behaviour": {
++    "evidence": "src/seykota_bot/bot.py:671 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
++    "state": "done"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
++   "direction": "這是全機隊最嚴重的一種。系統已經停下來，不會自動下任何單。交易所上的實際部位是標準答案，要人立刻去處理。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [
++    "立刻到交易所 App 查這個交易對有沒有倉位。",
++    "有倉位：手動平倉，或補掛一張停損單。",
++    "確認交易所上沒有沒保護的倉位。確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）",
++   "what": "開倉後想掛停損單失敗，緊急用市價平倉也失敗——交易所上可能還留著完全沒有保護的真實倉位。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損換單失敗、且自動重掛也連續失敗的根本原因：讀 src/seykota_bot/bot.py 換單流程（取消舊單→掛新單）與重掛邏輯，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是價格／數量規則、API 錯誤還是網路問題，並提出治本修正。",
++   "behaviour": {
++    "phase": "8-seykota",
++    "reason": "目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。",
++    "state": "pending"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.PROTECTION_REPLACE_FAILED",
++   "direction": "系統會立刻用原本的停損價重掛一張保護單，最多試 3 次；3 次都失敗才通知你。收到通知代表倉位此刻仍沒有交易所端的停損保護，要盡快處理。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [
++    "到交易所 App 確認這筆倉位目前有沒有停損單。",
++    "沒有的話，手動掛一張停損單（價格用訊息裡的停損價），或直接平倉。",
++    "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "移動停損換單失敗，舊停損單已取消，部位目前無交易所端保護",
++   "what": "要把移動停損換到新價位，舊單已經取消，但新單沒掛上——這段時間倉位是沒有保護的。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查換單時舊停損單取消失敗、且自動重試也失敗的原因：讀 src/seykota_bot/bot.py 取消舊單的流程與錯誤處理，對照 journal 與交易所錯誤碼，判斷是單已不存在、權限還是 API 問題，並提出治本修正。",
++   "behaviour": {
++    "phase": "8-seykota",
++    "reason": "目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。",
++    "state": "pending"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
++   "direction": "系統只會取消它自己記錄的那張舊停損單，而且會先確認新的保護單已經掛上才動手，最多試 3 次；條件不成立或都失敗才通知你。殘留的停損單如果被觸發，可能提早平掉目前的倉位。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [
++    "到交易所 App 的委託清單找訊息裡那張停損單編號。",
++    "確認它不是目前倉位正在用的保護單後，手動取消。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "換單時舊停損單取消失敗，可能殘留在交易所",
++   "what": "換停損單時，舊單本該被取消卻取消失敗，可能還留在交易所上。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查平倉後停損單取消失敗、且自動重試也失敗的原因：讀 src/seykota_bot/bot.py 平倉後清理保護單的流程，對照 journal 與交易所錯誤碼，並提出治本修正。",
++   "behaviour": {
++    "phase": "8-seykota",
++    "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。",
++    "state": "pending"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
++   "direction": "系統會先確認倉位真的已經平掉，再取消它自己記錄的那張停損單，最多試 3 次；條件不成立或都失敗才通知你。殘留的單通常不會成交，但留著可能在之後開新倉時造成誤判。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [
++    "到交易所 App 的委託清單找訊息裡那張停損單編號。",
++    "還在的話手動取消；已經不在（自行失效）就不用處理。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "平倉後停損單取消失敗，可能還掛在交易所",
++   "what": "平倉後要收掉停損單卻收不掉，可能還掛著。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼系統無法唯一確認這個倉位的原生保護單：讀 src/seykota_bot/bot.py 的保護單核對邏輯（_verified_exchange_protective_stop 一帶），對照交易所目前的委託清單，判斷是保護單不存在、有多張、還是欄位對不上，並提出治本修正。",
++   "behaviour": {
++    "evidence": "src/seykota_bot/bot.py:883 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
++    "state": "done"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.PROTECTION_UNVERIFIED",
++   "direction": "系統先停下來、不新增任何風險。交易所的實際委託是標準答案：要確認這個倉位有沒有、有幾張保護單。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [
++    "到交易所 App 查這個交易對的倉位與委託清單。",
++    "沒有停損單：補掛一張；有多張：取消多餘的，只留一張。",
++    "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "交易所存在部位，但沒有可唯一確認的原生保護單",
++   "what": "交易所上有倉位，但系統找不到能確定屬於這個倉位的停損單。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼交易所回報的部位無法唯一辨識：讀 src/seykota_bot/bot.py 的 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了，並提出治本修正。",
++   "behaviour": {
++    "evidence": "src/seykota_bot/bot.py:1035 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
++    "state": "done"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.POSITION_AMBIGUOUS",
++   "direction": "系統停下來，等人確認交易所上的實際部位。交易所資料是標準答案。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [
++    "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）。",
++    "如果有不該存在的倉位（例如手動開的），先處理掉。",
++    "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "交易所部位資料無法唯一辨識",
++   "what": "交易所回報的倉位資料，系統看不懂或認不出來是哪一筆。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。",
++   "behaviour": {
++    "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）",
++    "state": "done"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.RECONCILE_FAILED",
++   "direction": "系統每一輪會自動重試，連續 3 次都失敗才暫停策略並通知你。常見原因是交易所 API 故障或金鑰權限變動。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡的錯誤原因。",
++    "確認交易所連線與 API 金鑰權限正常。",
++    "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "非暫時性的持倉同步失敗",
++   "what": "跟交易所對帳反覆失敗，不是網路暫時斷線那種小問題。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「執行模式與交易所目標不符」：先確認目前設定與交易所目標各是什麼、為什麼會不一致；再檢查 src/seykota_bot/safe_halt_resume.py 為什麼拒絕清除這一類暫停（已知缺陷：改好設定重啟後仍清不掉），提出讓「改好設定＋重啟」就能恢復的修正。",
++   "behaviour": {
++    "phase": "8-seykota",
++    "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。",
++    "state": "pending"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.EXCHANGE_TARGET_UNSAFE",
++   "direction": "整支策略立刻全部停擺、拒絕任何操作。一定要先把設定改對，不能直接解除。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [
++    "檢查 seykota 的執行模式設定與交易所連線目標，改成一致。",
++    "改好後重啟 seykota-bot 服務。",
++    "注意：目前有已知缺陷——改好設定重啟後，暫停狀態可能仍清不掉（解除工具會拒絕這一類）。遇到時把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）",
++   "what": "系統本來設定要連模擬帳戶，卻接到了真實帳戶（或反過來）——設定跟目標不一致。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「真倉固定訂單識別能力不足」：讀 src/seykota_bot/bot.py 的 _require_live_fixed_identifier_contract 看它檢查什麼、為什麼沒通過；並檢查 src/seykota_bot/safe_halt_resume.py 為什麼拒絕清除這一類暫停（已知缺陷），提出治本修正。",
++   "behaviour": {
++    "phase": "8-seykota",
++    "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。",
++    "state": "pending"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
++   "direction": "系統停下來，拒絕所有真倉操作。要先確認交易所帳號與 API 能力沒問題，不能直接解除。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [
++    "確認交易所帳號權限與 API 設定（是否支援自訂訂單編號）。",
++    "確認沒問題後重啟 seykota-bot 服務。",
++    "注意：目前有已知缺陷——重啟後暫停狀態可能仍清不掉（解除工具會拒絕這一類）。遇到時把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "真倉固定訂單識別能力不足",
++   "what": "在真倉模式下，系統沒辦法精確辨識自己下的每一張單。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這個未分類的執行期例外：從 seykota-bot 的 journal 找出連續失敗的例外訊息與堆疊，定位 src/seykota_bot/ 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。",
++   "behaviour": {
++    "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）",
++    "state": "done"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.RUNTIME_CYCLE_FAILED",
++   "direction": "系統每一輪會自動重試，連續 3 次都失敗才暫停策略並通知你。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡的錯誤內容。",
++    "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "未分類的執行期例外（run_forever catch-all）",
++   "what": "程式運作中出現一個沒被特別分類過的錯誤（各種意外狀況都算）。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "evidence": "src/seykota_bot/bot.py:1227 只記錄、下一輪再確認成交（Phase 3）",
++    "state": "done"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.CLOSE_FILL_PENDING",
++   "direction": "系統已經把倉位標成已平倉，下一輪會自己把成交細節補進紀錄。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [],
++   "tier": "R0",
++   "title": "交易所部位已消失，等待平倉成交資料回填",
++   "what": "交易所上的倉位已經消失（代表已經平倉了），只是成交細節還沒補進記錄。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "evidence": "src/seykota_bot/bot.py:1262 只記錄出場（Phase 3）",
++    "state": "done"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.TRADE_EXIT",
++   "direction": "正常平倉，系統已經記錄並結算。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [],
++   "tier": "R0",
++   "title": "原生停損觸發的正常平倉",
++   "what": "原生停損正常觸發，倉位正常平掉。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "evidence": "src/seykota_bot/bot.py:1342 資金不足跳過進場、只記錄（Phase 3）",
++    "state": "done"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
++   "direction": "下一次訊號再評估。要不要加本金是投資決定，不是錯誤處理。",
++   "emits_event": {
++    "phase": "8-seykota",
++    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++   ],
++   "open": true,
++   "steps": [],
++   "tier": "R0",
++   "title": "權益低於最低下單資金，跳過本次進場",
++   "what": "帳戶裡的資金不夠最低下單金額，這次先跳過不進場。"
++  },
++  {
++   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼移動停損單無法驗證：讀 src/strategy.py 的 _ensure_native_trailing_stop 與相關核對函式，對照交易所目前的委託清單與 state/state.json，判斷是單不存在、有多張、還是單號與 state 不一致，並提出治本修正。",
++   "behaviour": {
++    "evidence": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除",
++    "state": "done"
++   },
++   "bot": "momentum",
++   "bot_label": "動能策略",
++   "code": "MOM.PROTECTION_UNVERIFIED",
++   "direction": "系統停下來，等人確認交易所上的實際委託。交易所資料是標準答案。",
++   "emits_event": {
++    "phase": "8-momentum",
++    "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知）"
++   ],
++   "open": true,
++   "steps": [
++    "到交易所 App 查這個交易對的倉位與委託清單，確認有恰好一張相符的移動停損單。",
++    "沒有就補掛；有多張就取消多餘的。",
++    "確認後解除暫停：在 momentum 主機 /opt/mexc-4h-momentum-trailing-stop 執行 `python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl` 取得確認碼，再加上 `--apply --confirm <確認碼> --exchange-verified` 執行一次。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "原生移動停損無法驗證",
++   "what": "交易所上的移動停損單，系統驗證不出它到底存不存在。"
++  },
++  {
++   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 協助確認一次 state 修復是否正確：讀 src/safe_halt_state_repair.py 的修復紀錄與 audit/ 下對應的證據，比對 audit/trading_ledger.jsonl 與交易所歷史成交，列出不一致的地方；並追查當初為什麼需要手動修 state。",
++   "behaviour": {
++    "evidence": "src/safe_halt_state_repair.py:148 修完主動暫停，等人解除",
++    "state": "done"
++   },
++   "bot": "momentum",
++   "bot_label": "動能策略",
++   "code": "MOM.STATE_REPAIRED_SAFE_HALT",
++   "direction": "這是刻意設計：工具改過帳目，一定要等人確認改得對，系統才能繼續跑。",
++   "emits_event": {
++    "phase": "8-momentum",
++    "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知）"
++   ],
++   "open": true,
++   "steps": [
++    "對照交易所的歷史成交，確認工具修過的那幾筆平倉紀錄正確。",
++    "確認後解除暫停：在 momentum 主機 /opt/mexc-4h-momentum-trailing-stop 執行 `python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl` 取得確認碼，再加上 `--apply --confirm <確認碼> --exchange-verified` 執行一次。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "工具修復本地 state 後主動 latch，等人明確解除",
++   "what": "有人用工具手動修過本地紀錄，工具修完後故意讓系統停下來。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "evidence": "src/main.py 寫錯誤心跳、下一輪重試（Phase 3）",
++    "state": "done"
++   },
++   "bot": "momentum",
++   "bot_label": "動能策略",
++   "code": "MOM.RUNTIME_CYCLE_FAILED",
++   "direction": "系統記一筆「有狀況」的標記，下一輪照常重試，不會停下來。",
++   "emits_event": {
++    "phase": "8-momentum",
++    "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知）"
++   ],
++   "open": true,
++   "steps": [],
++   "tier": "R0",
++   "title": "run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）",
++   "what": "程式運作中出現一個沒被特別分類過的錯誤。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "phase": "v2-W3",
++    "reason": "只在 development／測試機（Phase 6b，受過渡開關控制、成功後還會發事後通知）；真倉只提案不補寫。v2 移除開關、成功不通知。",
++    "state": "pending"
++   },
++   "bot": "momentum",
++   "bot_label": "動能策略",
++   "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
++   "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
++   "emits_event": {
++    "phase": "v2-W3",
++    "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 只在 development／測試機（Phase 6b，受過渡開關控制、成功後還會發事後通知）；真倉只提案不補寫。v2 移除開關、成功不通知。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
++    "白話通知未做 — 只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
++   ],
++   "open": true,
++   "steps": [],
++   "tier": "R1",
++   "title": "無歧義的孤兒平倉已自動補寫進帳本",
++   "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。"
++  },
++  {
++   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
++   "behaviour": {
++    "phase": "v2-W3",
++    "reason": "退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。",
++    "state": "pending"
++   },
++   "bot": "momentum",
++   "bot_label": "動能策略",
++   "code": "MOM.VERIFIED_CLOSE_PROPOSED",
++   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
++   "emits_event": {
++    "phase": "v2-W3",
++    "reason": "真倉（operations）Phase 5 影子版 scripts/repair_bot_shadow.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
++    "白話通知未做 — 真倉（operations）Phase 5 影子版 scripts/repair_bot_shadow.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
++   ],
++   "open": true,
++   "steps": [
++    "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」的三步，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
++    "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "孤兒平倉已算出修復方案，附提案通知",
++   "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
++  },
++  {
++   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
++   "behaviour": {
++    "phase": "v2-W3",
++    "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 遇到帳本已有半套修復或寫入失敗即停手、開請求、不重試；真倉（operations）的影子版只提案、不寫帳本，不會發生這種情況。",
++    "state": "pending"
++   },
++   "bot": "momentum",
++   "bot_label": "動能策略",
++   "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
++   "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
++   "emits_event": {
++    "phase": "v2-W3",
++    "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 遇到帳本已有半套修復或寫入失敗即停手、開請求、不重試；真倉（operations）的影子版只提案、不寫帳本，不會發生這種情況。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
++    "白話通知未做 — 只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
++   ],
++   "open": true,
++   "steps": [
++    "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
++    "確認修正步驟後照做（手動流程見momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
++    "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
++   ],
++   "tier": "R3",
++   "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
++   "what": "動能策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。"
++  },
++  {
++   "ai_prompt": "請在 btc-bull-market-competition 追查為什麼本地帳本出現負的或不可能的餘額：讀 src/btc_competition/runner.py 的 _holdings_unverified 與 executor.fetch_balances，比對本地 state/帳本與交易所實際餘額，找出差異從哪一筆交易開始，提出讓本地與交易所一致的修正步驟（先給我確認再執行）與治本修正。",
++   "behaviour": {
++    "evidence": "src/btc_competition/runner.py:347 暫停並等人以 btc-competition-resume 解除",
++    "state": "done"
++   },
++   "bot": "btc-competition",
++   "bot_label": "競賽策略",
++   "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
++   "direction": "系統停下來。交易所的實際餘額是標準答案，要先讓本地記錄跟交易所一致。",
++   "emits_event": {
++    "phase": "8-btc-competition",
++    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
++   ],
++   "open": true,
++   "steps": [
++    "到交易所 App 查每個資產的實際餘額。",
++    "對照本地記錄，找出是哪個資產、差多少。",
++    "確認後解除暫停：在 btc 主機執行 `btc-competition-resume preview` 取得確認碼，再執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "出現負／不可能的餘額，本地帳本本身不可信",
++   "what": "帳上出現負的、或不可能存在的金額——代表這份本地記錄本身已經不能信了。"
++  },
++  {
++   "ai_prompt": "請在 btc-bull-market-competition 追查再平衡為什麼連續零成交、自動重試也失敗：讀 src/btc_competition/runner.py 與 executor 的下單流程，對照日誌與交易所回應，判斷是下單量低於最小值、餘額、價格保護還是 API 問題，並提出治本修正。",
++   "behaviour": {
++    "phase": "8-btc-competition",
++    "reason": "目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。",
++    "state": "pending"
++   },
++   "bot": "btc-competition",
++   "bot_label": "競賽策略",
++   "code": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
++   "direction": "系統會自動重新取價、重算下單量再試一次完整的調整，最多 3 次；都失敗才通知你。",
++   "emits_event": {
++    "phase": "8-btc-competition",
++    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）",
++    "白話通知未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡的失敗原因（常見：交易所最小下單量、餘額不足、交易對暫停交易）。",
++    "確認交易所帳戶餘額與交易對狀態正常。",
++    "確認後解除暫停：在 btc 主機執行 `btc-competition-resume preview` 取得確認碼，再執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "連續 3 天該再平衡卻零成交",
++   "what": "連續 3 天該重新調整持倉比例，卻完全成交不了任何一筆。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "evidence": "src/btc_competition/runner.py pending_target_weights 下一輪續做（Phase 3）",
++    "state": "done"
++   },
++   "bot": "btc-competition",
++   "bot_label": "競賽策略",
++   "code": "BTC.REBALANCE_PENDING",
++   "direction": "剩下的部分下一輪會自動繼續做。",
++   "emits_event": {
++    "phase": "8-btc-competition",
++    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
++   ],
++   "open": true,
++   "steps": [],
++   "tier": "R0",
++   "title": "部分成交，目標權重尚未達成",
++   "what": "這次調整持倉只成交了一部分，目標比例還沒完全達到。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "evidence": "src/btc_competition/runner.py 寫錯誤心跳、隔天重試（Phase 3）",
++    "state": "done"
++   },
++   "bot": "btc-competition",
++   "bot_label": "競賽策略",
++   "code": "BTC.RUNTIME_CYCLE_FAILED",
++   "direction": "系統記一筆「有狀況」的標記，隔天自動重試。",
++   "emits_event": {
++    "phase": "8-btc-competition",
++    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
++   ],
++   "open": true,
++   "steps": [],
++   "tier": "R0",
++   "title": "runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）",
++   "what": "程式運作中出現一個沒被特別分類過的錯誤。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "evidence": "mexc_futures_bot.py:713 只記錄差額，不影響交易（Phase 4e 定案）",
++    "state": "done"
++   },
++   "bot": "mycrypto",
++   "bot_label": "加密策略",
++   "code": "MYC.RECONCILE_DELTA_EXCEEDED",
++   "direction": "這個落差就是手續費：交易所回報的是扣手續費前的數字，本地記的是扣完的淨額。不是異常，只記錄備查。",
++   "emits_event": {
++    "evidence": "mexc_futures_bot.py:713 append_fleet_event（R0）",
++    "state": "done"
++   },
++   "notes": [],
++   "open": false,
++   "steps": [],
++   "tier": "R0",
++   "title": "本地帳本與交易所回報損益差額超過容忍值",
++   "what": "本地帳本算出來的賺賠，跟交易所回報的賺賠有落差。"
++  },
++  {
++   "ai_prompt": "請在 my-crypto-bot 追查這個連續發生的未分類例外：從 my-crypto 的日誌找出例外訊息與堆疊，定位 mexc_futures_bot.py 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。",
++   "behaviour": {
++    "phase": "8-mycrypto",
++    "reason": "目前：每次都照常重試，但沒有計數、連續失敗也不會升格。",
++    "state": "pending"
++   },
++   "bot": "mycrypto",
++   "bot_label": "加密策略",
++   "code": "MYC.RUNTIME_CYCLE_FAILED",
++   "direction": "系統下一輪會自動重試，連續 3 次都失敗才通知你。",
++   "emits_event": {
++    "phase": "8-mycrypto",
++    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 目前：每次都照常重試，但沒有計數、連續失敗也不會升格。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
++    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡的錯誤內容與 my-crypto 的日誌。",
++    "確認 my-crypto 服務仍在運作、交易所連線與設定正常。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "未分類的執行期例外（catch-all）",
++   "what": "程式運作中出現一個沒被特別分類過的錯誤。"
++  },
++  {
++   "ai_prompt": "請在 my-crypto-bot 追查為什麼開倉後的停損單被交易所拒絕：讀 mexc_futures_bot.py 掛保護單的流程與交易所回傳的錯誤碼，判斷是價格／數量規則、槓桿設定還是 API 參數問題，並提出治本修正。",
++   "behaviour": {
++    "evidence": "mexc_futures_bot.py:1304 只通知、不自動下單（現行行為即符合 v2）",
++    "state": "done"
++   },
++   "bot": "mycrypto",
++   "bot_label": "加密策略",
++   "code": "MYC.PROTECTION_PLACEMENT_REJECTED",
++   "direction": "系統不會自動下單。交易所上的實際部位是標準答案，要人立刻確認倉位有沒有保護。",
++   "emits_event": {
++    "phase": "8-mycrypto",
++    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
++   ],
++   "open": true,
++   "steps": [
++    "立刻到交易所 App 查這個交易對的倉位與停損單。",
++    "沒有停損：手動補掛一張，或直接平倉。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "開倉停損單被交易所拒絕，部位可能沒有交易所端保護",
++   "what": "開倉後想掛的停損單被交易所直接拒絕，這筆倉位可能完全沒有保護。"
++  },
++  {
++   "ai_prompt": "請在 my-crypto-bot 追查開倉後查不到部位、補掛停損也失敗的原因：讀 mexc_futures_bot.py 開倉後查部位（fetch_positions）與掛保護單的流程，對照日誌與交易所回應，並提出治本修正。",
++   "behaviour": {
++    "phase": "8-mycrypto",
++    "reason": "目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。",
++    "state": "pending"
++   },
++   "bot": "mycrypto",
++   "bot_label": "加密策略",
++   "code": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
++   "direction": "系統會自動重查部位並補掛停損，最多 3 次；都失敗才通知你。收到通知代表倉位此刻可能沒有停損保護。",
++   "emits_event": {
++    "phase": "8-mycrypto",
++    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
++    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
++   ],
++   "open": true,
++   "steps": [
++    "到交易所 App 確認這筆倉位與停損單。",
++    "沒有停損：手動補掛一張，或直接平倉。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "開倉後查不到部位資訊，無法掛停損單",
++   "what": "剛開完倉，卻查不到這筆倉位的資訊，沒辦法掛停損單。"
++  },
++  {
++   "ai_prompt": "請在 my-crypto-bot 追查掛停損單時拋出的例外：讀 mexc_futures_bot.py 掛保護單的流程，對照 my-crypto 的日誌找出例外訊息與堆疊，判斷原因並提出治本修正。",
++   "behaviour": {
++    "evidence": "mexc_futures_bot.py:1317 只通知、不自動下單（現行行為即符合 v2）",
++    "state": "done"
++   },
++   "bot": "mycrypto",
++   "bot_label": "加密策略",
++   "code": "MYC.PROTECTION_PLACEMENT_ERROR",
++   "direction": "系統不會自動下單。要人立刻確認交易所上的倉位有沒有保護。",
++   "emits_event": {
++    "phase": "8-mycrypto",
++    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
++   ],
++   "open": true,
++   "steps": [
++    "立刻到交易所 App 查這個交易對的倉位與停損單。",
++    "沒有停損：手動補掛一張，或直接平倉。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "掛停損單時拋出例外，部位本身已開",
++   "what": "掛停損單的過程中程式出錯，但倉位本身已經開了，一樣沒有保護。"
++  },
++  {
++   "ai_prompt": "請在 my-crypto-bot 追查移動停損搬移連續失敗的原因：讀 mexc_futures_bot.py 搬移停損單的流程與錯誤處理，對照日誌與交易所錯誤碼，並提出治本修正。",
++   "behaviour": {
++    "phase": "8-mycrypto",
++    "reason": "下一輪會自動重掛（已符合），但連續失敗不會升格通知。",
++    "state": "pending"
++   },
++   "bot": "mycrypto",
++   "bot_label": "加密策略",
++   "code": "MYC.PROTECTION_REPLACE_FAILED",
++   "direction": "系統下一輪會自動重掛，連續 3 輪都失敗才通知你。收到通知代表倉位此刻沒有交易所端的停損保護。",
++   "emits_event": {
++    "phase": "8-mycrypto",
++    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 下一輪會自動重掛（已符合），但連續失敗不會升格通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
++    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
++   ],
++   "open": true,
++   "steps": [
++    "到交易所 App 確認這筆倉位目前有沒有停損單。",
++    "沒有的話手動補掛一張，或直接平倉。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "搬移移動停損單失敗，交易所端目前沒有停損保護",
++   "what": "要把移動停損單搬到新價位卻失敗，交易所端目前沒有停損保護。"
++  },
++  {
++   "ai_prompt": "請在 my-crypto-bot 追查平倉後殘留停損單取消失敗、且自動重試也失敗的原因：讀 mexc_futures_bot.py 平倉後清理保護單的流程，對照日誌與交易所錯誤碼，並提出治本修正。",
++   "behaviour": {
++    "phase": "8-mycrypto",
++    "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。",
++    "state": "pending"
++   },
++   "bot": "mycrypto",
++   "bot_label": "加密策略",
++   "code": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
++   "direction": "系統會先確認倉位真的已經平掉，再取消它自己記錄的那張停損單，最多試 3 次；條件不成立或都失敗才通知你。殘留的單通常不會成交，但留著可能在之後開新倉時造成誤判。",
++   "emits_event": {
++    "phase": "8-mycrypto",
++    "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
++    "白話通知未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
++   ],
++   "open": true,
++   "steps": [
++    "到交易所 App 的委託清單找訊息裡那張停損單編號。",
++    "還在的話手動取消。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "平倉後取消殘留停損單失敗",
++   "what": "平倉後要取消殘留的停損單卻取消失敗。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "state": "done"
++   },
++   "bot": "fleet",
++   "bot_label": "全機隊",
++   "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
++   "direction": "不需要另外處理這個紅燈：同一件事維運通知的「帳本↔交易所」會通知你，照那則處理。",
++   "emits_event": {
++    "state": "n/a"
++   },
++   "notes": [],
++   "open": false,
++   "steps": [],
++   "tier": "R0",
++   "title": "帳本↔交易所對帳 DIVERGED 時故意讓 unit 變紅（exit 2）",
++   "what": "本地帳本跟交易所對不上時，對帳程式故意讓自己的服務顯示紅色失敗。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "state": "done"
++   },
++   "bot": "fleet",
++   "bot_label": "全機隊",
++   "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
++   "direction": "不需要另外處理這個紅燈：同一件事維運通知的「帳本↔Google 表」會通知你，照那則處理。",
++   "emits_event": {
++    "state": "n/a"
++   },
++   "notes": [],
++   "open": false,
++   "steps": [],
++   "tier": "R0",
++   "title": "帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）",
++   "what": "本地帳本跟共用的 Google 表格對不上時，對帳程式故意讓自己的服務顯示紅色失敗。"
++  }
++ ],
++ "tiers": [
++  {
++   "id": "R3",
++   "sub": "系統絕不自己動手，會一直提醒到有人處理",
++   "title": "一定要人處理"
++  },
++  {
++   "id": "R2",
++   "sub": "連續失敗 3 次才通知一次，附給 AI 的追查指令",
++   "title": "系統先自己試，試不起來才找你"
++  },
++  {
++   "id": "R1",
++   "sub": "沒有第二個選項，做完留紀錄",
++   "title": "自動處理，不通知"
++  },
++  {
++   "id": "R0",
++   "sub": "不需要處理，不通知任何人",
++   "title": "只是記一筆"
++  }
++ ]
++}
++</script>
+ <script>
+-(function(){
+-  var BOTS = {
+-    seykota:  {label:"趨勢策略", full:"BTC 趨勢策略"},
+-    momentum: {label:"動能策略", full:"動能輪動策略"},
+-    btc:      {label:"競賽策略", full:"BTC 競賽策略"},
+-    mycrypto: {label:"加密策略", full:"加密貨幣策略"},
+-    fleet:    {label:"全機隊",   full:"全機隊共用機制"}
+-  };
+-
+-  var TIERS = [
+-    {id:"r4", code:"R4", title:"一定要人處理"},
+-    {id:"r3", code:"R3", title:"先通知，晚一點自動做"},
+-    {id:"r2", code:"R2", title:"自動處理，幾乎沒風險"},
+-    {id:"r1", code:"R1", title:"想出辦法才通知你"},
+-    {id:"r0", code:"R0", title:"只是記一筆"}
+-  ];
+-
+-  var ENTRIES = [
+-    // ---- R4：一定要人處理 ----
+-    {tier:"r4", bot:"seykota", what:"開倉後想掛停損單失敗，緊急用市價平倉也失敗——交易所上可能還留著完全沒有保護的真實倉位。", how:"這是全機隊最嚴重的一種。系統整個停下來、不再新增任何風險，<b>必須立刻</b>到交易所人工檢查，處理完才能解除。"},
+-    {tier:"r4", bot:"seykota", what:"交易所上有倉位，但系統找不到能確定屬於這個倉位的停損單。", how:"系統先停下來，等人到交易所核對清楚部位跟保護單，補齊或確認後才解除。"},
+-    {tier:"r4", bot:"seykota", what:"交易所回報的倉位資料，系統看不懂或認不出來是哪一筆。", how:"系統停下來，等人工核對交易所實際部位後才解除。"},
+-    {tier:"r4", bot:"seykota", what:"系統本來設定要連模擬帳戶，卻接到了真實帳戶（或反過來）——設定跟目標不一致。", how:"整支策略立刻全部停擺、拒絕任何操作。要改好設定檔再重新啟動，不能只按一下解除。"},
+-    {tier:"r4", bot:"seykota", what:"在真倉模式下，系統沒辦法精確辨識自己下的每一張單。", how:"停下來，拒絕所有真倉操作。要先確認交易所帳號權限沒問題，再重新啟動。"},
+-    {tier:"r4", bot:"momentum", what:"交易所上的移動停損單，系統驗證不出它到底存不存在。", how:"停下來，等人核對交易所實際委託後才解除。"},
+-    {tier:"r4", bot:"momentum", what:"有人用工具手動修過本地紀錄，工具修完後故意讓系統停下來。", how:"這是刻意設計成這樣：工具改過帳目，就一定要等人親自確認改得對，才能讓系統繼續跑。"},
+-    {tier:"r4", bot:"btc", what:"帳上出現負的、或不可能存在的金額——代表這份本地記錄本身已經不能信了。", how:"停下來，等人核對交易所實際餘額跟本地記錄，確認沒問題後才解除。"},
+-    {tier:"r4", bot:"mycrypto", what:"開倉後想掛的停損單被交易所直接拒絕，這筆倉位可能完全沒有保護。", how:"系統不會自動下單。要立刻到交易所確認部位跟保護單狀態。"},
+-    {tier:"r4", bot:"mycrypto", what:"掛停損單的過程中程式出錯，但倉位本身已經開了，一樣沒有保護。", how:"系統不會自動下單。要立刻到交易所確認部位跟保護單狀態。"},
+-
+-    // ---- R3：先通知，晚一點自動做 ----
+-    {tier:"r3", bot:"seykota", what:"要把移動停損換到新價位，舊單已經取消，但新單沒掛上——這段時間倉位是沒有保護的。", how:"過一段時間系統會<b>自動用原來的價位</b>重新掛一張，成功就沒事。你也可以提早按確認讓它馬上做。"},
+-    {tier:"r3", bot:"seykota", what:"跟交易所對帳反覆失敗，不是網路暫時斷線那種小問題。", how:"先重試幾次，連續失敗到一定次數才真的停下；停下後過一陣子系統會<b>自動再對一次帳</b>。你也可以提早按確認。"},
+-    {tier:"r3", bot:"seykota", what:"程式運作中出現一個沒被特別分類過的錯誤（各種意外狀況都算）。", how:"先重試，連續失敗多次才真的停下；停下後系統一樣會<b>自動嘗試恢復</b>，你也可以提早按確認。"},
+-    {tier:"r3", bot:"btc", what:"連續 3 天該重新調整持倉比例，卻完全成交不了任何一筆。", how:"過一段時間系統會<b>自動整個重試一次</b>（重新報價、重算下單量）。如果連試兩次都還是零成交，才會升級成一定要人處理。"},
+-    {tier:"r3", bot:"mycrypto", what:"剛開完倉，卻查不到這筆倉位的資訊，沒辦法掛停損單。", how:"過一段時間系統會<b>自動重新查一次</b>並補掛停損，你也可以提早按確認讓它馬上查。"},
+-    {tier:"r3", bot:"mycrypto", what:"要把移動停損單搬到新價位卻失敗，交易所端目前沒有停損保護。", how:"下一輪本來就會<b>自動重新掛上</b>；如果連續好幾輪都不行，才會真正升級成要人處理。"},
+-
+-    // ---- R2：自動處理，幾乎沒風險 ----
+-    {tier:"r2", bot:"seykota", what:"開倉後想掛停損單失敗，但系統立刻用市價把這筆倉位整個平掉，而且成功了。", how:"因為倉位已經平掉、交易所上沒有任何裸露風險，系統<b>自動繼續</b>，不用人管，事後可以在記錄裡查到這一筆。"},
+-
+-    // ---- R1：想出辦法才通知你 ----
+-    {tier:"r1", bot:"seykota", what:"換停損單時，舊單本該被取消卻取消失敗，可能還留在交易所上。", how:"系統會去查清楚到底是哪一張多出來的單，<b>寫成一個「建議取消」的提案通知你</b>，但不會自己送出取消。"},
+-    {tier:"r1", bot:"seykota", what:"平倉後要收掉停損單卻收不掉，可能還掛著。", how:"同上：系統算出確切是哪一張，<b>通知你核准取消</b>，或者你確認那張單其實已經自己失效了。"},
+-    {tier:"r1", bot:"mycrypto", what:"程式運作中出現一個沒被特別分類過的錯誤。", how:"先自動重試；如果連續發生，系統<b>想出處理辦法後才通知你</b>，由你決定要不要介入。"},
+-    {tier:"r1", bot:"mycrypto", what:"平倉後要取消殘留的停損單卻取消失敗。", how:"系統算出確切是哪一張，<b>寫成提案通知你核准取消</b>，不會自己送出。"},
+ 
+-    // ---- R0：只是記一筆 ----
+-    {tier:"r0", bot:"seykota", what:"交易所上的倉位已經消失（代表已經平倉了），只是成交細節還沒補進記錄。", how:"系統自己標記成「已平倉」，下一輪自動把細節補齊。不用管，也不會通知你。"},
+-    {tier:"r0", bot:"seykota", what:"原生停損正常觸發，倉位正常平掉。", how:"這就是策略本來該做的事，不是問題。系統正常記錄結算，不用管。"},
+-    {tier:"r0", bot:"seykota", what:"帳戶裡的資金不夠最低下單金額，這次先跳過不進場。", how:"系統自動跳過這一次，下次訊號再重新評估。要不要加碼本金是你的投資決定，這不算錯誤，不用管。"},
+-    {tier:"r0", bot:"momentum", what:"程式運作中出現一個沒被特別分類過的錯誤。", how:"系統記一筆「有狀況」的標記，下一輪照常重試，<b>不會真的停下來</b>。不用管。"},
+-    {tier:"r0", bot:"btc", what:"這次調整持倉只成交了一部分，目標比例還沒完全達到。", how:"這是正常過程，系統下一輪會<b>自動接著補上</b>剩下的部分。不用管。"},
+-    {tier:"r0", bot:"btc", what:"程式運作中出現一個沒被特別分類過的錯誤。", how:"系統記一筆，明天排程一到會<b>自動重試一次</b>。不用管。"},
+-    {tier:"r0", bot:"mycrypto", what:"本地帳本算出來的賺賠，跟交易所回報的賺賠有落差，但落差不算大。", how:"交易所的數字才是準的，這只是<b>記一筆備查</b>，不影響任何操作、不用管。（只有連續好幾筆都偏同一個方向，才會真的升級成要處理的問題。）"},
+-    {tier:"r0", bot:"fleet", what:"本地帳本跟交易所對不上時，畫面故意顯示一個紅色警示。", how:"這只是重複通知——同一件事已經用其他方式（像 LINE）通知過你了。<b>這個紅色警示本身看到不用緊張</b>，不用再處理一次。"},
+-    {tier:"r0", bot:"fleet", what:"本地帳本跟共用的 Google 表格對不上時，畫面故意顯示一個紅色警示。", how:"跟上面完全一樣，只是對照的對象換成 Google 表格。<b>看到不用緊張</b>，不用再處理一次。"}
+-  ];
+-
+-  var counts = {all:ENTRIES.length};
+-  TIERS.forEach(function(t){ counts[t.id] = 0; });
+-  Object.keys(BOTS).forEach(function(b){ counts[b] = 0; });
+-  ENTRIES.forEach(function(e){ counts[e.tier]++; counts[e.bot]++; });
+-
+-  var registerEl = document.getElementById("register");
+-  TIERS.forEach(function(t){
+-    var section = document.createElement("section");
+-    section.className = "tier";
+-    section.dataset.tier = t.id;
+-
+-    var head = document.createElement("div");
+-    head.className = "tier-head t-" + t.id;
+-    head.innerHTML =
+-      '<span class="tier-code">' + t.code + '</span>' +
+-      '<span class="tier-title">' + t.title + '</span>' +
+-      '<span class="tier-count">' + counts[t.id] + ' 種</span>';
+-    section.appendChild(head);
+-
+-    var rows = document.createElement("div");
+-    rows.className = "rows";
+-    ENTRIES.filter(function(e){ return e.tier === t.id; }).forEach(function(e){
+-      var row = document.createElement("div");
+-      row.className = "row";
+-      row.dataset.bot = e.bot;
+-      row.innerHTML =
+-        '<span class="row-bot">' + BOTS[e.bot].label + '</span>' +
+-        '<div class="row-body">' +
+-          '<p class="row-what">' + e.what + '</p>' +
+-          '<p class="row-how">' + e.how + '</p>' +
+-        '</div>';
+-      rows.appendChild(row);
+-    });
+-    section.appendChild(rows);
+-    registerEl.appendChild(section);
++var DATA = JSON.parse(document.getElementById("data").textContent);
++function el(tag, cls, text){ var n=document.createElement(tag); if(cls) n.className=cls; if(text!==undefined) n.textContent=text; return n; }
++var STATE_LABEL = {"done":"已做","pending":"未做","n/a":"不適用"};
++var STATE_CLASS = {"done":"st-done","pending":"st-pending","n/a":"st-na"};
++function chipGroup(host, values, onPick){
++  var buttons=[];
++  values.forEach(function(v){
++    var b=el("button","chip"); b.type="button"; b.setAttribute("aria-pressed", v.id==="all"?"true":"false");
++    b.appendChild(document.createTextNode(v.label)); b.appendChild(el("span","n",String(v.n)));
++    b.addEventListener("click", function(){ buttons.forEach(function(x){x.setAttribute("aria-pressed","false");}); b.setAttribute("aria-pressed","true"); onPick(v.id); });
++    buttons.push(b); host.appendChild(b);
+   });
++}
++function statusText(s, phases){
++  if(s.state==="done") return "已做："+s.evidence;
++  if(s.state==="n/a") return "不適用："+s.reason;
++  return "未做："+s.reason+"（預定："+(phases[s.phase]||s.phase)+"）";
++}
+ 
+-  var filtersEl = document.getElementById("filters");
+-  var state = {tier:"all", bot:"all"};
+-
+-  function chip(id, label, n, group){
+-    var b = document.createElement("button");
+-    b.type = "button";
+-    b.className = "chip";
+-    b.dataset.group = group;
+-    b.dataset.value = id;
+-    b.setAttribute("aria-pressed", id === "all" ? "true" : "false");
+-    b.innerHTML = label + '<span class="n">' + n + '</span>';
+-    b.addEventListener("click", function(){
+-      state[group] = id;
+-      document.querySelectorAll('.chip[data-group="' + group + '"]').forEach(function(c){
+-        c.setAttribute("aria-pressed", c.dataset.value === id ? "true" : "false");
+-      });
+-      applyFilter();
++var register=document.getElementById("register"), filters=document.getElementById("filters");
++var pick={tier:"all",bot:"all",open:"all"};
++var rows=[];
++DATA.tiers.forEach(function(t){
++  var entries=DATA.entries.filter(function(e){return e.tier===t.id;});
++  var section=el("section"); section.dataset.tier=t.id;
++  var head=el("div","tier-head"); head.style.setProperty("--edge","var(--"+t.id+")"); head.style.setProperty("--bg","var(--"+t.id+"-bg)");
++  head.appendChild(el("span","tier-code",t.id)); head.appendChild(el("span","tier-title",t.title)); head.appendChild(el("span","tier-count",entries.length+" 種"));
++  section.appendChild(head);
++  var box=el("div","rows");
++  entries.forEach(function(e){
++    var row=el("div","row"); row.dataset.bot=e.bot; row.dataset.open=e.open?"yes":"no";
++    row.appendChild(el("span","row-bot",e.bot_label));
++    var body=el("div","row-body");
++    body.appendChild(el("p","row-title",e.title));
++    body.appendChild(el("p","code",e.code));
++    body.appendChild(el("p","row-what",e.what));
++    body.appendChild(el("p","row-how",e.direction));
++    var st=el("div","status");
++    [["行為",e.behaviour],["白話通知",e.emits_event]].forEach(function(pair){
++      var s=el("span","st "+STATE_CLASS[pair[1].state],pair[0]+"："+STATE_LABEL[pair[1].state]); st.appendChild(s);
+     });
+-    return b;
+-  }
+-
+-  filtersEl.appendChild(chip("all", "全部等級", counts.all, "tier"));
+-  TIERS.forEach(function(t){ filtersEl.appendChild(chip(t.id, t.code, counts[t.id], "tier")); });
+-
+-  var sep = document.createElement("span");
+-  sep.style.width = "1px";
+-  sep.style.background = "var(--line)";
+-  sep.style.margin = "4px 4px";
+-  filtersEl.appendChild(sep);
+-
+-  filtersEl.appendChild(chip("all", "全部策略", counts.all, "bot"));
+-  Object.keys(BOTS).forEach(function(b){ filtersEl.appendChild(chip(b, BOTS[b].label, counts[b], "bot")); });
++    body.appendChild(st);
++    e.notes.forEach(function(n){ body.appendChild(el("p","note",n)); });
++    if(e.steps.length){
++      var d=el("details"); d.appendChild(el("summary",null,"處理步驟"+(e.ai_prompt?"與給 AI 的追查指令":"")));
++      var ol=el("ol"); e.steps.forEach(function(s){ ol.appendChild(el("li",null,s)); }); d.appendChild(ol);
++      if(e.ai_prompt){ d.appendChild(el("p","note","給 AI 的追查指令（實際通知會再附上當次的錯誤碼、事件編號與事件資料）：")); d.appendChild(el("pre",null,e.ai_prompt)); }
++      body.appendChild(d);
++    }
++    row.appendChild(body); box.appendChild(row); rows.push(row);
++  });
++  section.appendChild(box); register.appendChild(section);
++});
++function apply(){
++  rows.forEach(function(r){
++    var okBot=pick.bot==="all"||r.dataset.bot===pick.bot, okOpen=pick.open==="all"||r.dataset.open==="yes";
++    var okTier=pick.tier==="all"||r.parentNode.parentNode.dataset.tier===pick.tier;
++    r.hidden=!(okBot&&okOpen&&okTier);
++  });
++  document.querySelectorAll("#register section").forEach(function(s){
++    s.hidden=!Array.prototype.some.call(s.querySelectorAll(".row"),function(r){return !r.hidden;});
++  });
++}
++function count(f){return DATA.entries.filter(f).length;}
++var tierHost=el("div","filters"), botHost=el("div","filters"), openHost=el("div","filters");
++filters.appendChild(tierHost); filters.appendChild(botHost); filters.appendChild(openHost);
++chipGroup(tierHost,[{id:"all",label:"全部等級",n:DATA.entries.length}].concat(DATA.tiers.map(function(t){return {id:t.id,label:t.id+" "+t.title,n:count(function(e){return e.tier===t.id;})};})),function(v){pick.tier=v;apply();});
++chipGroup(botHost,[{id:"all",label:"全部策略",n:DATA.entries.length}].concat(DATA.bots.map(function(b){return {id:b.id,label:b.label,n:count(function(e){return e.bot===b.id;})};})),function(v){pick.bot=v;apply();});
++chipGroup(openHost,[{id:"all",label:"全部",n:DATA.entries.length},{id:"open",label:"只看還沒做完的",n:count(function(e){return e.open;})}],function(v){pick.open=v;apply();});
+ 
+-  function applyFilter(){
+-    document.querySelectorAll("section.tier").forEach(function(section){
+-      var tierMatch = state.tier === "all" || section.dataset.tier === state.tier;
+-      var visibleRows = 0;
+-      section.querySelectorAll(".row").forEach(function(row){
+-        var botMatch = state.bot === "all" || row.dataset.bot === state.bot;
+-        var show = tierMatch && botMatch;
+-        row.hidden = !show;
+-        if (show) visibleRows++;
+-      });
+-      section.hidden = visibleRows === 0;
+-    });
+-  }
+-})();
+ </script>
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+new file mode 100644
+index 0000000..08a26bd
+--- /dev/null
++++ b/docs/guides/fleet-rollout-register.html
+@@ -0,0 +1,1205 @@
++<title>機隊一致性登記冊</title>
++<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
++<style>
++  :root{
++    --paper:#F1F3EC; --paper-raised:#FAFBF6; --line:#DBE0D0;
++    --ink:#1F2A22; --ink-soft:#57604E; --ink-faint:#8A9080;
++    --accent:#5B3A5C; --accent-bg:#EDE3EC; --accent-line:#C9AECB;
++    --R3:#963025; --R3-bg:#F4E1DD;
++    --R2:#8C6317; --R2-bg:#F1E6C9;
++    --R1:#357357; --R1-bg:#DEEAE3;
++    --R0:#6B7566; --R0-bg:#E7EAE0;
++    --done:#357357; --done-bg:#DEEAE3;
++    --pending:#8C6317; --pending-bg:#F1E6C9;
++    --na:#6B7566; --na-bg:#E7EAE0;
++  }
++  @media (prefers-color-scheme: dark){
++    :root:not([data-theme="light"]){
++      --paper:#18150F; --paper-raised:#211D16; --line:#332D22;
++      --ink:#EDE6D8; --ink-soft:#B7AF9C; --ink-faint:#847C6C;
++      --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
++      --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
++      --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
++      --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
++    }
++  }
++  :root[data-theme="dark"]{
++    --paper:#18150F; --paper-raised:#211D16; --line:#332D22;
++    --ink:#EDE6D8; --ink-soft:#B7AF9C; --ink-faint:#847C6C;
++    --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
++    --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
++    --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
++    --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
++  }
++  *{box-sizing:border-box;}
++  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans TC","IBM Plex Mono",sans-serif;padding:40px 20px 64px;}
++  .wrap{max-width:860px;margin-inline:auto;}
++  .eyebrow{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);}
++  h1{font-family:"Noto Serif TC",serif;font-weight:900;font-size:clamp(28px,5vw,40px);line-height:1.25;margin:6px 0 12px;}
++  h2{font-family:"Noto Serif TC",serif;font-weight:700;font-size:20px;margin:36px 0 12px;}
++  .lede{font-size:15.5px;line-height:1.75;color:var(--ink-soft);max-width:60ch;margin:0 0 24px;}
++  .lede b{color:var(--ink);}
++  .legend{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-bottom:24px;}
++  .legend-item{background:var(--paper-raised);padding:14px 12px 12px;display:flex;flex-direction:column;gap:6px;}
++  .legend-code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-weight:600;font-size:12px;}
++  .legend-name{font-size:13px;font-weight:700;line-height:1.3;}
++  .legend-sub{font-size:11.5px;color:var(--ink-faint);line-height:1.5;}
++  .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
++  .chip{font:inherit;font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--paper-raised);color:var(--ink-soft);cursor:pointer;}
++  .chip[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent);font-weight:700;}
++  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
++  .chip .n{font-family:"IBM Plex Mono","Noto Sans TC",monospace;opacity:.75;margin-inline-start:4px;}
++  .tier-head{display:flex;align-items:baseline;gap:12px;padding:14px 16px;border-radius:3px 3px 0 0;border-inline-start:4px solid var(--edge);background:var(--bg);margin-top:20px;}
++  .tier-code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-weight:600;font-size:13px;color:var(--edge);}
++  .tier-title{font-family:"Noto Serif TC",serif;font-weight:700;font-size:17px;}
++  .tier-count{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;color:var(--ink-faint);margin-inline-start:auto;}
++  .rows{border-inline-start:4px solid var(--line);border-block-end:1px solid var(--line);}
++  .row{display:grid;grid-template-columns:104px 1fr;gap:16px;padding:14px 16px;border-block-start:1px solid var(--line);}
++  .row-bot{font-size:11.5px;font-weight:700;color:var(--ink-soft);padding:3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--paper-raised);text-align:center;align-self:start;white-space:nowrap;}
++  .row-body p{margin:0;font-size:14.5px;line-height:1.7;}
++  .row-title{font-weight:700;}
++  .row-what{color:var(--ink);margin-top:2px !important;}
++  .row-how{color:var(--ink-soft);margin-top:5px !important;}
++  .code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;color:var(--ink-faint);}
++  .card p.desc{margin-top:2px;}
++  .status{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
++  .st{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;color:var(--c);background:var(--cb);}
++  .st-done{--c:var(--done);--cb:var(--done-bg);} .st-pending{--c:var(--pending);--cb:var(--pending-bg);} .st-na{--c:var(--na);--cb:var(--na-bg);}
++  .note{font-size:13px;color:var(--ink-soft);margin-top:6px !important;line-height:1.6;}
++  details{margin-top:8px;font-size:13.5px;}
++  details summary{cursor:pointer;color:var(--accent);font-weight:700;}
++  details ol{margin:6px 0 0;padding-inline-start:22px;line-height:1.7;}
++  details pre{white-space:pre-wrap;background:var(--paper-raised);border:1px solid var(--line);border-radius:3px;padding:10px;font-size:12.5px;line-height:1.6;}
++  .card{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:14px 16px;margin-bottom:12px;}
++  .card h3{margin:0 0 4px;font-size:15.5px;}
++  .card p{margin:0;font-size:13.5px;color:var(--ink-soft);line-height:1.6;}
++  .grid{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;margin-top:10px;font-size:13.5px;line-height:1.6;}
++  .grid .who{font-weight:700;color:var(--ink-soft);}
++  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;}
++  .summary div{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:10px 12px;font-size:13px;line-height:1.7;}
++  .summary b{display:block;font-size:14px;}
++  [hidden]{display:none !important;}
++  @media (max-width:560px){
++    .legend,.summary{grid-template-columns:1fr 1fr;}
++    .row{grid-template-columns:1fr;} .row-bot{justify-self:start;}
++    .grid{grid-template-columns:1fr;}
++    body{padding-inline:16px;}
++  }
++  .foot{margin-top:36px;font-size:12px;color:var(--ink-faint);line-height:1.7;border-block-start:1px solid var(--line);padding-top:16px;}
++</style>
++
++<div class="wrap">
++  <div class="eyebrow">交易機隊 · 四支策略做到哪裡了</div>
++  <h1>機隊一致性登記冊</h1>
++  <p class="lede">
++    每一項機隊功能、每一條錯誤處理規則，在四支策略裡<b>實際做到了沒有</b>。規則只有一條：
++    沒做的一定要寫在這裡——<b>「未做」要寫目前狀況和預定在哪一關做</b>，<b>「不適用」要寫理由</b>。
++    漏寫的話，自動檢查（CI）會擋下來，不會再有「只做了一支、沒人記得」。
++    <b>「已做」指的是真倉已經在跑</b>（部署來源 <code>operations</code> 分支上有）；只合併到開發分支或只在測試機上的，一律算「未做」。
++  </p>
++  <div class="summary" id="summary"></div>
++  <div id="filters"></div>
++  <h2>機隊功能</h2>
++  <div id="capabilities"></div>
++  <h2>錯誤處理規則（依錯誤目錄逐條）</h2>
++  <p class="lede">「行為」：這條錯誤發生時，策略有沒有照錯誤目錄說的處理。「白話通知」：有沒有寫進共用事件日誌——只有寫進去的，才會變成你手機上的白話通知。</p>
++  <div id="entries"></div>
++  <h2>預定的關卡</h2>
++  <div id="phases"></div>
++  <div class="foot">
++    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-18 對四個 repo 逐項盤點）與 <code>fleet-error-catalog/v2</code>。
++    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 0213a01</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 520cb9e</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations b8eda43</code>。
++    本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
++  </div>
++</div>
++
++<script type="application/json" id="data">
++{
++ "capabilities": [
++  {
++   "description": "出事時用同一套欄位（原因碼＋證據＋指紋）把策略停住，四支才能用同一套解除與通知流程。",
++   "id": "latch.unified_model",
++   "status": {
++    "btc-competition": {
++     "evidence": "src/btc_competition/runner.py:347 build_safe_halt（Phase 4c）",
++     "state": "done"
++    },
++    "momentum": {
++     "evidence": "src/strategy.py:1067 build_safe_halt（Phase 4c）",
++     "state": "done"
++    },
++    "mycrypto": {
++     "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。",
++     "state": "n/a"
++    },
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:386 build_safe_halt（Phase 4c）",
++     "state": "done"
++    }
++   },
++   "title": "統一格式的暫停（latch）"
++  },
++  {
++   "description": "先預覽拿確認碼、再帶確認碼解除，避免清掉的不是眼前這一次的暫停。",
++   "id": "latch.resume_tool",
++   "status": {
++    "btc-competition": {
++     "evidence": "btc-competition-resume（src/btc_competition/safe_halt_resume.py）",
++     "state": "done"
++    },
++    "momentum": {
++     "evidence": "src/safe_halt_resume.py（--apply --confirm --exchange-verified）",
++     "state": "done"
++    },
++    "mycrypto": {
++     "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。",
++     "state": "n/a"
++    },
++    "seykota": {
++     "evidence": "seykota-resume（src/seykota_bot/safe_halt_resume.py）",
++     "state": "done"
++    }
++   },
++   "title": "兩段式解除工具"
++  },
++  {
++   "description": "設定錯誤類的暫停（例如連錯交易所）不能用解除工具清，只能改好設定後重啟；重啟後系統要自己確認設定正確並解除。",
++   "id": "latch.restart_only_clear",
++   "status": {
++    "btc-competition": {
++     "reason": "沒有「改設定重啟」這一類暫停。",
++     "state": "n/a"
++    },
++    "momentum": {
++     "reason": "沒有「改設定重啟」這一類暫停。",
++     "state": "n/a"
++    },
++    "mycrypto": {
++     "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。",
++     "state": "n/a"
++    },
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。",
++     "state": "pending"
++    }
++   },
++   "title": "「改好設定重啟」就能解除的暫停真的會被清掉"
++  },
++  {
++   "description": "暫時性的錯誤先自動重試，連續失敗才停下或通知人。",
++   "id": "latch.consecutive_failure_counter",
++   "status": {
++    "btc-competition": {
++     "reason": "未分類例外不暫停：寫錯誤心跳、隔天重試（R0）。",
++     "state": "n/a"
++    },
++    "momentum": {
++     "reason": "未分類例外不暫停：寫錯誤心跳、下一輪重試（R0）。",
++     "state": "n/a"
++    },
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "MYC.RUNTIME_CYCLE_FAILED 目前每次都照常重試但沒有計數，v2 要求連續 3 次失敗才升格通知。",
++     "state": "pending"
++    },
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:123 Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）",
++     "state": "done"
++    }
++   },
++   "title": "連續失敗 3 次才升格（不因一次意外就停）"
++  },
++  {
++   "description": "每支策略定時寫出自己「正常／暫停／出錯」的狀態，維運通知據此提醒。",
++   "id": "runtime.status_snapshot",
++   "status": {
++    "btc-competition": {
++     "evidence": "src/btc_competition/portfolio_snapshot_adapter.py strategy.runtime_status",
++     "state": "done"
++    },
++    "momentum": {
++     "evidence": "src/portfolio_snapshot_adapter.py strategy.runtime_status",
++     "state": "done"
++    },
++    "mycrypto": {
++     "evidence": "portfolio_snapshot_adapter.py:75 _runtime_status（strategy.runtime_status）",
++     "state": "done"
++    },
++    "seykota": {
++     "evidence": "src/seykota_bot/portfolio_snapshot_adapter.py strategy.runtime_status",
++     "state": "done"
++    }
++   },
++   "title": "策略運行狀態（維運通知的第四軸）"
++  },
++  {
++   "description": "定時比對本地帳本與交易所，寫出 audit/ledger_status.json 給維運通知讀。",
++   "id": "reconcile.ledger_status",
++   "status": {
++    "btc-competition": {
++     "evidence": "src/btc_competition/reconcile_compare.py",
++     "state": "done"
++    },
++    "momentum": {
++     "evidence": "src/reconcile_compare.py",
++     "state": "done"
++    },
++    "mycrypto": {
++     "evidence": "reconcile_compare.py:101 main",
++     "state": "done"
++    },
++    "seykota": {
++     "evidence": "src/seykota_bot/reconcile/compare.py",
++     "state": "done"
++    }
++   },
++   "title": "帳本↔交易所對帳狀態檔"
++  },
++  {
++   "description": "定時比對本地帳本與 Google 表，寫出 audit/google_reconcile_status.json 給維運通知讀。",
++   "id": "reconcile.google_status",
++   "status": {
++    "btc-competition": {
++     "evidence": "src/btc_competition/reconcile_google.py",
++     "state": "done"
++    },
++    "momentum": {
++     "evidence": "src/google_reconcile.py",
++     "state": "done"
++    },
++    "mycrypto": {
++     "evidence": "google_reconcile.py:135 main",
++     "state": "done"
++    },
++    "seykota": {
++     "evidence": "src/seykota_bot/reconcile/google_reconcile.py",
++     "state": "done"
++    }
++   },
++   "title": "帳本↔Google 表對帳狀態檔"
++  },
++  {
++   "description": "交易所已平倉但本地帳本漏記時，以交易所成交為準自動補寫；結構對不上才重試並升格。",
++   "id": "repair_bot.verified_close",
++   "status": {
++    "btc-competition": {
++     "reason": "現貨再平衡策略，沒有開倉／平倉配對，不會有漏記平倉。",
++     "state": "n/a"
++    },
++    "momentum": {
++     "phase": "v2-W3",
++     "reason": "真倉（operations）只有 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py；會自動補寫的 v1 版 scripts/repair_bot.py（Phase 6b，受過渡開關 MOMENTUM_REPAIR_AUTO_APPLY 控制）只在 development／測試機。v2 由共用執行器取代。",
++     "state": "pending"
++    },
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "有同樣的漏記平倉形狀（reconcile_compare 會產生 position_diffs），目前只有一次性手修腳本；需要先做 MEXC 成交查詢轉接器。",
++     "state": "pending"
++    },
++    "seykota": {
++     "phase": "v2-W4",
++     "reason": "只有 Phase 5 只提案的影子版，而且發出的 SEY.VERIFIED_CLOSE_PROPOSED 從未登記進 v1 目錄。",
++     "state": "pending"
++    }
++   },
++   "title": "漏記平倉自動修復機器人"
++  },
++  {
++   "description": "一個設定就讓修復機器人完全停手（不偵測、不查交易所、不寫帳本）。所有修復機器人同名同行為。",
++   "id": "repair_bot.pause_brake",
++   "status": {
++    "btc-competition": {
++     "reason": "沒有修復機器人（見上一列）。",
++     "state": "n/a"
++    },
++    "momentum": {
++     "phase": "v2-W3",
++     "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 有 MOMENTUM_REPAIR_PAUSED，真倉（operations）仍是 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py，沒有煞車。改用共用執行器時保留煞車，W6 一起上真倉。",
++     "state": "pending"
++    },
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "跟著修復機器人一起做。",
++     "state": "pending"
++    },
++    "seykota": {
++     "phase": "v2-W4",
++     "reason": "影子版沒有煞車；升到共用執行器時一起加 SEYKOTA_REPAIR_PAUSED。",
++     "state": "pending"
++    }
++   },
++   "title": "修復機器人緊急煞車"
++  },
++  {
++   "description": "策略自己不推播，把需要人知道的事寫成 audit/ops_export.json，交給維運通知代送。",
++   "id": "ops_export.writer",
++   "status": {
++    "btc-competition": {
++     "phase": "8-btc-competition",
++     "reason": "目前沒有任何會通知人的事件來源。",
++     "state": "pending"
++    },
++    "momentum": {
++     "phase": "v2-W3",
++     "reason": "只在 development／測試機（Phase 7b，src/ops_export_refresh.py），寫的是 fleet-ops-export/v1；真倉（operations）還沒有。改用共用執行器時升 v2，W6 一起上真倉。",
++     "state": "pending"
++    },
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "目前沒有任何會通知人的事件來源。",
++     "state": "pending"
++    },
++    "seykota": {
++     "phase": "v2-W4",
++     "reason": "還沒有；升到共用修復執行器時一起寫。",
++     "state": "pending"
++    }
++   },
++   "title": "把要通知的事寫成匯出檔"
++  },
++  {
++   "description": "維運主機的 ops-notify 設定檔對這支策略開了 OPS_NOTIFY_<KEY>_OPS_EXPORT=on。部署狀態，無法由 CI 檢查，每次部署後人工更新。",
++   "id": "ops_notify.export_relay_enabled",
++   "status": {
++    "btc-competition": {
++     "phase": "8-btc-competition",
++     "reason": "還沒有匯出檔。",
++     "state": "pending"
++    },
++    "momentum": {
++     "phase": "v2-W6",
++     "reason": "測試機已開（2026-09-17，閘門驗證通過）；真倉等 v2 一起推。",
++     "state": "pending"
++    },
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "還沒有匯出檔。",
++     "state": "pending"
++    },
++    "seykota": {
++     "phase": "v2-W6",
++     "reason": "兩台都還沒開。",
++     "state": "pending"
++    }
++   },
++   "title": "維運通知已開啟匯出轉送（部署設定）"
++  },
++  {
++   "description": "維運主機的 ops-notify 設定檔列出這支策略要盯的 systemd unit。部署狀態，每次部署後人工更新。",
++   "id": "ops_notify.units_axis",
++   "status": {
++    "btc-competition": {
++     "phase": "8-btc-competition",
++     "reason": "還沒決定要盯哪些背景服務。",
++     "state": "pending"
++    },
++    "momentum": {
++     "phase": "v2-W6",
++     "reason": "測試機已設定（盯修復機器人 unit／timer）；真倉還沒設定。",
++     "state": "pending"
++    },
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "還沒決定要盯哪些背景服務。",
++     "state": "pending"
++    },
++    "seykota": {
++     "phase": "v2-W6",
++     "reason": "兩台都還沒設定；修復機器人升級後一起盯。",
++     "state": "pending"
++    }
++   },
++   "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
++  }
++ ],
++ "catalog": [
++  {
++   "behaviour": {
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:399 _clear_automatic_safe_halt 確認已平倉後自動解除",
++     "state": "done"
++    }
++   },
++   "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R1",
++   "title": "開倉後停損掛單失敗，緊急市價平倉成功"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:671 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
++     "state": "done"
++    }
++   },
++   "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。",
++     "state": "pending"
++    }
++   },
++   "code": "SEY.PROTECTION_REPLACE_FAILED",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "移動停損換單失敗，舊停損單已取消，部位目前無交易所端保護"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。",
++     "state": "pending"
++    }
++   },
++   "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "換單時舊停損單取消失敗，可能殘留在交易所"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。",
++     "state": "pending"
++    }
++   },
++   "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "平倉後停損單取消失敗，可能還掛在交易所"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:883 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
++     "state": "done"
++    }
++   },
++   "code": "SEY.PROTECTION_UNVERIFIED",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "交易所存在部位，但沒有可唯一確認的原生保護單"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:1035 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
++     "state": "done"
++    }
++   },
++   "code": "SEY.POSITION_AMBIGUOUS",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "交易所部位資料無法唯一辨識"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）",
++     "state": "done"
++    }
++   },
++   "code": "SEY.RECONCILE_FAILED",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "非暫時性的持倉同步失敗"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。",
++     "state": "pending"
++    }
++   },
++   "code": "SEY.EXCHANGE_TARGET_UNSAFE",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。",
++     "state": "pending"
++    }
++   },
++   "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "真倉固定訂單識別能力不足"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）",
++     "state": "done"
++    }
++   },
++   "code": "SEY.RUNTIME_CYCLE_FAILED",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "未分類的執行期例外（run_forever catch-all）"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:1227 只記錄、下一輪再確認成交（Phase 3）",
++     "state": "done"
++    }
++   },
++   "code": "SEY.CLOSE_FILL_PENDING",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R0",
++   "title": "交易所部位已消失，等待平倉成交資料回填"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:1262 只記錄出場（Phase 3）",
++     "state": "done"
++    }
++   },
++   "code": "SEY.TRADE_EXIT",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R0",
++   "title": "原生停損觸發的正常平倉"
++  },
++  {
++   "behaviour": {
++    "seykota": {
++     "evidence": "src/seykota_bot/bot.py:1342 資金不足跳過進場、只記錄（Phase 3）",
++     "state": "done"
++    }
++   },
++   "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
++   "emits_event": {
++    "seykota": {
++     "phase": "8-seykota",
++     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R0",
++   "title": "權益低於最低下單資金，跳過本次進場"
++  },
++  {
++   "behaviour": {
++    "momentum": {
++     "evidence": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除",
++     "state": "done"
++    }
++   },
++   "code": "MOM.PROTECTION_UNVERIFIED",
++   "emits_event": {
++    "momentum": {
++     "phase": "8-momentum",
++     "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "原生移動停損無法驗證"
++  },
++  {
++   "behaviour": {
++    "momentum": {
++     "evidence": "src/safe_halt_state_repair.py:148 修完主動暫停，等人解除",
++     "state": "done"
++    }
++   },
++   "code": "MOM.STATE_REPAIRED_SAFE_HALT",
++   "emits_event": {
++    "momentum": {
++     "phase": "8-momentum",
++     "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "工具修復本地 state 後主動 latch，等人明確解除"
++  },
++  {
++   "behaviour": {
++    "momentum": {
++     "evidence": "src/main.py 寫錯誤心跳、下一輪重試（Phase 3）",
++     "state": "done"
++    }
++   },
++   "code": "MOM.RUNTIME_CYCLE_FAILED",
++   "emits_event": {
++    "momentum": {
++     "phase": "8-momentum",
++     "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R0",
++   "title": "run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）"
++  },
++  {
++   "behaviour": {
++    "momentum": {
++     "phase": "v2-W3",
++     "reason": "只在 development／測試機（Phase 6b，受過渡開關控制、成功後還會發事後通知）；真倉只提案不補寫。v2 移除開關、成功不通知。",
++     "state": "pending"
++    }
++   },
++   "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
++   "emits_event": {
++    "momentum": {
++     "phase": "v2-W3",
++     "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。",
++     "state": "pending"
++    }
++   },
++   "tier": "R1",
++   "title": "無歧義的孤兒平倉已自動補寫進帳本"
++  },
++  {
++   "behaviour": {
++    "momentum": {
++     "phase": "v2-W3",
++     "reason": "退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。",
++     "state": "pending"
++    }
++   },
++   "code": "MOM.VERIFIED_CLOSE_PROPOSED",
++   "emits_event": {
++    "momentum": {
++     "phase": "v2-W3",
++     "reason": "真倉（operations）Phase 5 影子版 scripts/repair_bot_shadow.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "孤兒平倉已算出修復方案，附提案通知"
++  },
++  {
++   "behaviour": {
++    "momentum": {
++     "phase": "v2-W3",
++     "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 遇到帳本已有半套修復或寫入失敗即停手、開請求、不重試；真倉（operations）的影子版只提案、不寫帳本，不會發生這種情況。",
++     "state": "pending"
++    }
++   },
++   "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
++   "emits_event": {
++    "momentum": {
++     "phase": "v2-W3",
++     "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗"
++  },
++  {
++   "behaviour": {
++    "btc-competition": {
++     "evidence": "src/btc_competition/runner.py:347 暫停並等人以 btc-competition-resume 解除",
++     "state": "done"
++    }
++   },
++   "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
++   "emits_event": {
++    "btc-competition": {
++     "phase": "8-btc-competition",
++     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "出現負／不可能的餘額，本地帳本本身不可信"
++  },
++  {
++   "behaviour": {
++    "btc-competition": {
++     "phase": "8-btc-competition",
++     "reason": "目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。",
++     "state": "pending"
++    }
++   },
++   "code": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
++   "emits_event": {
++    "btc-competition": {
++     "phase": "8-btc-competition",
++     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "連續 3 天該再平衡卻零成交"
++  },
++  {
++   "behaviour": {
++    "btc-competition": {
++     "evidence": "src/btc_competition/runner.py pending_target_weights 下一輪續做（Phase 3）",
++     "state": "done"
++    }
++   },
++   "code": "BTC.REBALANCE_PENDING",
++   "emits_event": {
++    "btc-competition": {
++     "phase": "8-btc-competition",
++     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R0",
++   "title": "部分成交，目標權重尚未達成"
++  },
++  {
++   "behaviour": {
++    "btc-competition": {
++     "evidence": "src/btc_competition/runner.py 寫錯誤心跳、隔天重試（Phase 3）",
++     "state": "done"
++    }
++   },
++   "code": "BTC.RUNTIME_CYCLE_FAILED",
++   "emits_event": {
++    "btc-competition": {
++     "phase": "8-btc-competition",
++     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R0",
++   "title": "runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）"
++  },
++  {
++   "behaviour": {
++    "mycrypto": {
++     "evidence": "mexc_futures_bot.py:713 只記錄差額，不影響交易（Phase 4e 定案）",
++     "state": "done"
++    }
++   },
++   "code": "MYC.RECONCILE_DELTA_EXCEEDED",
++   "emits_event": {
++    "mycrypto": {
++     "evidence": "mexc_futures_bot.py:713 append_fleet_event（R0）",
++     "state": "done"
++    }
++   },
++   "tier": "R0",
++   "title": "本地帳本與交易所回報損益差額超過容忍值"
++  },
++  {
++   "behaviour": {
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "目前：每次都照常重試，但沒有計數、連續失敗也不會升格。",
++     "state": "pending"
++    }
++   },
++   "code": "MYC.RUNTIME_CYCLE_FAILED",
++   "emits_event": {
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "未分類的執行期例外（catch-all）"
++  },
++  {
++   "behaviour": {
++    "mycrypto": {
++     "evidence": "mexc_futures_bot.py:1304 只通知、不自動下單（現行行為即符合 v2）",
++     "state": "done"
++    }
++   },
++   "code": "MYC.PROTECTION_PLACEMENT_REJECTED",
++   "emits_event": {
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "開倉停損單被交易所拒絕，部位可能沒有交易所端保護"
++  },
++  {
++   "behaviour": {
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。",
++     "state": "pending"
++    }
++   },
++   "code": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
++   "emits_event": {
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "開倉後查不到部位資訊，無法掛停損單"
++  },
++  {
++   "behaviour": {
++    "mycrypto": {
++     "evidence": "mexc_futures_bot.py:1317 只通知、不自動下單（現行行為即符合 v2）",
++     "state": "done"
++    }
++   },
++   "code": "MYC.PROTECTION_PLACEMENT_ERROR",
++   "emits_event": {
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R3",
++   "title": "掛停損單時拋出例外，部位本身已開"
++  },
++  {
++   "behaviour": {
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "下一輪會自動重掛（已符合），但連續失敗不會升格通知。",
++     "state": "pending"
++    }
++   },
++   "code": "MYC.PROTECTION_REPLACE_FAILED",
++   "emits_event": {
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "搬移移動停損單失敗，交易所端目前沒有停損保護"
++  },
++  {
++   "behaviour": {
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。",
++     "state": "pending"
++    }
++   },
++   "code": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
++   "emits_event": {
++    "mycrypto": {
++     "phase": "8-mycrypto",
++     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++     "state": "pending"
++    }
++   },
++   "tier": "R2",
++   "title": "平倉後取消殘留停損單失敗"
++  },
++  {
++   "behaviour": {
++    "btc-competition": {
++     "evidence": "src/btc_competition/reconcile_compare.py:228 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知",
++     "state": "done"
++    },
++    "momentum": {
++     "evidence": "src/reconcile_compare.py:107 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知",
++     "state": "done"
++    },
++    "mycrypto": {
++     "evidence": "reconcile_compare.py:101 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知",
++     "state": "done"
++    },
++    "seykota": {
++     "evidence": "src/seykota_bot/reconcile/compare.py:250 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知",
++     "state": "done"
++    }
++   },
++   "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
++   "emits_event": {
++    "btc-competition": {
++     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
++     "state": "n/a"
++    },
++    "momentum": {
++     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
++     "state": "n/a"
++    },
++    "mycrypto": {
++     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
++     "state": "n/a"
++    },
++    "seykota": {
++     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
++     "state": "n/a"
++    }
++   },
++   "tier": "R0",
++   "title": "帳本↔交易所對帳 DIVERGED 時故意讓 unit 變紅（exit 2）"
++  },
++  {
++   "behaviour": {
++    "btc-competition": {
++     "evidence": "src/btc_competition/reconcile_google.py:283 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知",
++     "state": "done"
++    },
++    "momentum": {
++     "evidence": "src/google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知",
++     "state": "done"
++    },
++    "mycrypto": {
++     "evidence": "google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知",
++     "state": "done"
++    },
++    "seykota": {
++     "evidence": "src/seykota_bot/reconcile/google_reconcile.py:137 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知",
++     "state": "done"
++    }
++   },
++   "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
++   "emits_event": {
++    "btc-competition": {
++     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
++     "state": "n/a"
++    },
++    "momentum": {
++     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
++     "state": "n/a"
++    },
++    "mycrypto": {
++     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
++     "state": "n/a"
++    },
++    "seykota": {
++     "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。",
++     "state": "n/a"
++    }
++   },
++   "tier": "R0",
++   "title": "帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）"
++  }
++ ],
++ "phase_counts": {
++  "8-btc-competition": 8,
++  "8-momentum": 3,
++  "8-mycrypto": 16,
++  "8-seykota": 20,
++  "v2-W2": 0,
++  "v2-W3": 9,
++  "v2-W4": 3,
++  "v2-W6": 4
++ },
++ "phase_order": [
++  "v2-W2",
++  "v2-W3",
++  "v2-W4",
++  "v2-W6",
++  "8-momentum",
++  "8-seykota",
++  "8-mycrypto",
++  "8-btc-competition"
++ ],
++ "phases": {
++  "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
++  "8-momentum": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
++  "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
++  "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
++  "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
++  "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
++  "v2-W4": "分級 v2：趨勢策略的修復機器人升到完整版",
++  "v2-W6": "分級 v2：部署到測試機與真倉"
++ },
++ "project_order": [
++  "seykota",
++  "momentum",
++  "mycrypto",
++  "btc-competition"
++ ],
++ "projects": {
++  "btc-competition": "競賽策略",
++  "momentum": "動能策略",
++  "mycrypto": "加密策略",
++  "seykota": "趨勢策略"
++ },
++ "totals": {
++  "btc-competition": {
++   "done": 10,
++   "n/a": 6,
++   "pending": 8
++  },
++  "momentum": {
++   "done": 10,
++   "n/a": 4,
++   "pending": 14
++  },
++  "mycrypto": {
++   "done": 9,
++   "n/a": 5,
++   "pending": 16
++  },
++  "seykota": {
++   "done": 17,
++   "n/a": 2,
++   "pending": 25
++  }
++ }
++}
++</script>
++<script>
++
++var DATA = JSON.parse(document.getElementById("data").textContent);
++function el(tag, cls, text){ var n=document.createElement(tag); if(cls) n.className=cls; if(text!==undefined) n.textContent=text; return n; }
++var STATE_LABEL = {"done":"已做","pending":"未做","n/a":"不適用"};
++var STATE_CLASS = {"done":"st-done","pending":"st-pending","n/a":"st-na"};
++function chipGroup(host, values, onPick){
++  var buttons=[];
++  values.forEach(function(v){
++    var b=el("button","chip"); b.type="button"; b.setAttribute("aria-pressed", v.id==="all"?"true":"false");
++    b.appendChild(document.createTextNode(v.label)); b.appendChild(el("span","n",String(v.n)));
++    b.addEventListener("click", function(){ buttons.forEach(function(x){x.setAttribute("aria-pressed","false");}); b.setAttribute("aria-pressed","true"); onPick(v.id); });
++    buttons.push(b); host.appendChild(b);
++  });
++}
++function statusText(s, phases){
++  if(s.state==="done") return "已做："+s.evidence;
++  if(s.state==="n/a") return "不適用："+s.reason;
++  return "未做："+s.reason+"（預定："+(phases[s.phase]||s.phase)+"）";
++}
++
++var pick={project:"all",state:"all"};
++var items=[];
++function card(host, title, sub, subClass, statuses){
++  var c=el("div","card"); c.appendChild(el("h3",null,title)); if(sub) c.appendChild(el("p",subClass,sub));
++  var g=el("div","grid");
++  statuses.forEach(function(s){
++    var who=el("span","who",s.label); var what=el("span");
++    what.appendChild(el("span","st "+STATE_CLASS[s.status.state],STATE_LABEL[s.status.state]));
++    what.appendChild(document.createTextNode(" "+statusText(s.status,DATA.phases)));
++    who.dataset.project=s.project; who.dataset.state=s.status.state; what.dataset.project=s.project; what.dataset.state=s.status.state;
++    g.appendChild(who); g.appendChild(what); items.push(who); items.push(what);
++  });
++  c.appendChild(g); host.appendChild(c); return c;
++}
++var cards=[];
++var capHost=document.getElementById("capabilities");
++DATA.capabilities.forEach(function(cap){
++  var c=card(capHost, cap.title, cap.description, "desc", DATA.project_order.map(function(p){return {project:p,label:DATA.projects[p],status:cap.status[p]};}));
++  cards.push(c);
++});
++var entryHost=document.getElementById("entries");
++DATA.catalog.forEach(function(row){
++  var statuses=[];
++  Object.keys(row.behaviour).sort(function(a,b){return DATA.project_order.indexOf(a)-DATA.project_order.indexOf(b);}).forEach(function(p){
++    statuses.push({project:p,label:DATA.projects[p]+"｜行為",status:row.behaviour[p]});
++    statuses.push({project:p,label:DATA.projects[p]+"｜白話通知",status:row.emits_event[p]});
++  });
++  cards.push(card(entryHost, row.tier+"｜"+row.title, row.code, "code", statuses));
++});
++var phaseHost=document.getElementById("phases");
++DATA.phase_order.forEach(function(k){
++  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜待做 "+DATA.phase_counts[k]+" 項")); phaseHost.appendChild(c);
++});
++var sum=document.getElementById("summary");
++DATA.project_order.forEach(function(p){
++  var d=el("div"); d.appendChild(el("b",null,DATA.projects[p]));
++  var t=DATA.totals[p]; d.appendChild(document.createTextNode("已做 "+t.done+"｜未做 "+t.pending+"｜不適用 "+t["n/a"])); sum.appendChild(d);
++});
++function apply(){
++  items.forEach(function(n){ n.hidden=!((pick.project==="all"||n.dataset.project===pick.project)&&(pick.state==="all"||n.dataset.state===pick.state)); });
++  cards.forEach(function(c){ c.hidden=!Array.prototype.some.call(c.querySelectorAll(".grid > span"),function(n){return !n.hidden;}); });
++}
++var f=document.getElementById("filters"), a=el("div","filters"), b=el("div","filters"); f.appendChild(a); f.appendChild(b);
++function rowsOf(p, s){ var t=DATA.totals[p]; return s ? t[s] : t.done+t.pending+t["n/a"]; }
++function allRows(s){ return DATA.project_order.reduce(function(n,p){return n+rowsOf(p,s);},0); }
++chipGroup(a,[{id:"all",label:"全部策略",n:allRows()}].concat(DATA.project_order.map(function(p){return {id:p,label:DATA.projects[p],n:rowsOf(p)};})),function(v){pick.project=v;apply();});
++chipGroup(b,[{id:"all",label:"全部狀態",n:allRows()},{id:"pending",label:"只看未做",n:allRows("pending")},{id:"done",label:"已做",n:allRows("done")},{id:"n/a",label:"不適用",n:allRows("n/a")}],function(v){pick.state=v;apply();});
++
++</script>
+diff --git a/pyproject.toml b/pyproject.toml
+index 1a16672..c5a5e34 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.19.0"
++version = "0.20.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/schemas/fleet-rollout-registry-v1.schema.json b/schemas/fleet-rollout-registry-v1.schema.json
+new file mode 100644
+index 0000000..f89e516
+--- /dev/null
++++ b/schemas/fleet-rollout-registry-v1.schema.json
+@@ -0,0 +1,91 @@
++{
++  "$schema": "http://json-schema.org/draft-07/schema#",
++  "$id": "https://github.com/bcup02/trade-alerts/schemas/fleet-rollout-registry-v1.schema.json",
++  "title": "Fleet rollout registry v1",
++  "description": "Which fleet capability each of the four strategies actually has, and whether each catalog condition's behaviour and event-log wiring exist in the strategy that owns it. Anything not done is pending (with the phase it lands in and why) or n/a (with why). Cross-field rules (all four strategies listed, pending phases registered, one row per catalog code with the right owners) are enforced by trade_alerts.rollout_registry.registry_problems.",
++  "type": "object",
++  "required": ["registry_version", "catalog_version", "updated_at", "projects", "phases", "sources", "capabilities", "catalog"],
++  "additionalProperties": false,
++  "definitions": {
++    "status": {
++      "type": "object",
++      "required": ["state"],
++      "additionalProperties": false,
++      "properties": {
++        "state": {"enum": ["done", "pending", "n/a"]},
++        "evidence": {"type": "string", "minLength": 1, "description": "done: where it lives on the sources commit (file:line or tool name)."},
++        "phase": {"type": "string", "minLength": 1, "description": "pending: a key of phases."},
++        "reason": {"type": "string", "minLength": 1, "description": "pending / n/a: plain-language current state or why it does not apply."}
++      },
++      "allOf": [
++        {"if": {"properties": {"state": {"const": "done"}}}, "then": {"required": ["evidence"]}},
++        {"if": {"properties": {"state": {"const": "pending"}}}, "then": {"required": ["phase", "reason"]}},
++        {"if": {"properties": {"state": {"const": "n/a"}}}, "then": {"required": ["reason"]}}
++      ]
++    },
++    "per_project": {
++      "type": "object",
++      "minProperties": 1,
++      "propertyNames": {"enum": ["momentum", "seykota", "mycrypto", "btc-competition"]},
++      "additionalProperties": {"$ref": "#/definitions/status"}
++    }
++  },
++  "properties": {
++    "registry_version": {"const": "fleet-rollout-registry/v1"},
++    "catalog_version": {"type": "string"},
++    "updated_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
++    "note": {"type": "string"},
++    "sources": {
++      "description": "What 'done' is measured against: per strategy, the repo and the branch the live host deploys from, and the commit the file:line evidence refers to. Merged to development or running on the dev host is not done.",
++      "type": "object",
++      "required": ["momentum", "seykota", "mycrypto", "btc-competition"],
++      "additionalProperties": false,
++      "patternProperties": {
++        "^(momentum|seykota|mycrypto|btc-competition)$": {
++          "type": "object",
++          "required": ["repo", "branch", "commit"],
++          "additionalProperties": false,
++          "properties": {
++            "repo": {"type": "string", "pattern": "^[\\w.-]+/[\\w.-]+$"},
++            "branch": {"const": "operations"},
++            "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
++          }
++        }
++      }
++    },
++    "projects": {
++      "type": "object",
++      "required": ["momentum", "seykota", "mycrypto", "btc-competition"],
++      "additionalProperties": false,
++      "patternProperties": {".*": {"type": "string", "minLength": 1}}
++    },
++    "phases": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string", "minLength": 1}},
++    "capabilities": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": ["id", "title", "description", "status"],
++        "additionalProperties": false,
++        "properties": {
++          "id": {"type": "string", "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$"},
++          "title": {"type": "string", "minLength": 1},
++          "description": {"type": "string", "minLength": 1},
++          "status": {"$ref": "#/definitions/per_project"}
++        }
++      }
++    },
++    "catalog": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": ["code", "behaviour", "emits_event"],
++        "additionalProperties": false,
++        "properties": {
++          "code": {"type": "string", "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"},
++          "behaviour": {"$ref": "#/definitions/per_project", "description": "Does the owning strategy do what the catalog entry's auto_action says?"},
++          "emits_event": {"$ref": "#/definitions/per_project", "description": "Does it write the condition to the shared fleet event log (the only way it reaches a plain-language notification)?"}
++        }
++      }
++    }
++  }
++}
+diff --git a/scripts/render_guides.py b/scripts/render_guides.py
+new file mode 100644
+index 0000000..3408823
+--- /dev/null
++++ b/scripts/render_guides.py
+@@ -0,0 +1,413 @@
++"""Generate the two human-readable guide pages from their JSON sources.
++
++    python scripts/render_guides.py          # rewrite docs/guides/*.html
++    python scripts/render_guides.py --check  # exit 1 if either page is stale
++
++``fleet-risk-register.html`` comes from the error catalog (plus the rollout
++registry's per-strategy status); ``fleet-rollout-register.html`` from the
++rollout registry.  Neither page may be edited by hand: a test re-renders both
++and fails if the committed file differs -- the v1 risk register drifted to 30
++of 33 conditions precisely because it was a second, hand-written copy.
++
++Output is deterministic (sorted JSON, no timestamps beyond the sources' own).
++All text reaches the page through ``textContent``, never ``innerHTML``.
++"""
++from __future__ import annotations
++
++import argparse
++import html
++import json
++import sys
++from pathlib import Path
++from typing import Any
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(ROOT / "src"))
++
++from trade_alerts.fleet_event_log import load_error_catalog  # noqa: E402
++from trade_alerts.rollout_registry import STRATEGY_PROJECTS, load_rollout_registry, owners  # noqa: E402
++
++GUIDES = ROOT / "docs" / "guides"
++RISK_PAGE = GUIDES / "fleet-risk-register.html"
++ROLLOUT_PAGE = GUIDES / "fleet-rollout-register.html"
++
++TIERS = [
++    {"id": "R3", "title": "一定要人處理", "sub": "系統絕不自己動手，會一直提醒到有人處理"},
++    {"id": "R2", "title": "系統先自己試，試不起來才找你", "sub": "連續失敗 3 次才通知一次，附給 AI 的追查指令"},
++    {"id": "R1", "title": "自動處理，不通知", "sub": "沒有第二個選項，做完留紀錄"},
++    {"id": "R0", "title": "只是記一筆", "sub": "不需要處理，不通知任何人"},
++]
++BOT_LABEL_FLEET = "全機隊"
++
++_CSS = """
++  :root{
++    --paper:#F1F3EC; --paper-raised:#FAFBF6; --line:#DBE0D0;
++    --ink:#1F2A22; --ink-soft:#57604E; --ink-faint:#8A9080;
++    --accent:#5B3A5C; --accent-bg:#EDE3EC; --accent-line:#C9AECB;
++    --R3:#963025; --R3-bg:#F4E1DD;
++    --R2:#8C6317; --R2-bg:#F1E6C9;
++    --R1:#357357; --R1-bg:#DEEAE3;
++    --R0:#6B7566; --R0-bg:#E7EAE0;
++    --done:#357357; --done-bg:#DEEAE3;
++    --pending:#8C6317; --pending-bg:#F1E6C9;
++    --na:#6B7566; --na-bg:#E7EAE0;
++  }
++  @media (prefers-color-scheme: dark){
++    :root:not([data-theme="light"]){
++      --paper:#18150F; --paper-raised:#211D16; --line:#332D22;
++      --ink:#EDE6D8; --ink-soft:#B7AF9C; --ink-faint:#847C6C;
++      --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
++      --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
++      --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
++      --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
++    }
++  }
++  :root[data-theme="dark"]{
++    --paper:#18150F; --paper-raised:#211D16; --line:#332D22;
++    --ink:#EDE6D8; --ink-soft:#B7AF9C; --ink-faint:#847C6C;
++    --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
++    --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
++    --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
++    --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
++  }
++  *{box-sizing:border-box;}
++  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans TC","IBM Plex Mono",sans-serif;padding:40px 20px 64px;}
++  .wrap{max-width:860px;margin-inline:auto;}
++  .eyebrow{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);}
++  h1{font-family:"Noto Serif TC",serif;font-weight:900;font-size:clamp(28px,5vw,40px);line-height:1.25;margin:6px 0 12px;}
++  h2{font-family:"Noto Serif TC",serif;font-weight:700;font-size:20px;margin:36px 0 12px;}
++  .lede{font-size:15.5px;line-height:1.75;color:var(--ink-soft);max-width:60ch;margin:0 0 24px;}
++  .lede b{color:var(--ink);}
++  .legend{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-bottom:24px;}
++  .legend-item{background:var(--paper-raised);padding:14px 12px 12px;display:flex;flex-direction:column;gap:6px;}
++  .legend-code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-weight:600;font-size:12px;}
++  .legend-name{font-size:13px;font-weight:700;line-height:1.3;}
++  .legend-sub{font-size:11.5px;color:var(--ink-faint);line-height:1.5;}
++  .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
++  .chip{font:inherit;font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--paper-raised);color:var(--ink-soft);cursor:pointer;}
++  .chip[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent);font-weight:700;}
++  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
++  .chip .n{font-family:"IBM Plex Mono","Noto Sans TC",monospace;opacity:.75;margin-inline-start:4px;}
++  .tier-head{display:flex;align-items:baseline;gap:12px;padding:14px 16px;border-radius:3px 3px 0 0;border-inline-start:4px solid var(--edge);background:var(--bg);margin-top:20px;}
++  .tier-code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-weight:600;font-size:13px;color:var(--edge);}
++  .tier-title{font-family:"Noto Serif TC",serif;font-weight:700;font-size:17px;}
++  .tier-count{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;color:var(--ink-faint);margin-inline-start:auto;}
++  .rows{border-inline-start:4px solid var(--line);border-block-end:1px solid var(--line);}
++  .row{display:grid;grid-template-columns:104px 1fr;gap:16px;padding:14px 16px;border-block-start:1px solid var(--line);}
++  .row-bot{font-size:11.5px;font-weight:700;color:var(--ink-soft);padding:3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--paper-raised);text-align:center;align-self:start;white-space:nowrap;}
++  .row-body p{margin:0;font-size:14.5px;line-height:1.7;}
++  .row-title{font-weight:700;}
++  .row-what{color:var(--ink);margin-top:2px !important;}
++  .row-how{color:var(--ink-soft);margin-top:5px !important;}
++  .code{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;color:var(--ink-faint);}
++  .card p.desc{margin-top:2px;}
++  .status{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
++  .st{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;color:var(--c);background:var(--cb);}
++  .st-done{--c:var(--done);--cb:var(--done-bg);} .st-pending{--c:var(--pending);--cb:var(--pending-bg);} .st-na{--c:var(--na);--cb:var(--na-bg);}
++  .note{font-size:13px;color:var(--ink-soft);margin-top:6px !important;line-height:1.6;}
++  details{margin-top:8px;font-size:13.5px;}
++  details summary{cursor:pointer;color:var(--accent);font-weight:700;}
++  details ol{margin:6px 0 0;padding-inline-start:22px;line-height:1.7;}
++  details pre{white-space:pre-wrap;background:var(--paper-raised);border:1px solid var(--line);border-radius:3px;padding:10px;font-size:12.5px;line-height:1.6;}
++  .card{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:14px 16px;margin-bottom:12px;}
++  .card h3{margin:0 0 4px;font-size:15.5px;}
++  .card p{margin:0;font-size:13.5px;color:var(--ink-soft);line-height:1.6;}
++  .grid{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;margin-top:10px;font-size:13.5px;line-height:1.6;}
++  .grid .who{font-weight:700;color:var(--ink-soft);}
++  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;}
++  .summary div{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:10px 12px;font-size:13px;line-height:1.7;}
++  .summary b{display:block;font-size:14px;}
++  [hidden]{display:none !important;}
++  @media (max-width:560px){
++    .legend,.summary{grid-template-columns:1fr 1fr;}
++    .row{grid-template-columns:1fr;} .row-bot{justify-self:start;}
++    .grid{grid-template-columns:1fr;}
++    body{padding-inline:16px;}
++  }
++  .foot{margin-top:36px;font-size:12px;color:var(--ink-faint);line-height:1.7;border-block-start:1px solid var(--line);padding-top:16px;}
++"""
++
++_FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900'
++          '&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">')
++
++
++def _page(title: str, body: str, data: dict[str, Any], script: str) -> str:
++    blob = json.dumps(data, ensure_ascii=False, sort_keys=True, indent=1).replace("</", "<\\/")
++    return (f"<title>{title}</title>\n{_FONTS}\n<style>{_CSS}</style>\n\n{body}\n\n"
++            f'<script type="application/json" id="data">\n{blob}\n</script>\n'
++            f"<script>\n{script}\n</script>\n")
++
++
++_JS_HELPERS = r"""
++var DATA = JSON.parse(document.getElementById("data").textContent);
++function el(tag, cls, text){ var n=document.createElement(tag); if(cls) n.className=cls; if(text!==undefined) n.textContent=text; return n; }
++var STATE_LABEL = {"done":"已做","pending":"未做","n/a":"不適用"};
++var STATE_CLASS = {"done":"st-done","pending":"st-pending","n/a":"st-na"};
++function chipGroup(host, values, onPick){
++  var buttons=[];
++  values.forEach(function(v){
++    var b=el("button","chip"); b.type="button"; b.setAttribute("aria-pressed", v.id==="all"?"true":"false");
++    b.appendChild(document.createTextNode(v.label)); b.appendChild(el("span","n",String(v.n)));
++    b.addEventListener("click", function(){ buttons.forEach(function(x){x.setAttribute("aria-pressed","false");}); b.setAttribute("aria-pressed","true"); onPick(v.id); });
++    buttons.push(b); host.appendChild(b);
++  });
++}
++function statusText(s, phases){
++  if(s.state==="done") return "已做："+s.evidence;
++  if(s.state==="n/a") return "不適用："+s.reason;
++  return "未做："+s.reason+"（預定："+(phases[s.phase]||s.phase)+"）";
++}
++"""
++
++_RISK_JS = _JS_HELPERS + r"""
++var register=document.getElementById("register"), filters=document.getElementById("filters");
++var pick={tier:"all",bot:"all",open:"all"};
++var rows=[];
++DATA.tiers.forEach(function(t){
++  var entries=DATA.entries.filter(function(e){return e.tier===t.id;});
++  var section=el("section"); section.dataset.tier=t.id;
++  var head=el("div","tier-head"); head.style.setProperty("--edge","var(--"+t.id+")"); head.style.setProperty("--bg","var(--"+t.id+"-bg)");
++  head.appendChild(el("span","tier-code",t.id)); head.appendChild(el("span","tier-title",t.title)); head.appendChild(el("span","tier-count",entries.length+" 種"));
++  section.appendChild(head);
++  var box=el("div","rows");
++  entries.forEach(function(e){
++    var row=el("div","row"); row.dataset.bot=e.bot; row.dataset.open=e.open?"yes":"no";
++    row.appendChild(el("span","row-bot",e.bot_label));
++    var body=el("div","row-body");
++    body.appendChild(el("p","row-title",e.title));
++    body.appendChild(el("p","code",e.code));
++    body.appendChild(el("p","row-what",e.what));
++    body.appendChild(el("p","row-how",e.direction));
++    var st=el("div","status");
++    [["行為",e.behaviour],["白話通知",e.emits_event]].forEach(function(pair){
++      var s=el("span","st "+STATE_CLASS[pair[1].state],pair[0]+"："+STATE_LABEL[pair[1].state]); st.appendChild(s);
++    });
++    body.appendChild(st);
++    e.notes.forEach(function(n){ body.appendChild(el("p","note",n)); });
++    if(e.steps.length){
++      var d=el("details"); d.appendChild(el("summary",null,"處理步驟"+(e.ai_prompt?"與給 AI 的追查指令":"")));
++      var ol=el("ol"); e.steps.forEach(function(s){ ol.appendChild(el("li",null,s)); }); d.appendChild(ol);
++      if(e.ai_prompt){ d.appendChild(el("p","note","給 AI 的追查指令（實際通知會再附上當次的錯誤碼、事件編號與事件資料）：")); d.appendChild(el("pre",null,e.ai_prompt)); }
++      body.appendChild(d);
++    }
++    row.appendChild(body); box.appendChild(row); rows.push(row);
++  });
++  section.appendChild(box); register.appendChild(section);
++});
++function apply(){
++  rows.forEach(function(r){
++    var okBot=pick.bot==="all"||r.dataset.bot===pick.bot, okOpen=pick.open==="all"||r.dataset.open==="yes";
++    var okTier=pick.tier==="all"||r.parentNode.parentNode.dataset.tier===pick.tier;
++    r.hidden=!(okBot&&okOpen&&okTier);
++  });
++  document.querySelectorAll("#register section").forEach(function(s){
++    s.hidden=!Array.prototype.some.call(s.querySelectorAll(".row"),function(r){return !r.hidden;});
++  });
++}
++function count(f){return DATA.entries.filter(f).length;}
++var tierHost=el("div","filters"), botHost=el("div","filters"), openHost=el("div","filters");
++filters.appendChild(tierHost); filters.appendChild(botHost); filters.appendChild(openHost);
++chipGroup(tierHost,[{id:"all",label:"全部等級",n:DATA.entries.length}].concat(DATA.tiers.map(function(t){return {id:t.id,label:t.id+" "+t.title,n:count(function(e){return e.tier===t.id;})};})),function(v){pick.tier=v;apply();});
++chipGroup(botHost,[{id:"all",label:"全部策略",n:DATA.entries.length}].concat(DATA.bots.map(function(b){return {id:b.id,label:b.label,n:count(function(e){return e.bot===b.id;})};})),function(v){pick.bot=v;apply();});
++chipGroup(openHost,[{id:"all",label:"全部",n:DATA.entries.length},{id:"open",label:"只看還沒做完的",n:count(function(e){return e.open;})}],function(v){pick.open=v;apply();});
++"""
++
++_ROLLOUT_JS = _JS_HELPERS + r"""
++var pick={project:"all",state:"all"};
++var items=[];
++function card(host, title, sub, subClass, statuses){
++  var c=el("div","card"); c.appendChild(el("h3",null,title)); if(sub) c.appendChild(el("p",subClass,sub));
++  var g=el("div","grid");
++  statuses.forEach(function(s){
++    var who=el("span","who",s.label); var what=el("span");
++    what.appendChild(el("span","st "+STATE_CLASS[s.status.state],STATE_LABEL[s.status.state]));
++    what.appendChild(document.createTextNode(" "+statusText(s.status,DATA.phases)));
++    who.dataset.project=s.project; who.dataset.state=s.status.state; what.dataset.project=s.project; what.dataset.state=s.status.state;
++    g.appendChild(who); g.appendChild(what); items.push(who); items.push(what);
++  });
++  c.appendChild(g); host.appendChild(c); return c;
++}
++var cards=[];
++var capHost=document.getElementById("capabilities");
++DATA.capabilities.forEach(function(cap){
++  var c=card(capHost, cap.title, cap.description, "desc", DATA.project_order.map(function(p){return {project:p,label:DATA.projects[p],status:cap.status[p]};}));
++  cards.push(c);
++});
++var entryHost=document.getElementById("entries");
++DATA.catalog.forEach(function(row){
++  var statuses=[];
++  Object.keys(row.behaviour).sort(function(a,b){return DATA.project_order.indexOf(a)-DATA.project_order.indexOf(b);}).forEach(function(p){
++    statuses.push({project:p,label:DATA.projects[p]+"｜行為",status:row.behaviour[p]});
++    statuses.push({project:p,label:DATA.projects[p]+"｜白話通知",status:row.emits_event[p]});
++  });
++  cards.push(card(entryHost, row.tier+"｜"+row.title, row.code, "code", statuses));
++});
++var phaseHost=document.getElementById("phases");
++DATA.phase_order.forEach(function(k){
++  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜待做 "+DATA.phase_counts[k]+" 項")); phaseHost.appendChild(c);
++});
++var sum=document.getElementById("summary");
++DATA.project_order.forEach(function(p){
++  var d=el("div"); d.appendChild(el("b",null,DATA.projects[p]));
++  var t=DATA.totals[p]; d.appendChild(document.createTextNode("已做 "+t.done+"｜未做 "+t.pending+"｜不適用 "+t["n/a"])); sum.appendChild(d);
++});
++function apply(){
++  items.forEach(function(n){ n.hidden=!((pick.project==="all"||n.dataset.project===pick.project)&&(pick.state==="all"||n.dataset.state===pick.state)); });
++  cards.forEach(function(c){ c.hidden=!Array.prototype.some.call(c.querySelectorAll(".grid > span"),function(n){return !n.hidden;}); });
++}
++var f=document.getElementById("filters"), a=el("div","filters"), b=el("div","filters"); f.appendChild(a); f.appendChild(b);
++function rowsOf(p, s){ var t=DATA.totals[p]; return s ? t[s] : t.done+t.pending+t["n/a"]; }
++function allRows(s){ return DATA.project_order.reduce(function(n,p){return n+rowsOf(p,s);},0); }
++chipGroup(a,[{id:"all",label:"全部策略",n:allRows()}].concat(DATA.project_order.map(function(p){return {id:p,label:DATA.projects[p],n:rowsOf(p)};})),function(v){pick.project=v;apply();});
++chipGroup(b,[{id:"all",label:"全部狀態",n:allRows()},{id:"pending",label:"只看未做",n:allRows("pending")},{id:"done",label:"已做",n:allRows("done")},{id:"n/a",label:"不適用",n:allRows("n/a")}],function(v){pick.state=v;apply();});
++"""
++
++
++def _combined(statuses: dict[str, Any]) -> dict[str, Any]:
++    """One status for a row that spans several strategies (FLEET.*): done only
++    if every strategy is done, n/a only if every one is n/a, else pending."""
++    states = {s["state"] for s in statuses.values()}
++    if states == {"done"}:
++        return {"state": "done"}
++    if states == {"n/a"}:
++        return {"state": "n/a"}
++    return {"state": "pending"}
++
++
++def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> str:
++    projects = registry["projects"]
++    phases = registry["phases"]
++    rows_by_code = {row["code"]: row for row in registry["catalog"]}
++    entries = []
++    for entry in catalog["entries"]:
++        code = entry["code"]
++        row = rows_by_code[code]
++        project_keys = owners(code)
++        fleet = code.startswith("FLEET.")
++        notes = []
++        for key, label in (("behaviour", "行為"), ("emits_event", "白話通知")):
++            for project in project_keys:
++                status = row[key][project]
++                if status["state"] == "pending":
++                    who = f"{projects[project]}：" if fleet else ""
++                    notes.append(f"{label}未做 — {who}{status['reason']}（預定：{phases[status['phase']]}）")
++        message = entry["operator_message"]
++        entries.append({
++            "code": code, "tier": entry["risk_tier"], "title": entry["title"],
++            "bot": "fleet" if fleet else project_keys[0],
++            "bot_label": BOT_LABEL_FLEET if fleet else projects[project_keys[0]],
++            "what": message["what"], "direction": message["direction"],
++            "steps": message["steps"] if entry["risk_tier"] in ("R2", "R3") else [],
++            "ai_prompt": message.get("ai_prompt"),
++            "behaviour": _combined(row["behaviour"]) if fleet else row["behaviour"][project_keys[0]],
++            "emits_event": _combined(row["emits_event"]) if fleet else row["emits_event"][project_keys[0]],
++            "notes": notes,
++            "open": bool(notes),
++        })
++    bots = [{"id": p, "label": projects[p]} for p in STRATEGY_PROJECTS] + [{"id": "fleet", "label": BOT_LABEL_FLEET}]
++    data = {"tiers": TIERS, "entries": entries, "bots": bots}
++    count = len(entries)
++    open_count = sum(1 for e in entries if e["open"])
++    body = f"""<div class="wrap">
++  <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
++  <h1>機隊風險登記冊</h1>
++  <p class="lede">
++    四支策略目前所有已知的「出問題」情況，共 <b>{count} 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>{open_count} 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++  </p>
++  <div class="legend">
++{''.join(f'''    <div class="legend-item"><span class="legend-code" style="color:var(--{t['id']})">{t['id']}</span><span class="legend-name">{t['title']}</span><span class="legend-sub">{t['sub']}</span></div>
++''' for t in TIERS)}  </div>
++  <div id="filters"></div>
++  <div id="register"></div>
++  <div class="foot">
++    資料來源：trade-alerts <code>{catalog['catalog_version']}</code>（錯誤分類）與 <code>{registry['registry_version']}</code>（各策略實際進度，{registry['updated_at']} 盤點）。
++    本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
++  </div>
++</div>"""
++    return _page("機隊風險登記冊", body, data, _RISK_JS)
++
++
++def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -> str:
++    projects = registry["projects"]
++    phases = registry["phases"]
++    titles = {entry["code"]: (entry["risk_tier"], entry["title"]) for entry in catalog["entries"]}
++    totals = {p: {"done": 0, "pending": 0, "n/a": 0} for p in STRATEGY_PROJECTS}
++    phase_counts = {k: 0 for k in phases}
++    for capability in registry["capabilities"]:
++        for project, status in capability["status"].items():
++            totals[project][status["state"]] += 1
++            if status["state"] == "pending":
++                phase_counts[status["phase"]] += 1
++    catalog_rows = []
++    for row in registry["catalog"]:
++        tier, title = titles[row["code"]]
++        catalog_rows.append({**row, "tier": tier, "title": title})
++        for key in ("behaviour", "emits_event"):
++            for project, status in row[key].items():
++                totals[project][status["state"]] += 1
++                if status["state"] == "pending":
++                    phase_counts[status["phase"]] += 1
++    data = {
++        "projects": projects, "project_order": list(STRATEGY_PROJECTS), "phases": phases,
++        "phase_order": list(phases), "phase_counts": phase_counts, "totals": totals,
++        "capabilities": registry["capabilities"], "catalog": catalog_rows,
++    }
++    sources = "；".join(
++        f"{html.escape(registry['projects'][p])} <code>{html.escape(s['repo'])}@{html.escape(s['branch'])} {html.escape(s['commit'][:7])}</code>"
++        for p, s in ((p, registry["sources"][p]) for p in STRATEGY_PROJECTS)
++    )
++    body = f"""<div class="wrap">
++  <div class="eyebrow">交易機隊 · 四支策略做到哪裡了</div>
++  <h1>機隊一致性登記冊</h1>
++  <p class="lede">
++    每一項機隊功能、每一條錯誤處理規則，在四支策略裡<b>實際做到了沒有</b>。規則只有一條：
++    沒做的一定要寫在這裡——<b>「未做」要寫目前狀況和預定在哪一關做</b>，<b>「不適用」要寫理由</b>。
++    漏寫的話，自動檢查（CI）會擋下來，不會再有「只做了一支、沒人記得」。
++    <b>「已做」指的是真倉已經在跑</b>（部署來源 <code>operations</code> 分支上有）；只合併到開發分支或只在測試機上的，一律算「未做」。
++  </p>
++  <div class="summary" id="summary"></div>
++  <div id="filters"></div>
++  <h2>機隊功能</h2>
++  <div id="capabilities"></div>
++  <h2>錯誤處理規則（依錯誤目錄逐條）</h2>
++  <p class="lede">「行為」：這條錯誤發生時，策略有沒有照錯誤目錄說的處理。「白話通知」：有沒有寫進共用事件日誌——只有寫進去的，才會變成你手機上的白話通知。</p>
++  <div id="entries"></div>
++  <h2>預定的關卡</h2>
++  <div id="phases"></div>
++  <div class="foot">
++    資料來源：trade-alerts <code>{registry['registry_version']}</code>（{registry['updated_at']} 對四個 repo 逐項盤點）與 <code>{catalog['catalog_version']}</code>。
++    「檔案:行號」證據對應的版本：{sources}。
++    本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
++  </div>
++</div>"""
++    return _page("機隊一致性登記冊", body, data, _ROLLOUT_JS)
++
++
++def rendered_pages() -> dict[Path, str]:
++    catalog = load_error_catalog()
++    registry = load_rollout_registry()
++    return {RISK_PAGE: render_risk_register(catalog, registry), ROLLOUT_PAGE: render_rollout_register(catalog, registry)}
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
++    parser.add_argument("--check", action="store_true", help="exit 1 if a committed page differs from a fresh render")
++    args = parser.parse_args(argv)
++    stale = []
++    for path, html in rendered_pages().items():
++        if args.check:
++            if not path.exists() or path.read_text(encoding="utf-8") != html:
++                stale.append(path)
++        else:
++            path.write_text(html, encoding="utf-8")
++            print(f"wrote {path.relative_to(ROOT)}")
++    if stale:
++        print("stale (run scripts/render_guides.py): " + ", ".join(str(p.relative_to(ROOT)) for p in stale))
++        return 1
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/scripts/verify_registry_evidence.py b/scripts/verify_registry_evidence.py
+new file mode 100644
+index 0000000..4983f90
+--- /dev/null
++++ b/scripts/verify_registry_evidence.py
+@@ -0,0 +1,95 @@
++"""Check every file:line the rollout registry cites against the strategy repos.
++
++    python scripts/verify_registry_evidence.py [--repos-root ~]
++
++``registry_problems`` can only see the registry itself; whether a ``done``
++cell's evidence points at real code lives in four other (private) repos, so
++this runs by hand before a registry change goes to review, not in CI.  For
++every path (and line) in a cell's ``evidence`` or ``reason`` it reads the file
++at the commit in ``sources`` -- the live branch -- and reports:
++
++* a ``done`` cell citing a file that does not exist at that commit (saying
++  whether it exists on ``origin/development``: the usual cause is dev-only
++  code marked done);
++* a ``pending`` / ``n/a`` cell citing a file that exists neither at that
++  commit nor on ``origin/development`` (their reasons may describe dev-only
++  code, but not code that exists nowhere);
++* a cited line past the end of the file.
++* a ``done`` cell with no file citation at all -- "done" has to point at
++  something a reviewer can open.
++
++It prints each ``done`` citation with the cited line so a reviewer can see
++that it is the claimed code.  Exit 1 if anything is wrong.
++"""
++from __future__ import annotations
++
++import argparse
++import re
++import subprocess
++import sys
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(ROOT / "src"))
++
++from trade_alerts.rollout_registry import load_rollout_registry  # noqa: E402
++
++# A path under a known top-level directory, or a bare ``name.py`` (my-crypto
++# keeps its modules at the repo root), optionally followed by ``:line``.
++_CITATION = re.compile(r"(?<![\w./-])((?:(?:src|scripts|tools|tests|docs|deploy)/[\w./-]+\.\w+)|[\w-]+\.py)(?::(\d+))?")
++
++
++def citations(text: str) -> list[tuple[str, int | None]]:
++    return [(m.group(1), int(m.group(2)) if m.group(2) else None) for m in _CITATION.finditer(text)]
++
++
++def _cells(registry):
++    for capability in registry["capabilities"]:
++        for project, status in capability["status"].items():
++            yield f"capability {capability['id']}", project, status
++    for row in registry["catalog"]:
++        for key in ("behaviour", "emits_event"):
++            for project, status in row[key].items():
++                yield f"{row['code']} {key}", project, status
++
++
++def _show(clone: Path, ref: str, path: str) -> str | None:
++    result = subprocess.run(["git", "-C", str(clone), "show", f"{ref}:{path}"], capture_output=True, text=True)
++    return result.stdout if result.returncode == 0 else None
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
++    parser.add_argument("--repos-root", type=Path, default=Path.home(), help="directory holding the four clones")
++    args = parser.parse_args(argv)
++    registry = load_rollout_registry()
++    failures = 0
++    for where, project, status in _cells(registry):
++        source = registry["sources"][project]
++        clone = args.repos_root / source["repo"].split("/", 1)[1]
++        text = " ".join(str(status.get(key, "")) for key in ("evidence", "reason"))
++        if status["state"] == "done" and not citations(status["evidence"]):
++            print(f"FAIL [done] {where} / {project}: evidence cites no file -- {status['evidence']}")
++            failures += 1
++        for path, line in citations(text):
++            content = _show(clone, source["commit"], path)
++            label = f"[{status['state']}] {where} / {project}: {path}{f':{line}' if line else ''}"
++            if content is None:
++                content = _show(clone, "origin/development", path)
++                if status["state"] == "done" or content is None:
++                    print(f"FAIL {label} -- not at {source['branch']} {source['commit'][:7]}"
++                          + (" (exists on development only)" if content is not None else " nor on development"))
++                    failures += 1
++                    continue
++            lines = content.splitlines()
++            if line is not None and line > len(lines):
++                print(f"FAIL {label} -- line past end of file ({len(lines)} lines)")
++                failures += 1
++            elif status["state"] == "done" and line is not None:
++                print(f"ok   {label} -> {lines[line - 1].strip()[:100]}")
++    print(f"{failures} problem(s)")
++    return 1 if failures else 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 38f299f..4e5e7a1 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -49,6 +49,13 @@ from .ops_export import (
+     render_notice_text,
+     write_ops_export,
+ )
++from .rollout_registry import (
++    REGISTRY_VERSION,
++    STRATEGY_PROJECTS,
++    load_rollout_registry,
++    project_rows,
++    registry_problems,
++)
+ from .safe_halt_model import (
+     FINGERPRINT_LENGTH,
+     RESUME_PATHS,
+@@ -211,6 +218,11 @@ __all__ = [
+     "needs_human",
+     "render_notice_text",
+     "write_ops_export",
++    "REGISTRY_VERSION",
++    "STRATEGY_PROJECTS",
++    "load_rollout_registry",
++    "project_rows",
++    "registry_problems",
+     "FINGERPRINT_LENGTH",
+     "RESUME_PATHS",
+     "SAFE_HALT_CLEARED_EVENT",
+@@ -277,4 +289,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.19.0"
++__version__ = "0.20.0"
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+new file mode 100644
+index 0000000..56636cf
+--- /dev/null
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -0,0 +1,930 @@
++{
++  "registry_version": "fleet-rollout-registry/v1",
++  "catalog_version": "fleet-error-catalog/v2",
++  "updated_at": "2026-09-18",
++  "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
++  "projects": {
++    "momentum": "動能策略",
++    "seykota": "趨勢策略",
++    "mycrypto": "加密策略",
++    "btc-competition": "競賽策略"
++  },
++  "phases": {
++    "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
++    "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
++    "v2-W4": "分級 v2：趨勢策略的修復機器人升到完整版",
++    "v2-W6": "分級 v2：部署到測試機與真倉",
++    "8-momentum": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
++    "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
++    "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
++    "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試"
++  },
++  "sources": {
++    "momentum": {
++      "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
++      "branch": "operations",
++      "commit": "520cb9e18f84fac8061d8d41ab5a9ca1d9093961"
++    },
++    "seykota": {
++      "repo": "AI-for-column/ed-seykota-systematic-trend-following",
++      "branch": "operations",
++      "commit": "0213a01f4695af7b7820136ecb818f748e861810"
++    },
++    "mycrypto": {
++      "repo": "AI-for-column/my-crypto-bot",
++      "branch": "operations",
++      "commit": "1efbdc01c80a6d0444152d6098e9cb3a95618265"
++    },
++    "btc-competition": {
++      "repo": "AI-for-column/btc-bull-market-competition",
++      "branch": "operations",
++      "commit": "b8eda43089a21cd71200e9fcf090a5a0de229c4a"
++    }
++  },
++  "capabilities": [
++    {
++      "id": "latch.unified_model",
++      "title": "統一格式的暫停（latch）",
++      "description": "出事時用同一套欄位（原因碼＋證據＋指紋）把策略停住，四支才能用同一套解除與通知流程。",
++      "status": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/strategy.py:1067 build_safe_halt（Phase 4c）"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:386 build_safe_halt（Phase 4c）"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/runner.py:347 build_safe_halt（Phase 4c）"
++        }
++      }
++    },
++    {
++      "id": "latch.resume_tool",
++      "title": "兩段式解除工具",
++      "description": "先預覽拿確認碼、再帶確認碼解除，避免清掉的不是眼前這一次的暫停。",
++      "status": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/safe_halt_resume.py（--apply --confirm --exchange-verified）"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "seykota-resume（src/seykota_bot/safe_halt_resume.py）"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "btc-competition-resume（src/btc_competition/safe_halt_resume.py）"
++        }
++      }
++    },
++    {
++      "id": "latch.restart_only_clear",
++      "title": "「改好設定重啟」就能解除的暫停真的會被清掉",
++      "description": "設定錯誤類的暫停（例如連錯交易所）不能用解除工具清，只能改好設定後重啟；重啟後系統要自己確認設定正確並解除。",
++      "status": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "沒有「改設定重啟」這一類暫停。"
++        },
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "沒有「改設定重啟」這一類暫停。"
++        }
++      }
++    },
++    {
++      "id": "latch.consecutive_failure_counter",
++      "title": "連續失敗 3 次才升格（不因一次意外就停）",
++      "description": "暫時性的錯誤先自動重試，連續失敗才停下或通知人。",
++      "status": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "未分類例外不暫停：寫錯誤心跳、下一輪重試（R0）。"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:123 Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "MYC.RUNTIME_CYCLE_FAILED 目前每次都照常重試但沒有計數，v2 要求連續 3 次失敗才升格通知。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "未分類例外不暫停：寫錯誤心跳、隔天重試（R0）。"
++        }
++      }
++    },
++    {
++      "id": "runtime.status_snapshot",
++      "title": "策略運行狀態（維運通知的第四軸）",
++      "description": "每支策略定時寫出自己「正常／暫停／出錯」的狀態，維運通知據此提醒。",
++      "status": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/portfolio_snapshot_adapter.py strategy.runtime_status"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/portfolio_snapshot_adapter.py strategy.runtime_status"
++        },
++        "mycrypto": {
++          "state": "done",
++          "evidence": "portfolio_snapshot_adapter.py:75 _runtime_status（strategy.runtime_status）"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/portfolio_snapshot_adapter.py strategy.runtime_status"
++        }
++      }
++    },
++    {
++      "id": "reconcile.ledger_status",
++      "title": "帳本↔交易所對帳狀態檔",
++      "description": "定時比對本地帳本與交易所，寫出 audit/ledger_status.json 給維運通知讀。",
++      "status": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/reconcile_compare.py"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/reconcile/compare.py"
++        },
++        "mycrypto": {
++          "state": "done",
++          "evidence": "reconcile_compare.py:101 main"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/reconcile_compare.py"
++        }
++      }
++    },
++    {
++      "id": "reconcile.google_status",
++      "title": "帳本↔Google 表對帳狀態檔",
++      "description": "定時比對本地帳本與 Google 表，寫出 audit/google_reconcile_status.json 給維運通知讀。",
++      "status": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/google_reconcile.py"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/reconcile/google_reconcile.py"
++        },
++        "mycrypto": {
++          "state": "done",
++          "evidence": "google_reconcile.py:135 main"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/reconcile_google.py"
++        }
++      }
++    },
++    {
++      "id": "repair_bot.verified_close",
++      "title": "漏記平倉自動修復機器人",
++      "description": "交易所已平倉但本地帳本漏記時，以交易所成交為準自動補寫；結構對不上才重試並升格。",
++      "status": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "真倉（operations）只有 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py；會自動補寫的 v1 版 scripts/repair_bot.py（Phase 6b，受過渡開關 MOMENTUM_REPAIR_AUTO_APPLY 控制）只在 development／測試機。v2 由共用執行器取代。"
++        },
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "只有 Phase 5 只提案的影子版，而且發出的 SEY.VERIFIED_CLOSE_PROPOSED 從未登記進 v1 目錄。"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "有同樣的漏記平倉形狀（reconcile_compare 會產生 position_diffs），目前只有一次性手修腳本；需要先做 MEXC 成交查詢轉接器。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "現貨再平衡策略，沒有開倉／平倉配對，不會有漏記平倉。"
++        }
++      }
++    },
++    {
++      "id": "repair_bot.pause_brake",
++      "title": "修復機器人緊急煞車",
++      "description": "一個設定就讓修復機器人完全停手（不偵測、不查交易所、不寫帳本）。所有修復機器人同名同行為。",
++      "status": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 有 MOMENTUM_REPAIR_PAUSED，真倉（operations）仍是 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py，沒有煞車。改用共用執行器時保留煞車，W6 一起上真倉。"
++        },
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "影子版沒有煞車；升到共用執行器時一起加 SEYKOTA_REPAIR_PAUSED。"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "跟著修復機器人一起做。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "沒有修復機器人（見上一列）。"
++        }
++      }
++    },
++    {
++      "id": "ops_export.writer",
++      "title": "把要通知的事寫成匯出檔",
++      "description": "策略自己不推播，把需要人知道的事寫成 audit/ops_export.json，交給維運通知代送。",
++      "status": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "只在 development／測試機（Phase 7b，src/ops_export_refresh.py），寫的是 fleet-ops-export/v1；真倉（operations）還沒有。改用共用執行器時升 v2，W6 一起上真倉。"
++        },
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "還沒有；升到共用修復執行器時一起寫。"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "目前沒有任何會通知人的事件來源。"
++        },
++        "btc-competition": {
++          "state": "pending",
++          "phase": "8-btc-competition",
++          "reason": "目前沒有任何會通知人的事件來源。"
++        }
++      }
++    },
++    {
++      "id": "ops_notify.export_relay_enabled",
++      "title": "維運通知已開啟匯出轉送（部署設定）",
++      "description": "維運主機的 ops-notify 設定檔對這支策略開了 OPS_NOTIFY_<KEY>_OPS_EXPORT=on。部署狀態，無法由 CI 檢查，每次部署後人工更新。",
++      "status": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W6",
++          "reason": "測試機已開（2026-09-17，閘門驗證通過）；真倉等 v2 一起推。"
++        },
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W6",
++          "reason": "兩台都還沒開。"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "還沒有匯出檔。"
++        },
++        "btc-competition": {
++          "state": "pending",
++          "phase": "8-btc-competition",
++          "reason": "還沒有匯出檔。"
++        }
++      }
++    },
++    {
++      "id": "ops_notify.units_axis",
++      "title": "維運通知盯背景服務有沒有掛掉（部署設定）",
++      "description": "維運主機的 ops-notify 設定檔列出這支策略要盯的 systemd unit。部署狀態，每次部署後人工更新。",
++      "status": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W6",
++          "reason": "測試機已設定（盯修復機器人 unit／timer）；真倉還沒設定。"
++        },
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W6",
++          "reason": "兩台都還沒設定；修復機器人升級後一起盯。"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "還沒決定要盯哪些背景服務。"
++        },
++        "btc-competition": {
++          "state": "pending",
++          "phase": "8-btc-competition",
++          "reason": "還沒決定要盯哪些背景服務。"
++        }
++      }
++    }
++  ],
++  "catalog": [
++    {
++      "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
++      "behaviour": {
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:399 _clear_automatic_safe_halt 確認已平倉後自動解除"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
++      "behaviour": {
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:671 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_REPLACE_FAILED",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_UNVERIFIED",
++      "behaviour": {
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:883 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.POSITION_AMBIGUOUS",
++      "behaviour": {
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:1035 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.RECONCILE_FAILED",
++      "behaviour": {
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.EXCHANGE_TARGET_UNSAFE",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.RUNTIME_CYCLE_FAILED",
++      "behaviour": {
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.CLOSE_FILL_PENDING",
++      "behaviour": {
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:1227 只記錄、下一輪再確認成交（Phase 3）"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.TRADE_EXIT",
++      "behaviour": {
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:1262 只記錄出場（Phase 3）"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
++      "behaviour": {
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:1342 資金不足跳過進場、只記錄（Phase 3）"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "MOM.PROTECTION_UNVERIFIED",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "8-momentum",
++          "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "MOM.STATE_REPAIRED_SAFE_HALT",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/safe_halt_state_repair.py:148 修完主動暫停，等人解除"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "8-momentum",
++          "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "MOM.RUNTIME_CYCLE_FAILED",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/main.py 寫錯誤心跳、下一輪重試（Phase 3）"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "8-momentum",
++          "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
++      "behaviour": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "只在 development／測試機（Phase 6b，受過渡開關控制、成功後還會發事後通知）；真倉只提案不補寫。v2 移除開關、成功不通知。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。"
++        }
++      }
++    },
++    {
++      "code": "MOM.VERIFIED_CLOSE_PROPOSED",
++      "behaviour": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "真倉（operations）Phase 5 影子版 scripts/repair_bot_shadow.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代。"
++        }
++      }
++    },
++    {
++      "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
++      "behaviour": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 遇到帳本已有半套修復或寫入失敗即停手、開請求、不重試；真倉（operations）的影子版只提案、不寫帳本，不會發生這種情況。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。"
++        }
++      }
++    },
++    {
++      "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
++      "behaviour": {
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/runner.py:347 暫停並等人以 btc-competition-resume 解除"
++        }
++      },
++      "emits_event": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "8-btc-competition",
++          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
++      "behaviour": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "8-btc-competition",
++          "reason": "目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。"
++        }
++      },
++      "emits_event": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "8-btc-competition",
++          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "BTC.REBALANCE_PENDING",
++      "behaviour": {
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/runner.py pending_target_weights 下一輪續做（Phase 3）"
++        }
++      },
++      "emits_event": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "8-btc-competition",
++          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "BTC.RUNTIME_CYCLE_FAILED",
++      "behaviour": {
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/runner.py 寫錯誤心跳、隔天重試（Phase 3）"
++        }
++      },
++      "emits_event": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "8-btc-competition",
++          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "MYC.RECONCILE_DELTA_EXCEEDED",
++      "behaviour": {
++        "mycrypto": {
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:713 只記錄差額，不影響交易（Phase 4e 定案）"
++        }
++      },
++      "emits_event": {
++        "mycrypto": {
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:713 append_fleet_event（R0）"
++        }
++      }
++    },
++    {
++      "code": "MYC.RUNTIME_CYCLE_FAILED",
++      "behaviour": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "目前：每次都照常重試，但沒有計數、連續失敗也不會升格。"
++        }
++      },
++      "emits_event": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "MYC.PROTECTION_PLACEMENT_REJECTED",
++      "behaviour": {
++        "mycrypto": {
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:1304 只通知、不自動下單（現行行為即符合 v2）"
++        }
++      },
++      "emits_event": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
++      "behaviour": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。"
++        }
++      },
++      "emits_event": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "MYC.PROTECTION_PLACEMENT_ERROR",
++      "behaviour": {
++        "mycrypto": {
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:1317 只通知、不自動下單（現行行為即符合 v2）"
++        }
++      },
++      "emits_event": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "MYC.PROTECTION_REPLACE_FAILED",
++      "behaviour": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "下一輪會自動重掛（已符合），但連續失敗不會升格通知。"
++        }
++      },
++      "emits_event": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
++      "behaviour": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。"
++        }
++      },
++      "emits_event": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/reconcile_compare.py:107 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/reconcile/compare.py:250 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
++        },
++        "mycrypto": {
++          "state": "done",
++          "evidence": "reconcile_compare.py:101 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/reconcile_compare.py:228 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "seykota": {
++          "state": "n/a",
++          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
++        }
++      }
++    },
++    {
++      "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/reconcile/google_reconcile.py:137 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
++        },
++        "mycrypto": {
++          "state": "done",
++          "evidence": "google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/reconcile_google.py:283 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "seykota": {
++          "state": "n/a",
++          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
++        }
++      }
++    }
++  ]
++}
+diff --git a/src/trade_alerts/rollout_registry.py b/src/trade_alerts/rollout_registry.py
+new file mode 100644
+index 0000000..9576a5e
+--- /dev/null
++++ b/src/trade_alerts/rollout_registry.py
+@@ -0,0 +1,168 @@
++"""Fleet rollout registry: which fleet capability each strategy actually has.
++
++The error catalog says what *should* happen for every condition; this registry
++says, per strategy, whether it does yet.  It exists because the fleet kept
++ending up with features built for one strategy of four and never written down
++anywhere, found only months later by auditing all the code.  The rule it
++enforces: a capability or catalog behaviour a strategy does not have is listed
++as ``pending`` (with the phase it lands in and why) or ``n/a`` (with why) --
++never silently missing.
++
++``done`` means present on the branch the live host deploys from
++(``operations``), at the commit recorded in ``sources`` -- merged to
++development or running on the dev host is still ``pending``.  File:line
++evidence refers to that commit, so it stays reproducible as the branches move;
++``scripts/verify_registry_evidence.py`` checks every such reference against
++local clones of the four repos (cross-repo, so not part of CI).
++
++``registry_problems`` is the executable form of that rule.  trade-alerts' own
++tests call it; a strategy repo's tests call :func:`project_rows` to check the
++rows that make claims about itself.  The human page
++``docs/guides/fleet-rollout-register.html`` is generated from the same file.
++"""
++from __future__ import annotations
++
++import json
++import re
++from importlib import resources
++from pathlib import Path
++from typing import Any, Mapping
++
++from .fleet_event_log import PROJECT_CODE_PREFIXES
++
++REGISTRY_VERSION = "fleet-rollout-registry/v1"
++PACKAGED_REGISTRY_NAME = "fleet-rollout-registry.json"
++#: The four strategies; ``fleet`` is a catalog prefix for cross-repo
++#: conditions, not a strategy that can have a capability.
++STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet")
++STATES = ("done", "pending", "n/a")
++#: ``done`` means present where the live host deploys from -- not merely
++#: merged to development or running on the dev host.
++LIVE_BRANCH = "operations"
++_COMMIT = re.compile(r"^[0-9a-f]{40}$")
++_OWNER = {prefix: project for project, prefix in PROJECT_CODE_PREFIXES.items()}
++
++
++def load_rollout_registry(path: str | Path | None = None) -> dict[str, Any]:
++    """Read the registry -- by default the copy shipped inside this package."""
++    if path is None:
++        raw = resources.files("trade_alerts").joinpath("catalog", PACKAGED_REGISTRY_NAME).read_text(encoding="utf-8")
++    else:
++        raw = Path(path).read_text(encoding="utf-8")
++    payload = json.loads(raw)
++    if not isinstance(payload, dict) or payload.get("registry_version") != REGISTRY_VERSION:
++        raise ValueError(f"not a {REGISTRY_VERSION} document")
++    return payload
++
++
++def _status_problems(where: str, status: Any, phases: Mapping[str, Any]) -> list[str]:
++    if not isinstance(status, Mapping):
++        return [f"{where}: status is not an object"]
++    state = status.get("state")
++    if state not in STATES:
++        return [f"{where}: unknown state {state!r}"]
++
++    def text(key: str) -> bool:
++        value = status.get(key)
++        return isinstance(value, str) and bool(value.strip())
++
++    problems = []
++    if state == "done" and not text("evidence"):
++        problems.append(f"{where}: done without evidence")
++    if state == "pending":
++        if not text("reason"):
++            problems.append(f"{where}: pending without a reason")
++        if status.get("phase") not in phases:
++            problems.append(f"{where}: pending phase {status.get('phase')!r} is not a registered phase")
++    if state == "n/a" and not text("reason"):
++        problems.append(f"{where}: n/a without a reason")
++    return problems
++
++
++def owners(code: str) -> tuple[str, ...]:
++    """Which strategies a catalog code is about: its prefix's project, or all
++    four for a ``FLEET.`` code."""
++    project = _OWNER.get(code.split(".", 1)[0])
++    if project is None:
++        raise ValueError(f"unknown catalog prefix in {code!r}")
++    return STRATEGY_PROJECTS if project == "fleet" else (project,)
++
++
++def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -> list[str]:
++    """Every way the registry fails its rule; empty means consistent."""
++    problems: list[str] = []
++    if registry.get("registry_version") != REGISTRY_VERSION:
++        problems.append(f"registry_version is not {REGISTRY_VERSION}")
++    if registry.get("catalog_version") != catalog.get("catalog_version"):
++        problems.append(f"registry is for {registry.get('catalog_version')!r}, catalog is {catalog.get('catalog_version')!r}")
++    projects = registry.get("projects") or {}
++    if set(projects) != set(STRATEGY_PROJECTS):
++        problems.append(f"projects must be exactly {sorted(STRATEGY_PROJECTS)}, got {sorted(projects)}")
++    phases = registry.get("phases") or {}
++    sources = registry.get("sources") or {}
++    if set(sources) != set(STRATEGY_PROJECTS):
++        problems.append(f"sources must list exactly {sorted(STRATEGY_PROJECTS)}, got {sorted(sources)}")
++    for project, source in sources.items():
++        if not isinstance(source, Mapping):
++            problems.append(f"sources / {project}: not an object")
++            continue
++        if not (isinstance(source.get("repo"), str) and source["repo"].count("/") == 1):
++            problems.append(f"sources / {project}: repo must be owner/name")
++        if source.get("branch") != LIVE_BRANCH:
++            problems.append(f"sources / {project}: branch must be {LIVE_BRANCH!r} (what the live host runs), got {source.get('branch')!r}")
++        if not (isinstance(source.get("commit"), str) and _COMMIT.match(source["commit"])):
++            problems.append(f"sources / {project}: commit must be a full 40-character SHA")
++
++    seen_ids: set[str] = set()
++    for capability in registry.get("capabilities") or []:
++        cid = capability.get("id")
++        if not cid or cid in seen_ids:
++            problems.append(f"capability id missing or duplicated: {cid!r}")
++        seen_ids.add(cid)
++        for key in ("title", "description"):
++            if not (isinstance(capability.get(key), str) and capability[key].strip()):
++                problems.append(f"capability {cid}: missing {key}")
++        status = capability.get("status") or {}
++        if set(status) != set(STRATEGY_PROJECTS):
++            problems.append(f"capability {cid}: must list all four strategies, got {sorted(status)}")
++        for project, value in status.items():
++            problems += _status_problems(f"capability {cid} / {project}", value, phases)
++
++    entries = {entry["code"]: entry for entry in catalog.get("entries") or []}
++    rows = {row.get("code"): row for row in registry.get("catalog") or []}
++    for code in sorted(entries.keys() - rows.keys()):
++        problems.append(f"catalog entry {code} has no registry row")
++    for code in sorted(rows.keys() - entries.keys()):
++        problems.append(f"registry row {code} is not in the catalog")
++    retired = {item.get("code") for item in catalog.get("retired_codes") or []}
++    for code, row in rows.items():
++        if code not in entries:
++            continue
++        expected = set(owners(code))
++        for key in ("behaviour", "emits_event"):
++            status = row.get(key) or {}
++            if set(status) != expected:
++                problems.append(f"{code} {key}: must list exactly {sorted(expected)}, got {sorted(status)}")
++            for project, value in status.items():
++                problems += _status_problems(f"{code} {key} / {project}", value, phases)
++        if code in retired:
++            for project, value in (row.get("behaviour") or {}).items():
++                if isinstance(value, Mapping) and value.get("state") != "pending":
++                    problems.append(f"{code} is retired but its behaviour for {project} is not pending replacement")
++    return problems
++
++
++def project_rows(registry: Mapping[str, Any], project: str) -> dict[str, dict[str, Any]]:
++    """Everything the registry claims about one strategy, for that strategy's
++    own tests: ``{"capability:<id>": status, "<code>:behaviour": status,
++    "<code>:emits_event": status}``."""
++    if project not in STRATEGY_PROJECTS:
++        raise ValueError(f"unknown strategy project {project!r}")
++    rows: dict[str, dict[str, Any]] = {}
++    for capability in registry.get("capabilities") or []:
++        rows[f"capability:{capability['id']}"] = dict(capability["status"][project])
++    for row in registry.get("catalog") or []:
++        for key in ("behaviour", "emits_event"):
++            if project in (row.get(key) or {}):
++                rows[f"{row['code']}:{key}"] = dict(row[key][project])
++    return rows
+diff --git a/tests/test_rollout_registry.py b/tests/test_rollout_registry.py
+new file mode 100644
+index 0000000..ea4a3b6
+--- /dev/null
++++ b/tests/test_rollout_registry.py
+@@ -0,0 +1,313 @@
++"""The rollout registry is the fleet's "four strategies or say why not" rule in
++executable form, so it gets the same treatment as the error catalog: the
++shipped copy must be consistent, every rule ``registry_problems`` claims to
++enforce has a counter-example here that it catches, and the two generated
++guide pages must equal a fresh render.
++"""
++from __future__ import annotations
++
++import copy
++import importlib.util
++import json
++from pathlib import Path
++
++import pytest
++
++from trade_alerts import (
++    REGISTRY_VERSION,
++    STRATEGY_PROJECTS,
++    load_rollout_registry,
++    project_rows,
++    registry_problems,
++)
++from trade_alerts.fleet_event_log import load_error_catalog
++from trade_alerts.rollout_registry import owners
++
++_ROOT = Path(__file__).resolve().parents[1]
++REGISTRY_PATH = _ROOT / "src" / "trade_alerts" / "catalog" / "fleet-rollout-registry.json"
++SCHEMA_PATH = _ROOT / "schemas" / "fleet-rollout-registry-v1.schema.json"
++
++
++@pytest.fixture(scope="module")
++def catalog() -> dict:
++    return load_error_catalog()
++
++
++@pytest.fixture()
++def registry() -> dict:
++    return load_rollout_registry()
++
++
++def _script(name):
++    spec = importlib.util.spec_from_file_location(name, _ROOT / "scripts" / f"{name}.py")
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module
++
++
++def _render_guides():
++    return _script("render_guides")
++
++
++# --- the shipped registry --------------------------------------------------
++
++
++def test_registry_matches_its_json_schema(registry):
++    jsonschema = pytest.importorskip("jsonschema")
++    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
++    jsonschema.Draft7Validator.check_schema(schema)
++    errors = list(jsonschema.Draft7Validator(schema).iter_errors(registry))
++    assert not errors, [f"{list(e.path)}: {e.message}" for e in errors]
++
++
++def test_shipped_registry_is_consistent_with_the_catalog(registry, catalog):
++    assert registry_problems(registry, catalog) == []
++
++
++def test_packaged_copy_is_the_repo_file(registry):
++    assert registry == json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
++    assert load_rollout_registry(REGISTRY_PATH) == registry
++
++
++def test_strategy_projects_are_the_four_strategies():
++    assert set(STRATEGY_PROJECTS) == {"seykota", "momentum", "mycrypto", "btc-competition"}
++
++
++def test_load_rejects_another_document(tmp_path):
++    path = tmp_path / "other.json"
++    path.write_text(json.dumps({"registry_version": "something-else/v9"}), encoding="utf-8")
++    with pytest.raises(ValueError):
++        load_rollout_registry(path)
++    path.write_text("[]", encoding="utf-8")
++    with pytest.raises(ValueError):
++        load_rollout_registry(path)
++
++
++# --- owners / project_rows -------------------------------------------------
++
++
++def test_owners_maps_prefix_to_strategy():
++    assert owners("SEY.POSITION_AMBIGUOUS") == ("seykota",)
++    assert owners("MOM.PROTECTION_UNVERIFIED") == ("momentum",)
++    assert owners("FLEET.ANYTHING") == STRATEGY_PROJECTS
++    with pytest.raises(ValueError):
++        owners("XYZ.NOPE")
++
++
++def test_project_rows_covers_every_claim_about_one_strategy(registry):
++    rows = project_rows(registry, "seykota")
++    for capability in registry["capabilities"]:
++        assert rows[f"capability:{capability['id']}"] == capability["status"]["seykota"]
++    sey_codes = [row["code"] for row in registry["catalog"] if row["code"].startswith("SEY.")]
++    assert sey_codes
++    for code in sey_codes:
++        assert f"{code}:behaviour" in rows and f"{code}:emits_event" in rows
++    assert not any(key.startswith("MOM.") for key in rows)
++
++
++def test_project_rows_returns_copies(registry):
++    rows = project_rows(registry, "momentum")
++    key = next(iter(rows))
++    rows[key]["state"] = "tampered"
++    assert project_rows(registry, "momentum")[key]["state"] != "tampered"
++
++
++def test_project_rows_rejects_unknown_project(registry):
++    with pytest.raises(ValueError):
++        project_rows(registry, "fleet")
++
++
++# --- every rule has a counter-example ----------------------------------------
++
++
++def _problems_after(registry, catalog, mutate) -> list[str]:
++    broken = copy.deepcopy(registry)
++    mutate(broken)
++    return registry_problems(broken, catalog)
++
++
++def _capability(registry, index=0):
++    return registry["capabilities"][index]
++
++
++def test_wrong_registry_version_is_caught(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: r.update(registry_version="x/v0"))
++    assert any(REGISTRY_VERSION in p for p in problems)
++
++
++def test_catalog_version_mismatch_is_caught(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: r.update(catalog_version="fleet-error-catalog/v1"))
++    assert any("catalog is" in p for p in problems)
++
++
++def test_missing_project_is_caught(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: r["projects"].pop("mycrypto"))
++    assert any(p.startswith("projects must be exactly") for p in problems)
++
++
++def test_capability_missing_a_strategy_is_caught(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: _capability(r)["status"].pop("btc-competition"))
++    assert any("must list all four strategies" in p for p in problems)
++
++
++def test_duplicate_capability_id_is_caught(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: r["capabilities"].append(copy.deepcopy(_capability(r))))
++    assert any("missing or duplicated" in p for p in problems)
++
++
++@pytest.mark.parametrize("key", ["title", "description"])
++def test_capability_without_text_is_caught(registry, catalog, key):
++    problems = _problems_after(registry, catalog, lambda r: _capability(r).update({key: "  "}))
++    assert any(f"missing {key}" in p for p in problems)
++
++
++def test_unknown_state_is_caught(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: _capability(r)["status"].update(seykota={"state": "maybe"}))
++    assert any("unknown state 'maybe'" in p for p in problems)
++
++
++def test_done_without_evidence_is_caught(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: _capability(r)["status"].update(seykota={"state": "done"}))
++    assert any("done without evidence" in p for p in problems)
++
++
++def test_pending_without_reason_is_caught(registry, catalog):
++    status = {"state": "pending", "phase": "v2-W2"}
++    problems = _problems_after(registry, catalog, lambda r: _capability(r)["status"].update(seykota=status))
++    assert any("pending without a reason" in p for p in problems)
++
++
++def test_pending_in_an_unregistered_phase_is_caught(registry, catalog):
++    status = {"state": "pending", "phase": "someday", "reason": "later"}
++    problems = _problems_after(registry, catalog, lambda r: _capability(r)["status"].update(seykota=status))
++    assert any("'someday' is not a registered phase" in p for p in problems)
++
++
++def test_na_without_reason_is_caught(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: _capability(r)["status"].update(seykota={"state": "n/a"}))
++    assert any("n/a without a reason" in p for p in problems)
++
++
++def test_catalog_entry_without_a_row_is_caught(registry, catalog):
++    code = registry["catalog"][0]["code"]
++    problems = _problems_after(registry, catalog, lambda r: r["catalog"].pop(0))
++    assert f"catalog entry {code} has no registry row" in problems
++
++
++def test_row_for_an_unknown_code_is_caught(registry, catalog):
++    def add(r):
++        row = copy.deepcopy(r["catalog"][0])
++        row["code"] = "SEY.NOT_IN_CATALOG"
++        r["catalog"].append(row)
++
++    assert "registry row SEY.NOT_IN_CATALOG is not in the catalog" in _problems_after(registry, catalog, add)
++
++
++def test_row_claiming_another_strategy_is_caught(registry, catalog):
++    def add_foreign(r):
++        row = next(row for row in r["catalog"] if row["code"].startswith("SEY."))
++        row["behaviour"]["momentum"] = {"state": "n/a", "reason": "not mine"}
++
++    problems = _problems_after(registry, catalog, add_foreign)
++    assert any("behaviour: must list exactly ['seykota']" in p for p in problems)
++
++
++def test_retired_code_marked_done_is_caught(registry, catalog):
++    retired = [item["code"] for item in catalog.get("retired_codes") or []]
++    assert retired, "the v2 catalog retires codes; this test needs one"
++    code = retired[0]
++
++    def finish(r):
++        row = next(row for row in r["catalog"] if row["code"] == code)
++        for project in row["behaviour"]:
++            row["behaviour"][project] = {"state": "done", "evidence": "somewhere"}
++
++    problems = _problems_after(registry, catalog, finish)
++    assert any(f"{code} is retired" in p for p in problems)
++
++
++def test_sources_missing_a_strategy_is_caught(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: r["sources"].pop("seykota"))
++    assert any(p.startswith("sources must list exactly") for p in problems)
++
++
++def test_sources_on_a_non_live_branch_is_caught(registry, catalog):
++    # The PR #31 review found done evidence pointing at code that only exists
++    # on development; "done" is pinned to what the live host runs.
++    problems = _problems_after(registry, catalog, lambda r: r["sources"]["momentum"].update(branch="development"))
++    assert any("sources / momentum: branch must be 'operations'" in p for p in problems)
++
++
++@pytest.mark.parametrize("commit", ["520cb9e", "HEAD", "Z" * 40, None])
++def test_sources_commit_must_be_a_full_sha(registry, catalog, commit):
++    problems = _problems_after(registry, catalog, lambda r: r["sources"]["momentum"].update(commit=commit))
++    assert any("sources / momentum: commit must be a full 40-character SHA" in p for p in problems)
++
++
++def test_sources_repo_must_be_owner_slash_name(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: r["sources"]["momentum"].update(repo="just-a-name"))
++    assert any("sources / momentum: repo must be owner/name" in p for p in problems)
++
++
++# --- evidence citations (the cross-repo check itself runs by hand) ----------
++
++
++def test_citation_parser_reads_paths_lines_and_root_modules():
++    citations = _script("verify_registry_evidence").citations
++    assert citations("src/strategy.py:1067 build_safe_halt") == [("src/strategy.py", 1067)]
++    assert citations("MOMENTUM_REPAIR_PAUSED（scripts/repair_bot.py:90）") == [("scripts/repair_bot.py", 90)]
++    assert citations("mexc_futures_bot.py:713 append_fleet_event") == [("mexc_futures_bot.py", 713)]
++    assert citations("reconcile_compare.py main") == [("reconcile_compare.py", None)]
++    assert citations("src/seykota_bot/bot.py 守衛；src/seykota_bot/safe_halt_resume.py:103") == [
++        ("src/seykota_bot/bot.py", None), ("src/seykota_bot/safe_halt_resume.py", 103)]
++    assert citations("程式已照目錄描述處理（Phase 3）") == []
++
++
++def test_every_done_cell_cites_a_file(registry):
++    citations = _script("verify_registry_evidence").citations
++    for where, project, status in _script("verify_registry_evidence")._cells(registry):
++        if status["state"] == "done":
++            assert citations(status["evidence"]), f"{where} / {project}: done evidence cites no file"
++
++
++# --- generated pages -------------------------------------------------------
++
++
++def test_committed_guide_pages_equal_a_fresh_render():
++    render_guides = _render_guides()
++    for path, html in render_guides.rendered_pages().items():
++        assert path.read_text(encoding="utf-8") == html, f"{path.name} is stale: run scripts/render_guides.py"
++
++
++def test_render_check_mode_passes_on_the_committed_pages():
++    assert _render_guides().main(["--check"]) == 0
++
++
++def test_render_check_mode_flags_a_hand_edited_page(tmp_path, monkeypatch):
++    render_guides = _render_guides()
++    pages = render_guides.rendered_pages()
++    edited = {}
++    for path, html in pages.items():
++        copy_path = tmp_path / path.name
++        copy_path.write_text(html, encoding="utf-8")
++        edited[copy_path] = html
++    first = next(iter(edited))
++    first.write_text(edited[first].replace("</body>", "<!-- hand edit --></body>", 1) + " ", encoding="utf-8")
++    monkeypatch.setattr(render_guides, "ROOT", tmp_path)
++    monkeypatch.setattr(render_guides, "rendered_pages", lambda: edited)
++    assert render_guides.main(["--check"]) == 1
++
++
++def test_pages_cover_every_catalog_entry_and_capability(registry, catalog):
++    pages = {path.name: html for path, html in _render_guides().rendered_pages().items()}
++    for entry in catalog["entries"]:
++        assert entry["code"] in pages["fleet-risk-register.html"]
++        assert entry["code"] in pages["fleet-rollout-register.html"]
++    for capability in registry["capabilities"]:
++        assert capability["id"] in pages["fleet-rollout-register.html"]
++
++
++def test_pages_never_inject_html_from_data():
++    for html in _render_guides().rendered_pages().values():
++        assert "innerHTML" not in html
++        assert "insertAdjacentHTML" not in html
