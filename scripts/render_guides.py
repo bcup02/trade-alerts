@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from trade_alerts.fleet_event_log import load_error_catalog  # noqa: E402
+from trade_alerts.glossary import load_glossary  # noqa: E402
 from trade_alerts.rollout_registry import STRATEGY_PROJECTS, load_rollout_registry, owners  # noqa: E402
 
 GUIDES = ROOT / "docs" / "guides"
@@ -177,7 +178,7 @@ DATA.tiers.forEach(function(t){
     body.appendChild(el("p","row-what",e.what));
     body.appendChild(el("p","row-how",e.direction));
     var st=el("div","status");
-    [["行為",e.behaviour],["白話通知",e.emits_event]].forEach(function(pair){
+    [["行為",e.behaviour],["寫進事件日誌",e.emits_event]].forEach(function(pair){
       var s=el("span","st "+STATE_CLASS[pair[1].state],pair[0]+"："+STATE_LABEL[pair[1].state]); st.appendChild(s);
     });
     body.appendChild(st);
@@ -269,15 +270,27 @@ _ROLLOUT_CSS = """
   #totop.show{opacity:1;pointer-events:auto;transform:none;}
   #totop:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
   .c-pending{--c:var(--pending);--cb:var(--pending-bg);} .c-done{--c:var(--done);--cb:var(--done-bg);}
+  .gloss-link{font-weight:700;color:var(--accent);}
+  .gloss-cat{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);margin-bottom:12px;}
+  .gloss-cat h3{margin:0;padding:10px 14px;font-size:14px;border-block-end:1px solid var(--line);color:var(--ink-soft);}
+  .gloss-row{display:grid;grid-template-columns:170px 1fr;gap:4px 14px;padding:10px 14px;border-block-end:1px solid var(--line);font-size:13.5px;line-height:1.6;scroll-margin-top:16px;}
+  .gloss-row:last-child{border-block-end:0;}
+  .gloss-zh{font-weight:700;}
+  .gloss-en{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;color:var(--ink-faint);overflow-wrap:anywhere;}
+  .gloss-def{color:var(--ink);}
+  .gloss-note{color:var(--ink-soft);font-size:12.5px;}
+  .gloss-old{color:var(--ink-faint);font-size:12.5px;}
+  .gloss-old s{margin-inline-end:6px;}
   @media (max-width:560px){
     .toc{grid-template-columns:1fr;}
     .sl{grid-template-columns:1fr;} .sl > .who{padding-bottom:0;border-block-end:0;}
+    .gloss-row{grid-template-columns:1fr;}
     #totop{right:16px;bottom:16px;}
   }
 """
 
 _ROLLOUT_JS = _JS_HELPERS + r"""
-var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"不相關","recent":"剛完成"};
+var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"跟這支無關","recent":"最新變動"};
 var KINDS=[["cap","機隊功能"],["rule","錯誤處理規則"]];
 function dots(item){
   var s=el("span","dots"); s.setAttribute("aria-hidden","true");
@@ -365,6 +378,24 @@ if(DATA.recent_summary && DATA.recent_summary.length){
   });
   recentBox.hidden=false;
 }
+var glossHost=document.getElementById("glossaryHost");
+DATA.glossary.forEach(function(group){
+  var card=el("div","gloss-cat"); card.appendChild(el("h3",null,group.category));
+  group.entries.forEach(function(g){
+    var row=el("div","gloss-row"); row.id="term-"+g.id;
+    var left=el("div"); left.appendChild(el("div","gloss-zh",g.zh)); left.appendChild(el("div","gloss-en",g.en.join("、")));
+    var right=el("div"); right.appendChild(el("div","gloss-def",g.definition));
+    if(g.note) right.appendChild(el("div","gloss-note",g.note));
+    if(g.retired.length){
+      var old=el("div","gloss-old"); old.appendChild(document.createTextNode("不要再用："));
+      g.retired.forEach(function(t){ old.appendChild(el("s",null,t)); });
+      right.appendChild(old);
+    }
+    row.appendChild(left); row.appendChild(right); card.appendChild(row);
+  });
+  glossHost.appendChild(card);
+});
+document.querySelectorAll(".gloss-link").forEach(function(a){ a.addEventListener("click",function(ev){ ev.preventDefault(); document.getElementById("glossary").scrollIntoView({block:"start"}); }); });
 var toc=document.getElementById("toc");
 toc.appendChild(tocColumn("pending","未完成")); toc.appendChild(tocColumn("done","已完成"));
 fillGroup(document.getElementById("pending"),"pending");
@@ -377,7 +408,7 @@ DATA.project_order.forEach(function(p){
 });
 var phaseHost=document.getElementById("phases");
 DATA.phase_order.forEach(function(k){
-  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜待做 "+DATA.phase_counts[k]+" 格")); phaseHost.appendChild(c);
+  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜未做 "+DATA.phase_counts[k]+" 格")); phaseHost.appendChild(c);
 });
 var toTop=document.getElementById("totop");
 toTop.addEventListener("click",function(){ window.scrollTo(0,0); var h=document.querySelector("h1"); if(h){ h.setAttribute("tabindex","-1"); h.focus({preventScroll:true}); } });
@@ -408,7 +439,7 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
         project_keys = owners(code)
         fleet = code.startswith("FLEET.")
         notes = []
-        for key, label in (("behaviour", "行為"), ("emits_event", "白話通知")):
+        for key, label in (("behaviour", "行為"), ("emits_event", "寫進事件日誌")):
             for project in project_keys:
                 status = row[key][project]
                 if status["state"] == "pending":
@@ -490,7 +521,7 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
         tier, title = titles[row["code"]]
         present = [p for p in STRATEGY_PROJECTS if p in row["behaviour"]]
         rows = [{"label": projects[p], "lines": [_line(row["behaviour"][p], "行為", phases),
-                                                 _line(row["emits_event"][p], "白話通知", phases)]} for p in present]
+                                                 _line(row["emits_event"][p], "寫進事件日誌", phases)]} for p in present]
         states = {p: ({row["behaviour"][p]["state"], row["emits_event"][p]["state"]} if p in present else set())
                   for p in STRATEGY_PROJECTS}
         items.append({"kind": "rule", "id": row["code"], "anchor": f"rule-{row['code']}", "title": f"{tier}｜{title}",
@@ -510,7 +541,16 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
     return items
 
 
-def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -> str:
+def _glossary_groups(glossary: dict[str, Any]) -> list[dict[str, Any]]:
+    """Entries grouped by category, in the order categories first appear."""
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for entry in glossary["entries"]:
+        groups.setdefault(entry["category"], []).append(
+            {k: entry.get(k) for k in ("id", "zh", "en", "definition", "retired", "note")})
+    return [{"category": category, "entries": entries} for category, entries in groups.items()]
+
+
+def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], glossary: dict[str, Any]) -> str:
     projects = registry["projects"]
     phases = registry["phases"]
     totals = {p: {"done": 0, "pending": 0, "n/a": 0} for p in STRATEGY_PROJECTS}
@@ -538,7 +578,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
     data = {
         "projects": projects, "project_order": list(STRATEGY_PROJECTS), "phases": phases,
         "phase_order": list(phases), "phase_counts": phase_counts, "totals": totals, "items": items,
-        "recent_summary": recent_summary,
+        "recent_summary": recent_summary, "glossary": _glossary_groups(glossary),
     }
     sources = "；".join(
         f"{html.escape(registry['projects'][p])} <code>{html.escape(s['repo'])}@{html.escape(s['branch'])} {html.escape(s['commit'][:7])}</code>"
@@ -550,8 +590,9 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
   <h1>機隊一致性登記冊</h1>
   <p class="lede">
     每一項機隊功能、每一條錯誤處理規則，在四支策略裡<b>實際做到了沒有</b>。
-    <b>「已做」＝真倉已經在跑</b>（部署來源 <code>operations</code> 分支上有），只在開發分支或測試機上的一律算「未做」；
+    <b>「已做」＝正式機已經在跑</b>（正式機分支 <code>operations</code> 上有），只合併到開發主幹、或只在開發機上的一律算「未做」；
     「未做」會寫預定在哪一關做，「不適用」會寫理由，漏寫 CI 會擋下來。
+    看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
     <a class="c-pending" href="#group-pending"><b>{n_pending}</b><span>項未完成——還有策略沒做到</span></a>
@@ -579,10 +620,14 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
   <div id="done"></div>
 
   <div class="group-head" id="group-phases" style="--c:var(--ink-soft)"><h2>預定的關卡</h2></div>
-  <p class="group-sub">「待做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
+  <p class="group-sub">「未做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
   <div id="phases" class="phase-list"></div>
+
+  <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">{len(glossary['entries'])} 條</span></div>
+  <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+  <div id="glossaryHost"></div>
   <div class="foot">
-    資料來源：trade-alerts <code>{registry['registry_version']}</code>（{registry['updated_at']} 對四個 repo 逐項盤點）與 <code>{catalog['catalog_version']}</code>。
+    資料來源：trade-alerts <code>{registry['registry_version']}</code>（{registry['updated_at']} 對四個 repo 逐項盤點）、<code>{catalog['catalog_version']}</code> 與 <code>{glossary['glossary_version']}</code>。
     「檔案:行號」證據對應的版本：{sources}。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
   </div>
@@ -594,7 +639,9 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
 def rendered_pages() -> dict[Path, str]:
     catalog = load_error_catalog()
     registry = load_rollout_registry()
-    return {RISK_PAGE: render_risk_register(catalog, registry), ROLLOUT_PAGE: render_rollout_register(catalog, registry)}
+    glossary = load_glossary()
+    return {RISK_PAGE: render_risk_register(catalog, registry),
+            ROLLOUT_PAGE: render_rollout_register(catalog, registry, glossary)}
 
 
 def main(argv: list[str] | None = None) -> int:

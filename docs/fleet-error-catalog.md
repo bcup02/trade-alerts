@@ -8,7 +8,7 @@
 
 放在 `trade-alerts` 的理由：四支策略與 ops-notify 都已相依這個套件，錯誤碼需要一個所有消費者
 都看得到、而且有版本標籤可以釘選的落點。Phase 7b 起這份 JSON 隨套件發佈（package data），
-`trade_alerts.ops_export` 在策略主機上執行期讀它的 `operator_message` 組通知文字，見 §4.8。
+`trade_alerts.ops_export` 在正式機／開發機上執行期讀它的 `operator_message` 組通知文字，見 §4.8。
 
 ---
 
@@ -30,12 +30,12 @@
 
 ## 2. 風險等級（v2，2026-09-18）
 
-| 等級 | 代號 | 自動處理 | 通知 | 說明 |
+| 等級 | 代號 | 中文名 | 通知 | 說明 |
 |---|---|---|---|---|
-| R0 | `LOG` | 不用處理 | 不通知 | 只進事件日誌。偵測之後的動作是固定的。 |
-| R1 | `AUTO` | 直接做 | **不通知** | 自動執行並記進事件日誌。沒有第二個選項，告訴人也沒有東西可以決定。 |
-| R2 | `RETRY_ESCALATE` | 自動嘗試恢復 | 連續失敗 `escalate_after`（預設 3）次才通知一次 | 系統自己先試；試不起來才升格：開請求、通知，附白話步驟與給 AI 的根因追查指令。 |
-| R3 | `HUMAN_REQUIRED` | 絕不自動 | 通知並持續提醒 | 高風險：一定要人處理，提醒到有人處理為止。 |
+| R0 | `LOG` | 只記錄 | 不通知 | 只進事件日誌。偵測之後的動作是固定的。 |
+| R1 | `AUTO` | 自動處理 | **不通知** | 自動執行並記進事件日誌。沒有第二個選項，告訴人也沒有東西可以決定。 |
+| R2 | `RETRY_ESCALATE` | 先自己試、失敗才通知 | 連續失敗 `escalate_after`（預設 3）次才通知一次 | 系統自己先試；試不起來才升格：開請求、通知，附白話步驟與給 AI 的根因追查指令。 |
+| R3 | `HUMAN_REQUIRED` | 一定要人處理 | 通知並持續提醒 | 高風險：一定要人處理，提醒到有人處理為止。 |
 
 **排序的軸是「人能不能做出跟自動處理不一樣的決定」，不是事情有多嚴重。** R0／R1 人沒有決定可做
 （`MECHANICAL`，永遠不通知）；R2／R3 才會到人手上（`JUDGEMENT`）。`test_mechanical_verdicts_never_reach_a_notifying_tier`
@@ -60,9 +60,9 @@
 
 ## 3. 目錄總覽
 
-Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（Phase 6 另補 3 條 momentum 修復 bot 條件，當時合計 **33 條**；
-2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 影子 bot 從部署起就一直在發這個事件，卻從未登記進目錄，
-導致一致性登記冊上這支策略的修復 bot 完全看不到對應紀錄，見下方 §3.1，目前合計 **34 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（Phase 6 另補 3 條 momentum 修復機器人 條件，當時合計 **33 條**；
+2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 修復機器人（只抓錯並提出修復建議） 從部署起就一直在發這個事件，卻從未登記進目錄，
+導致一致性登記冊上這支策略的修復機器人 完全看不到對應紀錄，見下方 §3.1，目前合計 **34 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
 Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
 
 | 判定 | 條數 | 佔比 |
@@ -97,7 +97,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `SEY.CLOSE_FILL_PENDING` | 誤標 critical | MECHANICAL | R0 | **P3** |
 | `SEY.TRADE_EXIT` | 誤標 critical | MECHANICAL | R0 | **P3** |
 | `SEY.ENTRY_SKIPPED_MIN_CAPITAL` | 誤標 critical | MECHANICAL | R0 | **P3** |
-| `SEY.VERIFIED_CLOSE_PROPOSED` | 修復 bot 提案通知（2026-09-18 補登，見下方說明） | JUDGEMENT | R2 | P8（v2） |
+| `SEY.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知（2026-09-18 補登，見下方說明） | JUDGEMENT | R2 | P8（v2） |
 
 **`protective_stop_failed` 拆成兩碼**是本節最重要的改動。現行程式在「停損掛單失敗」之後會立刻
 嘗試緊急市價平倉，但不論平倉成功或失敗，都收斂成同一個 latch 原因碼。這兩種結果的真倉風險相差
@@ -111,7 +111,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `MOM.PROTECTION_UNVERIFIED` | latch dict，3 觸發點共用 | JUDGEMENT | R3 | P4 |
 | `MOM.STATE_REPAIRED_SAFE_HALT` | 人工工具寫入的 latch | JUDGEMENT | R3 | P4 |
 | `MOM.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重試 | MECHANICAL | R0 | — |
-| `MOM.VERIFIED_CLOSE_PROPOSED` | 修復 bot 提案通知 | JUDGEMENT | R2 | P8（v2） |
+| `MOM.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知 | JUDGEMENT | R2 | P8（v2） |
 | `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R1 | **P6** |
 | `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R3 | **P6** |
 
@@ -119,10 +119,10 @@ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原�
 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
 正是 seykota 要改成的樣子。
 
-後三條是 Phase 6 的 verified-close-backfill 修復 bot（`scripts/repair_bot.py`）。v2 起：無歧義 → R1 自動寫、不通知；
+後三條是 Phase 6 的 verified-close-backfill 修復機器人（`scripts/repair_bot.py`）。v2 起：無歧義 → R1 自動寫、不通知；
 以交易所為準仍能對應 → 照交易所補寫；只有結構上對不上才重試並升格（R2，`MOM.VERIFIED_CLOSE_PROPOSED` 的呼叫點
 由共用修復執行器取代時退役）；帳本已不乾淨 → R3 停手。v1 的過渡開關 `MOMENTUM_REPAIR_AUTO_APPLY`（只有 momentum
-有、當時 33 條只管 1 條、沒有任何機制會評估並打開它）在 v2 移除；seykota 的影子 bot（§3.1 最後一條
+有、當時 33 條只管 1 條、沒有任何機制會評估並打開它）在 v2 移除；seykota 的修復機器人（只抓錯並提出修復建議）（§3.1 最後一條
 `SEY.VERIFIED_CLOSE_PROPOSED`）發出這個事件從未登記進 v1 目錄，2026-09-18 補登進 v2 目錄——跟 momentum 對等的處置、
 同一個理由、同樣列進 `retired_codes`，seykota 升到共用修復執行器（v2-W4）時一起取代退役。
 
@@ -151,7 +151,7 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障�
 | `MYC.PROTECTION_ORPHAN_CANCEL_FAILED` | `PROTECTIVE_STOP_CANCEL_FAILED` | JUDGEMENT | R2 | P8（v2） |
 
 **my-crypto 不加 latch**（使用者 2026-09-12 定案）。兩個叫 `SAFE_HALT` 的事件名宣稱一個這支程式
-根本沒有的停機行為——bot 發完通知照常繼續交易。替一支目前沒有這個概念的 LIVE bot 新增停機行為，
+根本沒有的安全暫停行為——bot 發完通知照常繼續交易。替一支目前沒有這個概念的 LIVE bot 新增安全暫停行為，
 風險高於它解決的問題，而且其中一個（`RECONCILE_DELTA_EXCEEDED`）依判準根本不是錯誤。Phase 3 只
 改名，讓事件名說實話。
 
@@ -181,7 +181,7 @@ LINE 以外的任何決策，而且紅 unit 會在下次部署的健康檢查裡
 | resume 帳本冪等 | ✗ | ✓ | N/A | N/A |
 | catch-all → latch | ✗ | ✗ | **✓ 唯一一支** | ✗ |
 
-seykota 的 `state.status` 同時裝著 `FLAT`／`LONG`／`SAFE_HALT`，所以「策略停機了」跟「策略目前
+seykota 的 `state.status` 同時裝著 `FLAT`／`LONG`／`SAFE_HALT`，所以「策略安全暫停了」跟「策略目前
 空手」共用同一個欄位——這也是 2026-09-11 venv 競態事故當時只能手改 state 檔的原因。
 
 ### 4.2 統一後的 latch 記錄
@@ -218,7 +218,7 @@ dict，四支共用同一份程式而不是各自複製形狀。與本節初版�
   `_halt_fingerprint()` 裡一份手維護的排除清單處理同一個問題（`updated_at`／
   `protection_status`／`expected_order_id`）；在寫入端就分開，是把這一整類 bug 消掉而不是繼續
   逐一列舉它的實例。
-- **`state.status` 不再承載 `SAFE_HALT`**（seykota），部位狀態與停機狀態徹底分家。
+- **`state.status` 不再承載 `SAFE_HALT`**（seykota），部位狀態與安全暫停狀態徹底分家。
 - btc 的 4 個扁平欄位（`safe_halt` / `safe_halt_reason` / `safe_halt_fingerprint` /
   `safe_halt_at`）折成同一個 dict。舊 state 檔的遷移：`state.py` 的 `load()` 以
   `k in cls.__dataclass_fields__` 過濾 raw dict，移除的欄位會被靜默忽略，不需要遷移腳本，但
@@ -265,7 +265,7 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
 
 **所有偵測結果都進日誌，而且日誌不通知任何人。** 這是本目錄判準的直接結果：57 條路徑裡 25 條
 （44%）不給人任何能做得不一樣的決定，那它們該有的紀錄是一行耐久的資料，不是一則告警。Phase 5
-的修復 bot 讀這份日誌來回頭評估自己這段期間的判斷（「看一段時間的決策」取代「看每一筆」）。
+的修復機器人 讀這份日誌來回頭評估自己這段期間的判斷（「看一段時間的決策」取代「看每一筆」）。
 
 - append-only JSONL，逐專案一個檔，放該策略的 `audit/`（跟帳本同一個目錄）。
 - 形狀與鎖定機制照 `projection_outbox`：一行一個 JSON 物件、附加時取 `flock` 獨佔鎖、解鎖前
@@ -283,12 +283,12 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
 ### 4.6 錯誤處理請求佇列（`trade_alerts.error_request_queue`）
 
 跨過門檻的錯誤開一張「請求」——請求對錯誤，就像 PR 對 commit：它指名一個條件、帶著證據與本目錄
-的風險等級，開著直到有一個 outcome 關掉它。**開請求此時仍然不通知**；Phase 5 的修復 bot 先算出
+的風險等級，開著直到有一個 outcome 關掉它。**開請求此時仍然不通知**；Phase 5 的修復機器人 先算出
 具體的修復內容；v2 起請求只在需要人時才開（R2 升格、R3），通知附白話步驟與給 AI 的根因追查指令
 （只重述問題的通知，等於把機器能做的分析丟回給讀的人做）。
 
 - 佇列放策略的 `audit/`，**刻意不放 `/var/lib/*-control`**——後者是 2770 setgid、ops-control
-  可寫，放那裡等於讓 Telegram relay 能偽造待處理項目給修復 bot 去執行。
+  可寫，放那裡等於讓 Telegram relay 能偽造待處理項目給修復機器人 去執行。
 - **R0／R1 永遠不能開請求**，這條規則寫在函式裡而不是留給每個呼叫端自律。R0 的意思是偵測之後的動作
   是固定的、R1 是已經自動做完，所以沒有東西可以讓一張請求「關於」它——那些只進 §4.5 的事件日誌。這與本目錄
   「MECHANICAL 判定不得落在會通知的等級」是同一條判準的兩個執行點。
@@ -300,10 +300,10 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
   outcome 是「實際發生了什麼」的稽核紀錄，第二筆會讓歷史對「哪個修復真的跑了」變得有歧義。
 - 格式在 `schemas/error-request-queue-v1.schema.json`。
 
-### 4.8 白話通知文字與維運匯出（Phase 7b，`trade_alerts.ops_export`）
+### 4.8 白話通知文字與匯出檔（Phase 7b，`trade_alerts.ops_export`）
 
 **策略不自己推播，ops-notify 代送。** 策略的 env 維持 `ALERTS_ENABLED=false`（2026-08-30 方針），
-所以修復 bot 以前呼叫 `publish` 的通知在兩台主機上其實都被靜默丟掉。Phase 7b 改成：策略把要讓人
+所以修復機器人 以前呼叫 `publish` 的通知在兩台主機上其實都被靜默丟掉。Phase 7b 改成：策略把要讓人
 知道的事整理成 `audit/ops_export.json`，擁有維運頻道的 ops-notify 讀它、每筆只送一次。
 
 - **`operator_message`**（v2 起**每條 entry 必填**）：`{what, direction, steps[], ai_prompt}`＝發生什麼事、
@@ -313,10 +313,10 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
 - **`build_ops_export(fleet_event_log, request_queue, *, project, catalog=None, window_days=7)`**：
   - `notices`：近 `window_days` 天**需要人**的事件——所有 R3，以及 `details.escalated` 為真的 R2
     （R0／R1 永遠不在內，未升格的 R2 也不在內），以 `event_id` 為鍵讓讀取端每筆只送一次。等級以事件上
-    記錄的為準，沒記錄才查目錄。`text` 是完整訊息本體：等級標頭 → 目錄標題 → 白話三段 → 「技術細節」
+    記錄的為準，沒記錄才查目錄。`text` 是完整訊息本體：等級標頭 → 目錄標題 → 白話通知三段（發生什麼事／解決方向／處理步驟） → 「技術細節」
     （事件 `details.notice_text`，沒有就用 `summary`）→ 給 AI 的追查指令（目錄的 `ai_prompt`＋本次事件的
     錯誤碼、事件編號與 evidence，可整段貼給 AI）。`critical` 恰好在 R3 時為真。格式 `fleet-ops-export/v2`。
-  - `open_requests`：所有未結案請求，附目錄的白話三段與 `ai_prompt`；`handling_started_at` 本版恆為
+  - `open_requests`：所有未結案請求，附目錄的白話通知三段（發生什麼事／解決方向／處理步驟）與 `ai_prompt`；`handling_started_at` 本版恆為
     `null`，Phase 7e 的「開始處理」按鈕才會寫入。
   - 事件日誌或佇列有壞行時直接拋錯（同 §4.5），不輸出一份看起來完整其實缺一塊的匯出；呼叫端
     best-effort 寫檔，匯出停止更新時由 ops-notify 報 `STALE`。

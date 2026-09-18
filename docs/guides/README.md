@@ -9,7 +9,7 @@ Perplexity／開發者看的工程規格與流程規則。這個目錄放**給�
 | 檔案 | 說明 | 對應資料源 |
 |---|---|---|
 | `fleet-risk-register.html` | 機隊風險登記冊——34 種已知錯誤情況，依四個風險等級（v2）白話說明、處理步驟與給 AI 的追查指令，並標示各策略實際做到了沒有；可依等級／策略／未做完篩選。 | `src/trade_alerts/catalog/fleet-error-catalog-v2.json`＋`fleet-rollout-registry.json` |
-| `fleet-rollout-register.html` | 機隊一致性登記冊——每項機隊功能與每條錯誤規則在四支策略的已做／未做（含預定哪一關）／不適用（含理由）；分「未完成／已完成」兩組，最上方目錄可點擊跳到該項，已完成項目預設摺疊，右下角有回到最上方按鈕。JSON 的 `recent_changes` 標出這次編輯真正動到的東西（一格變成已做／不適用是 `type: completed`，新增一整列是 `type: added`），頁面上不分兩種、統一用「🆕 最新變動」黃色標示並列在最上方摘要欄，兼作「這次更新有沒有真的生效」的視覺確認——**每次編輯登記冊 JSON 都要同步整份換掉這個欄位，不是累加，沒有東西要標就設成 `[]`**。 | `src/trade_alerts/catalog/fleet-rollout-registry.json` |
+| `fleet-rollout-register.html` | 機隊一致性登記冊——每項機隊功能與每條錯誤規則在四支策略的已做／未做（含預定哪一關）／不適用（含理由）；分「未完成／已完成」兩組，最上方目錄可點擊跳到該項，已完成項目預設摺疊，右下角有回到最上方按鈕。JSON 的 `recent_changes` 標出這次編輯真正動到的東西（一格變成已做／不適用是 `type: completed`，新增一整列是 `type: added`），頁面上不分兩種、統一用「🆕 最新變動」黃色標示並列在最上方摘要欄，兼作「這次更新有沒有真的生效」的視覺確認——**每次編輯登記冊 JSON 都要同步整份換掉這個欄位，不是累加，沒有東西要標就設成 `[]`**。頁面最下方另有「名詞對照表」（全專案統一中文名、對應英文代號、不要再用的舊叫法）；`tests/test_fleet_glossary.py` 會掃描本 repo 給人看的文字，出現舊叫法就擋。 | `src/trade_alerts/catalog/fleet-rollout-registry.json`＋`fleet-glossary.json` |
 
 ## 慣例
 

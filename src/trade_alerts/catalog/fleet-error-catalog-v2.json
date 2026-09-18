@@ -93,7 +93,7 @@
         "steps": [
           "立刻到交易所 App 查這個交易對有沒有倉位。",
           "有倉位：手動平倉，或補掛一張停損單。",
-          "確認交易所上沒有沒保護的倉位。確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+          "確認交易所上沒有沒保護的倉位。確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次「停損掛單失敗、緊急市價平倉也失敗」的根本原因：讀 src/seykota_bot/bot.py 開倉後掛保護單與緊急平倉的流程，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是下單規則、API 權限、餘額還是網路問題，說明交易所上現在的部位狀態該怎麼確認，並提出治本修正。"
@@ -125,7 +125,7 @@
         "steps": [
           "到交易所 App 確認這筆倉位目前有沒有停損單。",
           "沒有的話，手動掛一張停損單（價格用訊息裡的停損價），或直接平倉。",
-          "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+          "確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損換單失敗、且自動重掛也連續失敗的根本原因：讀 src/seykota_bot/bot.py 換單流程（取消舊單→掛新單）與重掛邏輯，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是價格／數量規則、API 錯誤還是網路問題，並提出治本修正。"
@@ -216,7 +216,7 @@
         "steps": [
           "到交易所 App 查這個交易對的倉位與委託清單。",
           "沒有停損單：補掛一張；有多張：取消多餘的，只留一張。",
-          "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+          "確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼系統無法唯一確認這個倉位的原生保護單：讀 src/seykota_bot/bot.py 的保護單核對邏輯（_verified_exchange_protective_stop 一帶），對照交易所目前的委託清單，判斷是保護單不存在、有多張、還是欄位對不上，並提出治本修正。"
@@ -247,7 +247,7 @@
         "steps": [
           "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）。",
           "如果有不該存在的倉位（例如手動開的），先處理掉。",
-          "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+          "確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼交易所回報的部位無法唯一辨識：讀 src/seykota_bot/bot.py 的 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了，並提出治本修正。"
@@ -255,7 +255,7 @@
     },
     {
       "code": "SEY.RECONCILE_FAILED",
-      "title": "非暫時性的持倉同步失敗",
+      "title": "非暫時性的對帳失敗",
       "project": "seykota",
       "sources": [
         "src/seykota_bot/bot.py:844"
@@ -278,7 +278,7 @@
         "steps": [
           "看訊息裡的錯誤原因。",
           "確認交易所連線與 API 金鑰權限正常。",
-          "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+          "確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。"
@@ -305,7 +305,7 @@
       "rationale": "設定錯誤只有人能改，而且這個守衛擋的正是「把模擬單打到真倉」。自動放行等於把安全閥拆掉。",
       "operator_message": {
         "what": "系統本來設定要連模擬帳戶，卻接到了真實帳戶（或反過來）——設定跟目標不一致。",
-        "direction": "整支策略立刻全部停擺、拒絕任何操作。一定要先把設定改對，不能直接解除。",
+        "direction": "整支策略立刻安全暫停、拒絕任何操作。一定要先把設定改對，不能直接解除。",
         "steps": [
           "檢查 seykota 的執行模式設定與交易所連線目標，改成一致。",
           "改好後重啟 seykota-bot 服務。",
@@ -368,7 +368,7 @@
         "direction": "系統每一輪會自動重試，連續 3 次都失敗才暫停策略並通知你。",
         "steps": [
           "看訊息裡的錯誤內容。",
-          "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+          "確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這個未分類的執行期例外：從 seykota-bot 的 journal 找出連續失敗的例外訊息與堆疊，定位 src/seykota_bot/ 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。"
@@ -483,7 +483,7 @@
         "steps": [
           "到交易所 App 查這個交易對的倉位與委託清單，確認有恰好一張相符的移動停損單。",
           "沒有就補掛；有多張就取消多餘的。",
-          "確認後解除暫停：在 momentum 主機 /opt/mexc-4h-momentum-trailing-stop 執行 `python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl` 取得確認碼，再加上 `--apply --confirm <確認碼> --exchange-verified` 執行一次。",
+          "確認後解除暫停：在正式機 /opt/mexc-4h-momentum-trailing-stop 執行 `python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl` 取得確認碼，再加上 `--apply --confirm <確認碼> --exchange-verified` 執行一次。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼移動停損單無法驗證：讀 src/strategy.py 的 _ensure_native_trailing_stop 與相關核對函式，對照交易所目前的委託清單與 state/state.json，判斷是單不存在、有多張、還是單號與 state 不一致，並提出治本修正。"
@@ -513,7 +513,7 @@
         "direction": "這是刻意設計：工具改過帳目，一定要等人確認改得對，系統才能繼續跑。",
         "steps": [
           "對照交易所的歷史成交，確認工具修過的那幾筆平倉紀錄正確。",
-          "確認後解除暫停：在 momentum 主機 /opt/mexc-4h-momentum-trailing-stop 執行 `python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl` 取得確認碼，再加上 `--apply --confirm <確認碼> --exchange-verified` 執行一次。",
+          "確認後解除暫停：在正式機 /opt/mexc-4h-momentum-trailing-stop 執行 `python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl` 取得確認碼，再加上 `--apply --confirm <確認碼> --exchange-verified` 執行一次。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 協助確認一次 state 修復是否正確：讀 src/safe_halt_state_repair.py 的修復紀錄與 audit/ 下對應的證據，比對 audit/trading_ledger.jsonl 與交易所歷史成交，列出不一致的地方；並追查當初為什麼需要手動修 state。"
@@ -549,7 +549,7 @@
     },
     {
       "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
-      "title": "無歧義的孤兒平倉已自動補寫進帳本",
+      "title": "無歧義的漏記平倉已自動補寫進帳本",
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:228"
@@ -577,7 +577,7 @@
     },
     {
       "code": "MOM.VERIFIED_CLOSE_PROPOSED",
-      "title": "孤兒平倉已算出修復方案，附提案通知",
+      "title": "漏記平倉已算出修復方案，附提案通知",
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:128"
@@ -660,7 +660,7 @@
         "steps": [
           "到交易所 App 查每個資產的實際餘額。",
           "對照本地記錄，找出是哪個資產、差多少。",
-          "確認後解除暫停：在 btc 主機執行 `btc-competition-resume preview` 取得確認碼，再執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。",
+          "確認後解除暫停：在正式機執行 `btc-competition-resume preview` 取得確認碼，再執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 btc-bull-market-competition 追查為什麼本地帳本出現負的或不可能的餘額：讀 src/btc_competition/runner.py 的 _holdings_unverified 與 executor.fetch_balances，比對本地 state/帳本與交易所實際餘額，找出差異從哪一筆交易開始，提出讓本地與交易所一致的修正步驟（先給我確認再執行）與治本修正。"
@@ -692,7 +692,7 @@
         "steps": [
           "看訊息裡的失敗原因（常見：交易所最小下單量、餘額不足、交易對暫停交易）。",
           "確認交易所帳戶餘額與交易對狀態正常。",
-          "確認後解除暫停：在 btc 主機執行 `btc-competition-resume preview` 取得確認碼，再執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。",
+          "確認後解除暫停：在正式機執行 `btc-competition-resume preview` 取得確認碼，再執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 btc-bull-market-competition 追查再平衡為什麼連續零成交、自動重試也失敗：讀 src/btc_competition/runner.py 與 executor 的下單流程，對照日誌與交易所回應，判斷是下單量低於最小值、餘額、價格保護還是 API 問題，並提出治本修正。"
@@ -1023,7 +1023,7 @@
     },
     {
       "code": "SEY.VERIFIED_CLOSE_PROPOSED",
-      "title": "孤兒平倉已算出修復方案，附提案通知",
+      "title": "漏記平倉已算出修復方案，附提案通知",
       "project": "seykota",
       "sources": [
         "scripts/repair_bot_shadow.py:144"
