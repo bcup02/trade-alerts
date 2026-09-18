@@ -378,6 +378,30 @@ def test_recent_change_type_added_with_a_bogus_project_is_caught(registry, catal
     assert any("not a known strategy" in p for p in problems)
 
 
+def test_rollout_items_recolors_the_dot_for_a_type_completed_change(registry, catalog):
+    """Synthetic, not data-driven: the live registry's recent_changes can (and
+    currently does) hold only type=added entries, which would leave this
+    render path -- dot recoloring + has_recent for type=completed -- with no
+    regression coverage at all (flagged in PR #39 review). Fabricate a
+    completed entry against whichever cell is actually done in the fixture,
+    independent of what recent_changes currently contains for real."""
+    render_guides = _render_guides()
+    capability = next(
+        c for c in registry["capabilities"]
+        if any(s["state"] == "done" for s in c["status"].values())
+    )
+    project = next(p for p, s in capability["status"].items() if s["state"] == "done")
+    edited = copy.deepcopy(registry)
+    edited["recent_changes"] = [{"kind": "cap", "id": capability["id"], "project": project, "note": "x"}]
+    assert registry_problems(edited, catalog) == []  # sanity: this is a legal completed entry
+
+    items = {i["anchor"]: i for i in render_guides.rollout_items(catalog, edited)}
+    item = items[f"cap-{capability['id']}"]
+    assert item["dots"][project] == "recent"
+    assert item["has_recent"] is True
+    assert item["added_recent"] is False
+
+
 def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog):
     """Both flavours of recent_changes entry -- type=completed (an existing cell
     just flipped to done/n-a) and type=added (a brand-new row, no cell to flip
