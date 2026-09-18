@@ -1,0 +1,3636 @@
+From 31cf9b19decd3585e305502b5342fafe93426072 Mon Sep 17 00:00:00 2001
+From: bcup02 <55205420+bcup02@users.noreply.github.com>
+Date: Fri, 18 Sep 2026 10:32:33 +0800
+Subject: [PATCH] feat: fleet error catalog v2 -- four risk tiers,
+ operator_message for all 33 (v0.19.0) (#29)
+
+Decided with the user 2026-09-18 (plan W1a). The five v1 tiers ordered
+nothing a reader could use: R1 "propose, let a human decide" gave the
+operator nothing to decide (the exchange is authoritative), R3's "auto-run
+after a timeout unless a Telegram button is pressed" was never built, and
+R2's after-the-fact notice reported bookkeeping that moved no money.
+
+v2: R0 log / R1 auto, silent (was R2) / R2 auto-retry, escalate after
+escalate_after=3 consecutive failures (was R1 + R3) / R3 human required
+(was R4). audit_notice removed. Governance invariant unchanged in spirit:
+MECHANICAL only in R0/R1, JUDGEMENT only in R2/R3.
+
+- Catalog -> fleet-error-catalog-v2.json: every entry re-tiered; changed
+  entries' auto_action/human_action/rationale rewritten (incl. two safety
+  conditions before seykota auto-cancels an orphan stop); retired_codes lists
+  MOM.VERIFIED_CLOSE_PROPOSED and SEY.VERIFIED_CLOSE_PROPOSED (emitted by
+  seykota's shadow bot but never catalogued in v1).
+- operator_message on all 33 entries (v1 had 3); R2/R3 also carry ai_prompt,
+  a root-cause prompt to paste to an AI.
+- RISK_TIERS four tiers; REQUESTABLE_TIERS = {R2, R3}; ops_export exports only
+  R3 and escalated R2 (needs_human), appends the AI prompt with the event's
+  code/id/evidence; fleet-ops-export v2. Event-log and request-queue schema
+  enums follow.
+
+No event log or request queue exists yet on either host (checked), so the
+relabelling needs no data migration.
+
+Co-authored-by: bcup02 <columnbb@gmail.com>
+Co-authored-by: Claude Opus 5 <noreply@anthropic.com>
+---
+ README.md                                     |    8 +-
+ docs/consumer-release-runbook.md              |   32 +
+ docs/fleet-error-catalog.md                   |  178 +--
+ pyproject.toml                                |    2 +-
+ schemas/error-request-queue-v1.schema.json    |    6 +-
+ schemas/fleet-error-catalog-v1.schema.json    |  107 --
+ schemas/fleet-error-catalog-v2.schema.json    |  270 +++++
+ schemas/fleet-event-log-v1.schema.json        |    2 +-
+ schemas/fleet-ops-export-v1.schema.json       |   51 -
+ schemas/fleet-ops-export-v2.schema.json       |  165 +++
+ src/trade_alerts/__init__.py                  |    4 +-
+ .../catalog/fleet-error-catalog-v1.json       |  757 ------------
+ .../catalog/fleet-error-catalog-v2.json       | 1037 +++++++++++++++++
+ src/trade_alerts/error_request_queue.py       |   21 +-
+ src/trade_alerts/fleet_event_log.py           |    6 +-
+ src/trade_alerts/ops_export.py                |   58 +-
+ src/trade_alerts/verified_close_backfill.py   |    2 +-
+ tests/test_error_request_queue.py             |   25 +-
+ tests/test_fleet_error_catalog.py             |   80 +-
+ tests/test_fleet_event_log.py                 |    6 +-
+ tests/test_ops_export.py                      |  146 ++-
+ tests/test_safe_halt_model.py                 |    2 +-
+ 22 files changed, 1825 insertions(+), 1140 deletions(-)
+ delete mode 100644 schemas/fleet-error-catalog-v1.schema.json
+ create mode 100644 schemas/fleet-error-catalog-v2.schema.json
+ delete mode 100644 schemas/fleet-ops-export-v1.schema.json
+ create mode 100644 schemas/fleet-ops-export-v2.schema.json
+ delete mode 100644 src/trade_alerts/catalog/fleet-error-catalog-v1.json
+ create mode 100644 src/trade_alerts/catalog/fleet-error-catalog-v2.json
+
+diff --git a/README.md b/README.md
+index d9f3993..a2a26d8 100644
+--- a/README.md
++++ b/README.md
+@@ -65,12 +65,12 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
+ ## 交易機隊錯誤目錄 v1
+ 
+ 全機隊錯誤分類的權威來源位於 [`docs/fleet-error-catalog.md`](docs/fleet-error-catalog.md)，
+-機器可讀版本位於 [`src/trade_alerts/catalog/fleet-error-catalog-v1.json`](src/trade_alerts/catalog/fleet-error-catalog-v1.json)，
++機器可讀版本位於 [`src/trade_alerts/catalog/fleet-error-catalog-v2.json`](src/trade_alerts/catalog/fleet-error-catalog-v2.json)，
+ 其 JSON Schema 位於
+-[`schemas/fleet-error-catalog-v1.schema.json`](schemas/fleet-error-catalog-v1.schema.json)。
++[`schemas/fleet-error-catalog-v2.schema.json`](schemas/fleet-error-catalog-v2.schema.json)。
+ 
+ 目錄替四支策略每一條維運可見的錯誤條件記錄：現行程式的行為、依判準「這個錯誤讓人做出什麼、
+-跟自動處理不一樣的決定？」判定的 `MECHANICAL`／`JUDGEMENT`、風險等級 R0–R4、自動與人工處置，
++跟自動處理不一樣的決定？」判定的 `MECHANICAL`／`JUDGEMENT`、風險等級 R0–R3（v2，2026-09-18：只記錄／自動不通知／自動嘗試失敗才通知／必須人工）、自動與人工處置，
+ 以及改動落在哪一個 Phase。
+ 
+ **Phase 7b 起目錄隨套件發佈、會在執行期被讀取**：`trade_alerts.ops_export` 從每個條件的
+@@ -78,7 +78,7 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
+ `load_error_catalog()` 不帶路徑時讀的就是套件內那一份。改動通知文字＝發新版本並讓策略重新釘選。
+ 
+ `trade_alerts.ops_export.build_ops_export()` + `write_ops_export()` 把一支策略的事件日誌與未結案
+-請求整理成 `audit/ops_export.json`（格式 `schemas/fleet-ops-export-v1.schema.json`），由 ops-notify
++請求整理成 `audit/ops_export.json`（格式 `schemas/fleet-ops-export-v2.schema.json`），由 ops-notify
+ 讀取後送到維運頻道；策略本身不推播。
+ 
+ `tests/test_fleet_error_catalog.py` 守住幾條不變式，其中最重要的一條是：判定為 `MECHANICAL`
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index ac3d23d..970d27a 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -557,3 +557,35 @@ trade-alerts：v0.18.1（Phase 7b 配套，純目錄資料）
+ 服務/工作流程驗證：trade-alerts pytest 229 全綠（無新增測試）。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.19.0（風險分級 v2，W1a）
++變更摘要：使用者 2026-09-18 拍板把錯誤分級由五級改四級（計畫 W1）。
++          1. 錯誤目錄升 fleet-error-catalog/v2（檔名 -v2.json，v1 移除）：
++             R0 只記錄／R1 自動、不通知（舊 R2）／R2 自動嘗試、連續
++             escalate_after（3）次失敗才升格通知（舊 R1＋舊 R3）／R3 必須
++             人工（舊 R4）。v1 的「提案」「逾時自動執行＋Telegram 提早核准」
++             「事後稽核通知 audit_notice」全部取消。33 條逐條重新分級（R0 9／
++             R1 2／R2 11／R3 11），被改變語意的條目同步改寫 auto_action／
++             human_action／rationale（含 seykota 孤兒停損單自動取消的兩道安全
++             條件）。新增 retired_codes：MOM.VERIFIED_CLOSE_PROPOSED（呼叫點由
++             共用修復執行器取代時退役）、SEY.VERIFIED_CLOSE_PROPOSED（seykota
++             影子 bot 一直在發、v1 卻從未登記）。
++          2. 33 條全部補 operator_message（v1 只有 3 條），R2／R3 另帶
++             ai_prompt（給 AI 的根因追查指令）。
++          3. 程式：RISK_TIERS 改四級；REQUESTABLE_TIERS 只剩 R2／R3；
++             ops_export 只匯出 R3 與 details.escalated 為真的 R2（needs_human），
++             訊息附 ai_prompt＋本次事件的錯誤碼／事件編號／evidence；
++             fleet-ops-export 升 v2（open_requests 多 ai_prompt）。
++             事件日誌／請求佇列兩份 schema 的等級列舉同步。
++          兩台主機的 fleet_event_log／error_requests 目前都不存在（已實測），
++          改變等級語意不需要搬資料。
++受影響消費專案：momentum（目前 v0.18.0，寫的是 v1 等級；W3 改用共用執行器
++          時一併升級）、ops-notify（讀 fleet-ops-export/v1；W5 升級）。
++          兩者在升級前都不會讀到 v2 的任何東西。seykota／my-crypto／btc 不受影響。
++部署入口：無（純函式庫 + 目錄資料）。
++版本驗證：pyproject.toml version == 0.19.0；trade_alerts.__version__ ==
++          "0.19.0"。
++服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index 0a57a4e..e8753c4 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -1,8 +1,8 @@
+-# 交易機隊錯誤目錄 v1
++# 交易機隊錯誤目錄 v2
+ 
+-**狀態：Phase 3 產出，2026-09-12 定版。** 本文件是全機隊錯誤分類的權威來源；機器可讀版本在
+-[`src/trade_alerts/catalog/fleet-error-catalog-v1.json`](../src/trade_alerts/catalog/fleet-error-catalog-v1.json)，其形狀由
+-[`schemas/fleet-error-catalog-v1.schema.json`](../schemas/fleet-error-catalog-v1.schema.json)
++**狀態：Phase 3 產出（2026-09-12 v1 定版），2026-09-18 升 v2（風險分級由五級改四級，見 §2）。** 本文件是全機隊錯誤分類的權威來源；機器可讀版本在
++[`src/trade_alerts/catalog/fleet-error-catalog-v2.json`](../src/trade_alerts/catalog/fleet-error-catalog-v2.json)，其形狀由
++[`schemas/fleet-error-catalog-v2.schema.json`](../schemas/fleet-error-catalog-v2.schema.json)
+ 定義，不變式由 `tests/test_fleet_error_catalog.py` 守住。兩份內容不一致時，以 JSON 為準——
+ 它是 Phase 4 事件日誌與錯誤處理請求佇列的輸入。
+ 
+@@ -28,31 +28,35 @@
+ `tests/test_fleet_error_catalog.py::test_mechanical_verdicts_never_reach_a_notifying_tier`
+ 把這條判準寫成了可執行的不變式：`MECHANICAL` 的條目不得落在任何會通知人的風險等級。
+ 
+-## 2. 風險等級
++## 2. 風險等級（v2，2026-09-18）
+ 
+-| 等級 | 代號 | 決策請求通知 | 自動執行 | 事後稽核通知 | 說明 |
+-|---|---|---|---|---|---|
+-| R0 | `LOG` | ✗ | ✗ | ✗ | 只進事件日誌。偵測之後的動作是固定的。 |
+-| R1 | `PROPOSE` | ✓ | ✗ | ✗ | **算出具體解決方案之後**才發 LINE 通知，並把方案當提案附上。絕不無人核准就執行。 |
+-| R2 | `AUTO_LOW` | ✗ | ✓ | ✓ | 低風險：直接自動執行，事後記進事件日誌並發一則稽核通知。 |
+-| R3 | `AUTO_TIMEOUT` | ✓ | ✓ | ✗ | 中風險：開請求 → Telegram 按鈕可提早核准 → **逾時不按也會執行**。 |
+-| R4 | `HUMAN_REQUIRED` | ✓ | ✗ | ✗ | 高風險：持續重複通知直到人處理。永不自動執行。 |
+-
+-R2 是唯一「自動執行但不發決策請求」的等級，所以 `MECHANICAL` 只能落在 R0 或 R2；反過來，
+-R1／R3／R4 一律保留給 `JUDGEMENT`。
+-
+-### 2.1 兩種通知不是同一件事（Phase 6 新增）
+-
+-`notifies` 與 `audit_notice` 是**兩個不同的欄位**，永遠不會同時為真：
+-
+-- **決策請求通知**（`notifies`，R1／R3／R4）：在問你要不要、該怎麼辦。收到的人得做決定，不然
+-  事情就停在那裡。§1 的判準管的就是這一種——沒有不同決定可做，就不該發。
+-- **事後稽核通知**（`audit_notice`，只有 R2）：事情已經做完了，這則通知只是告訴你做了什麼。
+-  它不問你任何事，不按也不會有任何後果，所以它不構成「打擾人做決定」，判準不禁止它。
+-
+-會有這個區分，是因為 R2 自動執行的動作**會動到真實損益**。動作本身沒有第二個選項（所以不該發
+-決策請求），但「錢動了」這件事本人應該當下就知道，而不是事後自己去翻日誌。兩者都成立，靠的是
+-把「告知」跟「請示」分開，而不是放寬判準。
++| 等級 | 代號 | 自動處理 | 通知 | 說明 |
++|---|---|---|---|---|
++| R0 | `LOG` | 不用處理 | 不通知 | 只進事件日誌。偵測之後的動作是固定的。 |
++| R1 | `AUTO` | 直接做 | **不通知** | 自動執行並記進事件日誌。沒有第二個選項，告訴人也沒有東西可以決定。 |
++| R2 | `RETRY_ESCALATE` | 自動嘗試恢復 | 連續失敗 `escalate_after`（預設 3）次才通知一次 | 系統自己先試；試不起來才升格：開請求、通知，附白話步驟與給 AI 的根因追查指令。 |
++| R3 | `HUMAN_REQUIRED` | 絕不自動 | 通知並持續提醒 | 高風險：一定要人處理，提醒到有人處理為止。 |
++
++**排序的軸是「人能不能做出跟自動處理不一樣的決定」，不是事情有多嚴重。** R0／R1 人沒有決定可做
++（`MECHANICAL`，永遠不通知）；R2／R3 才會到人手上（`JUDGEMENT`）。`test_mechanical_verdicts_never_reach_a_notifying_tier`
++照這條寫成不變式。
++
++### 2.1 v2 改了什麼、為什麼
++
++使用者 2026-09-18 讀風險登記冊後拍板，理由與決定：
++
++- **v1 的 R1「提案、交給人決定」沒有意義。** 交易所是權威資料：治標就是照交易所讓帳本、交易所、
++  Google 表三方一致，這件事機器能做就該自己做；真正需要人的只有「機器試了還是對不上」，而那時人要做的
++  是追查根因——所以 v2 的升格訊息一律附一段可以直接貼給 AI 的根因追查指令（`operator_message.ai_prompt`）。
++- **v1 的 R3「逾時自動執行＋Telegram 提早核准」取消。** 動作內容確定的就立即重試；重試起不來才升格。
++  v1 R1 與 v1 R3 合併成 v2 R2。
++- **v1 的 R2 事後稽核通知取消**，v1 R2 → v2 R1 不通知。自動補寫帳本只是記下交易所上已經發生的事，
++  沒有動到任何錢。`audit_notice` 欄位刪除。
++- v1 R4 → v2 R3，內容不變。
++- 請求佇列只收 R2（升格時）與 R3；ops-notify 只轉送 R3 與升格的 R2。
++- 退役代碼列在 JSON 的 `retired_codes`，永不重用（不變式守住）。
++- 條目的 `auto_action`／`human_action` 描述的是 v2 目標行為，落在 `lands_in_phase`（8＝v2 分級落實到各策略）；
++  **某支策略實際做到了沒有，不在本目錄，而在全機隊一致性登記冊追蹤。**
+ 
+ ## 3. 目錄總覽
+ 
+@@ -64,64 +68,66 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `MECHANICAL`（動作固定） | 11 | 33% |
+ | `JUDGEMENT`（真的要人判斷） | 22 | 67% |
+ 
+-| 風險等級 | 條數 |
++| 風險等級（v2） | 條數 |
+ |---|---|
+-| R0 日誌 | 9 |
+-| R1 提案 | 5 |
+-| R2 自動執行 | 2 |
+-| R3 逾時自動 | 6 |
+-| R4 必須人工 | 11 |
++| R0 只記錄 | 9 |
++| R1 自動、不通知 | 2 |
++| R2 自動嘗試、失敗才通知 | 11 |
++| R3 必須人工 | 11 |
++
++下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
+ 
+ ### 3.1 ed-seykota（14 條）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+-| `SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED` | latch `protective_stop_failed` | MECHANICAL | R2 | P4 |
+-| `SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED` | latch `protective_stop_failed` | JUDGEMENT | R4 | P4 |
+-| `SEY.PROTECTION_REPLACE_FAILED` | latch `protective_stop_replace_failed` | JUDGEMENT | R3 | P6 |
+-| `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` | 通知 only | JUDGEMENT | R1 | P5 |
+-| `SEY.PROTECTION_CLOSE_CANCEL_FAILED` | 通知 only | JUDGEMENT | R1 | P5 |
+-| `SEY.PROTECTION_UNVERIFIED` | latch | JUDGEMENT | R4 | P4 |
+-| `SEY.POSITION_AMBIGUOUS` | latch | JUDGEMENT | R4 | P4 |
+-| `SEY.RECONCILE_FAILED` | latch | JUDGEMENT | R3 | P4 |
+-| `SEY.EXCHANGE_TARGET_UNSAFE` | latch | JUDGEMENT | R4 | P4 |
+-| `SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE` | latch | JUDGEMENT | R4 | P4 |
+-| `SEY.RUNTIME_CYCLE_FAILED` | latch（catch-all） | JUDGEMENT | R3 | P4 |
++| `SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED` | latch `protective_stop_failed` | MECHANICAL | R1 | P4 |
++| `SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED` | latch `protective_stop_failed` | JUDGEMENT | R3 | P4 |
++| `SEY.PROTECTION_REPLACE_FAILED` | latch `protective_stop_replace_failed` | JUDGEMENT | R2 | P8（v2） |
++| `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` | 通知 only | JUDGEMENT | R2 | P8（v2） |
++| `SEY.PROTECTION_CLOSE_CANCEL_FAILED` | 通知 only | JUDGEMENT | R2 | P8（v2） |
++| `SEY.PROTECTION_UNVERIFIED` | latch | JUDGEMENT | R3 | P4 |
++| `SEY.POSITION_AMBIGUOUS` | latch | JUDGEMENT | R3 | P4 |
++| `SEY.RECONCILE_FAILED` | latch | JUDGEMENT | R2 | P4 |
++| `SEY.EXCHANGE_TARGET_UNSAFE` | latch | JUDGEMENT | R3 | P4 |
++| `SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE` | latch | JUDGEMENT | R3 | P4 |
++| `SEY.RUNTIME_CYCLE_FAILED` | latch（catch-all） | JUDGEMENT | R2 | P4 |
+ | `SEY.CLOSE_FILL_PENDING` | 誤標 critical | MECHANICAL | R0 | **P3** |
+ | `SEY.TRADE_EXIT` | 誤標 critical | MECHANICAL | R0 | **P3** |
+ | `SEY.ENTRY_SKIPPED_MIN_CAPITAL` | 誤標 critical | MECHANICAL | R0 | **P3** |
+ 
+ **`protective_stop_failed` 拆成兩碼**是本節最重要的改動。現行程式在「停損掛單失敗」之後會立刻
+ 嘗試緊急市價平倉，但不論平倉成功或失敗，都收斂成同一個 latch 原因碼。這兩種結果的真倉風險相差
+-極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R2 自動清 latch）；平倉也失敗代表真倉
+-有裸露部位而且程式的補救手段已經失敗過一次（→ R4，全機隊風險最高的一類）。
++極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R1 自動清 latch）；平倉也失敗代表真倉
++有裸露部位而且程式的補救手段已經失敗過一次（→ R3，全機隊風險最高的一類）。
+ 
+ ### 3.2 momentum（6 條）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+-| `MOM.PROTECTION_UNVERIFIED` | latch dict，3 觸發點共用 | JUDGEMENT | R4 | P4 |
+-| `MOM.STATE_REPAIRED_SAFE_HALT` | 人工工具寫入的 latch | JUDGEMENT | R4 | P4 |
++| `MOM.PROTECTION_UNVERIFIED` | latch dict，3 觸發點共用 | JUDGEMENT | R3 | P4 |
++| `MOM.STATE_REPAIRED_SAFE_HALT` | 人工工具寫入的 latch | JUDGEMENT | R3 | P4 |
+ | `MOM.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重試 | MECHANICAL | R0 | — |
+-| `MOM.VERIFIED_CLOSE_PROPOSED` | 修復 bot 提案通知 | JUDGEMENT | R1 | P5 |
+-| `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R2 | **P6** |
+-| `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R4 | **P6** |
++| `MOM.VERIFIED_CLOSE_PROPOSED` | 修復 bot 提案通知 | JUDGEMENT | R2 | P8（v2） |
++| `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R1 | **P6** |
++| `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R3 | **P6** |
+ 
+ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
+ 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
+ 正是 seykota 要改成的樣子。
+ 
+-後三條是 Phase 6 的 verified-close-backfill 修復 bot（`scripts/repair_bot.py`）。同一個偵測結果依
+-判準分流到三個等級：無歧義 → R2 自動寫；有疑慮 → R1 提案；帳本已不乾淨 → R4 停手。自動寫入的
+-開關（`MOMENTUM_REPAIR_AUTO_APPLY`）預設關閉，關閉時一律走 R1。seykota 不在範圍內，維持 Phase 5
+-影子模式。
++後三條是 Phase 6 的 verified-close-backfill 修復 bot（`scripts/repair_bot.py`）。v2 起：無歧義 → R1 自動寫、不通知；
++以交易所為準仍能對應 → 照交易所補寫；只有結構上對不上才重試並升格（R2，`MOM.VERIFIED_CLOSE_PROPOSED` 的呼叫點
++由共用修復執行器取代時退役）；帳本已不乾淨 → R3 停手。v1 的過渡開關 `MOMENTUM_REPAIR_AUTO_APPLY`（只有 momentum
++有、33 條只管 1 條、沒有任何機制會評估並打開它）在 v2 移除；seykota 的影子 bot 發出的
++`SEY.VERIFIED_CLOSE_PROPOSED` 從未登記進 v1 目錄，v2 列入 `retired_codes`，seykota 改用同一個共用執行器。
+ 
+ ### 3.3 btc-competition（4 條）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+-| `BTC.BOOK_CORRUPT_NEGATIVE_BALANCE` | latch（4 個扁平欄位） | JUDGEMENT | R4 | P4 |
+-| `BTC.EXECUTION_BLOCKED_ZERO_FILLS` | latch | JUDGEMENT | R3 | P6 |
++| `BTC.BOOK_CORRUPT_NEGATIVE_BALANCE` | latch（4 個扁平欄位） | JUDGEMENT | R3 | P4 |
++| `BTC.EXECUTION_BLOCKED_ZERO_FILLS` | latch | JUDGEMENT | R2 | P8（v2） |
+ | `BTC.REBALANCE_PENDING` | 不 latch，自動續做 | MECHANICAL | R0 | — |
+ | `BTC.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重新拋出 | MECHANICAL | R0 | — |
+ 
+@@ -133,12 +139,12 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障
+ | 錯誤碼 | 現行事件名 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+ | `MYC.RECONCILE_DELTA_EXCEEDED` | `SAFE_HALT`（誤導） | MECHANICAL | R0 | **P3** 改名 / **P4e** 定案不聚合 |
+-| `MYC.RUNTIME_CYCLE_FAILED` | `SAFE_HALT`（誤導） | JUDGEMENT | R1 | **P3** 改名 / P5 |
+-| `MYC.PROTECTION_PLACEMENT_REJECTED` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R4 | **P3** 改名 / P5 |
+-| `MYC.PROTECTION_PLACEMENT_NO_POSITION` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P6 |
+-| `MYC.PROTECTION_PLACEMENT_ERROR` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R4 | **P3** 改名 / P5 |
+-| `MYC.PROTECTION_REPLACE_FAILED` | `PROTECTIVE_STOP_FAILED` ×2 | JUDGEMENT | R3 | **P3** 改名 / P6 |
+-| `MYC.PROTECTION_ORPHAN_CANCEL_FAILED` | `PROTECTIVE_STOP_CANCEL_FAILED` | JUDGEMENT | R1 | **P3** 改名 / P5 |
++| `MYC.RUNTIME_CYCLE_FAILED` | `SAFE_HALT`（誤導） | JUDGEMENT | R2 | P8（v2） |
++| `MYC.PROTECTION_PLACEMENT_REJECTED` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P5 |
++| `MYC.PROTECTION_PLACEMENT_NO_POSITION` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R2 | P8（v2） |
++| `MYC.PROTECTION_PLACEMENT_ERROR` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P5 |
++| `MYC.PROTECTION_REPLACE_FAILED` | `PROTECTIVE_STOP_FAILED` ×2 | JUDGEMENT | R2 | P8（v2） |
++| `MYC.PROTECTION_ORPHAN_CANCEL_FAILED` | `PROTECTIVE_STOP_CANCEL_FAILED` | JUDGEMENT | R2 | P8（v2） |
+ 
+ **my-crypto 不加 latch**（使用者 2026-09-12 定案）。兩個叫 `SAFE_HALT` 的事件名宣稱一個這支程式
+ 根本沒有的停機行為——bot 發完通知照常繼續交易。替一支目前沒有這個概念的 LIVE bot 新增停機行為，
+@@ -146,7 +152,7 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障
+ 改名，讓事件名說實話。
+ 
+ 五個共用 `PROTECTIVE_STOP_FAILED` 的呼叫點語意差異很大（明確被拒絕／查不到部位／拋例外／搬移
+-失敗），風險等級從 R3 到 R4 都有，看 log 的人目前分不出來，Phase 3 一併拆成各自的碼。
++失敗），風險等級從 R2 到 R3 都有，看 log 的人目前分不出來，Phase 3 一併拆成各自的碼。
+ 
+ ### 3.5 跨 repo（2 條）
+ 
+@@ -274,17 +280,18 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停
+ 
+ 跨過門檻的錯誤開一張「請求」——請求對錯誤，就像 PR 對 commit：它指名一個條件、帶著證據與本目錄
+ 的風險等級，開著直到有一個 outcome 關掉它。**開請求此時仍然不通知**；Phase 5 的修復 bot 先算出
+-具體的修復內容，才發通知並附上提案（只重述問題的通知，等於把機器能做的分析丟回給讀的人做）。
++具體的修復內容；v2 起請求只在需要人時才開（R2 升格、R3），通知附白話步驟與給 AI 的根因追查指令
++（只重述問題的通知，等於把機器能做的分析丟回給讀的人做）。
+ 
+ - 佇列放策略的 `audit/`，**刻意不放 `/var/lib/*-control`**——後者是 2770 setgid、ops-control
+   可寫，放那裡等於讓 Telegram relay 能偽造待處理項目給修復 bot 去執行。
+-- **R0 永遠不能開請求**，這條規則寫在函式裡而不是留給每個呼叫端自律。R0 的意思是偵測之後的動作
+-  是固定的，所以沒有東西可以讓一張請求「關於」它——那些只進 §4.5 的事件日誌。這與本目錄
++- **R0／R1 永遠不能開請求**，這條規則寫在函式裡而不是留給每個呼叫端自律。R0 的意思是偵測之後的動作
++  是固定的、R1 是已經自動做完，所以沒有東西可以讓一張請求「關於」它——那些只進 §4.5 的事件日誌。這與本目錄
+   「MECHANICAL 判定不得落在會通知的等級」是同一條判準的兩個執行點。
+ - 去重鍵是 `(project, code, evidence)` 的 fingerprint：一個條件連續成立 20 個輪詢週期產生
+   **一張**請求，不是 20 張。請求被解決之後同一條件再發生，會開**新的一張**——策略確實第二次撞到
+   這個問題，值得一張新請求，而不是靜默重開一張已關閉的。
+-- 關閉狀態四種：`RESOLVED_AUTO`（R2，以及 R3 逾時後自動執行）、`RESOLVED_HUMAN`、`SUPERSEDED`
++- 關閉狀態四種：`RESOLVED_AUTO`（升格後的 R2 自動重試終於成功）、`RESOLVED_HUMAN`、`SUPERSEDED`
+   （同條件帶著不同證據重開）、`WITHDRAWN`（條件自己不再成立）。已關閉的請求拒絕再關一次——
+   outcome 是「實際發生了什麼」的稽核紀錄，第二筆會讓歷史對「哪個修復真的跑了」變得有歧義。
+ - 格式在 `schemas/error-request-queue-v1.schema.json`。
+@@ -295,23 +302,24 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停
+ 所以修復 bot 以前呼叫 `publish` 的通知在兩台主機上其實都被靜默丟掉。Phase 7b 改成：策略把要讓人
+ 知道的事整理成 `audit/ops_export.json`，擁有維運頻道的 ops-notify 讀它、每筆只送一次。
+ 
+-- **`operator_message`**（每條 entry 可選）：`{what, direction, steps[]}`＝發生什麼事、解決方向、
+-  處理步驟，語氣比照機隊風險登記冊，不用術語。有這個欄位就三段都不得為空；R0 不得有（R0 不通知
+-  任何人，寫了也沒人看得到）。先寫 momentum 修復 bot 的三條（R1／R2／R4），其餘條目在該策略接進
+-  ops-notify 時補上——沒有的條目通知會退回只顯示目錄標題＋技術細節。
++- **`operator_message`**（v2 起**每條 entry 必填**）：`{what, direction, steps[], ai_prompt}`＝發生什麼事、
++  解決方向、處理步驟、給 AI 的根因追查指令，語氣比照機隊風險登記冊，不用術語。三段皆不得為空；
++  `ai_prompt` 在 R2／R3 必填、R0／R1 不得有。v1 只寫了 3 條、「其餘接入時再補」——這正是 v2 要消除的
++  「先做一部分、沒登記」，所以 v2 一次補齊 33 條，風險登記冊頁也由它產生。
+ - **`build_ops_export(fleet_event_log, request_queue, *, project, catalog=None, window_days=7)`**：
+-  - `notices`：近 `window_days` 天、等級 R1–R4 的事件（R0 永遠不在內），以 `event_id` 為鍵讓讀取端
+-    每筆只送一次。等級以事件上記錄的為準，沒記錄才查目錄。`text` 是完整訊息本體：等級標頭 →
+-    目錄標題 → 白話三段 → 「技術細節」（事件 `details.notice_text`，沒有就用 `summary`）。
+-    `critical` 恰好在 R4 時為真。
+-  - `open_requests`：所有未結案請求，附目錄的白話三段；`handling_started_at` 本版恆為 `null`，
+-    Phase 7e 的「開始處理」按鈕才會寫入（欄位先放進 v1，之後不用改格式版本）。
++  - `notices`：近 `window_days` 天**需要人**的事件——所有 R3，以及 `details.escalated` 為真的 R2
++    （R0／R1 永遠不在內，未升格的 R2 也不在內），以 `event_id` 為鍵讓讀取端每筆只送一次。等級以事件上
++    記錄的為準，沒記錄才查目錄。`text` 是完整訊息本體：等級標頭 → 目錄標題 → 白話三段 → 「技術細節」
++    （事件 `details.notice_text`，沒有就用 `summary`）→ 給 AI 的追查指令（目錄的 `ai_prompt`＋本次事件的
++    錯誤碼、事件編號與 evidence，可整段貼給 AI）。`critical` 恰好在 R3 時為真。格式 `fleet-ops-export/v2`。
++  - `open_requests`：所有未結案請求，附目錄的白話三段與 `ai_prompt`；`handling_started_at` 本版恆為
++    `null`，Phase 7e 的「開始處理」按鈕才會寫入。
+   - 事件日誌或佇列有壞行時直接拋錯（同 §4.5），不輸出一份看起來完整其實缺一塊的匯出；呼叫端
+     best-effort 寫檔，匯出停止更新時由 ops-notify 報 `STALE`。
+ - **`write_ops_export(path, export)`**：整份原子替換、`0644`。檔案由策略自己的服務帳號寫進
+   `audit/`；ops-notify／ops-control 只有群組讀權限，relay 端無法偽造要送的項目（與 §4.6 佇列放
+   `audit/` 同一個理由）。
+-- 格式在 `schemas/fleet-ops-export-v1.schema.json`。
++- 格式在 `schemas/fleet-ops-export-v2.schema.json`。
+ 
+ ### 4.7 `reconciliation_delta`：撤回聚合計畫（Phase 4e，2026-09-15）
+ 
+@@ -370,8 +378,8 @@ log 行的 `event=` 與 `severity=` 欄位，不影響任何推播、下單或
+   （`PROJECT_CODE_PREFIXES` 不得與已發布的 `code` 前綴 drift）、
+   `test_safe_halt_model.py::test_every_catalog_resume_path_is_one_this_model_implements`
+   （entry 不得規定沒有任何策略實作得出來的 resume 路徑）、
+-  `test_error_request_queue.py::test_r0_conditions_can_never_open_a_request`
+-  （逐筆拿目錄裡的 R0 條件去試開請求，必須全部被拒）。
+-- Phase 7b 起另有三條白話文字的不變式：`operator_message` 三段皆非空、R0 不得有
+-  `operator_message`、momentum 修復 bot 三條必須有。改通知文字就是改這份 JSON——它隨套件發佈，
+-  策略重新釘選新版本才會生效。
++  `test_error_request_queue.py::test_r0_and_r1_conditions_can_never_open_a_request`
++  （逐筆拿目錄裡的 R0／R1 條件去試開請求，必須全部被拒）。
++- v2 起的白話文字與分級不變式：每條都有 `operator_message` 且三段皆非空、R2／R3 必有 `ai_prompt`
++  而 R0／R1 不得有、四級語意固定、只有 R2 帶 `escalate_after`、退役代碼不得重用。改通知文字就是改這份
++  JSON——它隨套件發佈，策略重新釘選新版本才會生效。
+diff --git a/pyproject.toml b/pyproject.toml
+index 2acbe49..1a16672 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.18.1"
++version = "0.19.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/schemas/error-request-queue-v1.schema.json b/schemas/error-request-queue-v1.schema.json
+index e8a5caa..7927769 100644
+--- a/schemas/error-request-queue-v1.schema.json
++++ b/schemas/error-request-queue-v1.schema.json
+@@ -2,7 +2,7 @@
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "$id": "https://github.com/bcup02/trade-alerts/schemas/error-request-queue-v1.schema.json",
+   "title": "Error-handling request queue record v1",
+-  "description": "One line of a strategy's append-only error-handling request queue, kept in the strategy's audit/ directory (never in /var/lib/*-control, which ops-control can write). A request names one condition that crossed a threshold and stays open until an outcome closes it. Opening a request notifies nobody; R0 conditions can never open one.",
++  "description": "One line of a strategy's append-only error-handling request queue, kept in the strategy's audit/ directory (never in /var/lib/*-control, which ops-control can write). A request names one condition that crossed a threshold and stays open until an outcome closes it. Opening a request notifies nobody; Only R2 (once escalated) and R3 conditions can open one (fleet-error-catalog/v2).",
+   "type": "object",
+   "required": ["kind"],
+   "oneOf": [
+@@ -39,8 +39,8 @@
+           "not": {"pattern": "\\."}
+         },
+         "risk_tier": {
+-          "description": "R0 is absent by construction: its action after detection is fixed, so there is nothing for a request to be about.",
+-          "enum": ["R1", "R2", "R3", "R4"]
++          "description": "fleet-error-catalog/v2 tiers. R0 and R1 are absent by construction: the action after detection is fixed or was already executed automatically, so there is nothing for a request to be about.",
++          "enum": ["R2", "R3"]
+         },
+         "fingerprint": {
+           "type": "string",
+diff --git a/schemas/fleet-error-catalog-v1.schema.json b/schemas/fleet-error-catalog-v1.schema.json
+deleted file mode 100644
+index c1e555b..0000000
+--- a/schemas/fleet-error-catalog-v1.schema.json
++++ /dev/null
+@@ -1,107 +0,0 @@
+-{
+-  "$schema": "http://json-schema.org/draft-07/schema#",
+-  "$id": "https://github.com/bcup02/trade-alerts/schemas/fleet-error-catalog-v1.schema.json",
+-  "title": "Fleet error catalog v1",
+-  "description": "One entry per operator-visible error condition in the trading fleet: what the code does today, whether a human could decide anything different, which risk tier that puts it in, and which phase the change lands in.",
+-  "type": "object",
+-  "required": ["catalog_version", "risk_tiers", "projects", "entries"],
+-  "additionalProperties": false,
+-  "properties": {
+-    "catalog_version": {"const": "fleet-error-catalog/v1"},
+-    "generated_for_phase": {"type": "integer", "minimum": 0},
+-    "note": {"type": "string"},
+-    "risk_tiers": {
+-      "type": "object",
+-      "description": "R0..R4, from 'log only' to 'a human must act'. Keys are fixed; the descriptions are the authoritative definition.",
+-      "required": ["R0", "R1", "R2", "R3", "R4"],
+-      "additionalProperties": false,
+-      "patternProperties": {
+-        "^R[0-4]$": {
+-          "type": "object",
+-          "required": ["label", "notifies", "auto_executes", "audit_notice", "description"],
+-          "additionalProperties": false,
+-          "properties": {
+-            "label": {"type": "string"},
+-            "notifies": {"type": "boolean", "description": "Sends a DECISION REQUEST: the human is being asked to choose something. Never true together with audit_notice."},
+-            "auto_executes": {"type": "boolean"},
+-            "audit_notice": {"type": "boolean", "description": "Sends an AFTER-THE-FACT AUDIT NOTICE: tells the human what was already done, asks nothing of them. Only meaningful for a tier that executes automatically without notifying."},
+-            "description": {"type": "string"}
+-          }
+-        }
+-      }
+-    },
+-    "projects": {
+-      "type": "object",
+-      "description": "Project key -> repository name. Keys match ops-notify's target keys so a catalog entry can be joined to a notification axis without a second mapping table.",
+-      "minProperties": 1,
+-      "additionalProperties": {"type": "string"}
+-    },
+-    "entries": {
+-      "type": "array",
+-      "minItems": 1,
+-      "items": {"$ref": "#/definitions/entry"}
+-    }
+-  },
+-  "definitions": {
+-    "entry": {
+-      "type": "object",
+-      "required": [
+-        "code", "title", "project", "sources", "current",
+-        "verdict", "risk_tier", "auto_action", "human_action",
+-        "resume", "lands_in_phase", "rationale"
+-      ],
+-      "additionalProperties": false,
+-      "properties": {
+-        "code": {
+-          "type": "string",
+-          "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$",
+-          "description": "Stable fleet-wide identifier: <project prefix>.<CONDITION>. Never reused for a different condition once published."
+-        },
+-        "title": {"type": "string", "minLength": 1},
+-        "project": {"type": "string", "minLength": 1},
+-        "sources": {
+-          "type": "array",
+-          "minItems": 1,
+-          "items": {"type": "string", "pattern": ".+:[0-9]+$"},
+-          "description": "file:line of every call site this condition is raised from. Repo-relative, except 'fleet' entries which are repo-qualified."
+-        },
+-        "current": {
+-          "type": "object",
+-          "description": "What the code does TODAY, before any phase-4+ change.",
+-          "required": ["latch", "notify", "unit_exit"],
+-          "additionalProperties": false,
+-          "properties": {
+-            "latch": {"type": ["string", "null"], "description": "Current latch reason string, or null when this condition does not latch."},
+-            "notify": {"type": ["string", "null"], "description": "Current notification event name plus its severity, or null when no notifier exists."},
+-            "unit_exit": {"type": ["integer", "null"], "description": "Non-zero process exit code used as a second notification channel, or null."}
+-          }
+-        },
+-        "verdict": {
+-          "enum": ["MECHANICAL", "JUDGEMENT"],
+-          "description": "Answer to the project's governing test: does this error let a human make a decision different from what automation would do anyway? No -> MECHANICAL."
+-        },
+-        "risk_tier": {"enum": ["R0", "R1", "R2", "R3", "R4"]},
+-        "auto_action": {"type": "string", "minLength": 1},
+-        "human_action": {"type": "string", "minLength": 1},
+-        "resume": {
+-          "enum": ["automatic", "two_stage_fingerprint", "restart_after_config_fix", "n/a"],
+-          "description": "How a latch for this condition is cleared. 'two_stage_fingerprint' is momentum's existing gate: --confirm must match the live latch fingerprint, and a matching ledger row makes a second clear a no-op."
+-        },
+-        "lands_in_phase": {"type": "integer", "minimum": 3, "maximum": 7},
+-        "rationale": {"type": "string", "minLength": 1},
+-        "operator_message": {"$ref": "#/definitions/operator_message"}
+-      }
+-    },
+-    "operator_message": {
+-      "type": "object",
+-      "description": "Plain-language text sent to the operator when this condition notifies (Phase 7b): what happened, which way the fix goes, and the concrete steps. Optional per entry -- written when a strategy's notifications are wired to ops-notify -- but when present all three parts must be non-empty. Never on an R0 entry, which notifies nobody.",
+-      "required": ["what", "direction", "steps"],
+-      "additionalProperties": false,
+-      "properties": {
+-        "what": {"type": "string", "minLength": 1, "description": "發生什麼事"},
+-        "direction": {"type": "string", "minLength": 1, "description": "解決方向"},
+-        "steps": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "description": "處理步驟, in order"}
+-      }
+-    }
+-  }
+-}
+diff --git a/schemas/fleet-error-catalog-v2.schema.json b/schemas/fleet-error-catalog-v2.schema.json
+new file mode 100644
+index 0000000..acec714
+--- /dev/null
++++ b/schemas/fleet-error-catalog-v2.schema.json
+@@ -0,0 +1,270 @@
++{
++  "$schema": "http://json-schema.org/draft-07/schema#",
++  "$id": "https://github.com/bcup02/trade-alerts/schemas/fleet-error-catalog-v2.schema.json",
++  "title": "Fleet error catalog v2",
++  "description": "One entry per operator-visible error condition in the trading fleet: what the code does today, whether a human could decide anything different, which risk tier that puts it in, and which phase the change lands in.",
++  "type": "object",
++  "required": [
++    "catalog_version",
++    "risk_tiers",
++    "projects",
++    "entries",
++    "retired_codes"
++  ],
++  "additionalProperties": false,
++  "properties": {
++    "catalog_version": {
++      "const": "fleet-error-catalog/v2"
++    },
++    "generated_for_phase": {
++      "type": "integer",
++      "minimum": 0
++    },
++    "note": {
++      "type": "string"
++    },
++    "risk_tiers": {
++      "type": "object",
++      "description": "R0..R3, from 'log only' to 'a human must act'. Keys are fixed; the descriptions are the authoritative definition. v2 (2026-09-18) replaced v1's five tiers.",
++      "required": [
++        "R0",
++        "R1",
++        "R2",
++        "R3"
++      ],
++      "additionalProperties": false,
++      "patternProperties": {
++        "^R[0-3]$": {
++          "type": "object",
++          "required": [
++            "label",
++            "notifies",
++            "auto_executes",
++            "description"
++          ],
++          "additionalProperties": false,
++          "properties": {
++            "label": {
++              "type": "string"
++            },
++            "notifies": {
++              "type": "boolean",
++              "description": "Can reach a human. For R2 only once it escalates."
++            },
++            "auto_executes": {
++              "type": "boolean"
++            },
++            "escalate_after": {
++              "type": "integer",
++              "minimum": 1,
++              "description": "R2 only: consecutive failed automatic attempts before escalating."
++            },
++            "description": {
++              "type": "string"
++            }
++          }
++        }
++      }
++    },
++    "projects": {
++      "type": "object",
++      "description": "Project key -> repository name. Keys match ops-notify's target keys so a catalog entry can be joined to a notification axis without a second mapping table.",
++      "minProperties": 1,
++      "additionalProperties": {
++        "type": "string"
++      }
++    },
++    "entries": {
++      "type": "array",
++      "minItems": 1,
++      "items": {
++        "$ref": "#/definitions/entry"
++      }
++    },
++    "retired_codes": {
++      "type": "array",
++      "description": "Codes that were published (or emitted) and must never be reused for a different condition.",
++      "items": {
++        "type": "object",
++        "required": [
++          "code",
++          "retired_in",
++          "reason"
++        ],
++        "additionalProperties": false,
++        "properties": {
++          "code": {
++            "type": "string",
++            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
++          },
++          "retired_in": {
++            "type": "string"
++          },
++          "reason": {
++            "type": "string",
++            "minLength": 1
++          }
++        }
++      }
++    }
++  },
++  "definitions": {
++    "entry": {
++      "type": "object",
++      "required": [
++        "code",
++        "title",
++        "project",
++        "sources",
++        "current",
++        "verdict",
++        "risk_tier",
++        "auto_action",
++        "human_action",
++        "resume",
++        "lands_in_phase",
++        "rationale",
++        "operator_message"
++      ],
++      "additionalProperties": false,
++      "properties": {
++        "code": {
++          "type": "string",
++          "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$",
++          "description": "Stable fleet-wide identifier: <project prefix>.<CONDITION>. Never reused for a different condition once published."
++        },
++        "title": {
++          "type": "string",
++          "minLength": 1
++        },
++        "project": {
++          "type": "string",
++          "minLength": 1
++        },
++        "sources": {
++          "type": "array",
++          "minItems": 1,
++          "items": {
++            "type": "string",
++            "pattern": ".+:[0-9]+$"
++          },
++          "description": "file:line of every call site this condition is raised from. Repo-relative, except 'fleet' entries which are repo-qualified."
++        },
++        "current": {
++          "type": "object",
++          "description": "What the code does TODAY, before any phase-4+ change.",
++          "required": [
++            "latch",
++            "notify",
++            "unit_exit"
++          ],
++          "additionalProperties": false,
++          "properties": {
++            "latch": {
++              "type": [
++                "string",
++                "null"
++              ],
++              "description": "Current latch reason string, or null when this condition does not latch."
++            },
++            "notify": {
++              "type": [
++                "string",
++                "null"
++              ],
++              "description": "Current notification event name plus its severity, or null when no notifier exists."
++            },
++            "unit_exit": {
++              "type": [
++                "integer",
++                "null"
++              ],
++              "description": "Non-zero process exit code used as a second notification channel, or null."
++            }
++          }
++        },
++        "verdict": {
++          "enum": [
++            "MECHANICAL",
++            "JUDGEMENT"
++          ],
++          "description": "Answer to the project's governing test: does this error let a human make a decision different from what automation would do anyway? No -> MECHANICAL."
++        },
++        "risk_tier": {
++          "enum": [
++            "R0",
++            "R1",
++            "R2",
++            "R3"
++          ]
++        },
++        "auto_action": {
++          "type": "string",
++          "minLength": 1
++        },
++        "human_action": {
++          "type": "string",
++          "minLength": 1
++        },
++        "resume": {
++          "enum": [
++            "automatic",
++            "two_stage_fingerprint",
++            "restart_after_config_fix",
++            "n/a"
++          ],
++          "description": "How a latch for this condition is cleared. 'two_stage_fingerprint' is momentum's existing gate: --confirm must match the live latch fingerprint, and a matching ledger row makes a second clear a no-op."
++        },
++        "lands_in_phase": {
++          "type": "integer",
++          "minimum": 3,
++          "maximum": 8,
++          "description": "Phase the target behaviour (auto_action/human_action) lands in. 8 = v2 tier behaviour rolled out per strategy; whether a strategy actually does it yet is tracked in the fleet rollout registry."
++        },
++        "rationale": {
++          "type": "string",
++          "minLength": 1
++        },
++        "operator_message": {
++          "$ref": "#/definitions/operator_message"
++        }
++      }
++    },
++    "operator_message": {
++      "type": "object",
++      "description": "Plain-language text for the operator: what happened, which way the fix goes, the concrete steps, and (required on R2/R3, enforced by tests) an ai_prompt to paste to an AI to trace the root cause. Every entry has one; it is also the source of the generated risk register page.",
++      "required": [
++        "what",
++        "direction",
++        "steps"
++      ],
++      "additionalProperties": false,
++      "properties": {
++        "what": {
++          "type": "string",
++          "minLength": 1,
++          "description": "發生什麼事"
++        },
++        "direction": {
++          "type": "string",
++          "minLength": 1,
++          "description": "解決方向"
++        },
++        "steps": {
++          "type": "array",
++          "minItems": 1,
++          "items": {
++            "type": "string",
++            "minLength": 1
++          },
++          "description": "處理步驟, in order"
++        },
++        "ai_prompt": {
++          "type": "string",
++          "minLength": 1,
++          "description": "給 AI 的根因追查指令. The notification appends the event's own identifiers and evidence."
++        }
++      }
++    }
++  }
++}
+diff --git a/schemas/fleet-event-log-v1.schema.json b/schemas/fleet-event-log-v1.schema.json
+index 044b524..9edf56e 100644
+--- a/schemas/fleet-event-log-v1.schema.json
++++ b/schemas/fleet-event-log-v1.schema.json
+@@ -24,7 +24,7 @@
+     "summary": {"type": "string"},
+     "risk_tier": {
+       "description": "The catalog tier as resolved when the event was written, or null when the writer did not resolve one. Recorded for audit only; this log never decides a tier.",
+-      "oneOf": [{"type": "null"}, {"enum": ["R0", "R1", "R2", "R3", "R4"]}]
++      "oneOf": [{"type": "null"}, {"enum": ["R0", "R1", "R2", "R3"]}]
+     },
+     "evidence": {
+       "type": "object",
+diff --git a/schemas/fleet-ops-export-v1.schema.json b/schemas/fleet-ops-export-v1.schema.json
+deleted file mode 100644
+index 140c4c8..0000000
+--- a/schemas/fleet-ops-export-v1.schema.json
++++ /dev/null
+@@ -1,51 +0,0 @@
+-{
+-  "$schema": "http://json-schema.org/draft-07/schema#",
+-  "$id": "https://github.com/bcup02/trade-alerts/schemas/fleet-ops-export-v1.schema.json",
+-  "title": "Fleet ops export v1",
+-  "description": "One strategy's snapshot of what its operator should hear about, rewritten whole by trade_alerts.ops_export.write_ops_export into the strategy's audit/ops_export.json and relayed by ops-notify. notices are the notifying (R1-R4) fleet events of the last window_days, keyed by event_id so a reader sends each exactly once; open_requests is every still-open error request.",
+-  "type": "object",
+-  "required": ["export_version", "project", "generated_at", "window_days", "notices", "open_requests"],
+-  "additionalProperties": false,
+-  "properties": {
+-    "export_version": {"const": "fleet-ops-export/v1"},
+-    "project": {"type": "string", "enum": ["seykota", "momentum", "mycrypto", "btc-competition", "fleet"]},
+-    "generated_at": {"type": "string", "format": "date-time", "description": "UTC; a reader treats an export that stops refreshing as STALE."},
+-    "window_days": {"type": "integer", "minimum": 1},
+-    "notices": {
+-      "type": "array",
+-      "items": {
+-        "type": "object",
+-        "required": ["event_id", "recorded_at", "code", "risk_tier", "critical", "text"],
+-        "additionalProperties": false,
+-        "properties": {
+-          "event_id": {"type": "string", "minLength": 1},
+-          "recorded_at": {"type": ["string", "null"]},
+-          "code": {"type": "string", "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"},
+-          "risk_tier": {"enum": ["R1", "R2", "R3", "R4"]},
+-          "critical": {"type": "boolean", "description": "true exactly when risk_tier is R4."},
+-          "text": {"type": "string", "minLength": 1, "description": "Complete plain-language message body; the reader adds only the strategy label and times."}
+-        }
+-      }
+-    },
+-    "open_requests": {
+-      "type": "array",
+-      "items": {
+-        "type": "object",
+-        "required": ["request_id", "fingerprint", "code", "risk_tier", "opened_at", "summary", "what", "direction", "steps", "handling_started_at"],
+-        "additionalProperties": false,
+-        "properties": {
+-          "request_id": {"type": "string", "minLength": 1},
+-          "fingerprint": {"type": "string", "minLength": 1},
+-          "code": {"type": "string", "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"},
+-          "risk_tier": {"enum": ["R1", "R2", "R3", "R4"]},
+-          "opened_at": {"type": "string"},
+-          "summary": {"type": "string"},
+-          "what": {"type": ["string", "null"], "description": "Catalog operator_message.what, or null when the entry has none yet."},
+-          "direction": {"type": ["string", "null"]},
+-          "steps": {"type": "array", "items": {"type": "string"}},
+-          "handling_started_at": {"type": ["string", "null"], "description": "Always null in this version; Phase 7e sets it when an operator presses 開始處理."}
+-        }
+-      }
+-    }
+-  }
+-}
+diff --git a/schemas/fleet-ops-export-v2.schema.json b/schemas/fleet-ops-export-v2.schema.json
+new file mode 100644
+index 0000000..29b8fce
+--- /dev/null
++++ b/schemas/fleet-ops-export-v2.schema.json
+@@ -0,0 +1,165 @@
++{
++  "$schema": "http://json-schema.org/draft-07/schema#",
++  "$id": "https://github.com/bcup02/trade-alerts/schemas/fleet-ops-export-v2.schema.json",
++  "title": "Fleet ops export v2",
++  "description": "One strategy's snapshot of what its operator should hear about, rewritten whole by trade_alerts.ops_export.write_ops_export into the strategy's audit/ops_export.json and relayed by ops-notify. notices are the fleet events that need a human (every R3, and R2 only once escalated -- fleet-error-catalog/v2) of the last window_days, keyed by event_id so a reader sends each exactly once; open_requests is every still-open error request.",
++  "type": "object",
++  "required": [
++    "export_version",
++    "project",
++    "generated_at",
++    "window_days",
++    "notices",
++    "open_requests"
++  ],
++  "additionalProperties": false,
++  "properties": {
++    "export_version": {
++      "const": "fleet-ops-export/v2"
++    },
++    "project": {
++      "type": "string",
++      "enum": [
++        "seykota",
++        "momentum",
++        "mycrypto",
++        "btc-competition",
++        "fleet"
++      ]
++    },
++    "generated_at": {
++      "type": "string",
++      "format": "date-time",
++      "description": "UTC; a reader treats an export that stops refreshing as STALE."
++    },
++    "window_days": {
++      "type": "integer",
++      "minimum": 1
++    },
++    "notices": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": [
++          "event_id",
++          "recorded_at",
++          "code",
++          "risk_tier",
++          "critical",
++          "text"
++        ],
++        "additionalProperties": false,
++        "properties": {
++          "event_id": {
++            "type": "string",
++            "minLength": 1
++          },
++          "recorded_at": {
++            "type": [
++              "string",
++              "null"
++            ]
++          },
++          "code": {
++            "type": "string",
++            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
++          },
++          "risk_tier": {
++            "enum": [
++              "R2",
++              "R3"
++            ]
++          },
++          "critical": {
++            "type": "boolean",
++            "description": "true exactly when risk_tier is R3."
++          },
++          "text": {
++            "type": "string",
++            "minLength": 1,
++            "description": "Complete plain-language message body including, when the catalog has one, the AI root-cause prompt with this event's identifiers; the reader adds only the strategy label and times."
++          }
++        }
++      }
++    },
++    "open_requests": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": [
++          "request_id",
++          "fingerprint",
++          "code",
++          "risk_tier",
++          "opened_at",
++          "summary",
++          "what",
++          "direction",
++          "steps",
++          "ai_prompt",
++          "handling_started_at"
++        ],
++        "additionalProperties": false,
++        "properties": {
++          "request_id": {
++            "type": "string",
++            "minLength": 1
++          },
++          "fingerprint": {
++            "type": "string",
++            "minLength": 1
++          },
++          "code": {
++            "type": "string",
++            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
++          },
++          "risk_tier": {
++            "enum": [
++              "R2",
++              "R3"
++            ]
++          },
++          "opened_at": {
++            "type": "string"
++          },
++          "summary": {
++            "type": "string"
++          },
++          "what": {
++            "type": [
++              "string",
++              "null"
++            ],
++            "description": "Catalog operator_message.what, or null when the entry has none yet."
++          },
++          "direction": {
++            "type": [
++              "string",
++              "null"
++            ]
++          },
++          "steps": {
++            "type": "array",
++            "items": {
++              "type": "string"
++            }
++          },
++          "handling_started_at": {
++            "type": [
++              "string",
++              "null"
++            ],
++            "description": "Always null in this version; Phase 7e sets it when an operator presses 開始處理."
++          },
++          "ai_prompt": {
++            "type": [
++              "string",
++              "null"
++            ],
++            "description": "Catalog operator_message.ai_prompt, or null."
++          }
++        }
++      }
++    }
++  }
++}
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 07bd72b..38f299f 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -45,6 +45,7 @@ from .ops_export import (
+     NOTIFYING_TIERS,
+     OPS_EXPORT_VERSION,
+     build_ops_export,
++    needs_human,
+     render_notice_text,
+     write_ops_export,
+ )
+@@ -207,6 +208,7 @@ __all__ = [
+     "NOTIFYING_TIERS",
+     "OPS_EXPORT_VERSION",
+     "build_ops_export",
++    "needs_human",
+     "render_notice_text",
+     "write_ops_export",
+     "FINGERPRINT_LENGTH",
+@@ -275,4 +277,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.18.1"
++__version__ = "0.19.0"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v1.json b/src/trade_alerts/catalog/fleet-error-catalog-v1.json
+deleted file mode 100644
+index e0ab2e3..0000000
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v1.json
++++ /dev/null
+@@ -1,757 +0,0 @@
+-{
+-  "catalog_version": "fleet-error-catalog/v1",
+-  "generated_for_phase": 3,
+-  "note": "Authoritative classification of every operator-visible error path that survived Phase 2. Consumed by trade_alerts.fleet_event_log (Phase 4a: risk_tier_for / catalog_entry) and trade_alerts.error_request_queue. 'current' describes the code as of the Phase 3 merge -- entries whose lands_in_phase is 3 are already in that state; everything later still shows the behaviour Phase 4+ will change. Prose rationale lives in docs/fleet-error-catalog.md.",
+-  "risk_tiers": {
+-    "R0": {
+-      "label": "LOG",
+-      "notifies": false,
+-      "auto_executes": false,
+-      "audit_notice": false,
+-      "description": "Event log only. The action after detection is fixed, so a notification produces no decision a human could make differently."
+-    },
+-    "R1": {
+-      "label": "PROPOSE",
+-      "notifies": true,
+-      "auto_executes": false,
+-      "audit_notice": false,
+-      "description": "Notify (LINE) only once a concrete remedy has been computed, and attach it as a proposal. Never executed without a human."
+-    },
+-    "R2": {
+-      "label": "AUTO_LOW",
+-      "notifies": false,
+-      "auto_executes": true,
+-      "audit_notice": true,
+-      "description": "Low risk: execute the remedy automatically, record it in the event log afterwards, and send an after-the-fact audit notice. The notice asks nothing of the reader -- it reports what already happened -- so it is not a decision request and does not make this a notifying tier."
+-    },
+-    "R3": {
+-      "label": "AUTO_TIMEOUT",
+-      "notifies": true,
+-      "auto_executes": true,
+-      "audit_notice": false,
+-      "description": "Medium risk: open a request, offer a Telegram button to approve early, and execute anyway once the timeout expires."
+-    },
+-    "R4": {
+-      "label": "HUMAN_REQUIRED",
+-      "notifies": true,
+-      "auto_executes": false,
+-      "audit_notice": false,
+-      "description": "High risk: repeat the notification until a human acts. Never auto-executed."
+-    }
+-  },
+-  "projects": {
+-    "seykota": "ed-seykota-systematic-trend-following",
+-    "momentum": "mexc-4h-momentum-trailing-stop",
+-    "mycrypto": "my-crypto-bot",
+-    "btc-competition": "btc-bull-market-competition",
+-    "fleet": "(cross-repo: same condition implemented in every strategy)"
+-  },
+-  "entries": [
+-    {
+-      "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
+-      "title": "開倉後停損掛單失敗，緊急市價平倉成功",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:513",
+-        "src/seykota_bot/bot.py:521",
+-        "src/seykota_bot/bot.py:525"
+-      ],
+-      "current": {
+-        "latch": "protective_stop_failed",
+-        "notify": "PROTECTIVE_STOP_FAILED (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R2",
+-      "auto_action": "部位已經平掉，交易所上沒有無保護曝險；自動清除 latch 並讓下一輪重新評估進場。",
+-      "human_action": "無。事後在事件日誌看得到。",
+-      "resume": "automatic",
+-      "lands_in_phase": 4,
+-      "rationale": "現行程式把緊急平倉成功與失敗兩種結果收斂成同一個 latch 原因碼。平倉成功時真倉沒有任何未保護部位，人來看也只會做同一件事（確認已平、放行），符合判準的「沒有第二個選項」。"
+-    },
+-    {
+-      "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
+-      "title": "停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:524",
+-        "src/seykota_bot/bot.py:525"
+-      ],
+-      "current": {
+-        "latch": "protective_stop_failed",
+-        "notify": "EMERGENCY_FLATTEN_FAILED (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "維持 latch，停止新增風險。不自動下任何單。",
+-      "human_action": "立即到交易所核對部位與委託，手動平倉或補掛保護單後再解除 latch。",
+-      "resume": "two_stage_fingerprint",
+-      "lands_in_phase": 4,
+-      "rationale": "真倉存在沒有停損保護的部位，而且程式自己的補救手段已經失敗過一次。這是全機隊風險最高的一類，任何自動動作都可能把情況弄得更糟。"
+-    },
+-    {
+-      "code": "SEY.PROTECTION_REPLACE_FAILED",
+-      "title": "移動停損換單失敗，舊停損單已取消，部位目前無交易所端保護",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:574",
+-        "src/seykota_bot/bot.py:575"
+-      ],
+-      "current": {
+-        "latch": "protective_stop_replace_failed",
+-        "notify": "PROTECTIVE_STOP_FAILED (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R3",
+-      "auto_action": "逾時後自動以原停損價重掛一張保護單；成功即清除 latch。",
+-      "human_action": "Telegram 按鈕可提早核准重掛，或選擇手動處理。",
+-      "resume": "two_stage_fingerprint",
+-      "lands_in_phase": 6,
+-      "rationale": "重掛保護單的動作內容是完全確定的（同一個部位、同一個停損價），my-crypto 對同一情境本來就是「下一輪自動重試而且不停機」。但 seykota 是真倉且換單當下部位裸露，所以給逾時自動執行而非立即自動執行。"
+-    },
+-    {
+-      "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
+-      "title": "換單時舊停損單取消失敗，可能殘留在交易所",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:593"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "PROTECTIVE_STOP_ORPHAN (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R1",
+-      "auto_action": "查詢交易所現存委託、比對出確切的孤兒單編號，把「取消這一張」寫成提案。不自動送出取消。",
+-      "human_action": "看提案確認那張單確實是孤兒後核准取消。",
+-      "resume": "n/a",
+-      "lands_in_phase": 5,
+-      "rationale": "自動取消一張「以為是孤兒」的委託，若判斷錯誤就是把正在保護部位的停損單拿掉。提案內容可以算得很精確，但執行權留給人。"
+-    },
+-    {
+-      "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
+-      "title": "平倉後停損單取消失敗，可能還掛在交易所",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:607"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "PROTECTIVE_STOP_CANCEL_FAILED (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R1",
+-      "auto_action": "同上：算出確切的殘留單編號並寫成取消提案。",
+-      "human_action": "核准取消，或確認該單已自行失效。",
+-      "resume": "n/a",
+-      "lands_in_phase": 5,
+-      "rationale": "跟 SEY.PROTECTION_ORPHAN_CANCEL_FAILED 同一個風險形狀，只是發生在平倉之後。部位已平時風險較低，但誤取消仍可能影響下一個部位的保護。"
+-    },
+-    {
+-      "code": "SEY.PROTECTION_UNVERIFIED",
+-      "title": "交易所存在部位，但沒有可唯一確認的原生保護單",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:726"
+-      ],
+-      "current": {
+-        "latch": "exchange_position_protection_unverified",
+-        "notify": "SAFE_HALT (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "維持 latch，不重建執行期狀態、不新增風險。",
+-      "human_action": "到交易所核對部位與保護單，補掛或釐清後解除 latch。",
+-      "resume": "two_stage_fingerprint",
+-      "lands_in_phase": 4,
+-      "rationale": "「找不到唯一保護單」可能是零張（部位裸露）也可能是多張（互相衝突），兩者的正確處置相反，程式無法自行判斷。與 MOM.PROTECTION_UNVERIFIED 是同一個條件的兩份實作。"
+-    },
+-    {
+-      "code": "SEY.POSITION_AMBIGUOUS",
+-      "title": "交易所部位資料無法唯一辨識",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:819"
+-      ],
+-      "current": {
+-        "latch": "exchange_position_ambiguous",
+-        "notify": "SAFE_HALT (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "維持 latch。",
+-      "human_action": "人工核對交易所部位後解除。",
+-      "resume": "two_stage_fingerprint",
+-      "lands_in_phase": 4,
+-      "rationale": "策略對自己管的是哪一個部位失去把握，任何自動動作都可能作用在錯的部位上。"
+-    },
+-    {
+-      "code": "SEY.RECONCILE_FAILED",
+-      "title": "非暫時性的持倉同步失敗",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:844"
+-      ],
+-      "current": {
+-        "latch": "reconcile_error",
+-        "notify": "SAFE_HALT (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R3",
+-      "auto_action": "先記事件、寫 DEGRADED heartbeat、下一輪重試；連續 N 次（預設 3）同類失敗才 latch。",
+-      "human_action": "Telegram 按鈕可提早重試，或手動處理。",
+-      "resume": "two_stage_fingerprint",
+-      "lands_in_phase": 4,
+-      "rationale": "Phase 1c 已把暫時性網路錯誤從這條路徑扣掉，但剩下的（解析失敗、交易所回傳非預期結構）在實務上仍多半是一次性的——2026-09-11 的 venv 競態事故就是從這裡 latch 的。單次失敗停掉整支真倉策略的代價，高於多等一輪的代價。"
+-    },
+-    {
+-      "code": "SEY.EXCHANGE_TARGET_UNSAFE",
+-      "title": "執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:1313"
+-      ],
+-      "current": {
+-        "latch": "exchange_target_unsafe",
+-        "notify": "SAFE_HALT (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "維持 latch，拒絕所有策略操作。",
+-      "human_action": "改設定檔／環境變數後重啟。",
+-      "resume": "restart_after_config_fix",
+-      "lands_in_phase": 4,
+-      "rationale": "設定錯誤只有人能改，而且這個守衛擋的正是「把模擬單打到真倉」。自動放行等於把安全閥拆掉。"
+-    },
+-    {
+-      "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+-      "title": "真倉固定訂單識別能力不足",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:1320"
+-      ],
+-      "current": {
+-        "latch": "fixed_identifier_contract_unavailable",
+-        "notify": "SAFE_HALT (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "維持 latch，拒絕所有 LIVE 策略操作。",
+-      "human_action": "確認交易所帳號權限／API 契約後重啟。",
+-      "resume": "restart_after_config_fix",
+-      "lands_in_phase": 4,
+-      "rationale": "沒有固定訂單識別就無法在事後把委託對回自己的部位，等於失去所有事後對帳能力。屬於憑證／權限層面，程式改不了。"
+-    },
+-    {
+-      "code": "SEY.RUNTIME_CYCLE_FAILED",
+-      "title": "未分類的執行期例外（run_forever catch-all）",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:1376"
+-      ],
+-      "current": {
+-        "latch": "runtime_error",
+-        "notify": "SAFE_HALT (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R3",
+-      "auto_action": "記事件、寫 DEGRADED heartbeat、下一輪重試；連續 N 次（預設 3）才 latch。latch 之後走跟其他原因碼一致的 resume 路徑。",
+-      "human_action": "Telegram 按鈕可提早解除，或看事件日誌決定是不是真的要人介入。",
+-      "resume": "two_stage_fingerprint",
+-      "lands_in_phase": 4,
+-      "rationale": "這是本專案的核心工作項：一個桶子同時裝著純暫時性狀況與真正的災難，而且立刻 latch、沒有 resume 路徑。改成計數器後，暫時性抖動不再靜默停掉真倉策略，持續性故障仍然會停。其他七個原因碼在這兩處之前就已經各自 latch，不受計數器影響；SEY.RECONCILE_FAILED 額外套用同一套計數器邏輯（各自獨立計數，見該條目）。"
+-    },
+-    {
+-      "code": "SEY.CLOSE_FILL_PENDING",
+-      "title": "交易所部位已消失，等待平倉成交資料回填",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:1020"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "CLOSE_FILL_PENDING (log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R0",
+-      "auto_action": "本地標記為 FLAT，等下一輪把成交資料補回帳本。程式已經這樣做。",
+-      "human_action": "無。",
+-      "resume": "n/a",
+-      "lands_in_phase": 3,
+-      "rationale": "原生停損在兩次輪詢之間觸發是預期內的正常結束方式，程式自己就會收斂。標成 critical 純屬誤標，Phase 3 直接降級。"
+-    },
+-    {
+-      "code": "SEY.TRADE_EXIT",
+-      "title": "原生停損觸發的正常平倉",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:1054"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "EXIT (log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R0",
+-      "auto_action": "記錄成交並結算，程式已經這樣做。",
+-      "human_action": "無。",
+-      "resume": "n/a",
+-      "lands_in_phase": 3,
+-      "rationale": "這是策略成功運作的樣子，不是錯誤。同一支程式在 bot.py:1230 的另一個 EXIT 呼叫點就沒有標 critical，兩處不一致，Phase 3 對齊成非 critical。"
+-    },
+-    {
+-      "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
+-      "title": "權益低於最低下單資金，跳過本次進場",
+-      "project": "seykota",
+-      "sources": [
+-        "src/seykota_bot/bot.py:1131"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "ENTRY_SKIPPED (log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R0",
+-      "auto_action": "跳過本次進場，下次訊號再評估。程式已經這樣做。",
+-      "human_action": "無。（要不要加碼本金是投資決策，不是錯誤處理。）",
+-      "resume": "n/a",
+-      "lands_in_phase": 3,
+-      "rationale": "部位大小算出來是 0 張時不進場，是風險控制正常生效。Phase 3 降級。"
+-    },
+-    {
+-      "code": "MOM.PROTECTION_UNVERIFIED",
+-      "title": "原生移動停損無法驗證",
+-      "project": "momentum",
+-      "sources": [
+-        "src/strategy.py:1295",
+-        "src/strategy.py:1331",
+-        "src/strategy.py:1718",
+-        "src/strategy.py:1053"
+-      ],
+-      "current": {
+-        "latch": "PROTECTION_UNVERIFIED",
+-        "notify": null,
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "維持 latch（DRY_RUN 下刻意忽略，見 strategy.py:1158）。",
+-      "human_action": "核對交易所委託後以 safe_halt_resume 解除。",
+-      "resume": "two_stage_fingerprint",
+-      "lands_in_phase": 4,
+-      "rationale": "與 SEY.PROTECTION_UNVERIFIED 同一條件。momentum 是全機隊唯一有完整 latch 模型（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram 中繼）的實作，Phase 4 以它為統一基準。"
+-    },
+-    {
+-      "code": "MOM.STATE_REPAIRED_SAFE_HALT",
+-      "title": "工具修復本地 state 後主動 latch，等人明確解除",
+-      "project": "momentum",
+-      "sources": [
+-        "src/safe_halt_state_repair.py:144"
+-      ],
+-      "current": {
+-        "latch": "state_repaired_safe_halt",
+-        "notify": null,
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "無——這條路徑本來就是人工工具寫進去的。",
+-      "human_action": "核對歷史平倉無誤後以 safe_halt_resume 解除。",
+-      "resume": "two_stage_fingerprint",
+-      "lands_in_phase": 4,
+-      "rationale": "唯一一個「刻意設計成要人來解除」的 latch，保留原樣。它同時是既有 resume 路徑的實證：這套 fingerprint 兩階段閘門已經在真倉用過。"
+-    },
+-    {
+-      "code": "MOM.RUNTIME_CYCLE_FAILED",
+-      "title": "run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）",
+-      "project": "momentum",
+-      "sources": [
+-        "src/main.py:329"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": null,
+-        "unit_exit": null
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R0",
+-      "auto_action": "寫 ERROR heartbeat，下一輪重試。程式已經這樣做。",
+-      "human_action": "無（第四軸的 ERROR 會讓 ops-notify 自行升級）。",
+-      "resume": "automatic",
+-      "lands_in_phase": 3,
+-      "rationale": "momentum 對 catch-all 的處置正是 seykota 要改成的樣子，列進目錄當作對照基準。"
+-    },
+-    {
+-      "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+-      "title": "無歧義的孤兒平倉已自動補寫進帳本",
+-      "project": "momentum",
+-      "sources": [
+-        "scripts/repair_bot.py:228"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "VERIFIED_CLOSE_AUTO_REPAIRED (critical=False，事後稽核通知)",
+-        "unit_exit": null
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R2",
+-      "auto_action": "MOMENTUM_REPAIR_AUTO_APPLY=true 且 assess_auto_repair 判定無歧義（本輪候選恰好 1、交易所已無部位、成交全為多單 SELL 且不早於 trade_open、帳本無修復痕跡、本地毛損益與交易所已實現損益差額 ≤ 0.01）時：證據檔落地、開 R2 請求、以 momentum 自己的 TradeLedger staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、請求標 RESOLVED_AUTO，事後發稽核通知。一輪最多一筆。",
+-      "human_action": "無需決定。稽核通知只告知已寫入的交易與金額；證據檔、事件日誌與請求佇列（RESOLVED_AUTO）留有完整紀錄。投影排隊失敗時通知附 queue_projection_intent.py 補救指令。",
+-      "resume": "n/a",
+-      "lands_in_phase": 6,
+-      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平空、且本地算出的毛損益與交易所回報的已實現損益差額在容忍內，人來看也只會做同一件事——照交易所寫下去。沒有第二個選項，所以不該產生決策請求，只該產生一則事後稽核通知（§2.1）。開關預設關閉（關閉時一律走 MOM.VERIFIED_CLOSE_PROPOSED）。開關開啟時，判準不成立有兩條退路：帳本已留有這筆交易的修復痕跡（同 incident_id 或其他修復紀錄）轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED（R4，critical 停手、不重試）；其餘判準不成立（多筆同時分歧、非多單 SELL、成交早於開倉或缺時間戳、損益殘差超過容忍值、缺 trade_id／incident_id 等）退回 MOM.VERIFIED_CLOSE_PROPOSED，通知附上未自動修復的原因。整批寫入失敗或讀回驗證不過同樣轉去 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED。交易所上該 symbol 仍有部位、或證據結構不足以算出修復事件（build_repair_events 拋 VerifiedCloseError）時，在抓證據階段就中止（不記事件、不通知，下一輪再看），根本不會進入判準評估。",
+-      "operator_message": {
+-        "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，確認沒有任何模糊地帶，已經自動把這筆平倉補寫進帳本。",
+-        "direction": "不需要做任何決定。這是事後通知，讓你知道帳本剛剛被自動補寫過、補了什麼。",
+-        "steps": [
+-          "不需要任何動作。",
+-          "想核對的話：看下方的交易編號、出場價和損益，跟交易所 App 上這筆比一下。",
+-          "如果訊息最後有「Google 投影排入失敗」的提醒，照提醒裡附的那行指令補排一次，試算表才會出現這一列。"
+-        ]
+-      }
+-    },
+-    {
+-      "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+-      "title": "孤兒平倉已算出修復方案，附提案通知",
+-      "project": "momentum",
+-      "sources": [
+-        "scripts/repair_bot.py:128"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "VERIFIED_CLOSE_PROPOSED (critical=False)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R1",
+-      "auto_action": "不寫帳本。唯讀抓交易所證據、算出完整修復事件，記事件日誌後發一次附提案的通知；同一 trade_id 不重複提案、不重複查交易所。自動模式開啟但判準不成立時，通知附上未自動修復的原因。",
+-      "human_action": "核對提案後用手動流程（fetch_verified_close_evidence.py → append_reconciled_close.py → queue_projection_intent.py）寫入，或判定不修。",
+-      "resume": "n/a",
+-      "lands_in_phase": 5,
+-      "rationale": "補登 Phase 5 影子模式既有行為（該階段只在程式碼註解宣告 R1）。這條落在這裡代表機器沒把握：可能是自動模式關閉，也可能是有判準不成立（多筆同時分歧、損益對不上、證據缺時間戳等），這些情況照交易所寫下去不一定對，需要人決定。",
+-      "operator_message": {
+-        "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了這筆平倉。修復機器人已經從交易所抓到成交紀錄、算好應該補寫的內容，但沒有自動寫入——可能是自動修復開關沒開，也可能是有判斷條件不符合（原因會列在下方）。",
+-        "direction": "以交易所的成交紀錄為準，把這筆平倉補寫進本地帳本；如果核對後覺得提案內容不對，可以先不補。",
+-        "steps": [
+-          "核對下方提案：交易編號、數量、進場價、出場價、損益，跟交易所 App 上這筆的實際成交是否一致。",
+-          "一致的話，到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」的三步指令補寫（抓證據 → 寫入帳本 → 排 Google 投影），每一步都先預覽、確認無誤再加 --apply。",
+-          "不一致或有疑慮就先不要寫入；機器人不會對同一筆重複提案，之後再處理也可以。",
+-          "補寫完成後，下一輪對帳（約 15 分鐘內）會自動變回正常，不需要另外回報。"
+-        ]
+-      }
+-    },
+-    {
+-      "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+-      "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+-      "project": "momentum",
+-      "sources": [
+-        "scripts/repair_bot.py:153"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "VERIFIED_CLOSE_REPAIR_BLOCKED (critical=True)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "不寫、不重試。開 R4 請求、記事件日誌、發一次 critical 通知；此 trade_id 之後一律跳過。（「重複提醒直到有人處理」的節奏屬 Phase 7，本階段只發一次。）",
+-      "human_action": "檢查 audit/trading_ledger.jsonl 裡這筆交易是否留有半套修復，對照 audit/error_requests.jsonl 與 fleet_event_log.jsonl，手動收斂後關閉請求。",
+-      "resume": "n/a",
+-      "lands_in_phase": 6,
+-      "rationale": "帳本裡已有這筆交易的修復紀錄（例如先前寫到一半）或這次寫入無法驗證，代表真實帳本的狀態已經不是「乾淨的孤兒開倉」。此時自動補完後半段等於猜，而猜錯會重複或錯記真實損益——這正是必須交給人的情況。",
+-      "operator_message": {
+-        "what": "動能策略的修復機器人本來要把一筆漏記的平倉補進帳本，但發現帳本裡這筆交易已經有修復過的痕跡（可能之前補到一半），或是這次寫入失敗、無法確認寫進去的內容正確，所以立刻停手。機器人之後不會再自動碰這筆交易。",
+-        "direction": "由人確認帳本裡這筆交易現在的樣子：缺的補齊、重複的不要再加，最後讓帳本跟交易所的成交紀錄一致。交易所的成交紀錄是標準答案。",
+-        "steps": [
+-          "記下這則訊息裡的交易編號（trade_id）和事件編號（incident_id）。",
+-          "到電腦前打開 audit/trading_ledger.jsonl，搜尋這個 trade_id，看它目前有哪些紀錄：有沒有平倉（trade_close）、有沒有重複的補寫。",
+-          "對照交易所 App 上這筆的實際成交（價格、數量、時間）。",
+-          "如果只是還沒補：照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」的三步手動補寫。如果已經補了一半或有重複：先不要再寫入任何東西，請開發端協助收斂。",
+-          "處理完後，下一輪對帳（約 15 分鐘內）應該變回正常；沒變回來代表帳本還沒對齊。"
+-        ]
+-      }
+-    },
+-    {
+-      "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+-      "title": "出現負／不可能的餘額，本地帳本本身不可信",
+-      "project": "btc-competition",
+-      "sources": [
+-        "src/btc_competition/runner.py:282",
+-        "src/btc_competition/runner.py:332"
+-      ],
+-      "current": {
+-        "latch": "HOLDINGS_UNVERIFIED:negative",
+-        "notify": null,
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "維持 latch。",
+-      "human_action": "核對交易所餘額與本地帳本後以 btc-competition-resume 解除。",
+-      "resume": "two_stage_fingerprint",
+-      "lands_in_phase": 4,
+-      "rationale": "負餘額代表帳本折疊邏輯或交易所回傳出了根本性的錯，之後每一個以它為輸入的決策都不可信。"
+-    },
+-    {
+-      "code": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+-      "title": "連續 3 天該再平衡卻零成交",
+-      "project": "btc-competition",
+-      "sources": [
+-        "src/btc_competition/runner.py:301",
+-        "src/btc_competition/runner.py:332"
+-      ],
+-      "current": {
+-        "latch": "EXECUTION_BLOCKED:3 consecutive days with zero fills",
+-        "notify": null,
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R3",
+-      "auto_action": "逾時後自動重試一次完整再平衡（含重新取價、重算下單量）；成功即清除 latch。",
+-      "human_action": "Telegram 按鈕可提早重試；連續兩次自動重試都零成交則升級成 R4。",
+-      "resume": "two_stage_fingerprint",
+-      "lands_in_phase": 6,
+-      "rationale": "交易所連三天拒絕每一張單，最常見原因是最小下單量或精度規則變了（seykota 2026-08-21 就撞過 stepSize 變更）。重試一次的代價低，而且重試本身會揭露真正的拒絕理由。"
+-    },
+-    {
+-      "code": "BTC.REBALANCE_PENDING",
+-      "title": "部分成交，目標權重尚未達成",
+-      "project": "btc-competition",
+-      "sources": [
+-        "src/btc_competition/runner.py:297"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": null,
+-        "unit_exit": null
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R0",
+-      "auto_action": "記進 pending_target_weights，下一輪自動續做。程式已經這樣做。",
+-      "human_action": "無。",
+-      "resume": "automatic",
+-      "lands_in_phase": 3,
+-      "rationale": "未完成的再平衡不是錯誤，是還沒做完的事。btc 已經是全機隊唯一把「未完成」跟「故障」分開的實作。"
+-    },
+-    {
+-      "code": "BTC.RUNTIME_CYCLE_FAILED",
+-      "title": "runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）",
+-      "project": "btc-competition",
+-      "sources": [
+-        "src/btc_competition/runner.py:358"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": null,
+-        "unit_exit": null
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R0",
+-      "auto_action": "寫 ERROR heartbeat 後重新拋出，由 timer 隔天重試。程式已經這樣做。",
+-      "human_action": "無（第四軸的 ERROR 會讓 ops-notify 自行升級）。",
+-      "resume": "automatic",
+-      "lands_in_phase": 3,
+-      "rationale": "與 MOM.RUNTIME_CYCLE_FAILED 同一處置形狀。"
+-    },
+-    {
+-      "code": "MYC.RECONCILE_DELTA_EXCEEDED",
+-      "title": "本地帳本與交易所回報損益差額超過容忍值",
+-      "project": "mycrypto",
+-      "sources": [
+-        "mexc_futures_bot.py:713"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "fleet_event_log measurement (audit-only, never notifies)",
+-        "unit_exit": null
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R0",
+-      "auto_action": "以交易所為權威記錄差額，不改變交易行為。",
+-      "human_action": "無，永久不會升級。2026-09-15（Phase 4e）盤查 trading-main 真實帳本（momentum 連續 17 筆、my-crypto 唯一 1 筆有效資料）發現這個差額精確等於-(entry_fee + exit_fee)——交易所回報損益本來就是手續費前的毛數字，本地net_pnl 是手續費後的淨數字，相減從定義上就只會是負的手續費，不是任何異常訊號，聚合起來也永遠是同一個已知、良性的偏差。撤回原本「聚合偏離才升級成請求」的計畫：不建聚合邏輯，每筆持續寫進 fleet_event_log 純供稽核查閱。",
+-      "resume": "n/a",
+-      "lands_in_phase": 4,
+-      "rationale": "使用者已定調：交易所是權威資料，單筆差額的結論永遠是「以交易所為準」，包裝成錯誤不產生任何決策。這是整個專案範圍擴大的起點。Phase 3 改名（SAFE_HALT → RECONCILE_DELTA_EXCEEDED）並降 critical，因為現行名稱宣稱一個根本不存在的停機行為。 2026-09-15 補充：這個指標原本想抓的問題（本地價格記錄跟交易所現實脫節，會沿用進未來的移動停損計算）已經被同一支程式 2026-08-22 的另一個修正（`_fetch_order_info()` 改用交易所確認過的 `dealAvgPrice`/`totalFee` 入帳）從源頭堵住——這也是為什麼觀察到的差額 100% 只剩手續費、沒有任何殘留雜訊。Phase 4e 因此把 Phase 3 當時保留的「聚合偏離才升級」計畫撤回，改成單純寫入`trade_alerts.fleet_event_log`（見 §4.5），取代原本呼叫 `alerts.publish()`——後者在 my-crypto 端本來就已經是 2026-08-30 起的本地 no-op stub，這次替換純粹是把稽核紀錄放進機隊統一格式，不是關掉正在發送的通知。"
+-    },
+-    {
+-      "code": "MYC.RUNTIME_CYCLE_FAILED",
+-      "title": "未分類的執行期例外（catch-all）",
+-      "project": "mycrypto",
+-      "sources": [
+-        "mexc_futures_bot.py:1512"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "RUNTIME_CYCLE_FAILED (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R1",
+-      "auto_action": "下一輪自動重試（常駐模式既有行為）；連續 N 次才寫成請求。",
+-      "human_action": "看提案決定要不要介入。",
+-      "resume": "automatic",
+-      "lands_in_phase": 5,
+-      "rationale": "使用者定案 my-crypto 不加 latch：這條路徑本來就靠下一輪重試自癒，加停機行為只會替一支目前沒有這個概念的 LIVE bot 新增風險。Phase 3 只改名（SAFE_HALT → RUNTIME_CYCLE_FAILED），因為它從來不 halt。"
+-    },
+-    {
+-      "code": "MYC.PROTECTION_PLACEMENT_REJECTED",
+-      "title": "開倉停損單被交易所拒絕，部位可能沒有交易所端保護",
+-      "project": "mycrypto",
+-      "sources": [
+-        "mexc_futures_bot.py:1266"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "PROTECTION_PLACEMENT_REJECTED (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "不自動下單。",
+-      "human_action": "立即到交易所確認部位與保護單。",
+-      "resume": "n/a",
+-      "lands_in_phase": 5,
+-      "rationale": "交易所明確拒絕而不是連線失敗，代表下單參數本身有問題，重試同一張只會再被拒一次；而部位已經開了、正在裸露。五個共用 PROTECTIVE_STOP_FAILED 名稱的呼叫點裡風險最高的一個，Phase 3 先拆成各自的碼。"
+-    },
+-    {
+-      "code": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
+-      "title": "開倉後查不到部位資訊，無法掛停損單",
+-      "project": "mycrypto",
+-      "sources": [
+-        "mexc_futures_bot.py:1273"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "PROTECTION_PLACEMENT_NO_POSITION (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R3",
+-      "auto_action": "逾時後自動重查一次部位並補掛停損。",
+-      "human_action": "Telegram 按鈕可提早觸發重查。",
+-      "resume": "n/a",
+-      "lands_in_phase": 6,
+-      "rationale": "「查不到部位」多半是下單與查詢之間的時間差，重查一次就會出現，跟明確被拒絕是不同的東西——現行程式把兩者共用同一個事件名，看 log 的人分不出來。"
+-    },
+-    {
+-      "code": "MYC.PROTECTION_PLACEMENT_ERROR",
+-      "title": "掛停損單時拋出例外，部位本身已開",
+-      "project": "mycrypto",
+-      "sources": [
+-        "mexc_futures_bot.py:1279"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "PROTECTION_PLACEMENT_ERROR (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R4",
+-      "auto_action": "不自動下單。",
+-      "human_action": "立即到交易所確認部位與保護單狀態。",
+-      "resume": "n/a",
+-      "lands_in_phase": 5,
+-      "rationale": "例外發生時無法確定停損單到底送出去了沒有，自動重掛有掛成兩張的風險，自動不管則部位裸露。這正是需要人去看一眼交易所的情形。"
+-    },
+-    {
+-      "code": "MYC.PROTECTION_REPLACE_FAILED",
+-      "title": "搬移移動停損單失敗，交易所端目前沒有停損保護",
+-      "project": "mycrypto",
+-      "sources": [
+-        "mexc_futures_bot.py:1494",
+-        "mexc_futures_bot.py:1503"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "PROTECTION_REPLACE_FAILED (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R3",
+-      "auto_action": "下一輪本來就會自動重掛（程式已把失效 ID 清成 None）；連續 N 輪仍失敗才開請求並逾時升級。",
+-      "human_action": "Telegram 按鈕可提早介入。",
+-      "resume": "automatic",
+-      "lands_in_phase": 6,
+-      "rationale": "與 SEY.PROTECTION_REPLACE_FAILED 同一條件。my-crypto 現行實作（清掉失效 ID、下一輪重掛、不停機）本身是對的，缺的只是「連續失敗幾輪之後要有人知道」。"
+-    },
+-    {
+-      "code": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
+-      "title": "平倉後取消殘留停損單失敗",
+-      "project": "mycrypto",
+-      "sources": [
+-        "mexc_futures_bot.py:1427"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "PROTECTION_ORPHAN_CANCEL_FAILED (critical, log-only)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R1",
+-      "auto_action": "算出確切的殘留單編號寫成取消提案，不自動送出。",
+-      "human_action": "核准取消。",
+-      "resume": "n/a",
+-      "lands_in_phase": 5,
+-      "rationale": "與 SEY.PROTECTION_CLOSE_CANCEL_FAILED 同一條件、同一處置。"
+-    },
+-    {
+-      "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
+-      "title": "帳本↔交易所對帳 DIVERGED 時故意讓 unit 變紅（exit 2）",
+-      "project": "fleet",
+-      "sources": [
+-        "btc-bull-market-competition/src/btc_competition/reconcile_compare.py:213",
+-        "ed-seykota-systematic-trend-following/src/seykota_bot/reconcile/compare.py:251",
+-        "mexc-4h-momentum-trailing-stop/src/reconcile_compare.py:110",
+-        "my-crypto-bot/reconcile_compare.py:102"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": null,
+-        "unit_exit": 2
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R0",
+-      "auto_action": "維持寫出 ledger_status.json；由 ops-notify 的 ledger 軸負責升級與去抖。exit 改回 0。",
+-      "human_action": "無（LINE 告警已經送同一件事）。",
+-      "resume": "n/a",
+-      "lands_in_phase": 4,
+-      "rationale": "unit 變紅不提供 LINE 告警以外的任何決策，而且紅 unit 會在下次部署的健康檢查裡製造假訊號（Phase 2a 部署期間就撞到過）。偵測本身保留，只是不再用退出碼當第二套通知管道。"
+-    },
+-    {
+-      "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
+-      "title": "帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）",
+-      "project": "fleet",
+-      "sources": [
+-        "btc-bull-market-competition/src/btc_competition/reconcile_google.py:289",
+-        "ed-seykota-systematic-trend-following/src/seykota_bot/reconcile/google_reconcile.py:140",
+-        "mexc-4h-momentum-trailing-stop/src/google_reconcile.py:138",
+-        "my-crypto-bot/google_reconcile.py:137"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": null,
+-        "unit_exit": 3
+-      },
+-      "verdict": "MECHANICAL",
+-      "risk_tier": "R0",
+-      "auto_action": "維持寫出 google_reconcile_status.json；由 ops-notify 的 google 軸負責升級與去抖。exit 改回 0。",
+-      "human_action": "無（LINE 告警已經送同一件事）。",
+-      "resume": "n/a",
+-      "lands_in_phase": 4,
+-      "rationale": "與 FLEET.LEDGER_DIVERGED_UNIT_EXIT 同一理由。Google 表是投影目標而非權威來源，它落後帳本更不構成需要人介入的錯誤。"
+-    }
+-  ]
+-}
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+new file mode 100644
+index 0000000..51864e5
+--- /dev/null
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -0,0 +1,1037 @@
++{
++  "catalog_version": "fleet-error-catalog/v2",
++  "generated_for_phase": 3,
++  "note": "Authoritative classification of every operator-visible error condition in the fleet. v2 (2026-09-18) replaces v1's five tiers with four: R0 log / R1 auto, silent / R2 auto-retry, escalate after escalate_after consecutive failures / R3 human required. 'current' describes the code as it is today; auto_action/human_action describe the target behaviour, which lands in lands_in_phase -- whether a strategy actually does it yet is tracked per project in the fleet rollout registry, not here. operator_message is the plain-language text shown to the operator (and the source of the generated risk register page). Prose rationale lives in docs/fleet-error-catalog.md.",
++  "risk_tiers": {
++    "R0": {
++      "label": "LOG",
++      "notifies": false,
++      "auto_executes": false,
++      "description": "Event log only. The action after detection is fixed, so a notification produces no decision a human could make differently."
++    },
++    "R1": {
++      "label": "AUTO",
++      "notifies": false,
++      "auto_executes": true,
++      "description": "Executed automatically and recorded in the event log. No notification: there is no second option a human could choose, so telling them asks nothing of them."
++    },
++    "R2": {
++      "label": "RETRY_ESCALATE",
++      "notifies": true,
++      "auto_executes": true,
++      "escalate_after": 3,
++      "description": "The system tries to recover by itself. Only after escalate_after consecutive failed attempts does it escalate: open a request and notify once, with the plain-language steps and a prompt an AI can use to trace the root cause."
++    },
++    "R3": {
++      "label": "HUMAN_REQUIRED",
++      "notifies": true,
++      "auto_executes": false,
++      "description": "High risk: never executed automatically. Notify and keep reminding until a human acts."
++    }
++  },
++  "projects": {
++    "seykota": "ed-seykota-systematic-trend-following",
++    "momentum": "mexc-4h-momentum-trailing-stop",
++    "mycrypto": "my-crypto-bot",
++    "btc-competition": "btc-bull-market-competition",
++    "fleet": "(cross-repo: same condition implemented in every strategy)"
++  },
++  "entries": [
++    {
++      "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
++      "title": "開倉後停損掛單失敗，緊急市價平倉成功",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:513",
++        "src/seykota_bot/bot.py:521",
++        "src/seykota_bot/bot.py:525"
++      ],
++      "current": {
++        "latch": "protective_stop_failed",
++        "notify": "PROTECTIVE_STOP_FAILED (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R1",
++      "auto_action": "部位已經平掉，交易所上沒有無保護曝險；自動清除 latch 並讓下一輪重新評估進場。",
++      "human_action": "無。事後在事件日誌看得到。",
++      "resume": "automatic",
++      "lands_in_phase": 4,
++      "rationale": "現行程式把緊急平倉成功與失敗兩種結果收斂成同一個 latch 原因碼。平倉成功時真倉沒有任何未保護部位，人來看也只會做同一件事（確認已平、放行），符合判準的「沒有第二個選項」。",
++      "operator_message": {
++        "what": "開倉後想掛停損單失敗，但系統立刻用市價把這筆倉位整個平掉，而且成功了。",
++        "direction": "不需要做任何決定：倉位已經平掉，交易所上沒有沒保護的部位。系統會自己解除暫停，下一輪照常評估進場。",
++        "steps": [
++          "不需要任何動作。",
++          "想了解發生原因，可以看事件日誌裡這筆的紀錄。"
++        ]
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
++      "title": "停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:524",
++        "src/seykota_bot/bot.py:525"
++      ],
++      "current": {
++        "latch": "protective_stop_failed",
++        "notify": "EMERGENCY_FLATTEN_FAILED (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "維持 latch，停止新增風險。不自動下任何單。",
++      "human_action": "立即到交易所核對部位與委託，手動平倉或補掛保護單後再解除 latch。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 4,
++      "rationale": "真倉存在沒有停損保護的部位，而且程式自己的補救手段已經失敗過一次。這是全機隊風險最高的一類，任何自動動作都可能把情況弄得更糟。",
++      "operator_message": {
++        "what": "開倉後想掛停損單失敗，緊急用市價平倉也失敗——交易所上可能還留著完全沒有保護的真實倉位。",
++        "direction": "這是全機隊最嚴重的一種。系統已經停下來，不會自動下任何單。交易所上的實際部位是標準答案，要人立刻去處理。",
++        "steps": [
++          "立刻到交易所 App 查這個交易對有沒有倉位。",
++          "有倉位：手動平倉，或補掛一張停損單。",
++          "確認交易所上沒有沒保護的倉位。確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次「停損掛單失敗、緊急市價平倉也失敗」的根本原因：讀 src/seykota_bot/bot.py 開倉後掛保護單與緊急平倉的流程，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是下單規則、API 權限、餘額還是網路問題，說明交易所上現在的部位狀態該怎麼確認，並提出治本修正。"
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_REPLACE_FAILED",
++      "title": "移動停損換單失敗，舊停損單已取消，部位目前無交易所端保護",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:574",
++        "src/seykota_bot/bot.py:575"
++      ],
++      "current": {
++        "latch": "protective_stop_replace_failed",
++        "notify": "PROTECTIVE_STOP_FAILED (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "立刻以原停損價重掛一張保護單，最多連續嘗試 escalate_after 次；成功即清除 latch。全部失敗才升格：開請求、通知。",
++      "human_action": "收到升格通知時倉位仍沒有交易所端保護：到交易所補掛停損或平倉，再解除 latch。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 8,
++      "rationale": "重掛保護單的動作內容是完全確定的（同一個部位、同一個停損價），my-crypto 對同一情境本來就是「下一輪自動重試而且不停機」。v2（2026-09-18）取消 v1 的逾時等待：動作內容完全確定，多等只是延長部位裸露的時間，所以立即重掛；連續 3 次都失敗代表不是暫時狀況，才交給人。",
++      "operator_message": {
++        "what": "要把移動停損換到新價位，舊單已經取消，但新單沒掛上——這段時間倉位是沒有保護的。",
++        "direction": "系統會立刻用原本的停損價重掛一張保護單，最多試 3 次；3 次都失敗才通知你。收到通知代表倉位此刻仍沒有交易所端的停損保護，要盡快處理。",
++        "steps": [
++          "到交易所 App 確認這筆倉位目前有沒有停損單。",
++          "沒有的話，手動掛一張停損單（價格用訊息裡的停損價），或直接平倉。",
++          "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損換單失敗、且自動重掛也連續失敗的根本原因：讀 src/seykota_bot/bot.py 換單流程（取消舊單→掛新單）與重掛邏輯，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是價格／數量規則、API 錯誤還是網路問題，並提出治本修正。"
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
++      "title": "換單時舊停損單取消失敗，可能殘留在交易所",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:593"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "PROTECTIVE_STOP_ORPHAN (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "只取消系統自己在換單時記錄的那張舊單編號（不做推測比對），而且取消前先確認新的保護單已在交易所上；兩者都成立才自動重試取消，最多連續 escalate_after 次。任一條件不成立或全部失敗即升格：開請求、通知。",
++      "human_action": "到交易所手動取消那張殘留停損單。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "自動取消一張「以為是孤兒」的委託，若判斷錯誤就是把正在保護部位的停損單拿掉——這個風險是真的。v2（2026-09-18）的自動重試因此加兩道條件：只取消系統自己記錄的那張舊單編號，且取消前先確認新保護單已在交易所上；任一不成立就不取消、直接升格給人。在這兩道條件下取消的對象是確定的，才屬於「系統自動嘗試」而不是「猜」。",
++      "operator_message": {
++        "what": "換停損單時，舊單本該被取消卻取消失敗，可能還留在交易所上。",
++        "direction": "系統只會取消它自己記錄的那張舊停損單，而且會先確認新的保護單已經掛上才動手，最多試 3 次；條件不成立或都失敗才通知你。殘留的停損單如果被觸發，可能提早平掉目前的倉位。",
++        "steps": [
++          "到交易所 App 的委託清單找訊息裡那張停損單編號。",
++          "確認它不是目前倉位正在用的保護單後，手動取消。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查換單時舊停損單取消失敗、且自動重試也失敗的原因：讀 src/seykota_bot/bot.py 取消舊單的流程與錯誤處理，對照 journal 與交易所錯誤碼，判斷是單已不存在、權限還是 API 問題，並提出治本修正。"
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
++      "title": "平倉後停損單取消失敗，可能還掛在交易所",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:607"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "PROTECTIVE_STOP_CANCEL_FAILED (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "取消前先確認該交易對在交易所已無部位，只取消系統自己記錄的那張保護單編號並自動重試，最多連續 escalate_after 次；條件不成立或全部失敗即升格：開請求、通知。",
++      "human_action": "到交易所手動取消殘留停損單，或確認它已自行失效。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "跟 SEY.PROTECTION_ORPHAN_CANCEL_FAILED 同一個風險形狀，只是發生在平倉之後。部位已平時風險較低，但誤取消仍可能影響下一個部位的保護。 v2（2026-09-18）：自動重試只在確認交易所上已無部位時進行，且只取消系統自己記錄的那張保護單編號；條件不成立就直接升格。",
++      "operator_message": {
++        "what": "平倉後要收掉停損單卻收不掉，可能還掛著。",
++        "direction": "系統會先確認倉位真的已經平掉，再取消它自己記錄的那張停損單，最多試 3 次；條件不成立或都失敗才通知你。殘留的單通常不會成交，但留著可能在之後開新倉時造成誤判。",
++        "steps": [
++          "到交易所 App 的委託清單找訊息裡那張停損單編號。",
++          "還在的話手動取消；已經不在（自行失效）就不用處理。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查平倉後停損單取消失敗、且自動重試也失敗的原因：讀 src/seykota_bot/bot.py 平倉後清理保護單的流程，對照 journal 與交易所錯誤碼，並提出治本修正。"
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_UNVERIFIED",
++      "title": "交易所存在部位，但沒有可唯一確認的原生保護單",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:726"
++      ],
++      "current": {
++        "latch": "exchange_position_protection_unverified",
++        "notify": "SAFE_HALT (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "維持 latch，不重建執行期狀態、不新增風險。",
++      "human_action": "到交易所核對部位與保護單，補掛或釐清後解除 latch。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 4,
++      "rationale": "「找不到唯一保護單」可能是零張（部位裸露）也可能是多張（互相衝突），兩者的正確處置相反，程式無法自行判斷。與 MOM.PROTECTION_UNVERIFIED 是同一個條件的兩份實作。",
++      "operator_message": {
++        "what": "交易所上有倉位，但系統找不到能確定屬於這個倉位的停損單。",
++        "direction": "系統先停下來、不新增任何風險。交易所的實際委託是標準答案：要確認這個倉位有沒有、有幾張保護單。",
++        "steps": [
++          "到交易所 App 查這個交易對的倉位與委託清單。",
++          "沒有停損單：補掛一張；有多張：取消多餘的，只留一張。",
++          "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼系統無法唯一確認這個倉位的原生保護單：讀 src/seykota_bot/bot.py 的保護單核對邏輯（_verified_exchange_protective_stop 一帶），對照交易所目前的委託清單，判斷是保護單不存在、有多張、還是欄位對不上，並提出治本修正。"
++      }
++    },
++    {
++      "code": "SEY.POSITION_AMBIGUOUS",
++      "title": "交易所部位資料無法唯一辨識",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:819"
++      ],
++      "current": {
++        "latch": "exchange_position_ambiguous",
++        "notify": "SAFE_HALT (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "維持 latch。",
++      "human_action": "人工核對交易所部位後解除。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 4,
++      "rationale": "策略對自己管的是哪一個部位失去把握，任何自動動作都可能作用在錯的部位上。",
++      "operator_message": {
++        "what": "交易所回報的倉位資料，系統看不懂或認不出來是哪一筆。",
++        "direction": "系統停下來，等人確認交易所上的實際部位。交易所資料是標準答案。",
++        "steps": [
++          "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）。",
++          "如果有不該存在的倉位（例如手動開的），先處理掉。",
++          "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼交易所回報的部位無法唯一辨識：讀 src/seykota_bot/bot.py 的 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了，並提出治本修正。"
++      }
++    },
++    {
++      "code": "SEY.RECONCILE_FAILED",
++      "title": "非暫時性的持倉同步失敗",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:844"
++      ],
++      "current": {
++        "latch": "reconcile_error",
++        "notify": "SAFE_HALT (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "記事件、寫 DEGRADED heartbeat、下一輪重試；連續 escalate_after 次同類失敗才升格：latch 並通知。",
++      "human_action": "確認交易所連線與金鑰正常後解除 latch。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 4,
++      "rationale": "Phase 1c 已把暫時性網路錯誤從這條路徑扣掉，但剩下的（解析失敗、交易所回傳非預期結構）在實務上仍多半是一次性的——2026-09-11 的 venv 競態事故就是從這裡 latch 的。單次失敗停掉整支真倉策略的代價，高於多等一輪的代價。",
++      "operator_message": {
++        "what": "跟交易所對帳反覆失敗，不是網路暫時斷線那種小問題。",
++        "direction": "系統每一輪會自動重試，連續 3 次都失敗才暫停策略並通知你。常見原因是交易所 API 故障或金鑰權限變動。",
++        "steps": [
++          "看訊息裡的錯誤原因。",
++          "確認交易所連線與 API 金鑰權限正常。",
++          "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。"
++      }
++    },
++    {
++      "code": "SEY.EXCHANGE_TARGET_UNSAFE",
++      "title": "執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:1313"
++      ],
++      "current": {
++        "latch": "exchange_target_unsafe",
++        "notify": "SAFE_HALT (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "維持 latch，拒絕所有策略操作。",
++      "human_action": "改設定檔／環境變數後重啟。",
++      "resume": "restart_after_config_fix",
++      "lands_in_phase": 4,
++      "rationale": "設定錯誤只有人能改，而且這個守衛擋的正是「把模擬單打到真倉」。自動放行等於把安全閥拆掉。",
++      "operator_message": {
++        "what": "系統本來設定要連模擬帳戶，卻接到了真實帳戶（或反過來）——設定跟目標不一致。",
++        "direction": "整支策略立刻全部停擺、拒絕任何操作。一定要先把設定改對，不能直接解除。",
++        "steps": [
++          "檢查 seykota 的執行模式設定與交易所連線目標，改成一致。",
++          "改好後重啟 seykota-bot 服務。",
++          "注意：目前有已知缺陷——改好設定重啟後，暫停狀態可能仍清不掉（解除工具會拒絕這一類）。遇到時把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「執行模式與交易所目標不符」：先確認目前設定與交易所目標各是什麼、為什麼會不一致；再檢查 src/seykota_bot/safe_halt_resume.py 為什麼拒絕清除這一類暫停（已知缺陷：改好設定重啟後仍清不掉），提出讓「改好設定＋重啟」就能恢復的修正。"
++      }
++    },
++    {
++      "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
++      "title": "真倉固定訂單識別能力不足",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:1320"
++      ],
++      "current": {
++        "latch": "fixed_identifier_contract_unavailable",
++        "notify": "SAFE_HALT (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "維持 latch，拒絕所有 LIVE 策略操作。",
++      "human_action": "確認交易所帳號權限／API 契約後重啟。",
++      "resume": "restart_after_config_fix",
++      "lands_in_phase": 4,
++      "rationale": "沒有固定訂單識別就無法在事後把委託對回自己的部位，等於失去所有事後對帳能力。屬於憑證／權限層面，程式改不了。",
++      "operator_message": {
++        "what": "在真倉模式下，系統沒辦法精確辨識自己下的每一張單。",
++        "direction": "系統停下來，拒絕所有真倉操作。要先確認交易所帳號與 API 能力沒問題，不能直接解除。",
++        "steps": [
++          "確認交易所帳號權限與 API 設定（是否支援自訂訂單編號）。",
++          "確認沒問題後重啟 seykota-bot 服務。",
++          "注意：目前有已知缺陷——重啟後暫停狀態可能仍清不掉（解除工具會拒絕這一類）。遇到時把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「真倉固定訂單識別能力不足」：讀 src/seykota_bot/bot.py 的 _require_live_fixed_identifier_contract 看它檢查什麼、為什麼沒通過；並檢查 src/seykota_bot/safe_halt_resume.py 為什麼拒絕清除這一類暫停（已知缺陷），提出治本修正。"
++      }
++    },
++    {
++      "code": "SEY.RUNTIME_CYCLE_FAILED",
++      "title": "未分類的執行期例外（run_forever catch-all）",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:1376"
++      ],
++      "current": {
++        "latch": "runtime_error",
++        "notify": "SAFE_HALT (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "記事件、寫 DEGRADED heartbeat、下一輪重試；連續 escalate_after 次才升格：latch 並通知。latch 之後走跟其他原因碼一致的 resume 路徑。",
++      "human_action": "看事件日誌與 journal 找出例外原因，修好後解除 latch。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 4,
++      "rationale": "這是本專案的核心工作項：一個桶子同時裝著純暫時性狀況與真正的災難，而且立刻 latch、沒有 resume 路徑。改成計數器後，暫時性抖動不再靜默停掉真倉策略，持續性故障仍然會停。其他七個原因碼在這兩處之前就已經各自 latch，不受計數器影響；SEY.RECONCILE_FAILED 額外套用同一套計數器邏輯（各自獨立計數，見該條目）。",
++      "operator_message": {
++        "what": "程式運作中出現一個沒被特別分類過的錯誤（各種意外狀況都算）。",
++        "direction": "系統每一輪會自動重試，連續 3 次都失敗才暫停策略並通知你。",
++        "steps": [
++          "看訊息裡的錯誤內容。",
++          "確認後解除暫停：在 seykota 主機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這個未分類的執行期例外：從 seykota-bot 的 journal 找出連續失敗的例外訊息與堆疊，定位 src/seykota_bot/ 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。"
++      }
++    },
++    {
++      "code": "SEY.CLOSE_FILL_PENDING",
++      "title": "交易所部位已消失，等待平倉成交資料回填",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:1020"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "CLOSE_FILL_PENDING (log-only)",
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R0",
++      "auto_action": "本地標記為 FLAT，等下一輪把成交資料補回帳本。程式已經這樣做。",
++      "human_action": "無。",
++      "resume": "n/a",
++      "lands_in_phase": 3,
++      "rationale": "原生停損在兩次輪詢之間觸發是預期內的正常結束方式，程式自己就會收斂。標成 critical 純屬誤標，Phase 3 直接降級。",
++      "operator_message": {
++        "what": "交易所上的倉位已經消失（代表已經平倉了），只是成交細節還沒補進記錄。",
++        "direction": "系統已經把倉位標成已平倉，下一輪會自己把成交細節補進紀錄。",
++        "steps": [
++          "不需要任何動作。"
++        ]
++      }
++    },
++    {
++      "code": "SEY.TRADE_EXIT",
++      "title": "原生停損觸發的正常平倉",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:1054"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "EXIT (log-only)",
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R0",
++      "auto_action": "記錄成交並結算，程式已經這樣做。",
++      "human_action": "無。",
++      "resume": "n/a",
++      "lands_in_phase": 3,
++      "rationale": "這是策略成功運作的樣子，不是錯誤。同一支程式在 bot.py:1230 的另一個 EXIT 呼叫點就沒有標 critical，兩處不一致，Phase 3 對齊成非 critical。",
++      "operator_message": {
++        "what": "原生停損正常觸發，倉位正常平掉。",
++        "direction": "正常平倉，系統已經記錄並結算。",
++        "steps": [
++          "不需要任何動作。"
++        ]
++      }
++    },
++    {
++      "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
++      "title": "權益低於最低下單資金，跳過本次進場",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:1131"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "ENTRY_SKIPPED (log-only)",
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R0",
++      "auto_action": "跳過本次進場，下次訊號再評估。程式已經這樣做。",
++      "human_action": "無。（要不要加碼本金是投資決策，不是錯誤處理。）",
++      "resume": "n/a",
++      "lands_in_phase": 3,
++      "rationale": "部位大小算出來是 0 張時不進場，是風險控制正常生效。Phase 3 降級。",
++      "operator_message": {
++        "what": "帳戶裡的資金不夠最低下單金額，這次先跳過不進場。",
++        "direction": "下一次訊號再評估。要不要加本金是投資決定，不是錯誤處理。",
++        "steps": [
++          "不需要任何動作。"
++        ]
++      }
++    },
++    {
++      "code": "MOM.PROTECTION_UNVERIFIED",
++      "title": "原生移動停損無法驗證",
++      "project": "momentum",
++      "sources": [
++        "src/strategy.py:1295",
++        "src/strategy.py:1331",
++        "src/strategy.py:1718",
++        "src/strategy.py:1053"
++      ],
++      "current": {
++        "latch": "PROTECTION_UNVERIFIED",
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "維持 latch（DRY_RUN 下刻意忽略，見 strategy.py:1158）。",
++      "human_action": "核對交易所委託後以 safe_halt_resume 解除。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 4,
++      "rationale": "與 SEY.PROTECTION_UNVERIFIED 同一條件。momentum 是全機隊唯一有完整 latch 模型（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram 中繼）的實作，Phase 4 以它為統一基準。",
++      "operator_message": {
++        "what": "交易所上的移動停損單，系統驗證不出它到底存不存在。",
++        "direction": "系統停下來，等人確認交易所上的實際委託。交易所資料是標準答案。",
++        "steps": [
++          "到交易所 App 查這個交易對的倉位與委託清單，確認有恰好一張相符的移動停損單。",
++          "沒有就補掛；有多張就取消多餘的。",
++          "確認後解除暫停：在 momentum 主機 /opt/mexc-4h-momentum-trailing-stop 執行 `python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl` 取得確認碼，再加上 `--apply --confirm <確認碼> --exchange-verified` 執行一次。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼移動停損單無法驗證：讀 src/strategy.py 的 _ensure_native_trailing_stop 與相關核對函式，對照交易所目前的委託清單與 state/state.json，判斷是單不存在、有多張、還是單號與 state 不一致，並提出治本修正。"
++      }
++    },
++    {
++      "code": "MOM.STATE_REPAIRED_SAFE_HALT",
++      "title": "工具修復本地 state 後主動 latch，等人明確解除",
++      "project": "momentum",
++      "sources": [
++        "src/safe_halt_state_repair.py:144"
++      ],
++      "current": {
++        "latch": "state_repaired_safe_halt",
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "無——這條路徑本來就是人工工具寫進去的。",
++      "human_action": "核對歷史平倉無誤後以 safe_halt_resume 解除。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 4,
++      "rationale": "唯一一個「刻意設計成要人來解除」的 latch，保留原樣。它同時是既有 resume 路徑的實證：這套 fingerprint 兩階段閘門已經在真倉用過。",
++      "operator_message": {
++        "what": "有人用工具手動修過本地紀錄，工具修完後故意讓系統停下來。",
++        "direction": "這是刻意設計：工具改過帳目，一定要等人確認改得對，系統才能繼續跑。",
++        "steps": [
++          "對照交易所的歷史成交，確認工具修過的那幾筆平倉紀錄正確。",
++          "確認後解除暫停：在 momentum 主機 /opt/mexc-4h-momentum-trailing-stop 執行 `python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl` 取得確認碼，再加上 `--apply --confirm <確認碼> --exchange-verified` 執行一次。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 協助確認一次 state 修復是否正確：讀 src/safe_halt_state_repair.py 的修復紀錄與 audit/ 下對應的證據，比對 audit/trading_ledger.jsonl 與交易所歷史成交，列出不一致的地方；並追查當初為什麼需要手動修 state。"
++      }
++    },
++    {
++      "code": "MOM.RUNTIME_CYCLE_FAILED",
++      "title": "run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）",
++      "project": "momentum",
++      "sources": [
++        "src/main.py:329"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R0",
++      "auto_action": "寫 ERROR heartbeat，下一輪重試。程式已經這樣做。",
++      "human_action": "無（第四軸的 ERROR 會讓 ops-notify 自行升級）。",
++      "resume": "automatic",
++      "lands_in_phase": 3,
++      "rationale": "momentum 對 catch-all 的處置正是 seykota 要改成的樣子，列進目錄當作對照基準。",
++      "operator_message": {
++        "what": "程式運作中出現一個沒被特別分類過的錯誤。",
++        "direction": "系統記一筆「有狀況」的標記，下一輪照常重試，不會停下來。",
++        "steps": [
++          "不需要任何動作。",
++          "如果一直重複，維運通知會因為「策略運行狀態」顯示錯誤而提醒你，照那則處理即可。"
++        ]
++      }
++    },
++    {
++      "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
++      "title": "無歧義的孤兒平倉已自動補寫進帳本",
++      "project": "momentum",
++      "sources": [
++        "scripts/repair_bot.py:228"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "VERIFIED_CLOSE_AUTO_REPAIRED (critical=False，事後稽核通知)",
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R1",
++      "auto_action": "assess_auto_repair 判定無歧義時：證據檔落地、以 momentum 自己的 TradeLedger staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、記事件日誌。一輪最多一筆。不通知。（v1 的 MOMENTUM_REPAIR_AUTO_APPLY 開關與事後稽核通知在 v2 移除，由共用修復執行器落實。）",
++      "human_action": "無需決定。證據檔與事件日誌留有完整紀錄。",
++      "resume": "n/a",
++      "lands_in_phase": 6,
++      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平掉，照交易所寫下去就是唯一正解，沒有第二個選項，所以既不該產生決策請求，也不需要通知（v2，2026-09-18：v1 的「事後稽核通知」取消——帳本補寫只是記下交易所上已經發生的事，沒有動到任何錢）。判準不成立時：帳本已留有這筆交易的修復痕跡或整批寫入失敗 → MOM.VERIFIED_CLOSE_REPAIR_BLOCKED（R3）；其餘以交易所為準仍能對應的情況照樣補寫，只有結構上對不上才重試並升格（R2）。交易所上該 symbol 仍有部位時，在抓證據階段就中止，下一輪再看。",
++      "operator_message": {
++        "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。",
++        "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
++        "steps": [
++          "不需要任何動作。",
++          "想核對：audit/fleet_event_log.jsonl 裡這筆事件記著交易編號、出場價和損益，可以跟交易所 App 比對。"
++        ]
++      }
++    },
++    {
++      "code": "MOM.VERIFIED_CLOSE_PROPOSED",
++      "title": "孤兒平倉已算出修復方案，附提案通知",
++      "project": "momentum",
++      "sources": [
++        "scripts/repair_bot.py:128"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "VERIFIED_CLOSE_PROPOSED (critical=False)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "（v2 目標，由共用修復執行器取代本條，屆時本代碼退役）以交易所為準自動補寫；只有結構上對不上時才記一次失敗，同一 trade_id 連續 escalate_after 次失敗才升格：開請求、通知，附給 AI 的根因追查指令。",
++      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "補登 Phase 5 影子模式既有行為（該階段只在程式碼註解宣告 v1 R1）。這條落在這裡代表機器沒把握：可能是自動模式關閉，也可能是有判準不成立（多筆同時分歧、損益對不上、證據缺時間戳等），這些情況照交易所寫下去不一定對，需要人決定。 v2（2026-09-18）：v1 的「提案、交給人決定」沒有意義——交易所是權威，治標就是照交易所補、讓三方一致；真正需要人的只有結構上對不上的情況，而那時該做的是追查根因。本條的呼叫點由共用修復執行器取代時退役（見 retired_codes）。",
++      "operator_message": {
++        "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
++        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
++        "steps": [
++          "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」的三步，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
++          "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
++      }
++    },
++    {
++      "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
++      "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
++      "project": "momentum",
++      "sources": [
++        "scripts/repair_bot.py:153"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "VERIFIED_CLOSE_REPAIR_BLOCKED (critical=True)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不寫、不重試。開請求、記事件日誌、通知；此 trade_id 之後一律跳過，直到請求關閉。",
++      "human_action": "帳本裡這筆已有補到一半的紀錄（或這次寫入無法驗證），自動補完可能重複記帳。先讀清楚帳本現況，再以交易所成交紀錄為準讓帳本、交易所、Google 表三方一致，最後關閉請求。",
++      "resume": "n/a",
++      "lands_in_phase": 6,
++      "rationale": "帳本裡已有這筆交易的修復紀錄（例如先前寫到一半）或這次寫入無法驗證，代表真實帳本的狀態已經不是「乾淨的孤兒開倉」。此時自動補完後半段等於猜，而猜錯會重複或錯記真實損益——這正是必須交給人的情況。",
++      "operator_message": {
++        "what": "動能策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。",
++        "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
++        "steps": [
++          "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
++          "確認修正步驟後照做（手動流程見momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
++          "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
++        ],
++        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
++      }
++    },
++    {
++      "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
++      "title": "出現負／不可能的餘額，本地帳本本身不可信",
++      "project": "btc-competition",
++      "sources": [
++        "src/btc_competition/runner.py:282",
++        "src/btc_competition/runner.py:332"
++      ],
++      "current": {
++        "latch": "HOLDINGS_UNVERIFIED:negative",
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "維持 latch。",
++      "human_action": "核對交易所餘額與本地帳本後以 btc-competition-resume 解除。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 4,
++      "rationale": "負餘額代表帳本折疊邏輯或交易所回傳出了根本性的錯，之後每一個以它為輸入的決策都不可信。",
++      "operator_message": {
++        "what": "帳上出現負的、或不可能存在的金額——代表這份本地記錄本身已經不能信了。",
++        "direction": "系統停下來。交易所的實際餘額是標準答案，要先讓本地記錄跟交易所一致。",
++        "steps": [
++          "到交易所 App 查每個資產的實際餘額。",
++          "對照本地記錄，找出是哪個資產、差多少。",
++          "確認後解除暫停：在 btc 主機執行 `btc-competition-resume preview` 取得確認碼，再執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 btc-bull-market-competition 追查為什麼本地帳本出現負的或不可能的餘額：讀 src/btc_competition/runner.py 的 _holdings_unverified 與 executor.fetch_balances，比對本地 state/帳本與交易所實際餘額，找出差異從哪一筆交易開始，提出讓本地與交易所一致的修正步驟（先給我確認再執行）與治本修正。"
++      }
++    },
++    {
++      "code": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
++      "title": "連續 3 天該再平衡卻零成交",
++      "project": "btc-competition",
++      "sources": [
++        "src/btc_competition/runner.py:301",
++        "src/btc_competition/runner.py:332"
++      ],
++      "current": {
++        "latch": "EXECUTION_BLOCKED:3 consecutive days with zero fills",
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "自動重新取價、重算下單量後重試完整再平衡，最多連續 escalate_after 次；成功即清除 latch。全部失敗才升格：通知。",
++      "human_action": "看失敗原因（最小下單量、餘額、交易對狀態），處理後解除 latch。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 8,
++      "rationale": "交易所連三天拒絕每一張單，最常見原因是最小下單量或精度規則變了（seykota 2026-08-21 就撞過 stepSize 變更）。重試一次的代價低，而且重試本身會揭露真正的拒絕理由。",
++      "operator_message": {
++        "what": "連續 3 天該重新調整持倉比例，卻完全成交不了任何一筆。",
++        "direction": "系統會自動重新取價、重算下單量再試一次完整的調整，最多 3 次；都失敗才通知你。",
++        "steps": [
++          "看訊息裡的失敗原因（常見：交易所最小下單量、餘額不足、交易對暫停交易）。",
++          "確認交易所帳戶餘額與交易對狀態正常。",
++          "確認後解除暫停：在 btc 主機執行 `btc-competition-resume preview` 取得確認碼，再執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 btc-bull-market-competition 追查再平衡為什麼連續零成交、自動重試也失敗：讀 src/btc_competition/runner.py 與 executor 的下單流程，對照日誌與交易所回應，判斷是下單量低於最小值、餘額、價格保護還是 API 問題，並提出治本修正。"
++      }
++    },
++    {
++      "code": "BTC.REBALANCE_PENDING",
++      "title": "部分成交，目標權重尚未達成",
++      "project": "btc-competition",
++      "sources": [
++        "src/btc_competition/runner.py:297"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R0",
++      "auto_action": "記進 pending_target_weights，下一輪自動續做。程式已經這樣做。",
++      "human_action": "無。",
++      "resume": "automatic",
++      "lands_in_phase": 3,
++      "rationale": "未完成的再平衡不是錯誤，是還沒做完的事。btc 已經是全機隊唯一把「未完成」跟「故障」分開的實作。",
++      "operator_message": {
++        "what": "這次調整持倉只成交了一部分，目標比例還沒完全達到。",
++        "direction": "剩下的部分下一輪會自動繼續做。",
++        "steps": [
++          "不需要任何動作。"
++        ]
++      }
++    },
++    {
++      "code": "BTC.RUNTIME_CYCLE_FAILED",
++      "title": "runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）",
++      "project": "btc-competition",
++      "sources": [
++        "src/btc_competition/runner.py:358"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R0",
++      "auto_action": "寫 ERROR heartbeat 後重新拋出，由 timer 隔天重試。程式已經這樣做。",
++      "human_action": "無（第四軸的 ERROR 會讓 ops-notify 自行升級）。",
++      "resume": "automatic",
++      "lands_in_phase": 3,
++      "rationale": "與 MOM.RUNTIME_CYCLE_FAILED 同一處置形狀。",
++      "operator_message": {
++        "what": "程式運作中出現一個沒被特別分類過的錯誤。",
++        "direction": "系統記一筆「有狀況」的標記，隔天自動重試。",
++        "steps": [
++          "不需要任何動作。",
++          "如果一直重複，維運通知會因為「策略運行狀態」顯示錯誤而提醒你，照那則處理即可。"
++        ]
++      }
++    },
++    {
++      "code": "MYC.RECONCILE_DELTA_EXCEEDED",
++      "title": "本地帳本與交易所回報損益差額超過容忍值",
++      "project": "mycrypto",
++      "sources": [
++        "mexc_futures_bot.py:713"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "fleet_event_log measurement (audit-only, never notifies)",
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R0",
++      "auto_action": "以交易所為權威記錄差額，不改變交易行為。",
++      "human_action": "無，永久不會升級。2026-09-15（Phase 4e）盤查 trading-main 真實帳本（momentum 連續 17 筆、my-crypto 唯一 1 筆有效資料）發現這個差額精確等於-(entry_fee + exit_fee)——交易所回報損益本來就是手續費前的毛數字，本地net_pnl 是手續費後的淨數字，相減從定義上就只會是負的手續費，不是任何異常訊號，聚合起來也永遠是同一個已知、良性的偏差。撤回原本「聚合偏離才升級成請求」的計畫：不建聚合邏輯，每筆持續寫進 fleet_event_log 純供稽核查閱。",
++      "resume": "n/a",
++      "lands_in_phase": 4,
++      "rationale": "使用者已定調：交易所是權威資料，單筆差額的結論永遠是「以交易所為準」，包裝成錯誤不產生任何決策。這是整個專案範圍擴大的起點。Phase 3 改名（SAFE_HALT → RECONCILE_DELTA_EXCEEDED）並降 critical，因為現行名稱宣稱一個根本不存在的停機行為。 2026-09-15 補充：這個指標原本想抓的問題（本地價格記錄跟交易所現實脫節，會沿用進未來的移動停損計算）已經被同一支程式 2026-08-22 的另一個修正（`_fetch_order_info()` 改用交易所確認過的 `dealAvgPrice`/`totalFee` 入帳）從源頭堵住——這也是為什麼觀察到的差額 100% 只剩手續費、沒有任何殘留雜訊。Phase 4e 因此把 Phase 3 當時保留的「聚合偏離才升級」計畫撤回，改成單純寫入`trade_alerts.fleet_event_log`（見 §4.5），取代原本呼叫 `alerts.publish()`——後者在 my-crypto 端本來就已經是 2026-08-30 起的本地 no-op stub，這次替換純粹是把稽核紀錄放進機隊統一格式，不是關掉正在發送的通知。",
++      "operator_message": {
++        "what": "本地帳本算出來的賺賠，跟交易所回報的賺賠有落差。",
++        "direction": "這個落差就是手續費：交易所回報的是扣手續費前的數字，本地記的是扣完的淨額。不是異常，只記錄備查。",
++        "steps": [
++          "不需要任何動作。"
++        ]
++      }
++    },
++    {
++      "code": "MYC.RUNTIME_CYCLE_FAILED",
++      "title": "未分類的執行期例外（catch-all）",
++      "project": "mycrypto",
++      "sources": [
++        "mexc_futures_bot.py:1512"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "RUNTIME_CYCLE_FAILED (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "下一輪自動重試（常駐模式既有行為）；連續 escalate_after 次失敗才升格：開請求、通知。",
++      "human_action": "看日誌找出例外原因並修正。",
++      "resume": "automatic",
++      "lands_in_phase": 8,
++      "rationale": "使用者定案 my-crypto 不加 latch：這條路徑本來就靠下一輪重試自癒，加停機行為只會替一支目前沒有這個概念的 LIVE bot 新增風險。Phase 3 只改名（SAFE_HALT → RUNTIME_CYCLE_FAILED），因為它從來不 halt。",
++      "operator_message": {
++        "what": "程式運作中出現一個沒被特別分類過的錯誤。",
++        "direction": "系統下一輪會自動重試，連續 3 次都失敗才通知你。",
++        "steps": [
++          "看訊息裡的錯誤內容與 my-crypto 的日誌。",
++          "確認 my-crypto 服務仍在運作、交易所連線與設定正常。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 my-crypto-bot 追查這個連續發生的未分類例外：從 my-crypto 的日誌找出例外訊息與堆疊，定位 mexc_futures_bot.py 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。"
++      }
++    },
++    {
++      "code": "MYC.PROTECTION_PLACEMENT_REJECTED",
++      "title": "開倉停損單被交易所拒絕，部位可能沒有交易所端保護",
++      "project": "mycrypto",
++      "sources": [
++        "mexc_futures_bot.py:1266"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "PROTECTION_PLACEMENT_REJECTED (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不自動下單。",
++      "human_action": "立即到交易所確認部位與保護單。",
++      "resume": "n/a",
++      "lands_in_phase": 5,
++      "rationale": "交易所明確拒絕而不是連線失敗，代表下單參數本身有問題，重試同一張只會再被拒一次；而部位已經開了、正在裸露。五個共用 PROTECTIVE_STOP_FAILED 名稱的呼叫點裡風險最高的一個，Phase 3 先拆成各自的碼。",
++      "operator_message": {
++        "what": "開倉後想掛的停損單被交易所直接拒絕，這筆倉位可能完全沒有保護。",
++        "direction": "系統不會自動下單。交易所上的實際部位是標準答案，要人立刻確認倉位有沒有保護。",
++        "steps": [
++          "立刻到交易所 App 查這個交易對的倉位與停損單。",
++          "沒有停損：手動補掛一張，或直接平倉。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 my-crypto-bot 追查為什麼開倉後的停損單被交易所拒絕：讀 mexc_futures_bot.py 掛保護單的流程與交易所回傳的錯誤碼，判斷是價格／數量規則、槓桿設定還是 API 參數問題，並提出治本修正。"
++      }
++    },
++    {
++      "code": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
++      "title": "開倉後查不到部位資訊，無法掛停損單",
++      "project": "mycrypto",
++      "sources": [
++        "mexc_futures_bot.py:1273"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "PROTECTION_PLACEMENT_NO_POSITION (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "自動重查部位並補掛停損，最多連續 escalate_after 次；全部失敗才升格：開請求、通知。",
++      "human_action": "到交易所確認部位與停損單，沒有停損就補掛或平倉。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "「查不到部位」多半是下單與查詢之間的時間差，重查一次就會出現，跟明確被拒絕是不同的東西——現行程式把兩者共用同一個事件名，看 log 的人分不出來。",
++      "operator_message": {
++        "what": "剛開完倉，卻查不到這筆倉位的資訊，沒辦法掛停損單。",
++        "direction": "系統會自動重查部位並補掛停損，最多 3 次；都失敗才通知你。收到通知代表倉位此刻可能沒有停損保護。",
++        "steps": [
++          "到交易所 App 確認這筆倉位與停損單。",
++          "沒有停損：手動補掛一張，或直接平倉。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 my-crypto-bot 追查開倉後查不到部位、補掛停損也失敗的原因：讀 mexc_futures_bot.py 開倉後查部位（fetch_positions）與掛保護單的流程，對照日誌與交易所回應，並提出治本修正。"
++      }
++    },
++    {
++      "code": "MYC.PROTECTION_PLACEMENT_ERROR",
++      "title": "掛停損單時拋出例外，部位本身已開",
++      "project": "mycrypto",
++      "sources": [
++        "mexc_futures_bot.py:1279"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "PROTECTION_PLACEMENT_ERROR (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不自動下單。",
++      "human_action": "立即到交易所確認部位與保護單狀態。",
++      "resume": "n/a",
++      "lands_in_phase": 5,
++      "rationale": "例外發生時無法確定停損單到底送出去了沒有，自動重掛有掛成兩張的風險，自動不管則部位裸露。這正是需要人去看一眼交易所的情形。",
++      "operator_message": {
++        "what": "掛停損單的過程中程式出錯，但倉位本身已經開了，一樣沒有保護。",
++        "direction": "系統不會自動下單。要人立刻確認交易所上的倉位有沒有保護。",
++        "steps": [
++          "立刻到交易所 App 查這個交易對的倉位與停損單。",
++          "沒有停損：手動補掛一張，或直接平倉。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 my-crypto-bot 追查掛停損單時拋出的例外：讀 mexc_futures_bot.py 掛保護單的流程，對照 my-crypto 的日誌找出例外訊息與堆疊，判斷原因並提出治本修正。"
++      }
++    },
++    {
++      "code": "MYC.PROTECTION_REPLACE_FAILED",
++      "title": "搬移移動停損單失敗，交易所端目前沒有停損保護",
++      "project": "mycrypto",
++      "sources": [
++        "mexc_futures_bot.py:1494",
++        "mexc_futures_bot.py:1503"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "PROTECTION_REPLACE_FAILED (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "下一輪本來就會自動重掛（程式已把失效 ID 清成 None）；連續 escalate_after 輪仍失敗才升格：開請求、通知。",
++      "human_action": "到交易所確認停損單，沒有就補掛或平倉。",
++      "resume": "automatic",
++      "lands_in_phase": 8,
++      "rationale": "與 SEY.PROTECTION_REPLACE_FAILED 同一條件。my-crypto 現行實作（清掉失效 ID、下一輪重掛、不停機）本身是對的，缺的只是「連續失敗幾輪之後要有人知道」。",
++      "operator_message": {
++        "what": "要把移動停損單搬到新價位卻失敗，交易所端目前沒有停損保護。",
++        "direction": "系統下一輪會自動重掛，連續 3 輪都失敗才通知你。收到通知代表倉位此刻沒有交易所端的停損保護。",
++        "steps": [
++          "到交易所 App 確認這筆倉位目前有沒有停損單。",
++          "沒有的話手動補掛一張，或直接平倉。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 my-crypto-bot 追查移動停損搬移連續失敗的原因：讀 mexc_futures_bot.py 搬移停損單的流程與錯誤處理，對照日誌與交易所錯誤碼，並提出治本修正。"
++      }
++    },
++    {
++      "code": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
++      "title": "平倉後取消殘留停損單失敗",
++      "project": "mycrypto",
++      "sources": [
++        "mexc_futures_bot.py:1427"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "PROTECTION_ORPHAN_CANCEL_FAILED (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "取消前先確認該交易對在交易所已無部位，只取消系統自己記錄的那張保護單編號並自動重試，最多連續 escalate_after 次；條件不成立或全部失敗即升格：開請求、通知。",
++      "human_action": "到交易所手動取消殘留停損單。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "與 SEY.PROTECTION_CLOSE_CANCEL_FAILED 同一條件、同一處置（含 v2 的自動取消條件：先確認已無部位、只取消系統自己記錄的那張單）。",
++      "operator_message": {
++        "what": "平倉後要取消殘留的停損單卻取消失敗。",
++        "direction": "系統會先確認倉位真的已經平掉，再取消它自己記錄的那張停損單，最多試 3 次；條件不成立或都失敗才通知你。殘留的單通常不會成交，但留著可能在之後開新倉時造成誤判。",
++        "steps": [
++          "到交易所 App 的委託清單找訊息裡那張停損單編號。",
++          "還在的話手動取消。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 my-crypto-bot 追查平倉後殘留停損單取消失敗、且自動重試也失敗的原因：讀 mexc_futures_bot.py 平倉後清理保護單的流程，對照日誌與交易所錯誤碼，並提出治本修正。"
++      }
++    },
++    {
++      "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
++      "title": "帳本↔交易所對帳 DIVERGED 時故意讓 unit 變紅（exit 2）",
++      "project": "fleet",
++      "sources": [
++        "btc-bull-market-competition/src/btc_competition/reconcile_compare.py:213",
++        "ed-seykota-systematic-trend-following/src/seykota_bot/reconcile/compare.py:251",
++        "mexc-4h-momentum-trailing-stop/src/reconcile_compare.py:110",
++        "my-crypto-bot/reconcile_compare.py:102"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": 2
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R0",
++      "auto_action": "維持寫出 ledger_status.json；由 ops-notify 的 ledger 軸負責升級與去抖。exit 改回 0。",
++      "human_action": "無（LINE 告警已經送同一件事）。",
++      "resume": "n/a",
++      "lands_in_phase": 4,
++      "rationale": "unit 變紅不提供 LINE 告警以外的任何決策，而且紅 unit 會在下次部署的健康檢查裡製造假訊號（Phase 2a 部署期間就撞到過）。偵測本身保留，只是不再用退出碼當第二套通知管道。",
++      "operator_message": {
++        "what": "本地帳本跟交易所對不上時，對帳程式故意讓自己的服務顯示紅色失敗。",
++        "direction": "不需要另外處理這個紅燈：同一件事維運通知的「帳本↔交易所」會通知你，照那則處理。",
++        "steps": [
++          "不需要任何動作。"
++        ]
++      }
++    },
++    {
++      "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
++      "title": "帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）",
++      "project": "fleet",
++      "sources": [
++        "btc-bull-market-competition/src/btc_competition/reconcile_google.py:289",
++        "ed-seykota-systematic-trend-following/src/seykota_bot/reconcile/google_reconcile.py:140",
++        "mexc-4h-momentum-trailing-stop/src/google_reconcile.py:138",
++        "my-crypto-bot/google_reconcile.py:137"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": 3
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R0",
++      "auto_action": "維持寫出 google_reconcile_status.json；由 ops-notify 的 google 軸負責升級與去抖。exit 改回 0。",
++      "human_action": "無（LINE 告警已經送同一件事）。",
++      "resume": "n/a",
++      "lands_in_phase": 4,
++      "rationale": "與 FLEET.LEDGER_DIVERGED_UNIT_EXIT 同一理由。Google 表是投影目標而非權威來源，它落後帳本更不構成需要人介入的錯誤。",
++      "operator_message": {
++        "what": "本地帳本跟共用的 Google 表格對不上時，對帳程式故意讓自己的服務顯示紅色失敗。",
++        "direction": "不需要另外處理這個紅燈：同一件事維運通知的「帳本↔Google 表」會通知你，照那則處理。",
++        "steps": [
++          "不需要任何動作。"
++        ]
++      }
++    }
++  ],
++  "retired_codes": [
++    {
++      "code": "MOM.VERIFIED_CLOSE_PROPOSED",
++      "retired_in": "fleet-error-catalog/v2",
++      "reason": "v1 R1 'propose, never write'. v2 has no proposal state: an unambiguous orphan close is repaired (R1), a mappable-but-imperfect one is repaired using the exchange as the authority, and only a structurally unmappable one retries and escalates (R2). Stays in the catalog until the shared repair runner replaces the call site."
++    },
++    {
++      "code": "SEY.VERIFIED_CLOSE_PROPOSED",
++      "retired_in": "fleet-error-catalog/v2",
++      "reason": "Emitted by seykota's Phase 5 shadow repair bot but never catalogued in v1. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED; seykota moves to the shared repair runner."
++    }
++  ]
++}
+diff --git a/src/trade_alerts/error_request_queue.py b/src/trade_alerts/error_request_queue.py
+index 622b2b8..9ba0b43 100644
+--- a/src/trade_alerts/error_request_queue.py
++++ b/src/trade_alerts/error_request_queue.py
+@@ -12,11 +12,12 @@ The queue lives in the strategy's ``audit/`` directory, deliberately **not** in
+ ops-control, so a queue placed there would let the Telegram relay fabricate
+ pending items for the repair bot to act on.
+ 
+-``R0`` conditions can never open a request.  R0 means the action after detection
+-is fixed, so there is nothing for a request to be about -- those belong in
+-``fleet_event_log`` alone.  That rule is enforced here rather than left to each
+-caller, mirroring the catalog's own executable invariant that a MECHANICAL
+-verdict may not reach a notifying tier.
++Only ``R2`` (once it escalates) and ``R3`` open requests.  ``R0`` means the
++action after detection is fixed and ``R1`` means it was executed automatically
++with no second option -- either way there is nothing for a request to be about,
++so both belong in ``fleet_event_log`` alone.  That rule is enforced here rather
++than left to each caller, mirroring the catalog's own executable invariant that
++a MECHANICAL verdict may not reach a notifying tier.
+ """
+ from __future__ import annotations
+ 
+@@ -40,13 +41,13 @@ OUTCOME_KIND = "error_request_outcome_v1"
+ FINGERPRINT_LENGTH = 12
+ 
+ #: A request leaves the queue only through one of these.  ``RESOLVED_AUTO`` is
+-#: an automatic remedy (R2, and R3 after its timeout), ``RESOLVED_HUMAN`` an
++#: an automatic remedy (an R2 retry that succeeded after escalating), ``RESOLVED_HUMAN`` an
+ #: operator acting, ``SUPERSEDED`` the same condition re-opening with different
+ #: evidence, and ``WITHDRAWN`` the condition no longer holding on its own.
+ TERMINAL_STATUSES = frozenset({"RESOLVED_AUTO", "RESOLVED_HUMAN", "SUPERSEDED", "WITHDRAWN"})
+ #: Tiers that may open a request at all; see the module docstring for why R0
+-#: cannot.
+-REQUESTABLE_TIERS = frozenset(tier for tier in RISK_TIERS if tier != "R0")
++#: and R1 cannot.
++REQUESTABLE_TIERS = frozenset({"R2", "R3"})
+ 
+ 
+ class ErrorRequestError(ValueError):
+@@ -94,8 +95,8 @@ def _require_requestable_tier(risk_tier: Any) -> str:
+         raise ErrorRequestError(f"unknown risk tier {risk_tier!r}")
+     if risk_tier not in REQUESTABLE_TIERS:
+         raise ErrorRequestError(
+-            f"{risk_tier} conditions never open a request: the action after detection is fixed, "
+-            "so record it in the fleet event log instead"
++            f"{risk_tier} conditions never open a request: the action after detection is fixed "
++            "or already executed automatically, so record it in the fleet event log instead"
+         )
+     return str(risk_tier)
+ 
+diff --git a/src/trade_alerts/fleet_event_log.py b/src/trade_alerts/fleet_event_log.py
+index bfae634..890e7d7 100644
+--- a/src/trade_alerts/fleet_event_log.py
++++ b/src/trade_alerts/fleet_event_log.py
+@@ -28,7 +28,9 @@ from typing import Any, Iterator, Mapping
+ from uuid import uuid4
+ 
+ FLEET_EVENT_KIND = "fleet_event_v1"
+-RISK_TIERS = ("R0", "R1", "R2", "R3", "R4")
++#: fleet-error-catalog/v2 (2026-09-18): R0 log / R1 auto, silent / R2 auto-retry,
++#: escalate after N failures / R3 human required.
++RISK_TIERS = ("R0", "R1", "R2", "R3")
+ 
+ #: Catalog code prefix per project key.  The project keys are the ones
+ #: ``ops-notify`` already uses as notification target keys, so an event joins to
+@@ -217,7 +219,7 @@ def read_fleet_events(path: str | Path) -> list[dict[str, Any]]:
+     return [record for record in read_jsonl(path) if record.get("kind") == FLEET_EVENT_KIND]
+ 
+ 
+-PACKAGED_CATALOG_NAME = "fleet-error-catalog-v1.json"
++PACKAGED_CATALOG_NAME = "fleet-error-catalog-v2.json"
+ 
+ 
+ def load_error_catalog(path: str | Path | None = None) -> dict[str, Any]:
+diff --git a/src/trade_alerts/ops_export.py b/src/trade_alerts/ops_export.py
+index f57c77b..0540e21 100644
+--- a/src/trade_alerts/ops_export.py
++++ b/src/trade_alerts/ops_export.py
+@@ -11,9 +11,13 @@ read it (``audit/`` is group-readable, never group-writable).  Nothing on the
+ relay side can fabricate an item to send.
+ 
+ The file is a full snapshot rewritten every time, not an append log, so a
+-reader never has to reconcile partial writes: ``notices`` are the notifying
+-events of the last ``window_days``, identified by ``event_id`` so the reader
++reader never has to reconcile partial writes: ``notices`` are the events of the
++last ``window_days`` that need a human, identified by ``event_id`` so the reader
+ can send each exactly once, and ``open_requests`` is everything still open.
++
++Which events need a human follows fleet-error-catalog/v2: every ``R3`` event,
++and an ``R2`` event only once the automatic retries gave up
++(``details.escalated`` is true).  ``R0`` and ``R1`` never reach the operator.
+ """
+ from __future__ import annotations
+ 
+@@ -35,18 +39,15 @@ from .fleet_event_log import (
+     utc_now_iso,
+ )
+ 
+-OPS_EXPORT_VERSION = "fleet-ops-export/v1"
++OPS_EXPORT_VERSION = "fleet-ops-export/v2"
+ DEFAULT_WINDOW_DAYS = 7
+-#: R0 is "log only": the action after detection is fixed, so it never reaches
+-#: the operator and never appears here.
+-NOTIFYING_TIERS = tuple(tier for tier in RISK_TIERS if tier != "R0")
++#: Tiers that can ever reach the operator: R3 always, R2 only once escalated.
++NOTIFYING_TIERS = ("R2", "R3")
+ _EXPORT_MODE = 0o644
+ 
+ _TIER_HEADERS = {
+-    "R1": "📋 修復提案（需要你決定）",
+-    "R2": "✅ 已自動處理（事後通知，不需要動作）",
+-    "R3": "⚠️ 中風險狀況（逾時會自動處理）",
+-    "R4": "🔴 需要人工處理",
++    "R2": "⚠️ 自動處理失敗，需要你處理",
++    "R3": "🔴 需要人工處理",
+ }
+ 
+ 
+@@ -77,10 +78,29 @@ def _resolve_tier(event: Mapping[str, Any], entry: Mapping[str, Any] | None) ->
+     return str(tier) if tier in RISK_TIERS else None
+ 
+ 
++def needs_human(event: Mapping[str, Any], risk_tier: str | None) -> bool:
++    """R3 always; R2 only when the strategy marked this event as the escalation
++    after its automatic retries failed."""
++    if risk_tier == "R3":
++        return True
++    details = event.get("details") if isinstance(event.get("details"), Mapping) else {}
++    return risk_tier == "R2" and details.get("escalated") is True
++
++
++def _ai_block(event: Mapping[str, Any], ai_prompt: str) -> list[str]:
++    """The catalog's prompt plus this occurrence's own identifiers, so it can be
++    pasted to an AI as-is without the operator digging anything up."""
++    evidence = event.get("evidence") if isinstance(event.get("evidence"), Mapping) else {}
++    return ["", "給 AI 的追查指令（整段貼給 Claude）：", ai_prompt.strip(),
++            f"錯誤碼：{event.get('project')}/{event.get('code')}　事件編號：{event.get('event_id')}",
++            "事件資料：" + json.dumps(dict(evidence), ensure_ascii=False, sort_keys=True)]
++
++
+ def render_notice_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None, risk_tier: str) -> str:
+     """Plain-language message for one event: tier header, catalog title, the
+-    entry's ``operator_message`` when it has one, then the technical detail the
+-    strategy attached (``details.notice_text``, else the event summary)."""
++    entry's ``operator_message`` when it has one, the technical detail the
++    strategy attached (``details.notice_text``, else the event summary), and the
++    entry's AI root-cause prompt with this event's identifiers."""
+     code = str(event.get("code") or "")
+     lines = [_TIER_HEADERS.get(risk_tier, risk_tier), str((entry or {}).get("title") or code)]
+ 
+@@ -96,6 +116,10 @@ def render_notice_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None
+         technical = event.get("summary")
+     if isinstance(technical, str) and technical.strip():
+         lines += ["", "技術細節：", technical.strip()]
++
++    ai_prompt = message.get("ai_prompt") if isinstance(message, Mapping) else None
++    if isinstance(ai_prompt, str) and ai_prompt.strip():
++        lines += _ai_block(event, ai_prompt)
+     return "\n".join(lines)
+ 
+ 
+@@ -108,7 +132,7 @@ def build_ops_export(
+     window_days: int = DEFAULT_WINDOW_DAYS,
+     now: datetime | None = None,
+ ) -> dict[str, Any]:
+-    """Build the ``fleet-ops-export/v1`` document for one strategy.
++    """Build the ``fleet-ops-export/v2`` document for one strategy.
+ 
+     A malformed event log or request queue raises (see ``read_jsonl``): an
+     export that silently left part of the evidence out would read as complete.
+@@ -116,8 +140,7 @@ def build_ops_export(
+     export that stops refreshing as ``STALE``.
+ 
+     ``open_requests[].handling_started_at`` is always ``null`` in this version;
+-    Phase 7e fills it in when an operator presses 「開始處理」.  The field is
+-    already part of v1 so that change needs no new format version.
++    Phase 7e fills it in when an operator presses 「開始處理」.
+     """
+     if window_days < 1:
+         raise ValueError("window_days must be at least 1")
+@@ -138,14 +161,14 @@ def build_ops_export(
+         bare_code = str(event.get("code") or "")
+         entry = _entry_or_none(catalog, project, bare_code)
+         tier = _resolve_tier(event, entry)
+-        if tier not in NOTIFYING_TIERS:
++        if not needs_human(event, tier):
+             continue
+         notices.append({
+             "event_id": str(event.get("event_id") or ""),
+             "recorded_at": event.get("recorded_at"),
+             "code": catalog_code(project, bare_code),
+             "risk_tier": tier,
+-            "critical": tier == "R4",
++            "critical": tier == "R3",
+             "text": render_notice_text(event, entry, tier),
+         })
+     notices.sort(key=lambda notice: (str(notice["recorded_at"] or ""), notice["event_id"]))
+@@ -168,6 +191,7 @@ def build_ops_export(
+             "what": message.get("what"),
+             "direction": message.get("direction"),
+             "steps": list(message.get("steps") or []),
++            "ai_prompt": message.get("ai_prompt"),
+             "handling_started_at": None,
+         })
+ 
+diff --git a/src/trade_alerts/verified_close_backfill.py b/src/trade_alerts/verified_close_backfill.py
+index a61e67e..ebb779f 100644
+--- a/src/trade_alerts/verified_close_backfill.py
++++ b/src/trade_alerts/verified_close_backfill.py
+@@ -443,7 +443,7 @@ def render_repair_proposal_text(
+     project: str,
+ ) -> str:
+     """Render a computed verified-close-backfill repair as a human-readable
+-    notification body -- R1 ``PROPOSE`` semantics (§2 of the fleet error
++    notification body -- v1 R1 ``PROPOSE`` semantics (§2 of the fleet error
+     catalog): the notification carries the already-computed fix as a
+     proposal, and nothing in this module ever executes it. Shadow mode
+     passes this text straight to ``AlertDispatcher.publish``; nothing here
+diff --git a/tests/test_error_request_queue.py b/tests/test_error_request_queue.py
+index b375005..882441a 100644
+--- a/tests/test_error_request_queue.py
++++ b/tests/test_error_request_queue.py
+@@ -19,7 +19,7 @@ from trade_alerts.fleet_event_log import append_fleet_event, read_jsonl
+ from trade_alerts.safe_halt_model import build_safe_halt
+ 
+ REPO_ROOT = Path(__file__).resolve().parents[1]
+-CATALOG = json.loads((REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json").read_text(encoding="utf-8"))
++CATALOG = json.loads((REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v2.json").read_text(encoding="utf-8"))
+ SCHEMA = json.loads((REPO_ROOT / "schemas" / "error-request-queue-v1.schema.json").read_text(encoding="utf-8"))
+ 
+ jsonschema = pytest.importorskip("jsonschema")
+@@ -31,7 +31,7 @@ def _open(path, **overrides):
+     payload = {
+         "project": "seykota",
+         "code": "PROTECTION_UNVERIFIED",
+-        "risk_tier": "R4",
++        "risk_tier": "R3",
+         "summary": "交易所存在部位，但沒有可唯一確認的原生保護單",
+         "evidence": EVIDENCE,
+     }
+@@ -44,7 +44,7 @@ def test_opening_a_request_records_code_tier_and_evidence(tmp_path):
+     request = _open(path, measurements={"observed_stops": 0})
+     assert request["project"] == "seykota"
+     assert request["code"] == "PROTECTION_UNVERIFIED"
+-    assert request["risk_tier"] == "R4"
++    assert request["risk_tier"] == "R3"
+     assert request["evidence"] == EVIDENCE
+     assert request["measurements"] == {"observed_stops": 0}
+     assert request["fingerprint"] == request_fingerprint("seykota", "PROTECTION_UNVERIFIED", EVIDENCE)
+@@ -52,20 +52,23 @@ def test_opening_a_request_records_code_tier_and_evidence(tmp_path):
+     assert find_error_request(path, request["request_id"]) == request
+ 
+ 
+-def test_r0_conditions_can_never_open_a_request(tmp_path):
+-    """The catalog's R0 tier means the action after detection is fixed."""
++def test_r0_and_r1_conditions_can_never_open_a_request(tmp_path):
++    """v2: R0 means the action after detection is fixed and R1 that it was
++    already executed automatically -- neither leaves anything for a request to
++    be about.  Only R2 (on escalation) and R3 open requests."""
+     path = tmp_path / "queue.jsonl"
+     with pytest.raises(ErrorRequestError, match="never open a request"):
+         _open(path, code="TRADE_EXIT", risk_tier="R0")
+     assert not path.exists()
+ 
+-    r0_codes = [entry for entry in CATALOG["entries"] if entry["risk_tier"] == "R0"]
+-    assert r0_codes, "the catalog is expected to classify some conditions as log-only"
+-    for entry in r0_codes:
++    silent = [entry for entry in CATALOG["entries"] if entry["risk_tier"] in ("R0", "R1")]
++    assert {entry["risk_tier"] for entry in silent} == {"R0", "R1"}
++    for entry in silent:
+         bare = entry["code"].split(".", 1)[1]
+         with pytest.raises(ErrorRequestError, match="never open a request"):
+-            open_error_request(path, project=entry["project"], code=bare, risk_tier="R0")
+-    assert "R0" not in REQUESTABLE_TIERS
++            open_error_request(path, project=entry["project"], code=bare, risk_tier=entry["risk_tier"])
++    assert not path.exists()
++    assert REQUESTABLE_TIERS == {"R2", "R3"}
+ 
+ 
+ def test_the_same_problem_across_many_cycles_is_one_request(tmp_path):
+@@ -155,7 +158,7 @@ def test_a_request_opened_from_a_latch_shares_the_latch_evidence(tmp_path):
+         event_log,
+         project="seykota",
+         code=halt["code"],
+-        risk_tier="R4",
++        risk_tier="R3",
+         evidence=halt["evidence"],
+         details=halt["details"],
+     )
+diff --git a/tests/test_fleet_error_catalog.py b/tests/test_fleet_error_catalog.py
+index 47f8495..929a077 100644
+--- a/tests/test_fleet_error_catalog.py
++++ b/tests/test_fleet_error_catalog.py
+@@ -15,8 +15,8 @@ from pathlib import Path
+ import pytest
+ 
+ _ROOT = Path(__file__).resolve().parents[1]
+-CATALOG_PATH = _ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json"
+-SCHEMA_PATH = _ROOT / "schemas" / "fleet-error-catalog-v1.schema.json"
++CATALOG_PATH = _ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v2.json"
++SCHEMA_PATH = _ROOT / "schemas" / "fleet-error-catalog-v2.schema.json"
+ 
+ 
+ @pytest.fixture(scope="module")
+@@ -53,9 +53,10 @@ def test_code_prefix_agrees_with_project(catalog):
+ 
+ def test_mechanical_verdicts_never_reach_a_notifying_tier(catalog):
+     """The governing test of the whole project: if a human cannot decide
+-    anything different, the condition must not be able to page one.  R2 is the
+-    one tier that automates without notifying, so MECHANICAL is limited to
+-    R0/R2 and every notifying tier is reserved for JUDGEMENT."""
++    anything different, the condition must not be able to page one.  In v2 the
++    two silent tiers are R0 (log) and R1 (automatic), so MECHANICAL is limited
++    to those and the tiers that can reach a human (R2 once escalated, R3) are
++    reserved for JUDGEMENT."""
+     tiers = catalog["risk_tiers"]
+     for entry in catalog["entries"]:
+         tier = tiers[entry["risk_tier"]]
+@@ -65,24 +66,34 @@ def test_mechanical_verdicts_never_reach_a_notifying_tier(catalog):
+             assert tier["notifies"], entry["code"]
+ 
+ 
+-def test_an_audit_notice_never_doubles_as_a_decision_request(catalog):
+-    """Phase 6 draws a line the governing test above depends on: a tier may
+-    tell a human what it already did (``audit_notice``) without that counting
+-    as asking them to decide (``notifies``).  The line only holds while the
+-    two can never be true at once -- otherwise any tier could notify freely by
+-    calling it an audit notice, and MECHANICAL conditions would be back to
+-    paging people."""
+-    for name, tier in catalog["risk_tiers"].items():
+-        if tier["audit_notice"]:
+-            assert not tier["notifies"], name
+-            assert tier["auto_executes"], name
++def test_v2_tier_semantics(catalog):
++    """fleet-error-catalog/v2 (2026-09-18): R0 log, R1 automatic and silent, R2
++    automatic with escalation after ``escalate_after`` failures, R3 human only.
++    v1's after-the-fact audit notice is gone: an R1 action has no second
++    option, so telling someone about it asks nothing of them."""
++    tiers = catalog["risk_tiers"]
++    assert set(tiers) == {"R0", "R1", "R2", "R3"}
++    assert (tiers["R0"]["notifies"], tiers["R0"]["auto_executes"]) == (False, False)
++    assert (tiers["R1"]["notifies"], tiers["R1"]["auto_executes"]) == (False, True)
++    assert (tiers["R2"]["notifies"], tiers["R2"]["auto_executes"]) == (True, True)
++    assert (tiers["R3"]["notifies"], tiers["R3"]["auto_executes"]) == (True, False)
++    assert all("audit_notice" not in tier for tier in tiers.values())
++
++
++def test_only_r2_escalates_and_it_says_after_how_many_failures(catalog):
++    tiers = catalog["risk_tiers"]
++    assert isinstance(tiers["R2"].get("escalate_after"), int) and tiers["R2"]["escalate_after"] >= 1
++    assert [name for name, tier in tiers.items() if "escalate_after" in tier] == ["R2"]
+ 
+ 
+-def test_only_an_automatic_tier_reports_after_the_fact(catalog):
+-    """An audit notice reports a completed action, so a tier that executes
+-    nothing has nothing to report."""
+-    reporting = {name for name, tier in catalog["risk_tiers"].items() if tier["audit_notice"]}
+-    assert reporting == {"R2"}
++def test_retired_codes_are_never_reused(catalog):
++    """A retired code stays retired: an entry may keep one only while its call
++    site still exists and is on its way out, and its own reason must say so."""
++    retired = {item["code"]: item for item in catalog["retired_codes"]}
++    assert retired, "v2 retires at least the v1 proposal codes"
++    live = {entry["code"] for entry in catalog["entries"]}
++    for code in retired.keys() & live:
++        assert "until" in retired[code]["reason"].lower() or "直到" in retired[code]["reason"], code
+ 
+ 
+ def test_only_judgement_conditions_latch_after_phase_4(catalog):
+@@ -127,7 +138,7 @@ def test_operator_messages_have_all_three_parts(catalog):
+         message = entry.get("operator_message")
+         if message is None:
+             continue
+-        assert set(message) == {"what", "direction", "steps"}, entry["code"]
++        assert set(message) <= {"what", "direction", "steps", "ai_prompt"}, entry["code"]
+         assert isinstance(message["what"], str) and message["what"].strip(), entry["code"]
+         assert isinstance(message["direction"], str) and message["direction"].strip(), entry["code"]
+         assert isinstance(message["steps"], list) and message["steps"], entry["code"]
+@@ -135,19 +146,24 @@ def test_operator_messages_have_all_three_parts(catalog):
+             assert isinstance(step, str) and step.strip(), entry["code"]
+ 
+ 
+-def test_r0_conditions_carry_no_operator_message(catalog):
+-    """R0 notifies nobody, so text written for it could never be read."""
++def test_every_entry_has_an_operator_message(catalog):
++    """v2: every entry, not just the ones already wired to ops-notify -- the
++    generated risk register page reads its plain-language text from here, and
++    "write it when the strategy is connected" is how v1 ended up with 3 of 33."""
+     for entry in catalog["entries"]:
+-        if entry["risk_tier"] == "R0":
+-            assert "operator_message" not in entry, entry["code"]
++        assert "operator_message" in entry, entry["code"]
+ 
+ 
+-def test_momentum_repair_bot_conditions_have_operator_messages(catalog):
+-    """Phase 7b wires these three to ops-notify first; the export would fall
+-    back to the bare catalog title without them."""
+-    by_code = {entry["code"]: entry for entry in catalog["entries"]}
+-    for code in ("MOM.VERIFIED_CLOSE_PROPOSED", "MOM.VERIFIED_CLOSE_AUTO_REPAIRED", "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"):
+-        assert "operator_message" in by_code[code], code
++def test_tiers_that_reach_a_human_carry_an_ai_prompt(catalog):
++    """An R2 escalation or an R3 stop hands the operator a problem the machine
++    could not solve; the message must include a prompt an AI can use to trace
++    the root cause, not just "go look"."""
++    for entry in catalog["entries"]:
++        prompt = entry["operator_message"].get("ai_prompt")
++        if entry["risk_tier"] in ("R2", "R3"):
++            assert isinstance(prompt, str) and prompt.strip(), entry["code"]
++        else:
++            assert prompt is None, entry["code"]
+ 
+ 
+ def test_packaged_catalog_is_the_file_the_tests_read():
+diff --git a/tests/test_fleet_event_log.py b/tests/test_fleet_event_log.py
+index 6ac51bc..0f949bd 100644
+--- a/tests/test_fleet_event_log.py
++++ b/tests/test_fleet_event_log.py
+@@ -18,7 +18,7 @@ from trade_alerts.fleet_event_log import (
+ )
+ 
+ REPO_ROOT = Path(__file__).resolve().parents[1]
+-CATALOG_PATH = REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json"
++CATALOG_PATH = REPO_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v2.json"
+ CATALOG = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+ SCHEMA = json.loads((REPO_ROOT / "schemas" / "fleet-event-log-v1.schema.json").read_text(encoding="utf-8"))
+ 
+@@ -52,7 +52,7 @@ def test_every_stored_event_validates_against_the_published_schema(tmp_path):
+         project="momentum",
+         code="PROTECTION_UNVERIFIED",
+         summary="原生移動停損無法驗證",
+-        risk_tier="R4",
++        risk_tier="R3",
+         evidence={"trade_id": "t-1", "symbol": "BTC_USDT"},
+         details={"expected_order_id": "o-9"},
+         measurements={"observed_orders": 0},
+@@ -123,7 +123,7 @@ def test_prefix_table_reproduces_every_published_catalog_code():
+ 
+ def test_catalog_lookup_resolves_a_tier_from_a_bare_condition_name():
+     catalog = load_error_catalog(CATALOG_PATH)
+-    assert risk_tier_for(catalog, "seykota", "PROTECTION_UNVERIFIED") == "R4"
++    assert risk_tier_for(catalog, "seykota", "PROTECTION_UNVERIFIED") == "R3"
+     assert risk_tier_for(catalog, "seykota", "TRADE_EXIT") == "R0"
+     assert catalog_entry(catalog, "seykota", "PROTECTION_PLACEMENT_FAILED_FLATTENED")["resume"] == "automatic"
+     with pytest.raises(FleetEventLogError, match="no catalog entry"):
+diff --git a/tests/test_ops_export.py b/tests/test_ops_export.py
+index 90431b4..12367de 100644
+--- a/tests/test_ops_export.py
++++ b/tests/test_ops_export.py
+@@ -11,14 +11,16 @@ from trade_alerts.ops_export import (
+     NOTIFYING_TIERS,
+     OPS_EXPORT_VERSION,
+     build_ops_export,
++    needs_human,
+     render_notice_text,
+     write_ops_export,
+ )
+ 
+ REPO_ROOT = Path(__file__).resolve().parents[1]
+-SCHEMA_PATH = REPO_ROOT / "schemas" / "fleet-ops-export-v1.schema.json"
+-NOW = datetime(2026, 9, 17, 12, 0, 0, tzinfo=timezone.utc)
++SCHEMA_PATH = REPO_ROOT / "schemas" / "fleet-ops-export-v2.schema.json"
++NOW = datetime(2026, 9, 18, 12, 0, 0, tzinfo=timezone.utc)
+ CATALOG = load_error_catalog()
++BY_CODE = {entry["code"]: entry for entry in CATALOG["entries"]}
+ 
+ 
+ def _iso(moment):
+@@ -36,72 +38,102 @@ def _event(log, *, code, risk_tier, age=timedelta(hours=1), project="momentum",
+     )
+ 
+ 
++def _escalated(**details):
++    return {"escalated": True, **details}
++
++
+ def _build(paths, **kwargs):
+     log, queue = paths
+     return build_ops_export(log, queue, project="momentum", catalog=CATALOG, now=NOW, **kwargs)
+ 
+ 
+ def test_missing_files_give_an_empty_export(paths):
+-    export = _build(paths)
+-    assert export == {
+-        "export_version": OPS_EXPORT_VERSION, "project": "momentum", "generated_at": "2026-09-17T12:00:00Z",
++    assert _build(paths) == {
++        "export_version": OPS_EXPORT_VERSION, "project": "momentum", "generated_at": "2026-09-18T12:00:00Z",
+         "window_days": 7, "notices": [], "open_requests": [],
+     }
++    assert OPS_EXPORT_VERSION == "fleet-ops-export/v2"
+ 
+ 
+-def test_r0_events_never_become_notices(paths):
++# --------------------------------------------------------------------------- #
++# who reaches a human (fleet-error-catalog/v2)
++# --------------------------------------------------------------------------- #
++def test_r0_and_r1_never_become_notices(paths):
+     log, _queue = paths
+     _event(log, code="RUNTIME_CYCLE_FAILED", risk_tier="R0")
+-    assert "R0" not in NOTIFYING_TIERS
++    _event(log, code="VERIFIED_CLOSE_AUTO_REPAIRED", risk_tier="R1", details={"notice_text": "x"})
++    assert NOTIFYING_TIERS == ("R2", "R3")
+     assert _build(paths)["notices"] == []
+ 
+ 
+-def test_notifying_events_carry_header_plain_language_and_technical_detail(paths):
++def test_r2_stays_silent_until_it_escalates(paths):
+     log, _queue = paths
+-    event = _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4", summary="ledger write failed",
+-                   details={"notice_text": "incident_id: abc\ntrade_id: t-1"})
++    _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R2", details={"attempt": 1})
++    _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R2", details={"attempt": 2, "escalated": False})
++    assert _build(paths)["notices"] == []
++
++    escalated = _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R2", details=_escalated(attempt=3))
++    [notice] = _build(paths)["notices"]
++    assert notice["event_id"] == escalated["event_id"]
++    assert notice["risk_tier"] == "R2" and notice["critical"] is False
++    assert notice["text"].startswith("⚠️ 自動處理失敗，需要你處理")
++
++
++def test_escalation_flag_must_be_literally_true(paths):
++    log, _queue = paths
++    _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R2", details={"escalated": "yes"})
++    assert _build(paths)["notices"] == []
++
++
++def test_needs_human_rule():
++    assert needs_human({}, "R3") is True
++    assert needs_human({"details": {"escalated": True}}, "R2") is True
++    assert needs_human({"details": {}}, "R2") is False
++    assert needs_human({"details": {"escalated": True}}, "R1") is False
++    assert needs_human({}, None) is False
++
++
++def test_r3_notice_carries_header_plain_language_technical_detail_and_ai_block(paths):
++    log, _queue = paths
++    event = _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R3", summary="ledger write failed",
++                   evidence={"trade_id": "T1", "incident_id": "inc-1"},
++                   details={"notice_text": "incident_id: inc-1\ntrade_id: T1"})
+ 
+     [notice] = _build(paths)["notices"]
+ 
+     assert notice["event_id"] == event["event_id"]
+     assert notice["code"] == "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"
+-    assert notice["risk_tier"] == "R4" and notice["critical"] is True
++    assert notice["risk_tier"] == "R3" and notice["critical"] is True
+     text = notice["text"]
+     assert text.startswith("🔴 需要人工處理\n自動修復停手")
+     assert "發生什麼事：" in text and "解決方向：" in text and "處理步驟：\n1. " in text
+-    assert "技術細節：\nincident_id: abc\ntrade_id: t-1" in text
++    assert "技術細節：\nincident_id: inc-1\ntrade_id: T1" in text
+     assert "ledger write failed" not in text  # notice_text wins over the summary
++    ai_prompt = BY_CODE["MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"]["operator_message"]["ai_prompt"]
++    assert "給 AI 的追查指令（整段貼給 Claude）：\n" + ai_prompt in text
++    assert f"錯誤碼：momentum/VERIFIED_CLOSE_REPAIR_BLOCKED　事件編號：{event['event_id']}" in text
++    assert text.endswith('事件資料：{"incident_id": "inc-1", "trade_id": "T1"}')
+ 
+ 
+ def test_summary_is_the_technical_detail_when_no_notice_text(paths):
+     log, _queue = paths
+-    _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R1", summary="proposal computed for trade_id=t-2")
+-    [notice] = _build(paths)["notices"]
+-    assert notice["critical"] is False
+-    assert notice["text"].startswith("📋 修復提案（需要你決定）")
+-    assert notice["text"].endswith("技術細節：\nproposal computed for trade_id=t-2")
+-
+-
+-def test_r2_is_labelled_as_an_after_the_fact_notice(paths):
+-    log, _queue = paths
+-    _event(log, code="VERIFIED_CLOSE_AUTO_REPAIRED", risk_tier="R2")
++    _event(log, code="PROTECTION_UNVERIFIED", risk_tier="R3", summary="trailing stop not found")
+     [notice] = _build(paths)["notices"]
+-    assert notice["text"].startswith("✅ 已自動處理（事後通知，不需要動作）")
+-    assert notice["critical"] is False
++    assert "技術細節：\ntrailing stop not found" in notice["text"]
+ 
+ 
+ def test_events_older_than_the_window_are_dropped(paths):
+     log, _queue = paths
+-    _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R1", age=timedelta(days=8), summary="old")
+-    recent = _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R1", age=timedelta(days=6), summary="new")
++    _event(log, code="PROTECTION_UNVERIFIED", risk_tier="R3", age=timedelta(days=8))
++    recent = _event(log, code="PROTECTION_UNVERIFIED", risk_tier="R3", age=timedelta(days=6))
+     assert [n["event_id"] for n in _build(paths)["notices"]] == [recent["event_id"]]
+     assert len(_build(paths, window_days=9)["notices"]) == 2
+ 
+ 
+ def test_notices_are_oldest_first(paths):
+     log, _queue = paths
+-    newer = _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R1", age=timedelta(hours=1))
+-    older = _event(log, code="VERIFIED_CLOSE_AUTO_REPAIRED", risk_tier="R2", age=timedelta(hours=3))
++    newer = _event(log, code="PROTECTION_UNVERIFIED", risk_tier="R3", age=timedelta(hours=1))
++    older = _event(log, code="STATE_REPAIRED_SAFE_HALT", risk_tier="R3", age=timedelta(hours=3))
+     assert [n["event_id"] for n in _build(paths)["notices"]] == [older["event_id"], newer["event_id"]]
+ 
+ 
+@@ -109,12 +141,12 @@ def test_tier_falls_back_to_the_catalog_when_the_event_has_none(paths):
+     log, _queue = paths
+     _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier=None)
+     [notice] = _build(paths)["notices"]
+-    assert notice["risk_tier"] == "R4"
++    assert notice["risk_tier"] == "R3"
+ 
+ 
+ def test_uncatalogued_event_with_a_recorded_tier_still_notifies_under_its_code(paths):
+     log, _queue = paths
+-    _event(log, code="SOMETHING_NEW", risk_tier="R4", summary="brand new condition")
++    _event(log, code="SOMETHING_NEW", risk_tier="R3", summary="brand new condition")
+     [notice] = _build(paths)["notices"]
+     assert notice["text"] == "🔴 需要人工處理\nSOMETHING_NEW\n\n技術細節：\nbrand new condition"
+ 
+@@ -127,44 +159,49 @@ def test_uncatalogued_event_without_a_tier_is_skipped(paths):
+ 
+ def test_other_projects_events_are_ignored(paths):
+     log, _queue = paths
+-    _event(log, code="PROTECTION_UNVERIFIED", risk_tier="R4", project="seykota")
++    _event(log, code="PROTECTION_UNVERIFIED", risk_tier="R3", project="seykota")
+     assert _build(paths)["notices"] == []
+ 
+ 
++# --------------------------------------------------------------------------- #
++# open requests
++# --------------------------------------------------------------------------- #
+ def test_open_requests_carry_the_operator_message_and_closed_ones_are_gone(paths):
+     _log, queue = paths
+-    blocked = open_error_request(queue, project="momentum", code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4",
++    blocked = open_error_request(queue, project="momentum", code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R3",
+                                  summary="ledger write failed", evidence={"trade_id": "t-1"},
+-                                 opened_at="2026-09-17T11:00:00Z")
+-    closed = open_error_request(queue, project="momentum", code="VERIFIED_CLOSE_AUTO_REPAIRED", risk_tier="R2",
++                                 opened_at="2026-09-18T11:00:00Z")
++    closed = open_error_request(queue, project="momentum", code="VERIFIED_CLOSE_PROPOSED", risk_tier="R2",
+                                 evidence={"trade_id": "t-2"})
+-    record_request_outcome(queue, request_id=closed["request_id"], status="RESOLVED_AUTO")
++    record_request_outcome(queue, request_id=closed["request_id"], status="RESOLVED_HUMAN")
+ 
+     [request] = _build(paths)["open_requests"]
+ 
+-    entry = next(e for e in CATALOG["entries"] if e["code"] == "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED")
++    message = BY_CODE["MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"]["operator_message"]
+     assert request == {
+         "request_id": blocked["request_id"], "fingerprint": blocked["fingerprint"],
+-        "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED", "risk_tier": "R4", "opened_at": "2026-09-17T11:00:00Z",
+-        "summary": "ledger write failed",
+-        "what": entry["operator_message"]["what"], "direction": entry["operator_message"]["direction"],
+-        "steps": entry["operator_message"]["steps"], "handling_started_at": None,
++        "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED", "risk_tier": "R3", "opened_at": "2026-09-18T11:00:00Z",
++        "summary": "ledger write failed", "what": message["what"], "direction": message["direction"],
++        "steps": message["steps"], "ai_prompt": message["ai_prompt"], "handling_started_at": None,
+     }
+ 
+ 
+-def test_open_request_without_an_operator_message_has_nulls(paths):
++def test_open_request_for_an_uncatalogued_code_has_nulls(paths):
+     _log, queue = paths
+-    open_error_request(queue, project="seykota", code="PROTECTION_UNVERIFIED", risk_tier="R4", evidence={"x": 1})
+-    log, _ = paths
+-    [request] = build_ops_export(log, queue, project="seykota", catalog=CATALOG, now=NOW)["open_requests"]
+-    assert request["what"] is None and request["direction"] is None and request["steps"] == []
++    open_error_request(queue, project="momentum", code="SOMETHING_NEW", risk_tier="R3", evidence={"x": 1})
++    [request] = _build(paths)["open_requests"]
++    assert request["what"] is None and request["direction"] is None
++    assert request["steps"] == [] and request["ai_prompt"] is None
+ 
+ 
++# --------------------------------------------------------------------------- #
++# misc
++# --------------------------------------------------------------------------- #
+ def test_defaults_to_the_packaged_catalog(paths):
+     log, queue = paths
+-    _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4")
++    _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R3")
+     [notice] = build_ops_export(log, queue, project="momentum", now=NOW)["notices"]
+-    assert "發生什麼事：" in notice["text"]
++    assert "發生什麼事：" in notice["text"] and "給 AI 的追查指令" in notice["text"]
+ 
+ 
+ def test_rejects_a_non_positive_window(paths):
+@@ -180,12 +217,12 @@ def test_malformed_event_log_raises_instead_of_exporting_a_partial_view(paths):
+ 
+ 
+ def test_render_notice_text_without_entry_or_detail():
+-    assert render_notice_text({"code": "X"}, None, "R1") == "📋 修復提案（需要你決定）\nX"
++    assert render_notice_text({"code": "X"}, None, "R3") == "🔴 需要人工處理\nX"
+ 
+ 
+ def test_write_is_atomic_world_readable_and_round_trips(paths, tmp_path):
+     log, _queue = paths
+-    _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4", details={"notice_text": "詳細"})
++    _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R3", details={"notice_text": "詳細"})
+     export = _build(paths)
+     target = tmp_path / "audit" / "ops_export.json"
+ 
+@@ -200,11 +237,14 @@ def test_write_is_atomic_world_readable_and_round_trips(paths, tmp_path):
+ def test_export_matches_its_json_schema(paths):
+     jsonschema = pytest.importorskip("jsonschema")
+     log, queue = paths
+-    _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4", details={"notice_text": "x"})
+-    _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R1")
+-    open_error_request(queue, project="momentum", code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R4",
++    _event(log, code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R3", details={"notice_text": "x"})
++    _event(log, code="VERIFIED_CLOSE_PROPOSED", risk_tier="R2", details=_escalated())
++    _event(log, code="VERIFIED_CLOSE_AUTO_REPAIRED", risk_tier="R1")
++    open_error_request(queue, project="momentum", code="VERIFIED_CLOSE_REPAIR_BLOCKED", risk_tier="R3",
+                        evidence={"trade_id": "t-1"})
++    export = _build(paths)
++    assert sorted(n["risk_tier"] for n in export["notices"]) == ["R2", "R3"]
+     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+     jsonschema.Draft7Validator.check_schema(schema)
+-    errors = list(jsonschema.Draft7Validator(schema).iter_errors(_build(paths)))
++    errors = list(jsonschema.Draft7Validator(schema).iter_errors(export))
+     assert not errors, [f"{list(e.path)}: {e.message}" for e in errors]
+diff --git a/tests/test_safe_halt_model.py b/tests/test_safe_halt_model.py
+index 5aecdb4..37a8b74 100644
+--- a/tests/test_safe_halt_model.py
++++ b/tests/test_safe_halt_model.py
+@@ -20,7 +20,7 @@ from trade_alerts.safe_halt_model import (
+     safe_halt_fingerprint,
+ )
+ 
+-CATALOG = json.loads((Path(__file__).resolve().parents[1] / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v1.json").read_text(encoding="utf-8"))
++CATALOG = json.loads((Path(__file__).resolve().parents[1] / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v2.json").read_text(encoding="utf-8"))
+ 
+ 
+ def _halt(**overrides):
+-- 
+2.43.0
+
