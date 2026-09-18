@@ -443,7 +443,7 @@ def render_repair_proposal_text(
     project: str,
 ) -> str:
     """Render a computed verified-close-backfill repair as a human-readable
-    notification body -- R1 ``PROPOSE`` semantics (§2 of the fleet error
+    notification body -- v1 R1 ``PROPOSE`` semantics (§2 of the fleet error
     catalog): the notification carries the already-computed fix as a
     proposal, and nothing in this module ever executes it. Shadow mode
     passes this text straight to ``AlertDispatcher.publish``; nothing here

@@ -12,11 +12,12 @@ The queue lives in the strategy's ``audit/`` directory, deliberately **not** in
 ops-control, so a queue placed there would let the Telegram relay fabricate
 pending items for the repair bot to act on.
 
-``R0`` conditions can never open a request.  R0 means the action after detection
-is fixed, so there is nothing for a request to be about -- those belong in
-``fleet_event_log`` alone.  That rule is enforced here rather than left to each
-caller, mirroring the catalog's own executable invariant that a MECHANICAL
-verdict may not reach a notifying tier.
+Only ``R2`` (once it escalates) and ``R3`` open requests.  ``R0`` means the
+action after detection is fixed and ``R1`` means it was executed automatically
+with no second option -- either way there is nothing for a request to be about,
+so both belong in ``fleet_event_log`` alone.  That rule is enforced here rather
+than left to each caller, mirroring the catalog's own executable invariant that
+a MECHANICAL verdict may not reach a notifying tier.
 """
 from __future__ import annotations
 
@@ -40,13 +41,13 @@ OUTCOME_KIND = "error_request_outcome_v1"
 FINGERPRINT_LENGTH = 12
 
 #: A request leaves the queue only through one of these.  ``RESOLVED_AUTO`` is
-#: an automatic remedy (R2, and R3 after its timeout), ``RESOLVED_HUMAN`` an
+#: an automatic remedy (an R2 retry that succeeded after escalating), ``RESOLVED_HUMAN`` an
 #: operator acting, ``SUPERSEDED`` the same condition re-opening with different
 #: evidence, and ``WITHDRAWN`` the condition no longer holding on its own.
 TERMINAL_STATUSES = frozenset({"RESOLVED_AUTO", "RESOLVED_HUMAN", "SUPERSEDED", "WITHDRAWN"})
 #: Tiers that may open a request at all; see the module docstring for why R0
-#: cannot.
-REQUESTABLE_TIERS = frozenset(tier for tier in RISK_TIERS if tier != "R0")
+#: and R1 cannot.
+REQUESTABLE_TIERS = frozenset({"R2", "R3"})
 
 
 class ErrorRequestError(ValueError):
@@ -94,8 +95,8 @@ def _require_requestable_tier(risk_tier: Any) -> str:
         raise ErrorRequestError(f"unknown risk tier {risk_tier!r}")
     if risk_tier not in REQUESTABLE_TIERS:
         raise ErrorRequestError(
-            f"{risk_tier} conditions never open a request: the action after detection is fixed, "
-            "so record it in the fleet event log instead"
+            f"{risk_tier} conditions never open a request: the action after detection is fixed "
+            "or already executed automatically, so record it in the fleet event log instead"
         )
     return str(risk_tier)
 

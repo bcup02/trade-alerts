@@ -1,8 +1,8 @@
-# 交易機隊錯誤目錄 v1
+# 交易機隊錯誤目錄 v2
 
-**狀態：Phase 3 產出，2026-09-12 定版。** 本文件是全機隊錯誤分類的權威來源；機器可讀版本在
-[`src/trade_alerts/catalog/fleet-error-catalog-v1.json`](../src/trade_alerts/catalog/fleet-error-catalog-v1.json)，其形狀由
-[`schemas/fleet-error-catalog-v1.schema.json`](../schemas/fleet-error-catalog-v1.schema.json)
+**狀態：Phase 3 產出（2026-09-12 v1 定版），2026-09-18 升 v2（風險分級由五級改四級，見 §2）。** 本文件是全機隊錯誤分類的權威來源；機器可讀版本在
+[`src/trade_alerts/catalog/fleet-error-catalog-v2.json`](../src/trade_alerts/catalog/fleet-error-catalog-v2.json)，其形狀由
+[`schemas/fleet-error-catalog-v2.schema.json`](../schemas/fleet-error-catalog-v2.schema.json)
 定義，不變式由 `tests/test_fleet_error_catalog.py` 守住。兩份內容不一致時，以 JSON 為準——
 它是 Phase 4 事件日誌與錯誤處理請求佇列的輸入。
 
@@ -28,31 +28,35 @@
 `tests/test_fleet_error_catalog.py::test_mechanical_verdicts_never_reach_a_notifying_tier`
 把這條判準寫成了可執行的不變式：`MECHANICAL` 的條目不得落在任何會通知人的風險等級。
 
-## 2. 風險等級
+## 2. 風險等級（v2，2026-09-18）
 
-| 等級 | 代號 | 決策請求通知 | 自動執行 | 事後稽核通知 | 說明 |
-|---|---|---|---|---|---|
-| R0 | `LOG` | ✗ | ✗ | ✗ | 只進事件日誌。偵測之後的動作是固定的。 |
-| R1 | `PROPOSE` | ✓ | ✗ | ✗ | **算出具體解決方案之後**才發 LINE 通知，並把方案當提案附上。絕不無人核准就執行。 |
-| R2 | `AUTO_LOW` | ✗ | ✓ | ✓ | 低風險：直接自動執行，事後記進事件日誌並發一則稽核通知。 |
-| R3 | `AUTO_TIMEOUT` | ✓ | ✓ | ✗ | 中風險：開請求 → Telegram 按鈕可提早核准 → **逾時不按也會執行**。 |
-| R4 | `HUMAN_REQUIRED` | ✓ | ✗ | ✗ | 高風險：持續重複通知直到人處理。永不自動執行。 |
+| 等級 | 代號 | 自動處理 | 通知 | 說明 |
+|---|---|---|---|---|
+| R0 | `LOG` | 不用處理 | 不通知 | 只進事件日誌。偵測之後的動作是固定的。 |
+| R1 | `AUTO` | 直接做 | **不通知** | 自動執行並記進事件日誌。沒有第二個選項，告訴人也沒有東西可以決定。 |
+| R2 | `RETRY_ESCALATE` | 自動嘗試恢復 | 連續失敗 `escalate_after`（預設 3）次才通知一次 | 系統自己先試；試不起來才升格：開請求、通知，附白話步驟與給 AI 的根因追查指令。 |
+| R3 | `HUMAN_REQUIRED` | 絕不自動 | 通知並持續提醒 | 高風險：一定要人處理，提醒到有人處理為止。 |
 
-R2 是唯一「自動執行但不發決策請求」的等級，所以 `MECHANICAL` 只能落在 R0 或 R2；反過來，
-R1／R3／R4 一律保留給 `JUDGEMENT`。
+**排序的軸是「人能不能做出跟自動處理不一樣的決定」，不是事情有多嚴重。** R0／R1 人沒有決定可做
+（`MECHANICAL`，永遠不通知）；R2／R3 才會到人手上（`JUDGEMENT`）。`test_mechanical_verdicts_never_reach_a_notifying_tier`
+照這條寫成不變式。
 
-### 2.1 兩種通知不是同一件事（Phase 6 新增）
+### 2.1 v2 改了什麼、為什麼
 
-`notifies` 與 `audit_notice` 是**兩個不同的欄位**，永遠不會同時為真：
+使用者 2026-09-18 讀風險登記冊後拍板，理由與決定：
 
-- **決策請求通知**（`notifies`，R1／R3／R4）：在問你要不要、該怎麼辦。收到的人得做決定，不然
-  事情就停在那裡。§1 的判準管的就是這一種——沒有不同決定可做，就不該發。
-- **事後稽核通知**（`audit_notice`，只有 R2）：事情已經做完了，這則通知只是告訴你做了什麼。
-  它不問你任何事，不按也不會有任何後果，所以它不構成「打擾人做決定」，判準不禁止它。
-
-會有這個區分，是因為 R2 自動執行的動作**會動到真實損益**。動作本身沒有第二個選項（所以不該發
-決策請求），但「錢動了」這件事本人應該當下就知道，而不是事後自己去翻日誌。兩者都成立，靠的是
-把「告知」跟「請示」分開，而不是放寬判準。
+- **v1 的 R1「提案、交給人決定」沒有意義。** 交易所是權威資料：治標就是照交易所讓帳本、交易所、
+  Google 表三方一致，這件事機器能做就該自己做；真正需要人的只有「機器試了還是對不上」，而那時人要做的
+  是追查根因——所以 v2 的升格訊息一律附一段可以直接貼給 AI 的根因追查指令（`operator_message.ai_prompt`）。
+- **v1 的 R3「逾時自動執行＋Telegram 提早核准」取消。** 動作內容確定的就立即重試；重試起不來才升格。
+  v1 R1 與 v1 R3 合併成 v2 R2。
+- **v1 的 R2 事後稽核通知取消**，v1 R2 → v2 R1 不通知。自動補寫帳本只是記下交易所上已經發生的事，
+  沒有動到任何錢。`audit_notice` 欄位刪除。
+- v1 R4 → v2 R3，內容不變。
+- 請求佇列只收 R2（升格時）與 R3；ops-notify 只轉送 R3 與升格的 R2。
+- 退役代碼列在 JSON 的 `retired_codes`，永不重用（不變式守住）。
+- 條目的 `auto_action`／`human_action` 描述的是 v2 目標行為，落在 `lands_in_phase`（8＝v2 分級落實到各策略）；
+  **某支策略實際做到了沒有，不在本目錄，而在全機隊一致性登記冊追蹤。**
 
 ## 3. 目錄總覽
 
@@ -64,64 +68,66 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `MECHANICAL`（動作固定） | 11 | 33% |
 | `JUDGEMENT`（真的要人判斷） | 22 | 67% |
 
-| 風險等級 | 條數 |
+| 風險等級（v2） | 條數 |
 |---|---|
-| R0 日誌 | 9 |
-| R1 提案 | 5 |
-| R2 自動執行 | 2 |
-| R3 逾時自動 | 6 |
-| R4 必須人工 | 11 |
+| R0 只記錄 | 9 |
+| R1 自動、不通知 | 2 |
+| R2 自動嘗試、失敗才通知 | 11 |
+| R3 必須人工 | 11 |
+
+下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
 
 ### 3.1 ed-seykota（14 條）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
-| `SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED` | latch `protective_stop_failed` | MECHANICAL | R2 | P4 |
-| `SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED` | latch `protective_stop_failed` | JUDGEMENT | R4 | P4 |
-| `SEY.PROTECTION_REPLACE_FAILED` | latch `protective_stop_replace_failed` | JUDGEMENT | R3 | P6 |
-| `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` | 通知 only | JUDGEMENT | R1 | P5 |
-| `SEY.PROTECTION_CLOSE_CANCEL_FAILED` | 通知 only | JUDGEMENT | R1 | P5 |
-| `SEY.PROTECTION_UNVERIFIED` | latch | JUDGEMENT | R4 | P4 |
-| `SEY.POSITION_AMBIGUOUS` | latch | JUDGEMENT | R4 | P4 |
-| `SEY.RECONCILE_FAILED` | latch | JUDGEMENT | R3 | P4 |
-| `SEY.EXCHANGE_TARGET_UNSAFE` | latch | JUDGEMENT | R4 | P4 |
-| `SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE` | latch | JUDGEMENT | R4 | P4 |
-| `SEY.RUNTIME_CYCLE_FAILED` | latch（catch-all） | JUDGEMENT | R3 | P4 |
+| `SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED` | latch `protective_stop_failed` | MECHANICAL | R1 | P4 |
+| `SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED` | latch `protective_stop_failed` | JUDGEMENT | R3 | P4 |
+| `SEY.PROTECTION_REPLACE_FAILED` | latch `protective_stop_replace_failed` | JUDGEMENT | R2 | P8（v2） |
+| `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` | 通知 only | JUDGEMENT | R2 | P8（v2） |
+| `SEY.PROTECTION_CLOSE_CANCEL_FAILED` | 通知 only | JUDGEMENT | R2 | P8（v2） |
+| `SEY.PROTECTION_UNVERIFIED` | latch | JUDGEMENT | R3 | P4 |
+| `SEY.POSITION_AMBIGUOUS` | latch | JUDGEMENT | R3 | P4 |
+| `SEY.RECONCILE_FAILED` | latch | JUDGEMENT | R2 | P4 |
+| `SEY.EXCHANGE_TARGET_UNSAFE` | latch | JUDGEMENT | R3 | P4 |
+| `SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE` | latch | JUDGEMENT | R3 | P4 |
+| `SEY.RUNTIME_CYCLE_FAILED` | latch（catch-all） | JUDGEMENT | R2 | P4 |
 | `SEY.CLOSE_FILL_PENDING` | 誤標 critical | MECHANICAL | R0 | **P3** |
 | `SEY.TRADE_EXIT` | 誤標 critical | MECHANICAL | R0 | **P3** |
 | `SEY.ENTRY_SKIPPED_MIN_CAPITAL` | 誤標 critical | MECHANICAL | R0 | **P3** |
 
 **`protective_stop_failed` 拆成兩碼**是本節最重要的改動。現行程式在「停損掛單失敗」之後會立刻
 嘗試緊急市價平倉，但不論平倉成功或失敗，都收斂成同一個 latch 原因碼。這兩種結果的真倉風險相差
-極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R2 自動清 latch）；平倉也失敗代表真倉
-有裸露部位而且程式的補救手段已經失敗過一次（→ R4，全機隊風險最高的一類）。
+極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R1 自動清 latch）；平倉也失敗代表真倉
+有裸露部位而且程式的補救手段已經失敗過一次（→ R3，全機隊風險最高的一類）。
 
 ### 3.2 momentum（6 條）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
-| `MOM.PROTECTION_UNVERIFIED` | latch dict，3 觸發點共用 | JUDGEMENT | R4 | P4 |
-| `MOM.STATE_REPAIRED_SAFE_HALT` | 人工工具寫入的 latch | JUDGEMENT | R4 | P4 |
+| `MOM.PROTECTION_UNVERIFIED` | latch dict，3 觸發點共用 | JUDGEMENT | R3 | P4 |
+| `MOM.STATE_REPAIRED_SAFE_HALT` | 人工工具寫入的 latch | JUDGEMENT | R3 | P4 |
 | `MOM.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重試 | MECHANICAL | R0 | — |
-| `MOM.VERIFIED_CLOSE_PROPOSED` | 修復 bot 提案通知 | JUDGEMENT | R1 | P5 |
-| `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R2 | **P6** |
-| `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R4 | **P6** |
+| `MOM.VERIFIED_CLOSE_PROPOSED` | 修復 bot 提案通知 | JUDGEMENT | R2 | P8（v2） |
+| `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R1 | **P6** |
+| `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R3 | **P6** |
 
 momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
 正是 seykota 要改成的樣子。
 
-後三條是 Phase 6 的 verified-close-backfill 修復 bot（`scripts/repair_bot.py`）。同一個偵測結果依
-判準分流到三個等級：無歧義 → R2 自動寫；有疑慮 → R1 提案；帳本已不乾淨 → R4 停手。自動寫入的
-開關（`MOMENTUM_REPAIR_AUTO_APPLY`）預設關閉，關閉時一律走 R1。seykota 不在範圍內，維持 Phase 5
-影子模式。
+後三條是 Phase 6 的 verified-close-backfill 修復 bot（`scripts/repair_bot.py`）。v2 起：無歧義 → R1 自動寫、不通知；
+以交易所為準仍能對應 → 照交易所補寫；只有結構上對不上才重試並升格（R2，`MOM.VERIFIED_CLOSE_PROPOSED` 的呼叫點
+由共用修復執行器取代時退役）；帳本已不乾淨 → R3 停手。v1 的過渡開關 `MOMENTUM_REPAIR_AUTO_APPLY`（只有 momentum
+有、33 條只管 1 條、沒有任何機制會評估並打開它）在 v2 移除；seykota 的影子 bot 發出的
+`SEY.VERIFIED_CLOSE_PROPOSED` 從未登記進 v1 目錄，v2 列入 `retired_codes`，seykota 改用同一個共用執行器。
 
 ### 3.3 btc-competition（4 條）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
-| `BTC.BOOK_CORRUPT_NEGATIVE_BALANCE` | latch（4 個扁平欄位） | JUDGEMENT | R4 | P4 |
-| `BTC.EXECUTION_BLOCKED_ZERO_FILLS` | latch | JUDGEMENT | R3 | P6 |
+| `BTC.BOOK_CORRUPT_NEGATIVE_BALANCE` | latch（4 個扁平欄位） | JUDGEMENT | R3 | P4 |
+| `BTC.EXECUTION_BLOCKED_ZERO_FILLS` | latch | JUDGEMENT | R2 | P8（v2） |
 | `BTC.REBALANCE_PENDING` | 不 latch，自動續做 | MECHANICAL | R0 | — |
 | `BTC.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重新拋出 | MECHANICAL | R0 | — |
 
@@ -133,12 +139,12 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障�
 | 錯誤碼 | 現行事件名 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
 | `MYC.RECONCILE_DELTA_EXCEEDED` | `SAFE_HALT`（誤導） | MECHANICAL | R0 | **P3** 改名 / **P4e** 定案不聚合 |
-| `MYC.RUNTIME_CYCLE_FAILED` | `SAFE_HALT`（誤導） | JUDGEMENT | R1 | **P3** 改名 / P5 |
-| `MYC.PROTECTION_PLACEMENT_REJECTED` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R4 | **P3** 改名 / P5 |
-| `MYC.PROTECTION_PLACEMENT_NO_POSITION` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P6 |
-| `MYC.PROTECTION_PLACEMENT_ERROR` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R4 | **P3** 改名 / P5 |
-| `MYC.PROTECTION_REPLACE_FAILED` | `PROTECTIVE_STOP_FAILED` ×2 | JUDGEMENT | R3 | **P3** 改名 / P6 |
-| `MYC.PROTECTION_ORPHAN_CANCEL_FAILED` | `PROTECTIVE_STOP_CANCEL_FAILED` | JUDGEMENT | R1 | **P3** 改名 / P5 |
+| `MYC.RUNTIME_CYCLE_FAILED` | `SAFE_HALT`（誤導） | JUDGEMENT | R2 | P8（v2） |
+| `MYC.PROTECTION_PLACEMENT_REJECTED` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P5 |
+| `MYC.PROTECTION_PLACEMENT_NO_POSITION` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R2 | P8（v2） |
+| `MYC.PROTECTION_PLACEMENT_ERROR` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P5 |
+| `MYC.PROTECTION_REPLACE_FAILED` | `PROTECTIVE_STOP_FAILED` ×2 | JUDGEMENT | R2 | P8（v2） |
+| `MYC.PROTECTION_ORPHAN_CANCEL_FAILED` | `PROTECTIVE_STOP_CANCEL_FAILED` | JUDGEMENT | R2 | P8（v2） |
 
 **my-crypto 不加 latch**（使用者 2026-09-12 定案）。兩個叫 `SAFE_HALT` 的事件名宣稱一個這支程式
 根本沒有的停機行為——bot 發完通知照常繼續交易。替一支目前沒有這個概念的 LIVE bot 新增停機行為，
@@ -146,7 +152,7 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障�
 改名，讓事件名說實話。
 
 五個共用 `PROTECTIVE_STOP_FAILED` 的呼叫點語意差異很大（明確被拒絕／查不到部位／拋例外／搬移
-失敗），風險等級從 R3 到 R4 都有，看 log 的人目前分不出來，Phase 3 一併拆成各自的碼。
+失敗），風險等級從 R2 到 R3 都有，看 log 的人目前分不出來，Phase 3 一併拆成各自的碼。
 
 ### 3.5 跨 repo（2 條）
 
@@ -274,17 +280,18 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
 
 跨過門檻的錯誤開一張「請求」——請求對錯誤，就像 PR 對 commit：它指名一個條件、帶著證據與本目錄
 的風險等級，開著直到有一個 outcome 關掉它。**開請求此時仍然不通知**；Phase 5 的修復 bot 先算出
-具體的修復內容，才發通知並附上提案（只重述問題的通知，等於把機器能做的分析丟回給讀的人做）。
+具體的修復內容；v2 起請求只在需要人時才開（R2 升格、R3），通知附白話步驟與給 AI 的根因追查指令
+（只重述問題的通知，等於把機器能做的分析丟回給讀的人做）。
 
 - 佇列放策略的 `audit/`，**刻意不放 `/var/lib/*-control`**——後者是 2770 setgid、ops-control
   可寫，放那裡等於讓 Telegram relay 能偽造待處理項目給修復 bot 去執行。
-- **R0 永遠不能開請求**，這條規則寫在函式裡而不是留給每個呼叫端自律。R0 的意思是偵測之後的動作
-  是固定的，所以沒有東西可以讓一張請求「關於」它——那些只進 §4.5 的事件日誌。這與本目錄
+- **R0／R1 永遠不能開請求**，這條規則寫在函式裡而不是留給每個呼叫端自律。R0 的意思是偵測之後的動作
+  是固定的、R1 是已經自動做完，所以沒有東西可以讓一張請求「關於」它——那些只進 §4.5 的事件日誌。這與本目錄
   「MECHANICAL 判定不得落在會通知的等級」是同一條判準的兩個執行點。
 - 去重鍵是 `(project, code, evidence)` 的 fingerprint：一個條件連續成立 20 個輪詢週期產生
   **一張**請求，不是 20 張。請求被解決之後同一條件再發生，會開**新的一張**——策略確實第二次撞到
   這個問題，值得一張新請求，而不是靜默重開一張已關閉的。
-- 關閉狀態四種：`RESOLVED_AUTO`（R2，以及 R3 逾時後自動執行）、`RESOLVED_HUMAN`、`SUPERSEDED`
+- 關閉狀態四種：`RESOLVED_AUTO`（升格後的 R2 自動重試終於成功）、`RESOLVED_HUMAN`、`SUPERSEDED`
   （同條件帶著不同證據重開）、`WITHDRAWN`（條件自己不再成立）。已關閉的請求拒絕再關一次——
   outcome 是「實際發生了什麼」的稽核紀錄，第二筆會讓歷史對「哪個修復真的跑了」變得有歧義。
 - 格式在 `schemas/error-request-queue-v1.schema.json`。
@@ -295,23 +302,24 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
 所以修復 bot 以前呼叫 `publish` 的通知在兩台主機上其實都被靜默丟掉。Phase 7b 改成：策略把要讓人
 知道的事整理成 `audit/ops_export.json`，擁有維運頻道的 ops-notify 讀它、每筆只送一次。
 
-- **`operator_message`**（每條 entry 可選）：`{what, direction, steps[]}`＝發生什麼事、解決方向、
-  處理步驟，語氣比照機隊風險登記冊，不用術語。有這個欄位就三段都不得為空；R0 不得有（R0 不通知
-  任何人，寫了也沒人看得到）。先寫 momentum 修復 bot 的三條（R1／R2／R4），其餘條目在該策略接進
-  ops-notify 時補上——沒有的條目通知會退回只顯示目錄標題＋技術細節。
+- **`operator_message`**（v2 起**每條 entry 必填**）：`{what, direction, steps[], ai_prompt}`＝發生什麼事、
+  解決方向、處理步驟、給 AI 的根因追查指令，語氣比照機隊風險登記冊，不用術語。三段皆不得為空；
+  `ai_prompt` 在 R2／R3 必填、R0／R1 不得有。v1 只寫了 3 條、「其餘接入時再補」——這正是 v2 要消除的
+  「先做一部分、沒登記」，所以 v2 一次補齊 33 條，風險登記冊頁也由它產生。
 - **`build_ops_export(fleet_event_log, request_queue, *, project, catalog=None, window_days=7)`**：
-  - `notices`：近 `window_days` 天、等級 R1–R4 的事件（R0 永遠不在內），以 `event_id` 為鍵讓讀取端
-    每筆只送一次。等級以事件上記錄的為準，沒記錄才查目錄。`text` 是完整訊息本體：等級標頭 →
-    目錄標題 → 白話三段 → 「技術細節」（事件 `details.notice_text`，沒有就用 `summary`）。
-    `critical` 恰好在 R4 時為真。
-  - `open_requests`：所有未結案請求，附目錄的白話三段；`handling_started_at` 本版恆為 `null`，
-    Phase 7e 的「開始處理」按鈕才會寫入（欄位先放進 v1，之後不用改格式版本）。
+  - `notices`：近 `window_days` 天**需要人**的事件——所有 R3，以及 `details.escalated` 為真的 R2
+    （R0／R1 永遠不在內，未升格的 R2 也不在內），以 `event_id` 為鍵讓讀取端每筆只送一次。等級以事件上
+    記錄的為準，沒記錄才查目錄。`text` 是完整訊息本體：等級標頭 → 目錄標題 → 白話三段 → 「技術細節」
+    （事件 `details.notice_text`，沒有就用 `summary`）→ 給 AI 的追查指令（目錄的 `ai_prompt`＋本次事件的
+    錯誤碼、事件編號與 evidence，可整段貼給 AI）。`critical` 恰好在 R3 時為真。格式 `fleet-ops-export/v2`。
+  - `open_requests`：所有未結案請求，附目錄的白話三段與 `ai_prompt`；`handling_started_at` 本版恆為
+    `null`，Phase 7e 的「開始處理」按鈕才會寫入。
   - 事件日誌或佇列有壞行時直接拋錯（同 §4.5），不輸出一份看起來完整其實缺一塊的匯出；呼叫端
     best-effort 寫檔，匯出停止更新時由 ops-notify 報 `STALE`。
 - **`write_ops_export(path, export)`**：整份原子替換、`0644`。檔案由策略自己的服務帳號寫進
   `audit/`；ops-notify／ops-control 只有群組讀權限，relay 端無法偽造要送的項目（與 §4.6 佇列放
   `audit/` 同一個理由）。
-- 格式在 `schemas/fleet-ops-export-v1.schema.json`。
+- 格式在 `schemas/fleet-ops-export-v2.schema.json`。
 
 ### 4.7 `reconciliation_delta`：撤回聚合計畫（Phase 4e，2026-09-15）
 
@@ -370,8 +378,8 @@ log 行的 `event=` 與 `severity=` 欄位，不影響任何推播、下單或�
   （`PROJECT_CODE_PREFIXES` 不得與已發布的 `code` 前綴 drift）、
   `test_safe_halt_model.py::test_every_catalog_resume_path_is_one_this_model_implements`
   （entry 不得規定沒有任何策略實作得出來的 resume 路徑）、
-  `test_error_request_queue.py::test_r0_conditions_can_never_open_a_request`
-  （逐筆拿目錄裡的 R0 條件去試開請求，必須全部被拒）。
-- Phase 7b 起另有三條白話文字的不變式：`operator_message` 三段皆非空、R0 不得有
-  `operator_message`、momentum 修復 bot 三條必須有。改通知文字就是改這份 JSON——它隨套件發佈，
-  策略重新釘選新版本才會生效。
+  `test_error_request_queue.py::test_r0_and_r1_conditions_can_never_open_a_request`
+  （逐筆拿目錄裡的 R0／R1 條件去試開請求，必須全部被拒）。
+- v2 起的白話文字與分級不變式：每條都有 `operator_message` 且三段皆非空、R2／R3 必有 `ai_prompt`
+  而 R0／R1 不得有、四級語意固定、只有 R2 帶 `escalate_after`、退役代碼不得重用。改通知文字就是改這份
+  JSON——它隨套件發佈，策略重新釘選新版本才會生效。

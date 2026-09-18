@@ -11,9 +11,13 @@ read it (``audit/`` is group-readable, never group-writable).  Nothing on the
 relay side can fabricate an item to send.
 
 The file is a full snapshot rewritten every time, not an append log, so a
-reader never has to reconcile partial writes: ``notices`` are the notifying
-events of the last ``window_days``, identified by ``event_id`` so the reader
+reader never has to reconcile partial writes: ``notices`` are the events of the
+last ``window_days`` that need a human, identified by ``event_id`` so the reader
 can send each exactly once, and ``open_requests`` is everything still open.
+
+Which events need a human follows fleet-error-catalog/v2: every ``R3`` event,
+and an ``R2`` event only once the automatic retries gave up
+(``details.escalated`` is true).  ``R0`` and ``R1`` never reach the operator.
 """
 from __future__ import annotations
 
@@ -35,18 +39,15 @@ from .fleet_event_log import (
     utc_now_iso,
 )
 
-OPS_EXPORT_VERSION = "fleet-ops-export/v1"
+OPS_EXPORT_VERSION = "fleet-ops-export/v2"
 DEFAULT_WINDOW_DAYS = 7
-#: R0 is "log only": the action after detection is fixed, so it never reaches
-#: the operator and never appears here.
-NOTIFYING_TIERS = tuple(tier for tier in RISK_TIERS if tier != "R0")
+#: Tiers that can ever reach the operator: R3 always, R2 only once escalated.
+NOTIFYING_TIERS = ("R2", "R3")
 _EXPORT_MODE = 0o644
 
 _TIER_HEADERS = {
-    "R1": "📋 修復提案（需要你決定）",
-    "R2": "✅ 已自動處理（事後通知，不需要動作）",
-    "R3": "⚠️ 中風險狀況（逾時會自動處理）",
-    "R4": "🔴 需要人工處理",
+    "R2": "⚠️ 自動處理失敗，需要你處理",
+    "R3": "🔴 需要人工處理",
 }
 
 
@@ -77,10 +78,29 @@ def _resolve_tier(event: Mapping[str, Any], entry: Mapping[str, Any] | None) -> 
     return str(tier) if tier in RISK_TIERS else None
 
 
+def needs_human(event: Mapping[str, Any], risk_tier: str | None) -> bool:
+    """R3 always; R2 only when the strategy marked this event as the escalation
+    after its automatic retries failed."""
+    if risk_tier == "R3":
+        return True
+    details = event.get("details") if isinstance(event.get("details"), Mapping) else {}
+    return risk_tier == "R2" and details.get("escalated") is True
+
+
+def _ai_block(event: Mapping[str, Any], ai_prompt: str) -> list[str]:
+    """The catalog's prompt plus this occurrence's own identifiers, so it can be
+    pasted to an AI as-is without the operator digging anything up."""
+    evidence = event.get("evidence") if isinstance(event.get("evidence"), Mapping) else {}
+    return ["", "給 AI 的追查指令（整段貼給 Claude）：", ai_prompt.strip(),
+            f"錯誤碼：{event.get('project')}/{event.get('code')}　事件編號：{event.get('event_id')}",
+            "事件資料：" + json.dumps(dict(evidence), ensure_ascii=False, sort_keys=True)]
+
+
 def render_notice_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None, risk_tier: str) -> str:
     """Plain-language message for one event: tier header, catalog title, the
-    entry's ``operator_message`` when it has one, then the technical detail the
-    strategy attached (``details.notice_text``, else the event summary)."""
+    entry's ``operator_message`` when it has one, the technical detail the
+    strategy attached (``details.notice_text``, else the event summary), and the
+    entry's AI root-cause prompt with this event's identifiers."""
     code = str(event.get("code") or "")
     lines = [_TIER_HEADERS.get(risk_tier, risk_tier), str((entry or {}).get("title") or code)]
 
@@ -96,6 +116,10 @@ def render_notice_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None
         technical = event.get("summary")
     if isinstance(technical, str) and technical.strip():
         lines += ["", "技術細節：", technical.strip()]
+
+    ai_prompt = message.get("ai_prompt") if isinstance(message, Mapping) else None
+    if isinstance(ai_prompt, str) and ai_prompt.strip():
+        lines += _ai_block(event, ai_prompt)
     return "\n".join(lines)
 
 
@@ -108,7 +132,7 @@ def build_ops_export(
     window_days: int = DEFAULT_WINDOW_DAYS,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Build the ``fleet-ops-export/v1`` document for one strategy.
+    """Build the ``fleet-ops-export/v2`` document for one strategy.
 
     A malformed event log or request queue raises (see ``read_jsonl``): an
     export that silently left part of the evidence out would read as complete.
@@ -116,8 +140,7 @@ def build_ops_export(
     export that stops refreshing as ``STALE``.
 
     ``open_requests[].handling_started_at`` is always ``null`` in this version;
-    Phase 7e fills it in when an operator presses 「開始處理」.  The field is
-    already part of v1 so that change needs no new format version.
+    Phase 7e fills it in when an operator presses 「開始處理」.
     """
     if window_days < 1:
         raise ValueError("window_days must be at least 1")
@@ -138,14 +161,14 @@ def build_ops_export(
         bare_code = str(event.get("code") or "")
         entry = _entry_or_none(catalog, project, bare_code)
         tier = _resolve_tier(event, entry)
-        if tier not in NOTIFYING_TIERS:
+        if not needs_human(event, tier):
             continue
         notices.append({
             "event_id": str(event.get("event_id") or ""),
             "recorded_at": event.get("recorded_at"),
             "code": catalog_code(project, bare_code),
             "risk_tier": tier,
-            "critical": tier == "R4",
+            "critical": tier == "R3",
             "text": render_notice_text(event, entry, tier),
         })
     notices.sort(key=lambda notice: (str(notice["recorded_at"] or ""), notice["event_id"]))
@@ -168,6 +191,7 @@ def build_ops_export(
             "what": message.get("what"),
             "direction": message.get("direction"),
             "steps": list(message.get("steps") or []),
+            "ai_prompt": message.get("ai_prompt"),
             "handling_started_at": None,
         })
 

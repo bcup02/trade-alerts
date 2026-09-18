@@ -45,6 +45,7 @@ from .ops_export import (
     NOTIFYING_TIERS,
     OPS_EXPORT_VERSION,
     build_ops_export,
+    needs_human,
     render_notice_text,
     write_ops_export,
 )
@@ -207,6 +208,7 @@ __all__ = [
     "NOTIFYING_TIERS",
     "OPS_EXPORT_VERSION",
     "build_ops_export",
+    "needs_human",
     "render_notice_text",
     "write_ops_export",
     "FINGERPRINT_LENGTH",
@@ -275,4 +277,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.18.1"
+__version__ = "0.19.0"

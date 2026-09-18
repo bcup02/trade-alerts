@@ -65,12 +65,12 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
 ## 交易機隊錯誤目錄 v1
 
 全機隊錯誤分類的權威來源位於 [`docs/fleet-error-catalog.md`](docs/fleet-error-catalog.md)，
-機器可讀版本位於 [`src/trade_alerts/catalog/fleet-error-catalog-v1.json`](src/trade_alerts/catalog/fleet-error-catalog-v1.json)，
+機器可讀版本位於 [`src/trade_alerts/catalog/fleet-error-catalog-v2.json`](src/trade_alerts/catalog/fleet-error-catalog-v2.json)，
 其 JSON Schema 位於
-[`schemas/fleet-error-catalog-v1.schema.json`](schemas/fleet-error-catalog-v1.schema.json)。
+[`schemas/fleet-error-catalog-v2.schema.json`](schemas/fleet-error-catalog-v2.schema.json)。
 
 目錄替四支策略每一條維運可見的錯誤條件記錄：現行程式的行為、依判準「這個錯誤讓人做出什麼、
-跟自動處理不一樣的決定？」判定的 `MECHANICAL`／`JUDGEMENT`、風險等級 R0–R4、自動與人工處置，
+跟自動處理不一樣的決定？」判定的 `MECHANICAL`／`JUDGEMENT`、風險等級 R0–R3（v2，2026-09-18：只記錄／自動不通知／自動嘗試失敗才通知／必須人工）、自動與人工處置，
 以及改動落在哪一個 Phase。
 
 **Phase 7b 起目錄隨套件發佈、會在執行期被讀取**：`trade_alerts.ops_export` 從每個條件的
@@ -78,7 +78,7 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
 `load_error_catalog()` 不帶路徑時讀的就是套件內那一份。改動通知文字＝發新版本並讓策略重新釘選。
 
 `trade_alerts.ops_export.build_ops_export()` + `write_ops_export()` 把一支策略的事件日誌與未結案
-請求整理成 `audit/ops_export.json`（格式 `schemas/fleet-ops-export-v1.schema.json`），由 ops-notify
+請求整理成 `audit/ops_export.json`（格式 `schemas/fleet-ops-export-v2.schema.json`），由 ops-notify
 讀取後送到維運頻道；策略本身不推播。
 
 `tests/test_fleet_error_catalog.py` 守住幾條不變式，其中最重要的一條是：判定為 `MECHANICAL`
