@@ -13,12 +13,13 @@
     "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
     "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
     "v2-W4": "分級 v2：趨勢策略的修復機器人升到完整版",
-    "v2-W6": "分級 v2：部署到測試機與真倉",
+    "v2-W6": "分級 v2：部署到開發機與正式機",
     "8-momentum": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
     "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
     "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
     "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
-    "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上"
+    "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
+    "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞"
   },
   "sources": {
     "momentum": {
@@ -45,8 +46,8 @@
   "capabilities": [
     {
       "id": "latch.unified_model",
-      "title": "統一格式的暫停（latch）",
-      "description": "出事時用同一套欄位（原因碼＋證據＋指紋）把策略停住，四支才能用同一套解除與通知流程。",
+      "title": "統一格式的安全暫停",
+      "description": "出事時用同一套欄位（原因碼＋證據＋確認碼）讓策略安全暫停，四支才能用同一套解除與通知流程。",
       "status": {
         "momentum": {
           "state": "done",
@@ -58,7 +59,7 @@
         },
         "mycrypto": {
           "state": "n/a",
-          "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
+          "reason": "使用者 2026-09-12 定案加密策略不加安全暫停：出錯照常繼續、下一輪重試。"
         },
         "btc-competition": {
           "state": "done",
@@ -81,7 +82,7 @@
         },
         "mycrypto": {
           "state": "n/a",
-          "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
+          "reason": "使用者 2026-09-12 定案加密策略不加安全暫停：出錯照常繼續、下一輪重試。"
         },
         "btc-competition": {
           "state": "done",
@@ -91,7 +92,7 @@
     },
     {
       "id": "latch.restart_only_clear",
-      "title": "「改好設定重啟」就能解除的暫停真的會被清掉",
+      "title": "「改好設定重啟」就能解除的安全暫停真的會被清掉",
       "description": "設定錯誤類的暫停（例如連錯交易所）不能用解除工具清，只能改好設定後重啟；重啟後系統要自己確認設定正確並解除。",
       "status": {
         "momentum": {
@@ -105,7 +106,7 @@
         },
         "mycrypto": {
           "state": "n/a",
-          "reason": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
+          "reason": "使用者 2026-09-12 定案加密策略不加安全暫停：出錯照常繼續、下一輪重試。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -207,24 +208,48 @@
       }
     },
     {
-      "id": "repair_bot.verified_close",
-      "title": "漏記平倉自動修復機器人",
-      "description": "交易所已平倉但本地帳本漏記時，以交易所成交為準自動補寫；結構對不上才重試並升格。",
+      "id": "repair_bot.detect_propose",
+      "title": "修復機器人：抓錯並提出修復建議",
+      "description": "修復機器人的第一個功能：定時找出「交易所已平倉、本地帳本漏記」的漏記平倉，算好修復方案、寫進事件日誌，但不自己動帳本。修復機器人一共三個功能，另外兩個見下面兩列。",
       "status": {
         "momentum": {
-          "state": "pending",
-          "phase": "v2-W3",
-          "reason": "真倉（operations）只有 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py；會自動補寫的 v1 版 scripts/repair_bot.py（Phase 6b，受過渡開關 MOMENTUM_REPAIR_AUTO_APPLY 控制）只在 development／測試機。v2 由共用執行器取代。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:127 append_fleet_event VERIFIED_CLOSE_PROPOSED（正式機每 15 分鐘跑一次，2026-09-18 查證 137 輪零候選）"
         },
         "seykota": {
-          "state": "pending",
-          "phase": "v2-W4",
-          "reason": "只有 Phase 5 只提案的影子版，而且發出的 SEY.VERIFIED_CLOSE_PROPOSED 從未登記進 v1 目錄。"
+          "state": "done",
+          "evidence": "scripts/repair_bot_shadow.py:144 append_fleet_event VERIFIED_CLOSE_PROPOSED（正式機每 15 分鐘跑一次，2026-09-18 查證 137 輪零候選）"
         },
         "mycrypto": {
           "state": "pending",
           "phase": "8-mycrypto",
-          "reason": "有同樣的漏記平倉形狀（reconcile_compare 會產生 position_diffs），目前只有一次性手修腳本；需要先做 MEXC 成交查詢轉接器。"
+          "reason": "加密策略有同樣的漏記平倉情況（對帳會產生 position_diffs），目前只有一次性手動修補腳本；要先做 MEXC 成交查詢才能接修復機器人。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "現貨再平衡策略，沒有開倉／平倉配對，不會有漏記平倉。"
+        }
+      }
+    },
+    {
+      "id": "repair_bot.verified_close",
+      "title": "修復機器人：自動補寫漏記平倉",
+      "description": "修復機器人的第二個功能：證據完全沒有疑慮時，照交易所成交紀錄把漏記的平倉直接寫進帳本；結構對不上才重試並升格。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "正式機（operations 分支）跑的已是 scripts/repair_bot.py，但自動補寫開關 MOMENTUM_REPAIR_AUTO_APPLY 在正式機沒打開（6d 關著觀察到 9/24），所以實際上還不會自動補寫。v2 由共用修復執行器取代並拿掉開關。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "正式機跑的是只抓錯提建議的 scripts/repair_bot_shadow.py，沒有自動補寫這條路徑；升到共用修復執行器時才有。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "跟著「抓錯並提出修復建議」一起做，要先有 MEXC 成交查詢。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -234,18 +259,17 @@
     },
     {
       "id": "repair_bot.pause_brake",
-      "title": "修復機器人緊急煞車",
-      "description": "一個設定就讓修復機器人完全停手（不偵測、不查交易所、不寫帳本）。所有修復機器人同名同行為。",
+      "title": "修復機器人：停用開關",
+      "description": "修復機器人的第三個功能：一個設定就讓修復機器人完全停手（不檢查、不查交易所、不寫帳本）。所有修復機器人同名同行為。",
       "status": {
         "momentum": {
-          "state": "pending",
-          "phase": "v2-W3",
-          "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 有 MOMENTUM_REPAIR_PAUSED，真倉（operations）仍是 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py，沒有煞車。改用共用執行器時保留煞車，W6 一起上真倉。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:268 MOMENTUM_REPAIR_PAUSED 為真就整輪跳過（第 374 行讀設定；正式機每輪輸出都帶 paused 欄位）"
         },
         "seykota": {
           "state": "pending",
           "phase": "v2-W4",
-          "reason": "影子版沒有煞車；升到共用執行器時一起加 SEYKOTA_REPAIR_PAUSED。"
+          "reason": "正式機跑的 scripts/repair_bot_shadow.py 沒有停用開關；升到共用修復執行器時一起加 SEYKOTA_REPAIR_PAUSED。"
         },
         "mycrypto": {
           "state": "pending",
@@ -254,7 +278,7 @@
         },
         "btc-competition": {
           "state": "n/a",
-          "reason": "沒有修復機器人（見上一列）。"
+          "reason": "沒有修復機器人（見「修復機器人：抓錯並提出修復建議」）。"
         }
       }
     },
@@ -265,7 +289,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:278 refresh_ops_export（2026-09-18 查證：今天 F3 資金費修復的整支重新部署把它一併帶上真倉，trading-main 每輪都在改寫 audit/ops_export.json，目前內容為空；ops-notify 那端轉送開關尚未開，見 ops_notify.export_relay_enabled）"
+          "evidence": "scripts/repair_bot.py:278 refresh_ops_export（2026-09-18 查證：當天資金費同步修復整支重新部署時一併帶上正式機，trading-main 每輪都在改寫 audit/ops_export.json，目前內容為空；維運通知那端的轉送開關還沒開，見「維運通知已開啟匯出轉送」）"
         },
         "seykota": {
           "state": "pending",
@@ -287,12 +311,12 @@
     {
       "id": "ops_notify.export_relay_enabled",
       "title": "維運通知已開啟匯出轉送（部署設定）",
-      "description": "維運主機的 ops-notify 設定檔對這支策略開了 OPS_NOTIFY_<KEY>_OPS_EXPORT=on。部署狀態，無法由 CI 檢查，每次部署後人工更新。",
+      "description": "正式機／開發機上維運通知（ops-notify）的設定檔對這支策略開了 OPS_NOTIFY_<KEY>_OPS_EXPORT=on。部署狀態，無法由 CI 檢查，每次部署後人工更新。",
       "status": {
         "momentum": {
           "state": "pending",
           "phase": "v2-W6",
-          "reason": "測試機已開（2026-09-17，閘門驗證通過）；真倉等 v2 一起推。"
+          "reason": "開發機已開（2026-09-17，閘門驗證通過）；正式機等 v2 一起推。"
         },
         "seykota": {
           "state": "pending",
@@ -314,12 +338,12 @@
     {
       "id": "ops_notify.units_axis",
       "title": "維運通知盯背景服務有沒有掛掉（部署設定）",
-      "description": "維運主機的 ops-notify 設定檔列出這支策略要盯的 systemd unit。部署狀態，每次部署後人工更新。",
+      "description": "正式機／開發機上維運通知（ops-notify）的設定檔列出這支策略要盯的 systemd unit。部署狀態，每次部署後人工更新。",
       "status": {
         "momentum": {
           "state": "pending",
           "phase": "v2-W6",
-          "reason": "測試機已設定（盯修復機器人 unit／timer）；真倉還沒設定。"
+          "reason": "開發機已設定（盯修復機器人的 unit／timer）；正式機還沒設定。"
         },
         "seykota": {
           "state": "pending",
@@ -340,26 +364,53 @@
     },
     {
       "id": "reconcile.funding_fee_sync",
-      "title": "資金費用同步",
+      "title": "資金費同步",
       "description": "定時查交易所的資金費結算紀錄、寫進本機帳本，讓帳目跟交易所餘額對得起來。",
       "status": {
         "momentum": {
           "state": "pending",
           "phase": "binance-funding-sync",
-          "reason": "2026-09-18 查證：scripts/sync_funding_fees.py 存在且會跑，但查的是 MEXC——真倉已於 2026-09-04 切換到 EXCHANGE=binance，這支程式從那天起就一直在查錯的交易所，對現在的真倉交易沒有實質幫助。09-04 起 25 筆真倉交易全部持倉很短（最長 2.83 小時），目前沒有一筆跨過資金費結算時間點，所以尚未造成已知漏記；但只要有一筆撐過 8 小時就會真的漏記且無法事後補回。PR AI-for-column/mexc-4h-momentum-trailing-stop#92 修好了這支程式本身的節流/重試/DRY_RUN 排除問題，但沒有解決「查錯交易所」這件事。"
+          "reason": "2026-09-18 查證：scripts/sync_funding_fees.py 存在且會跑，但查的是 MEXC——正式機上的動能策略已於 2026-09-04 切換到 EXCHANGE=binance，這支程式從那天起就一直在查錯的交易所，對現在的真倉交易沒有實質幫助。09-04 起 25 筆真倉交易全部持倉很短（最長 2.83 小時），目前沒有一筆跨過資金費結算時間點，所以尚未造成已知漏記；但只要有一筆撐過 8 小時就會真的漏記且無法事後補回。PR AI-for-column/mexc-4h-momentum-trailing-stop#92 修好了這支程式本身的節流/重試/DRY_RUN 排除問題，但沒有解決「查錯交易所」這件事。"
         },
         "seykota": {
           "state": "pending",
           "phase": "binance-funding-sync",
-          "reason": "2026-09-18 查證：整個 repo 沒有任何資金費同步腳本，也沒有對應的 systemd unit。已經造成一筆真實漏記：唯一一筆真倉交易（BTCUSDT，2026-09-03T17:31 開倉、2026-09-04T02:41 平倉，持倉 9.16 小時）真的跨過 00:00 UTC 結算時間點，這筆資金費沒有任何程式查過、也永遠補不回來了（金額應該很小，但缺口是真實發生過的，不是推測）。趨勢策略是長線策略、持倉時間本來就比動能策略長，之後再發生同樣情況的機率比動能策略高，建議優先權高於動能。"
+          "reason": "2026-09-18 查證：整個 repo 沒有任何資金費同步腳本，也沒有對應的 systemd unit。已經造成一筆真實漏記：唯一一筆真倉交易（BTCUSDT，2026-09-03T17:31 開倉、2026-09-04T02:41 平倉，持倉 9.16 小時）真的跨過 00:00 UTC 結算時間點，這筆資金費沒有任何程式查過、也永遠補不回來了（金額應該很小，但缺口是真實發生過的，不是推測）。趨勢策略持倉時間本來就比動能策略長，之後再發生同樣情況的機率比動能策略高，建議優先權高於動能。"
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "sync_funding_fees_entry.py（固定查 BTC_USDT，配 my-crypto-bot-funding-sync.service/.timer，真倉 2026-09-18 確認執行成功，帳本持續累積資金費紀錄）"
+          "evidence": "sync_funding_fees_entry.py（固定查 BTC_USDT，配 my-crypto-bot-funding-sync.service/.timer，正式機 2026-09-18 確認執行成功，帳本持續累積資金費紀錄）"
         },
         "btc-competition": {
           "state": "n/a",
           "reason": "現貨再平衡策略，不是永續合約，沒有資金費結算這個概念。"
+        }
+      }
+    },
+    {
+      "id": "docs.glossary_adopted",
+      "title": "文件與訊息已改用統一名詞",
+      "description": "這支策略 repo 裡給人看的文字（README、docs、通知與 LINE 訊息）已照中英對照表改用統一名詞，不再出現「不要再用」的舊叫法。對照表見本頁下方「名詞對照表」。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "naming-rollout",
+          "reason": "還沒改：docs/branch-governance.md 對開發機、安全暫停、移動停損都還用舊叫法。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "naming-rollout",
+          "reason": "還沒改：README 的安全暫停、docs/operations-modes.md 的修復機器人都還用舊叫法。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "naming-rollout",
+          "reason": "還沒改：README 對模擬倉、移動停損還用舊叫法。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "naming-rollout",
+          "reason": "還沒改：docs/execution-flow.md 對安全暫停還用舊叫法，也還有「正式機跑模擬帳戶」這種過時說法。"
         }
       }
     }
@@ -648,14 +699,14 @@
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "只在 development／測試機（Phase 6b，受過渡開關控制、成功後還會發事後通知）；真倉只提案不補寫。v2 移除開關、成功不通知。"
+          "reason": "正式機跑的 scripts/repair_bot.py 已有這條路徑，但自動補寫開關在正式機沒打開，所以不會發生。v2 拿掉開關、成功不通知。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。"
+          "reason": "同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。"
         }
       }
     },
@@ -665,14 +716,14 @@
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。"
+          "reason": "退役中：正式機目前會提出修復建議；v2 由共用修復執行器取代——能對應就補、結構對不上才重試升格。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "真倉（operations）Phase 5 影子版 scripts/repair_bot_shadow.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代。"
+          "reason": "正式機的 scripts/repair_bot.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代。"
         }
       }
     },
@@ -682,14 +733,14 @@
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 遇到帳本已有半套修復或寫入失敗即停手、開請求、不重試；真倉（operations）的影子版只提案、不寫帳本，不會發生這種情況。"
+          "reason": "正式機的 scripts/repair_bot.py 有這條路徑（帳本已有半套修復或寫入失敗就停手、開請求、不重試），但只有開了自動補寫才會走到；正式機開關沒開。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。"
+          "reason": "同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。"
         }
       }
     },
@@ -957,24 +1008,36 @@
         "seykota": {
           "state": "pending",
           "phase": "v2-W4",
-          "reason": "2026-09-18 補登目錄缺口：真倉（operations）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟 momentum 5b 同一設計原封不動移植），每輪都會偵測孤兒平倉並算出提案，但 v2 目標行為是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提案、從不寫帳本，不符合 v2 目標，升到共用修復執行器（v2-W4）才算做到。"
+          "reason": "2026-09-18 補登目錄缺口：正式機（operations 分支）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟動能策略 5b 同一設計），每輪都會找漏記平倉並提出修復建議；但 v2 目標是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提建議、從不寫帳本，升到共用修復執行器（v2-W4）才算做到。"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "pending",
           "phase": "v2-W4",
-          "reason": "真倉（operations）Phase 5c 影子版 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代時換成 v2 標籤。"
+          "reason": "正式機的 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代時換成 v2 標籤。"
         }
       }
     }
   ],
   "recent_changes": [
     {
-      "kind": "rule",
-      "id": "SEY.VERIFIED_CLOSE_PROPOSED",
+      "kind": "cap",
+      "id": "repair_bot.detect_propose",
       "type": "added",
-      "note": "使用者核對 5b/5c 時發現趨勢策略的修復機器人完全找不到對應紀錄——查出是 v1 目錄漏登，已補上跟動能策略對等的一條（目前仍是「未做」，因為機器人用的是舊版標籤）。"
+      "note": "新增：5b/5c 部署到正式機的「抓錯並提出修復建議」之前根本沒有登記；現在跟另外兩列並排，一看就知道三列是同一支修復機器人的三個功能。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.pause_brake",
+      "project": "momentum",
+      "note": "更正：動能策略正式機跑的 repair_bot.py 已有停用開關而且每輪都在讀，之前誤標未做。"
+    },
+    {
+      "kind": "cap",
+      "id": "docs.glossary_adopted",
+      "type": "added",
+      "note": "新增：各 repo 的文件與訊息還沒改用統一名詞，列為未做，逐 repo 處理。"
     }
   ]
 }

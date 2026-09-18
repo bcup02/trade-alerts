@@ -1,0 +1,618 @@
+{
+  "glossary_version": "fleet-glossary/v1",
+  "updated_at": "2026-09-18",
+  "note": "機隊全專案中文用詞對照表。給人看的文字一律用 zh；retired 是不要再用的舊叫法，tests/test_fleet_glossary.py 會掃描 trade-alerts 內給人看的文字，出現就擋。英文代號只如實列出，不在這裡改。",
+  "entries": [
+    {
+      "id": "strategy.seykota",
+      "category": "策略",
+      "zh": "趨勢策略",
+      "en": [
+        "seykota",
+        "ed-seykota-systematic-trend-following",
+        "SEY."
+      ],
+      "definition": "用 4 小時 K 線做 BTC 趨勢跟隨的策略，持倉通常比較久。",
+      "retired": [
+        "長線策略",
+        "4 小時趨勢追蹤"
+      ],
+      "note": "程式裡的專案代號目前不只一個（seykota-btcusdt-4h、ed-seykota），這次只統一中文。"
+    },
+    {
+      "id": "strategy.momentum",
+      "category": "策略",
+      "zh": "動能策略",
+      "en": [
+        "momentum",
+        "mexc-4h-momentum-trailing-stop",
+        "MOM."
+      ],
+      "definition": "抓短線急漲幣種、用移動停損出場的策略。",
+      "retired": [
+        "MEXC 4H 動能追蹤停損",
+        "MEXC 動能"
+      ],
+      "note": "專案代號目前有 mexc-4h-momentum 與 mexc-4h-momentum-trailing-stop 兩個。"
+    },
+    {
+      "id": "strategy.mycrypto",
+      "category": "策略",
+      "zh": "加密策略",
+      "en": [
+        "mycrypto",
+        "my-crypto-bot",
+        "MYC."
+      ],
+      "definition": "在 MEXC 做 BTC 永續合約的策略。",
+      "retired": [],
+      "note": "中文句子裡提到它時用「加密策略」，不要直接寫 my-crypto。"
+    },
+    {
+      "id": "strategy.btc-competition",
+      "category": "策略",
+      "zh": "競賽策略",
+      "en": [
+        "btc-competition",
+        "btc-bull-market-competition",
+        "BTC."
+      ],
+      "definition": "在 Binance 現貨定期再平衡一籃子幣的策略。",
+      "retired": [
+        "BTC 牛市競賽",
+        "BTC 競賽"
+      ]
+    },
+    {
+      "id": "strategy.fleet",
+      "category": "策略",
+      "zh": "全機隊",
+      "en": [
+        "fleet",
+        "FLEET."
+      ],
+      "definition": "四支策略全部，加上共用的維運工具。",
+      "retired": []
+    },
+    {
+      "id": "host.main",
+      "category": "主機",
+      "zh": "正式機",
+      "en": [
+        "trading-main"
+      ],
+      "definition": "GCP 上跑正式交易的那台主機，部署來源是正式機分支（operations）。",
+      "retired": [
+        "策略主機",
+        "seykota 主機",
+        "momentum 主機",
+        "btc 主機",
+        "維運主機",
+        "正式環境",
+        "真倉（operations）"
+      ],
+      "note": "「真倉」只拿來說交易模式（用真錢），不拿來指這台主機。"
+    },
+    {
+      "id": "host.dev",
+      "category": "主機",
+      "zh": "開發機",
+      "en": [
+        "trading-dev"
+      ],
+      "definition": "GCP 上給開發測試用的那台主機，部署來源是開發機分支（testing）。",
+      "retired": [
+        "測試機",
+        "WSL 開發機隊",
+        "development／測試機"
+      ],
+      "note": "舊文件叫 WSL 開發機隊，那台機器現在已是 GCP 上的 trading-dev。"
+    },
+    {
+      "id": "mode.live",
+      "category": "交易模式",
+      "zh": "真倉",
+      "en": [
+        "LIVE",
+        "LIVE_ONLINE",
+        "LIVE_TRADING",
+        "ENABLE_LIVE_TRADING"
+      ],
+      "definition": "用真錢、下真單。",
+      "retired": [
+        "實盤",
+        "正式實盤"
+      ],
+      "note": "真錢開關目前各策略名稱不同：動能策略叫 LIVE_TRADING，其他三支叫 ENABLE_LIVE_TRADING。"
+    },
+    {
+      "id": "mode.demo",
+      "category": "交易模式",
+      "zh": "模擬倉",
+      "en": [
+        "DEMO",
+        "testnet"
+      ],
+      "definition": "下單到交易所提供的模擬帳戶，不動真錢。",
+      "retired": [
+        "模擬盤",
+        "測試網模擬倉"
+      ]
+    },
+    {
+      "id": "mode.paper",
+      "category": "交易模式",
+      "zh": "紙上模擬",
+      "en": [
+        "DRY_RUN",
+        "DRY_RUN_ONLINE",
+        "PAPER",
+        "BTC_COMP_PAPER"
+      ],
+      "definition": "完全不下單，只在本機記錄「如果下單會怎樣」。",
+      "retired": [
+        "模擬演練",
+        "本地紙上模擬"
+      ],
+      "note": "DRY_RUN_ONLINE 在各策略的實際做法還要逐支核對，核對後若有策略其實會下單到模擬帳戶，改歸「模擬倉」。"
+    },
+    {
+      "id": "branch.operations",
+      "category": "分支",
+      "zh": "正式機分支",
+      "en": [
+        "operations"
+      ],
+      "definition": "正式機部署時拿的程式版本。登記冊的「已做」就是看這條分支上有沒有。",
+      "retired": [
+        "營運版"
+      ]
+    },
+    {
+      "id": "branch.testing",
+      "category": "分支",
+      "zh": "開發機分支",
+      "en": [
+        "testing"
+      ],
+      "definition": "開發機部署時拿的程式版本。",
+      "retired": []
+    },
+    {
+      "id": "branch.development",
+      "category": "分支",
+      "zh": "開發主幹",
+      "en": [
+        "development"
+      ],
+      "definition": "PR 合併進來的地方；合併到這裡還不代表已經上任何一台主機。",
+      "retired": []
+    },
+    {
+      "id": "branch.default",
+      "category": "分支",
+      "zh": "預設分支",
+      "en": [
+        "main",
+        "master"
+      ],
+      "definition": "GitHub 上的預設分支，各 repo 有的叫 main、有的叫 master。",
+      "retired": []
+    },
+    {
+      "id": "repair.bot",
+      "category": "修復機器人",
+      "zh": "修復機器人",
+      "en": [
+        "scripts/repair_bot.py",
+        "scripts/repair_bot_shadow.py",
+        "*-repair-shadow.service"
+      ],
+      "definition": "定時檢查「交易所已經平倉、本地帳本卻漏記」的情況，並提出或直接補寫修復。動能策略、趨勢策略各有一支。",
+      "retired": [
+        "修復 bot",
+        "影子版",
+        "影子 bot",
+        "抓錯機器人",
+        "自動修復 bot"
+      ],
+      "note": "systemd 服務名稱仍叫 *-repair-shadow（歷史名稱），動能策略那支其實已經是完整版。"
+    },
+    {
+      "id": "repair.detect_propose",
+      "category": "修復機器人",
+      "zh": "抓錯並提出修復建議",
+      "en": [
+        "VERIFIED_CLOSE_PROPOSED",
+        "repair_bot.detect_propose"
+      ],
+      "definition": "修復機器人的第一個功能：找出漏記平倉、算好修復方案，但不自己動帳本。",
+      "retired": [
+        "影子模式"
+      ]
+    },
+    {
+      "id": "repair.auto_apply",
+      "category": "修復機器人",
+      "zh": "自動補寫漏記平倉",
+      "en": [
+        "MOMENTUM_REPAIR_AUTO_APPLY",
+        "VERIFIED_CLOSE_AUTO_REPAIRED",
+        "repair_bot.verified_close"
+      ],
+      "definition": "修復機器人的第二個功能：證據完全沒有疑慮時，直接照交易所紀錄把漏記的平倉寫進帳本。",
+      "retired": []
+    },
+    {
+      "id": "repair.pause",
+      "category": "修復機器人",
+      "zh": "修復機器人停用開關",
+      "en": [
+        "MOMENTUM_REPAIR_PAUSED",
+        "SEYKOTA_REPAIR_PAUSED",
+        "repair_bot.pause_brake"
+      ],
+      "definition": "修復機器人的第三個功能：一個設定就讓它完全停手（不檢查、不查交易所、不寫帳本）。",
+      "retired": [
+        "緊急煞車",
+        "煞車"
+      ]
+    },
+    {
+      "id": "repair.shared_runner",
+      "category": "修復機器人",
+      "zh": "共用修復執行器",
+      "en": [
+        "trade_alerts.verified_close_backfill",
+        "v2-W2"
+      ],
+      "definition": "計畫中兩支策略共用的同一份修復程式，之後取代各自的修復機器人主體。",
+      "retired": [
+        "共用執行器"
+      ]
+    },
+    {
+      "id": "event.missed_close",
+      "category": "事件",
+      "zh": "漏記平倉",
+      "en": [
+        "verified close",
+        "orphan close"
+      ],
+      "definition": "交易所上那筆倉位已經平掉了，本地帳本卻沒有記到平倉。",
+      "retired": [
+        "孤兒平倉",
+        "孤兒單"
+      ]
+    },
+    {
+      "id": "safety.halt",
+      "category": "安全機制",
+      "zh": "安全暫停",
+      "en": [
+        "SAFE_HALT",
+        "latch",
+        "safe_halt"
+      ],
+      "definition": "出事時策略自己停下來、不再下任何新單，等人確認後才解除。",
+      "retired": [
+        "停擺",
+        "緊急停止",
+        "緊急暫停",
+        "熔斷"
+      ],
+      "note": "「熔斷」只保留給將來可能做的「單日虧損上限」，不拿來指安全暫停。「停機」也不要再拿來指安全暫停，但因為會誤抓「暫停機制」這類詞，自動檢查不擋，靠人工留意。"
+    },
+    {
+      "id": "safety.entry_pause",
+      "category": "安全機制",
+      "zh": "暫停新進場",
+      "en": [
+        "MOMENTUM_ENTRY_PAUSED"
+      ],
+      "definition": "只擋新開倉，已經有的倉位照常保護和對帳。",
+      "retired": [
+        "保護型暫停"
+      ]
+    },
+    {
+      "id": "safety.resume",
+      "category": "安全機制",
+      "zh": "解除工具",
+      "en": [
+        "seykota-resume",
+        "btc-competition-resume",
+        "src/safe_halt_resume.py"
+      ],
+      "definition": "解除安全暫停用的兩段式指令：先預覽拿確認碼，再帶確認碼解除。",
+      "retired": []
+    },
+    {
+      "id": "safety.confirm_code",
+      "category": "安全機制",
+      "zh": "確認碼",
+      "en": [
+        "fingerprint"
+      ],
+      "definition": "解除安全暫停時要貼回去的那串碼，確保解除的正是眼前這一次暫停。",
+      "retired": [
+        "指紋"
+      ]
+    },
+    {
+      "id": "reconcile",
+      "category": "對帳",
+      "zh": "對帳",
+      "en": [
+        "reconcile",
+        "ledger_status.json",
+        "google_reconcile_status.json"
+      ],
+      "definition": "比對本地帳本、交易所、Google 表三邊的紀錄是否一致。",
+      "retired": [
+        "持倉同步"
+      ],
+      "note": "「核對」當一般動詞（去交易所核對部位）可以用；指「帳本↔交易所／Google 表的比對」這件事時一律叫「對帳」。自動檢查不擋「核對」。"
+    },
+    {
+      "id": "ledger",
+      "category": "對帳",
+      "zh": "帳本",
+      "en": [
+        "trading_ledger.jsonl"
+      ],
+      "definition": "每支策略在本機記錄每筆交易的檔案。",
+      "retired": []
+    },
+    {
+      "id": "google_sheet",
+      "category": "對帳",
+      "zh": "Google 表",
+      "en": [
+        "Google Sheet「AI自動程式交易紀錄」"
+      ],
+      "definition": "四支策略共用、給人看的交易紀錄試算表。",
+      "retired": [
+        "Google 交易紀錄"
+      ],
+      "note": "LINE 查詢選單的「交易紀錄」是另一個東西，不要混用。"
+    },
+    {
+      "id": "funding_sync",
+      "category": "對帳",
+      "zh": "資金費同步",
+      "en": [
+        "reconcile.funding_fee_sync",
+        "sync_funding_fees"
+      ],
+      "definition": "定時查交易所的資金費結算紀錄、寫進本機帳本。",
+      "retired": [
+        "資金費用"
+      ]
+    },
+    {
+      "id": "notify.event_log",
+      "category": "通知",
+      "zh": "事件日誌",
+      "en": [
+        "fleet_event_log.jsonl",
+        "trade_alerts.fleet_event_log"
+      ],
+      "definition": "各策略把發生的狀況寫進這個共用格式的檔案，後面的通知都從這裡來。",
+      "retired": []
+    },
+    {
+      "id": "notify.request_queue",
+      "category": "通知",
+      "zh": "請求佇列",
+      "en": [
+        "error_requests.jsonl"
+      ],
+      "definition": "需要人處理的事情排在這裡，處理完才關掉。",
+      "retired": []
+    },
+    {
+      "id": "notify.export",
+      "category": "通知",
+      "zh": "匯出檔",
+      "en": [
+        "audit/ops_export.json"
+      ],
+      "definition": "策略把要通知人的事整理成這個檔案，交給維運通知代送。",
+      "retired": [
+        "維運匯出"
+      ]
+    },
+    {
+      "id": "notify.operator_message",
+      "category": "通知",
+      "zh": "白話通知",
+      "en": [
+        "operator_message"
+      ],
+      "definition": "送到 LINE 的白話訊息：發生什麼事、解決方向、處理步驟。",
+      "retired": [
+        "白話三段"
+      ]
+    },
+    {
+      "id": "notify.ops_notify",
+      "category": "通知",
+      "zh": "維運通知",
+      "en": [
+        "ops-notify"
+      ],
+      "definition": "在每台主機上定時檢查各策略狀態、有問題就發 LINE 的工具。",
+      "retired": []
+    },
+    {
+      "id": "notify.ops_control",
+      "category": "通知",
+      "zh": "Telegram 遙控",
+      "en": [
+        "ops-control"
+      ],
+      "definition": "用 Telegram 查狀態、預覽和解除安全暫停的工具（目前只接動能策略）。",
+      "retired": [
+        "Telegram 中繼"
+      ]
+    },
+    {
+      "id": "notify.portfolio_query",
+      "category": "通知",
+      "zh": "LINE 查詢",
+      "en": [
+        "portfolio-query"
+      ],
+      "definition": "在 LINE 上查持倉、交易紀錄、帳本狀態的工具。",
+      "retired": []
+    },
+    {
+      "id": "notify.runtime_status",
+      "category": "通知",
+      "zh": "運行狀態",
+      "en": [
+        "strategy.runtime_status"
+      ],
+      "definition": "每支策略定時寫出自己是正常、安全暫停還是出錯。",
+      "retired": []
+    },
+    {
+      "id": "trailing_stop",
+      "category": "其他",
+      "zh": "移動停損",
+      "en": [
+        "trailing stop",
+        "NATIVE_TRAILING_STOP"
+      ],
+      "definition": "價格往有利方向走時跟著往上移的停損。",
+      "retired": [
+        "追蹤停損"
+      ]
+    },
+    {
+      "id": "ops",
+      "category": "其他",
+      "zh": "維運",
+      "en": [
+        "ops",
+        "ops-notify",
+        "ops-control",
+        "portfolio-query"
+      ],
+      "definition": "讓策略好管理的周邊工具統稱；不是交易策略本身。",
+      "retired": [
+        "營運"
+      ]
+    },
+    {
+      "id": "tier.r0",
+      "category": "風險等級",
+      "zh": "R0 只記錄",
+      "en": [
+        "R0",
+        "LOG"
+      ],
+      "definition": "不需要處理，也不通知任何人，只寫紀錄。",
+      "retired": [],
+      "note": "舊文件另有一套叫法（不用處理／直接做／自動嘗試恢復／絕不自動），已統一成這四個；舊叫法都是日常用語，自動檢查不擋。"
+    },
+    {
+      "id": "tier.r1",
+      "category": "風險等級",
+      "zh": "R1 自動處理",
+      "en": [
+        "R1",
+        "AUTO"
+      ],
+      "definition": "只有一種做法，系統自己做完，不通知。",
+      "retired": []
+    },
+    {
+      "id": "tier.r2",
+      "category": "風險等級",
+      "zh": "R2 先自己試、失敗才通知",
+      "en": [
+        "R2",
+        "RETRY_ESCALATE"
+      ],
+      "definition": "系統先自己試，連續失敗 3 次才通知一次，附給 AI 的追查指令。",
+      "retired": []
+    },
+    {
+      "id": "tier.r3",
+      "category": "風險等級",
+      "zh": "R3 一定要人處理",
+      "en": [
+        "R3",
+        "HUMAN_REQUIRED"
+      ],
+      "definition": "系統絕不自己動手，一直提醒到有人處理。",
+      "retired": []
+    },
+    {
+      "id": "status.done",
+      "category": "登記冊狀態",
+      "zh": "已做",
+      "en": [
+        "done"
+      ],
+      "definition": "正式機上已經在跑。",
+      "retired": []
+    },
+    {
+      "id": "status.pending",
+      "category": "登記冊狀態",
+      "zh": "未做",
+      "en": [
+        "pending"
+      ],
+      "definition": "還沒做到，會寫預定在哪一關做。",
+      "retired": [
+        "待做"
+      ]
+    },
+    {
+      "id": "status.na",
+      "category": "登記冊狀態",
+      "zh": "不適用",
+      "en": [
+        "n/a"
+      ],
+      "definition": "這支策略不需要這個功能，會寫理由。",
+      "retired": []
+    },
+    {
+      "id": "status.none",
+      "category": "登記冊狀態",
+      "zh": "跟這支無關",
+      "en": [
+        "none"
+      ],
+      "definition": "這條錯誤規則只屬於別支策略。",
+      "retired": [
+        "不相關"
+      ]
+    },
+    {
+      "id": "status.recent",
+      "category": "登記冊狀態",
+      "zh": "最新變動",
+      "en": [
+        "recent_changes"
+      ],
+      "definition": "最近一次更新登記冊真正改動的項目，用金黃色標示。",
+      "retired": []
+    },
+    {
+      "id": "register.emits_event",
+      "category": "登記冊狀態",
+      "zh": "寫進事件日誌",
+      "en": [
+        "emits_event"
+      ],
+      "definition": "錯誤規則的第二欄：這條錯誤發生時，有沒有寫進事件日誌（寫進去才會變成白話通知）。",
+      "retired": []
+    }
+  ]
+}

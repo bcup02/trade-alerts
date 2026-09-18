@@ -148,9 +148,21 @@
   #totop.show{opacity:1;pointer-events:auto;transform:none;}
   #totop:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
   .c-pending{--c:var(--pending);--cb:var(--pending-bg);} .c-done{--c:var(--done);--cb:var(--done-bg);}
+  .gloss-link{font-weight:700;color:var(--accent);}
+  .gloss-cat{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);margin-bottom:12px;}
+  .gloss-cat h3{margin:0;padding:10px 14px;font-size:14px;border-block-end:1px solid var(--line);color:var(--ink-soft);}
+  .gloss-row{display:grid;grid-template-columns:170px 1fr;gap:4px 14px;padding:10px 14px;border-block-end:1px solid var(--line);font-size:13.5px;line-height:1.6;scroll-margin-top:16px;}
+  .gloss-row:last-child{border-block-end:0;}
+  .gloss-zh{font-weight:700;}
+  .gloss-en{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;color:var(--ink-faint);overflow-wrap:anywhere;}
+  .gloss-def{color:var(--ink);}
+  .gloss-note{color:var(--ink-soft);font-size:12.5px;}
+  .gloss-old{color:var(--ink-faint);font-size:12.5px;}
+  .gloss-old s{margin-inline-end:6px;}
   @media (max-width:560px){
     .toc{grid-template-columns:1fr;}
     .sl{grid-template-columns:1fr;} .sl > .who{padding-bottom:0;border-block-end:0;}
+    .gloss-row{grid-template-columns:1fr;}
     #totop{right:16px;bottom:16px;}
   }
 </style>
@@ -160,11 +172,12 @@
   <h1>機隊一致性登記冊</h1>
   <p class="lede">
     每一項機隊功能、每一條錯誤處理規則，在四支策略裡<b>實際做到了沒有</b>。
-    <b>「已做」＝真倉已經在跑</b>（部署來源 <code>operations</code> 分支上有），只在開發分支或測試機上的一律算「未做」；
+    <b>「已做」＝正式機已經在跑</b>（正式機分支 <code>operations</code> 上有），只合併到開發主幹、或只在開發機上的一律算「未做」；
     「未做」會寫預定在哪一關做，「不適用」會寫理由，漏寫 CI 會擋下來。
+    看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>39</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>41</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>8</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -180,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">39 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">41 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -189,10 +202,14 @@
   <div id="done"></div>
 
   <div class="group-head" id="group-phases" style="--c:var(--ink-soft)"><h2>預定的關卡</h2></div>
-  <p class="group-sub">「待做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
+  <p class="group-sub">「未做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
   <div id="phases" class="phase-list"></div>
+
+  <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">48 條</span></div>
+  <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+  <div id="glossaryHost"></div>
   <div class="foot">
-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-18 對四個 repo 逐項盤點）與 <code>fleet-error-catalog/v2</code>。
+    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-18 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 0213a01</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations b48b88b</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations b8eda43</code>。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
   </div>
@@ -201,6 +218,667 @@
 
 <script type="application/json" id="data">
 {
+ "glossary": [
+  {
+   "category": "策略",
+   "entries": [
+    {
+     "definition": "用 4 小時 K 線做 BTC 趨勢跟隨的策略，持倉通常比較久。",
+     "en": [
+      "seykota",
+      "ed-seykota-systematic-trend-following",
+      "SEY."
+     ],
+     "id": "strategy.seykota",
+     "note": "程式裡的專案代號目前不只一個（seykota-btcusdt-4h、ed-seykota），這次只統一中文。",
+     "retired": [
+      "長線策略",
+      "4 小時趨勢追蹤"
+     ],
+     "zh": "趨勢策略"
+    },
+    {
+     "definition": "抓短線急漲幣種、用移動停損出場的策略。",
+     "en": [
+      "momentum",
+      "mexc-4h-momentum-trailing-stop",
+      "MOM."
+     ],
+     "id": "strategy.momentum",
+     "note": "專案代號目前有 mexc-4h-momentum 與 mexc-4h-momentum-trailing-stop 兩個。",
+     "retired": [
+      "MEXC 4H 動能追蹤停損",
+      "MEXC 動能"
+     ],
+     "zh": "動能策略"
+    },
+    {
+     "definition": "在 MEXC 做 BTC 永續合約的策略。",
+     "en": [
+      "mycrypto",
+      "my-crypto-bot",
+      "MYC."
+     ],
+     "id": "strategy.mycrypto",
+     "note": "中文句子裡提到它時用「加密策略」，不要直接寫 my-crypto。",
+     "retired": [],
+     "zh": "加密策略"
+    },
+    {
+     "definition": "在 Binance 現貨定期再平衡一籃子幣的策略。",
+     "en": [
+      "btc-competition",
+      "btc-bull-market-competition",
+      "BTC."
+     ],
+     "id": "strategy.btc-competition",
+     "note": null,
+     "retired": [
+      "BTC 牛市競賽",
+      "BTC 競賽"
+     ],
+     "zh": "競賽策略"
+    },
+    {
+     "definition": "四支策略全部，加上共用的維運工具。",
+     "en": [
+      "fleet",
+      "FLEET."
+     ],
+     "id": "strategy.fleet",
+     "note": null,
+     "retired": [],
+     "zh": "全機隊"
+    }
+   ]
+  },
+  {
+   "category": "主機",
+   "entries": [
+    {
+     "definition": "GCP 上跑正式交易的那台主機，部署來源是正式機分支（operations）。",
+     "en": [
+      "trading-main"
+     ],
+     "id": "host.main",
+     "note": "「真倉」只拿來說交易模式（用真錢），不拿來指這台主機。",
+     "retired": [
+      "策略主機",
+      "seykota 主機",
+      "momentum 主機",
+      "btc 主機",
+      "維運主機",
+      "正式環境",
+      "真倉（operations）"
+     ],
+     "zh": "正式機"
+    },
+    {
+     "definition": "GCP 上給開發測試用的那台主機，部署來源是開發機分支（testing）。",
+     "en": [
+      "trading-dev"
+     ],
+     "id": "host.dev",
+     "note": "舊文件叫 WSL 開發機隊，那台機器現在已是 GCP 上的 trading-dev。",
+     "retired": [
+      "測試機",
+      "WSL 開發機隊",
+      "development／測試機"
+     ],
+     "zh": "開發機"
+    }
+   ]
+  },
+  {
+   "category": "交易模式",
+   "entries": [
+    {
+     "definition": "用真錢、下真單。",
+     "en": [
+      "LIVE",
+      "LIVE_ONLINE",
+      "LIVE_TRADING",
+      "ENABLE_LIVE_TRADING"
+     ],
+     "id": "mode.live",
+     "note": "真錢開關目前各策略名稱不同：動能策略叫 LIVE_TRADING，其他三支叫 ENABLE_LIVE_TRADING。",
+     "retired": [
+      "實盤",
+      "正式實盤"
+     ],
+     "zh": "真倉"
+    },
+    {
+     "definition": "下單到交易所提供的模擬帳戶，不動真錢。",
+     "en": [
+      "DEMO",
+      "testnet"
+     ],
+     "id": "mode.demo",
+     "note": null,
+     "retired": [
+      "模擬盤",
+      "測試網模擬倉"
+     ],
+     "zh": "模擬倉"
+    },
+    {
+     "definition": "完全不下單，只在本機記錄「如果下單會怎樣」。",
+     "en": [
+      "DRY_RUN",
+      "DRY_RUN_ONLINE",
+      "PAPER",
+      "BTC_COMP_PAPER"
+     ],
+     "id": "mode.paper",
+     "note": "DRY_RUN_ONLINE 在各策略的實際做法還要逐支核對，核對後若有策略其實會下單到模擬帳戶，改歸「模擬倉」。",
+     "retired": [
+      "模擬演練",
+      "本地紙上模擬"
+     ],
+     "zh": "紙上模擬"
+    }
+   ]
+  },
+  {
+   "category": "分支",
+   "entries": [
+    {
+     "definition": "正式機部署時拿的程式版本。登記冊的「已做」就是看這條分支上有沒有。",
+     "en": [
+      "operations"
+     ],
+     "id": "branch.operations",
+     "note": null,
+     "retired": [
+      "營運版"
+     ],
+     "zh": "正式機分支"
+    },
+    {
+     "definition": "開發機部署時拿的程式版本。",
+     "en": [
+      "testing"
+     ],
+     "id": "branch.testing",
+     "note": null,
+     "retired": [],
+     "zh": "開發機分支"
+    },
+    {
+     "definition": "PR 合併進來的地方；合併到這裡還不代表已經上任何一台主機。",
+     "en": [
+      "development"
+     ],
+     "id": "branch.development",
+     "note": null,
+     "retired": [],
+     "zh": "開發主幹"
+    },
+    {
+     "definition": "GitHub 上的預設分支，各 repo 有的叫 main、有的叫 master。",
+     "en": [
+      "main",
+      "master"
+     ],
+     "id": "branch.default",
+     "note": null,
+     "retired": [],
+     "zh": "預設分支"
+    }
+   ]
+  },
+  {
+   "category": "修復機器人",
+   "entries": [
+    {
+     "definition": "定時檢查「交易所已經平倉、本地帳本卻漏記」的情況，並提出或直接補寫修復。動能策略、趨勢策略各有一支。",
+     "en": [
+      "scripts/repair_bot.py",
+      "scripts/repair_bot_shadow.py",
+      "*-repair-shadow.service"
+     ],
+     "id": "repair.bot",
+     "note": "systemd 服務名稱仍叫 *-repair-shadow（歷史名稱），動能策略那支其實已經是完整版。",
+     "retired": [
+      "修復 bot",
+      "影子版",
+      "影子 bot",
+      "抓錯機器人",
+      "自動修復 bot"
+     ],
+     "zh": "修復機器人"
+    },
+    {
+     "definition": "修復機器人的第一個功能：找出漏記平倉、算好修復方案，但不自己動帳本。",
+     "en": [
+      "VERIFIED_CLOSE_PROPOSED",
+      "repair_bot.detect_propose"
+     ],
+     "id": "repair.detect_propose",
+     "note": null,
+     "retired": [
+      "影子模式"
+     ],
+     "zh": "抓錯並提出修復建議"
+    },
+    {
+     "definition": "修復機器人的第二個功能：證據完全沒有疑慮時，直接照交易所紀錄把漏記的平倉寫進帳本。",
+     "en": [
+      "MOMENTUM_REPAIR_AUTO_APPLY",
+      "VERIFIED_CLOSE_AUTO_REPAIRED",
+      "repair_bot.verified_close"
+     ],
+     "id": "repair.auto_apply",
+     "note": null,
+     "retired": [],
+     "zh": "自動補寫漏記平倉"
+    },
+    {
+     "definition": "修復機器人的第三個功能：一個設定就讓它完全停手（不檢查、不查交易所、不寫帳本）。",
+     "en": [
+      "MOMENTUM_REPAIR_PAUSED",
+      "SEYKOTA_REPAIR_PAUSED",
+      "repair_bot.pause_brake"
+     ],
+     "id": "repair.pause",
+     "note": null,
+     "retired": [
+      "緊急煞車",
+      "煞車"
+     ],
+     "zh": "修復機器人停用開關"
+    },
+    {
+     "definition": "計畫中兩支策略共用的同一份修復程式，之後取代各自的修復機器人主體。",
+     "en": [
+      "trade_alerts.verified_close_backfill",
+      "v2-W2"
+     ],
+     "id": "repair.shared_runner",
+     "note": null,
+     "retired": [
+      "共用執行器"
+     ],
+     "zh": "共用修復執行器"
+    }
+   ]
+  },
+  {
+   "category": "事件",
+   "entries": [
+    {
+     "definition": "交易所上那筆倉位已經平掉了，本地帳本卻沒有記到平倉。",
+     "en": [
+      "verified close",
+      "orphan close"
+     ],
+     "id": "event.missed_close",
+     "note": null,
+     "retired": [
+      "孤兒平倉",
+      "孤兒單"
+     ],
+     "zh": "漏記平倉"
+    }
+   ]
+  },
+  {
+   "category": "安全機制",
+   "entries": [
+    {
+     "definition": "出事時策略自己停下來、不再下任何新單，等人確認後才解除。",
+     "en": [
+      "SAFE_HALT",
+      "latch",
+      "safe_halt"
+     ],
+     "id": "safety.halt",
+     "note": "「熔斷」只保留給將來可能做的「單日虧損上限」，不拿來指安全暫停。「停機」也不要再拿來指安全暫停，但因為會誤抓「暫停機制」這類詞，自動檢查不擋，靠人工留意。",
+     "retired": [
+      "停擺",
+      "緊急停止",
+      "緊急暫停",
+      "熔斷"
+     ],
+     "zh": "安全暫停"
+    },
+    {
+     "definition": "只擋新開倉，已經有的倉位照常保護和對帳。",
+     "en": [
+      "MOMENTUM_ENTRY_PAUSED"
+     ],
+     "id": "safety.entry_pause",
+     "note": null,
+     "retired": [
+      "保護型暫停"
+     ],
+     "zh": "暫停新進場"
+    },
+    {
+     "definition": "解除安全暫停用的兩段式指令：先預覽拿確認碼，再帶確認碼解除。",
+     "en": [
+      "seykota-resume",
+      "btc-competition-resume",
+      "src/safe_halt_resume.py"
+     ],
+     "id": "safety.resume",
+     "note": null,
+     "retired": [],
+     "zh": "解除工具"
+    },
+    {
+     "definition": "解除安全暫停時要貼回去的那串碼，確保解除的正是眼前這一次暫停。",
+     "en": [
+      "fingerprint"
+     ],
+     "id": "safety.confirm_code",
+     "note": null,
+     "retired": [
+      "指紋"
+     ],
+     "zh": "確認碼"
+    }
+   ]
+  },
+  {
+   "category": "對帳",
+   "entries": [
+    {
+     "definition": "比對本地帳本、交易所、Google 表三邊的紀錄是否一致。",
+     "en": [
+      "reconcile",
+      "ledger_status.json",
+      "google_reconcile_status.json"
+     ],
+     "id": "reconcile",
+     "note": "「核對」當一般動詞（去交易所核對部位）可以用；指「帳本↔交易所／Google 表的比對」這件事時一律叫「對帳」。自動檢查不擋「核對」。",
+     "retired": [
+      "持倉同步"
+     ],
+     "zh": "對帳"
+    },
+    {
+     "definition": "每支策略在本機記錄每筆交易的檔案。",
+     "en": [
+      "trading_ledger.jsonl"
+     ],
+     "id": "ledger",
+     "note": null,
+     "retired": [],
+     "zh": "帳本"
+    },
+    {
+     "definition": "四支策略共用、給人看的交易紀錄試算表。",
+     "en": [
+      "Google Sheet「AI自動程式交易紀錄」"
+     ],
+     "id": "google_sheet",
+     "note": "LINE 查詢選單的「交易紀錄」是另一個東西，不要混用。",
+     "retired": [
+      "Google 交易紀錄"
+     ],
+     "zh": "Google 表"
+    },
+    {
+     "definition": "定時查交易所的資金費結算紀錄、寫進本機帳本。",
+     "en": [
+      "reconcile.funding_fee_sync",
+      "sync_funding_fees"
+     ],
+     "id": "funding_sync",
+     "note": null,
+     "retired": [
+      "資金費用"
+     ],
+     "zh": "資金費同步"
+    }
+   ]
+  },
+  {
+   "category": "通知",
+   "entries": [
+    {
+     "definition": "各策略把發生的狀況寫進這個共用格式的檔案，後面的通知都從這裡來。",
+     "en": [
+      "fleet_event_log.jsonl",
+      "trade_alerts.fleet_event_log"
+     ],
+     "id": "notify.event_log",
+     "note": null,
+     "retired": [],
+     "zh": "事件日誌"
+    },
+    {
+     "definition": "需要人處理的事情排在這裡，處理完才關掉。",
+     "en": [
+      "error_requests.jsonl"
+     ],
+     "id": "notify.request_queue",
+     "note": null,
+     "retired": [],
+     "zh": "請求佇列"
+    },
+    {
+     "definition": "策略把要通知人的事整理成這個檔案，交給維運通知代送。",
+     "en": [
+      "audit/ops_export.json"
+     ],
+     "id": "notify.export",
+     "note": null,
+     "retired": [
+      "維運匯出"
+     ],
+     "zh": "匯出檔"
+    },
+    {
+     "definition": "送到 LINE 的白話訊息：發生什麼事、解決方向、處理步驟。",
+     "en": [
+      "operator_message"
+     ],
+     "id": "notify.operator_message",
+     "note": null,
+     "retired": [
+      "白話三段"
+     ],
+     "zh": "白話通知"
+    },
+    {
+     "definition": "在每台主機上定時檢查各策略狀態、有問題就發 LINE 的工具。",
+     "en": [
+      "ops-notify"
+     ],
+     "id": "notify.ops_notify",
+     "note": null,
+     "retired": [],
+     "zh": "維運通知"
+    },
+    {
+     "definition": "用 Telegram 查狀態、預覽和解除安全暫停的工具（目前只接動能策略）。",
+     "en": [
+      "ops-control"
+     ],
+     "id": "notify.ops_control",
+     "note": null,
+     "retired": [
+      "Telegram 中繼"
+     ],
+     "zh": "Telegram 遙控"
+    },
+    {
+     "definition": "在 LINE 上查持倉、交易紀錄、帳本狀態的工具。",
+     "en": [
+      "portfolio-query"
+     ],
+     "id": "notify.portfolio_query",
+     "note": null,
+     "retired": [],
+     "zh": "LINE 查詢"
+    },
+    {
+     "definition": "每支策略定時寫出自己是正常、安全暫停還是出錯。",
+     "en": [
+      "strategy.runtime_status"
+     ],
+     "id": "notify.runtime_status",
+     "note": null,
+     "retired": [],
+     "zh": "運行狀態"
+    }
+   ]
+  },
+  {
+   "category": "其他",
+   "entries": [
+    {
+     "definition": "價格往有利方向走時跟著往上移的停損。",
+     "en": [
+      "trailing stop",
+      "NATIVE_TRAILING_STOP"
+     ],
+     "id": "trailing_stop",
+     "note": null,
+     "retired": [
+      "追蹤停損"
+     ],
+     "zh": "移動停損"
+    },
+    {
+     "definition": "讓策略好管理的周邊工具統稱；不是交易策略本身。",
+     "en": [
+      "ops",
+      "ops-notify",
+      "ops-control",
+      "portfolio-query"
+     ],
+     "id": "ops",
+     "note": null,
+     "retired": [
+      "營運"
+     ],
+     "zh": "維運"
+    }
+   ]
+  },
+  {
+   "category": "風險等級",
+   "entries": [
+    {
+     "definition": "不需要處理，也不通知任何人，只寫紀錄。",
+     "en": [
+      "R0",
+      "LOG"
+     ],
+     "id": "tier.r0",
+     "note": "舊文件另有一套叫法（不用處理／直接做／自動嘗試恢復／絕不自動），已統一成這四個；舊叫法都是日常用語，自動檢查不擋。",
+     "retired": [],
+     "zh": "R0 只記錄"
+    },
+    {
+     "definition": "只有一種做法，系統自己做完，不通知。",
+     "en": [
+      "R1",
+      "AUTO"
+     ],
+     "id": "tier.r1",
+     "note": null,
+     "retired": [],
+     "zh": "R1 自動處理"
+    },
+    {
+     "definition": "系統先自己試，連續失敗 3 次才通知一次，附給 AI 的追查指令。",
+     "en": [
+      "R2",
+      "RETRY_ESCALATE"
+     ],
+     "id": "tier.r2",
+     "note": null,
+     "retired": [],
+     "zh": "R2 先自己試、失敗才通知"
+    },
+    {
+     "definition": "系統絕不自己動手，一直提醒到有人處理。",
+     "en": [
+      "R3",
+      "HUMAN_REQUIRED"
+     ],
+     "id": "tier.r3",
+     "note": null,
+     "retired": [],
+     "zh": "R3 一定要人處理"
+    }
+   ]
+  },
+  {
+   "category": "登記冊狀態",
+   "entries": [
+    {
+     "definition": "正式機上已經在跑。",
+     "en": [
+      "done"
+     ],
+     "id": "status.done",
+     "note": null,
+     "retired": [],
+     "zh": "已做"
+    },
+    {
+     "definition": "還沒做到，會寫預定在哪一關做。",
+     "en": [
+      "pending"
+     ],
+     "id": "status.pending",
+     "note": null,
+     "retired": [
+      "待做"
+     ],
+     "zh": "未做"
+    },
+    {
+     "definition": "這支策略不需要這個功能，會寫理由。",
+     "en": [
+      "n/a"
+     ],
+     "id": "status.na",
+     "note": null,
+     "retired": [],
+     "zh": "不適用"
+    },
+    {
+     "definition": "這條錯誤規則只屬於別支策略。",
+     "en": [
+      "none"
+     ],
+     "id": "status.none",
+     "note": null,
+     "retired": [
+      "不相關"
+     ],
+     "zh": "跟這支無關"
+    },
+    {
+     "definition": "最近一次更新登記冊真正改動的項目，用金黃色標示。",
+     "en": [
+      "recent_changes"
+     ],
+     "id": "status.recent",
+     "note": null,
+     "retired": [],
+     "zh": "最新變動"
+    },
+    {
+     "definition": "錯誤規則的第二欄：這條錯誤發生時，有沒有寫進事件日誌（寫進去才會變成白話通知）。",
+     "en": [
+      "emits_event"
+     ],
+     "id": "register.emits_event",
+     "note": null,
+     "retired": [],
+     "zh": "寫進事件日誌"
+    }
+   ]
+  }
+ ],
  "items": [
   {
    "added_recent": false,
@@ -245,7 +923,7 @@
        "aspect": null,
        "phase": null,
        "state": "n/a",
-       "text": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
+       "text": "使用者 2026-09-12 定案加密策略不加安全暫停：出錯照常繼續、下一輪重試。"
       }
      ]
     },
@@ -261,8 +939,8 @@
      ]
     }
    ],
-   "sub": "出事時用同一套欄位（原因碼＋證據＋指紋）把策略停住，四支才能用同一套解除與通知流程。",
-   "title": "統一格式的暫停（latch）"
+   "sub": "出事時用同一套欄位（原因碼＋證據＋確認碼）讓策略安全暫停，四支才能用同一套解除與通知流程。",
+   "title": "統一格式的安全暫停"
   },
   {
    "added_recent": false,
@@ -307,7 +985,7 @@
        "aspect": null,
        "phase": null,
        "state": "n/a",
-       "text": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
+       "text": "使用者 2026-09-12 定案加密策略不加安全暫停：出錯照常繼續、下一輪重試。"
       }
      ]
     },
@@ -369,7 +1047,7 @@
        "aspect": null,
        "phase": null,
        "state": "n/a",
-       "text": "使用者 2026-09-12 定案 my-crypto 不加暫停機制：出錯照常繼續、下一輪重試。"
+       "text": "使用者 2026-09-12 定案加密策略不加安全暫停：出錯照常繼續、下一輪重試。"
       }
      ]
     },
@@ -386,7 +1064,7 @@
     }
    ],
    "sub": "設定錯誤類的暫停（例如連錯交易所）不能用解除工具清，只能改好設定後重啟；重啟後系統要自己確認設定正確並解除。",
-   "title": "「改好設定重啟」就能解除的暫停真的會被清掉"
+   "title": "「改好設定重啟」就能解除的安全暫停真的會被清掉"
   },
   {
    "added_recent": false,
@@ -637,6 +1315,68 @@
    "title": "帳本↔Google 表對帳狀態檔"
   },
   {
+   "added_recent": true,
+   "anchor": "cap-repair_bot.detect_propose",
+   "complete": false,
+   "dots": {
+    "btc-competition": "na",
+    "momentum": "done",
+    "mycrypto": "pending",
+    "seykota": "done"
+   },
+   "has_recent": false,
+   "id": "repair_bot.detect_propose",
+   "kind": "cap",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": null,
+       "state": "done",
+       "text": "scripts/repair_bot_shadow.py:144 append_fleet_event VERIFIED_CLOSE_PROPOSED（正式機每 15 分鐘跑一次，2026-09-18 查證 137 輪零候選）"
+      }
+     ]
+    },
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": null,
+       "state": "done",
+       "text": "scripts/repair_bot.py:127 append_fleet_event VERIFIED_CLOSE_PROPOSED（正式機每 15 分鐘跑一次，2026-09-18 查證 137 輪零候選）"
+      }
+     ]
+    },
+    {
+     "label": "加密策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
+       "state": "pending",
+       "text": "加密策略有同樣的漏記平倉情況（對帳會產生 position_diffs），目前只有一次性手動修補腳本；要先做 MEXC 成交查詢才能接修復機器人。"
+      }
+     ]
+    },
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": null,
+       "state": "n/a",
+       "text": "現貨再平衡策略，沒有開倉／平倉配對，不會有漏記平倉。"
+      }
+     ]
+    }
+   ],
+   "sub": "修復機器人的第一個功能：定時找出「交易所已平倉、本地帳本漏記」的漏記平倉，算好修復方案、寫進事件日誌，但不自己動帳本。修復機器人一共三個功能，另外兩個見下面兩列。",
+   "title": "修復機器人：抓錯並提出修復建議"
+  },
+  {
    "added_recent": false,
    "anchor": "cap-repair_bot.verified_close",
    "complete": false,
@@ -657,7 +1397,7 @@
        "aspect": null,
        "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
        "state": "pending",
-       "text": "只有 Phase 5 只提案的影子版，而且發出的 SEY.VERIFIED_CLOSE_PROPOSED 從未登記進 v1 目錄。"
+       "text": "正式機跑的是只抓錯提建議的 scripts/repair_bot_shadow.py，沒有自動補寫這條路徑；升到共用修復執行器時才有。"
       }
      ]
     },
@@ -668,7 +1408,7 @@
        "aspect": null,
        "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
        "state": "pending",
-       "text": "真倉（operations）只有 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py；會自動補寫的 v1 版 scripts/repair_bot.py（Phase 6b，受過渡開關 MOMENTUM_REPAIR_AUTO_APPLY 控制）只在 development／測試機。v2 由共用執行器取代。"
+       "text": "正式機（operations 分支）跑的已是 scripts/repair_bot.py，但自動補寫開關 MOMENTUM_REPAIR_AUTO_APPLY 在正式機沒打開（6d 關著觀察到 9/24），所以實際上還不會自動補寫。v2 由共用修復執行器取代並拿掉開關。"
       }
      ]
     },
@@ -679,7 +1419,7 @@
        "aspect": null,
        "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
        "state": "pending",
-       "text": "有同樣的漏記平倉形狀（reconcile_compare 會產生 position_diffs），目前只有一次性手修腳本；需要先做 MEXC 成交查詢轉接器。"
+       "text": "跟著「抓錯並提出修復建議」一起做，要先有 MEXC 成交查詢。"
       }
      ]
     },
@@ -695,8 +1435,8 @@
      ]
     }
    ],
-   "sub": "交易所已平倉但本地帳本漏記時，以交易所成交為準自動補寫；結構對不上才重試並升格。",
-   "title": "漏記平倉自動修復機器人"
+   "sub": "修復機器人的第二個功能：證據完全沒有疑慮時，照交易所成交紀錄把漏記的平倉直接寫進帳本；結構對不上才重試並升格。",
+   "title": "修復機器人：自動補寫漏記平倉"
   },
   {
    "added_recent": false,
@@ -704,11 +1444,11 @@
    "complete": false,
    "dots": {
     "btc-competition": "na",
-    "momentum": "pending",
+    "momentum": "recent",
     "mycrypto": "pending",
     "seykota": "pending"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "repair_bot.pause_brake",
    "kind": "cap",
    "rows": [
@@ -719,7 +1459,7 @@
        "aspect": null,
        "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
        "state": "pending",
-       "text": "影子版沒有煞車；升到共用執行器時一起加 SEYKOTA_REPAIR_PAUSED。"
+       "text": "正式機跑的 scripts/repair_bot_shadow.py 沒有停用開關；升到共用修復執行器時一起加 SEYKOTA_REPAIR_PAUSED。"
       }
      ]
     },
@@ -728,9 +1468,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
-       "state": "pending",
-       "text": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 有 MOMENTUM_REPAIR_PAUSED，真倉（operations）仍是 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py，沒有煞車。改用共用執行器時保留煞車，W6 一起上真倉。"
+       "phase": null,
+       "state": "done",
+       "text": "scripts/repair_bot.py:268 MOMENTUM_REPAIR_PAUSED 為真就整輪跳過（第 374 行讀設定；正式機每輪輸出都帶 paused 欄位）"
       }
      ]
     },
@@ -752,13 +1492,13 @@
        "aspect": null,
        "phase": null,
        "state": "n/a",
-       "text": "沒有修復機器人（見上一列）。"
+       "text": "沒有修復機器人（見「修復機器人：抓錯並提出修復建議」）。"
       }
      ]
     }
    ],
-   "sub": "一個設定就讓修復機器人完全停手（不偵測、不查交易所、不寫帳本）。所有修復機器人同名同行為。",
-   "title": "修復機器人緊急煞車"
+   "sub": "修復機器人的第三個功能：一個設定就讓修復機器人完全停手（不檢查、不查交易所、不寫帳本）。所有修復機器人同名同行為。",
+   "title": "修復機器人：停用開關"
   },
   {
    "added_recent": false,
@@ -792,7 +1532,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "scripts/repair_bot.py:278 refresh_ops_export（2026-09-18 查證：今天 F3 資金費修復的整支重新部署把它一併帶上真倉，trading-main 每輪都在改寫 audit/ops_export.json，目前內容為空；ops-notify 那端轉送開關尚未開，見 ops_notify.export_relay_enabled）"
+       "text": "scripts/repair_bot.py:278 refresh_ops_export（2026-09-18 查證：當天資金費同步修復整支重新部署時一併帶上正式機，trading-main 每輪都在改寫 audit/ops_export.json，目前內容為空；維運通知那端的轉送開關還沒開，見「維運通知已開啟匯出轉送」）"
       }
      ]
     },
@@ -841,7 +1581,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "分級 v2：部署到測試機與真倉",
+       "phase": "分級 v2：部署到開發機與正式機",
        "state": "pending",
        "text": "兩台都還沒開。"
       }
@@ -852,9 +1592,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "分級 v2：部署到測試機與真倉",
+       "phase": "分級 v2：部署到開發機與正式機",
        "state": "pending",
-       "text": "測試機已開（2026-09-17，閘門驗證通過）；真倉等 v2 一起推。"
+       "text": "開發機已開（2026-09-17，閘門驗證通過）；正式機等 v2 一起推。"
       }
      ]
     },
@@ -881,7 +1621,7 @@
      ]
     }
    ],
-   "sub": "維運主機的 ops-notify 設定檔對這支策略開了 OPS_NOTIFY_<KEY>_OPS_EXPORT=on。部署狀態，無法由 CI 檢查，每次部署後人工更新。",
+   "sub": "正式機／開發機上維運通知（ops-notify）的設定檔對這支策略開了 OPS_NOTIFY_<KEY>_OPS_EXPORT=on。部署狀態，無法由 CI 檢查，每次部署後人工更新。",
    "title": "維運通知已開啟匯出轉送（部署設定）"
   },
   {
@@ -903,7 +1643,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "分級 v2：部署到測試機與真倉",
+       "phase": "分級 v2：部署到開發機與正式機",
        "state": "pending",
        "text": "兩台都還沒設定；修復機器人升級後一起盯。"
       }
@@ -914,9 +1654,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "分級 v2：部署到測試機與真倉",
+       "phase": "分級 v2：部署到開發機與正式機",
        "state": "pending",
-       "text": "測試機已設定（盯修復機器人 unit／timer）；真倉還沒設定。"
+       "text": "開發機已設定（盯修復機器人的 unit／timer）；正式機還沒設定。"
       }
      ]
     },
@@ -943,7 +1683,7 @@
      ]
     }
    ],
-   "sub": "維運主機的 ops-notify 設定檔列出這支策略要盯的 systemd unit。部署狀態，每次部署後人工更新。",
+   "sub": "正式機／開發機上維運通知（ops-notify）的設定檔列出這支策略要盯的 systemd unit。部署狀態，每次部署後人工更新。",
    "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
   },
   {
@@ -967,7 +1707,7 @@
        "aspect": null,
        "phase": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
        "state": "pending",
-       "text": "2026-09-18 查證：整個 repo 沒有任何資金費同步腳本，也沒有對應的 systemd unit。已經造成一筆真實漏記：唯一一筆真倉交易（BTCUSDT，2026-09-03T17:31 開倉、2026-09-04T02:41 平倉，持倉 9.16 小時）真的跨過 00:00 UTC 結算時間點，這筆資金費沒有任何程式查過、也永遠補不回來了（金額應該很小，但缺口是真實發生過的，不是推測）。趨勢策略是長線策略、持倉時間本來就比動能策略長，之後再發生同樣情況的機率比動能策略高，建議優先權高於動能。"
+       "text": "2026-09-18 查證：整個 repo 沒有任何資金費同步腳本，也沒有對應的 systemd unit。已經造成一筆真實漏記：唯一一筆真倉交易（BTCUSDT，2026-09-03T17:31 開倉、2026-09-04T02:41 平倉，持倉 9.16 小時）真的跨過 00:00 UTC 結算時間點，這筆資金費沒有任何程式查過、也永遠補不回來了（金額應該很小，但缺口是真實發生過的，不是推測）。趨勢策略持倉時間本來就比動能策略長，之後再發生同樣情況的機率比動能策略高，建議優先權高於動能。"
       }
      ]
     },
@@ -978,7 +1718,7 @@
        "aspect": null,
        "phase": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
        "state": "pending",
-       "text": "2026-09-18 查證：scripts/sync_funding_fees.py 存在且會跑，但查的是 MEXC——真倉已於 2026-09-04 切換到 EXCHANGE=binance，這支程式從那天起就一直在查錯的交易所，對現在的真倉交易沒有實質幫助。09-04 起 25 筆真倉交易全部持倉很短（最長 2.83 小時），目前沒有一筆跨過資金費結算時間點，所以尚未造成已知漏記；但只要有一筆撐過 8 小時就會真的漏記且無法事後補回。PR AI-for-column/mexc-4h-momentum-trailing-stop#92 修好了這支程式本身的節流/重試/DRY_RUN 排除問題，但沒有解決「查錯交易所」這件事。"
+       "text": "2026-09-18 查證：scripts/sync_funding_fees.py 存在且會跑，但查的是 MEXC——正式機上的動能策略已於 2026-09-04 切換到 EXCHANGE=binance，這支程式從那天起就一直在查錯的交易所，對現在的真倉交易沒有實質幫助。09-04 起 25 筆真倉交易全部持倉很短（最長 2.83 小時），目前沒有一筆跨過資金費結算時間點，所以尚未造成已知漏記；但只要有一筆撐過 8 小時就會真的漏記且無法事後補回。PR AI-for-column/mexc-4h-momentum-trailing-stop#92 修好了這支程式本身的節流/重試/DRY_RUN 排除問題，但沒有解決「查錯交易所」這件事。"
       }
      ]
     },
@@ -989,7 +1729,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "sync_funding_fees_entry.py（固定查 BTC_USDT，配 my-crypto-bot-funding-sync.service/.timer，真倉 2026-09-18 確認執行成功，帳本持續累積資金費紀錄）"
+       "text": "sync_funding_fees_entry.py（固定查 BTC_USDT，配 my-crypto-bot-funding-sync.service/.timer，正式機 2026-09-18 確認執行成功，帳本持續累積資金費紀錄）"
       }
      ]
     },
@@ -1006,7 +1746,69 @@
     }
    ],
    "sub": "定時查交易所的資金費結算紀錄、寫進本機帳本，讓帳目跟交易所餘額對得起來。",
-   "title": "資金費用同步"
+   "title": "資金費同步"
+  },
+  {
+   "added_recent": true,
+   "anchor": "cap-docs.glossary_adopted",
+   "complete": false,
+   "dots": {
+    "btc-competition": "pending",
+    "momentum": "pending",
+    "mycrypto": "pending",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "docs.glossary_adopted",
+   "kind": "cap",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
+       "state": "pending",
+       "text": "還沒改：README 的安全暫停、docs/operations-modes.md 的修復機器人都還用舊叫法。"
+      }
+     ]
+    },
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
+       "state": "pending",
+       "text": "還沒改：docs/branch-governance.md 對開發機、安全暫停、移動停損都還用舊叫法。"
+      }
+     ]
+    },
+    {
+     "label": "加密策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
+       "state": "pending",
+       "text": "還沒改：README 對模擬倉、移動停損還用舊叫法。"
+      }
+     ]
+    },
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
+       "state": "pending",
+       "text": "還沒改：docs/execution-flow.md 對安全暫停還用舊叫法，也還有「正式機跑模擬帳戶」這種過時說法。"
+      }
+     ]
+    }
+   ],
+   "sub": "這支策略 repo 裡給人看的文字（README、docs、通知與 LINE 訊息）已照中英對照表改用統一名詞，不再出現「不要再用」的舊叫法。對照表見本頁下方「名詞對照表」。",
+   "title": "文件與訊息已改用統一名詞"
   },
   {
    "added_recent": false,
@@ -1032,7 +1834,7 @@
        "text": "src/seykota_bot/bot.py:399 _clear_automatic_safe_halt 確認已平倉後自動解除"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1067,7 +1869,7 @@
        "text": "src/seykota_bot/bot.py:671 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1102,7 +1904,7 @@
        "text": "目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1137,7 +1939,7 @@
        "text": "目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1172,7 +1974,7 @@
        "text": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1207,7 +2009,7 @@
        "text": "src/seykota_bot/bot.py:883 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1242,7 +2044,7 @@
        "text": "src/seykota_bot/bot.py:1035 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1277,7 +2079,7 @@
        "text": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1286,7 +2088,7 @@
     }
    ],
    "sub": "SEY.RECONCILE_FAILED",
-   "title": "R2｜非暫時性的持倉同步失敗"
+   "title": "R2｜非暫時性的對帳失敗"
   },
   {
    "added_recent": false,
@@ -1312,7 +2114,7 @@
        "text": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1347,7 +2149,7 @@
        "text": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1382,7 +2184,7 @@
        "text": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1417,7 +2219,7 @@
        "text": "src/seykota_bot/bot.py:1227 只記錄、下一輪再確認成交（Phase 3）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1452,7 +2254,7 @@
        "text": "src/seykota_bot/bot.py:1262 只記錄出場（Phase 3）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1487,7 +2289,7 @@
        "text": "src/seykota_bot/bot.py:1342 資金不足跳過進場、只記錄（Phase 3）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
        "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1522,7 +2324,7 @@
        "text": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
        "state": "pending",
        "text": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1557,7 +2359,7 @@
        "text": "src/safe_halt_state_repair.py:148 修完主動暫停，等人解除"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
        "state": "pending",
        "text": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1592,7 +2394,7 @@
        "text": "src/main.py 寫錯誤心跳、下一輪重試（Phase 3）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
        "state": "pending",
        "text": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1624,19 +2426,19 @@
        "aspect": "行為",
        "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
        "state": "pending",
-       "text": "只在 development／測試機（Phase 6b，受過渡開關控制、成功後還會發事後通知）；真倉只提案不補寫。v2 移除開關、成功不通知。"
+       "text": "正式機跑的 scripts/repair_bot.py 已有這條路徑，但自動補寫開關在正式機沒打開，所以不會發生。v2 拿掉開關、成功不通知。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
        "state": "pending",
-       "text": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。"
+       "text": "同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。"
       }
      ]
     }
    ],
    "sub": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
-   "title": "R1｜無歧義的孤兒平倉已自動補寫進帳本"
+   "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
   },
   {
    "added_recent": false,
@@ -1659,19 +2461,19 @@
        "aspect": "行為",
        "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
        "state": "pending",
-       "text": "退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。"
+       "text": "退役中：正式機目前會提出修復建議；v2 由共用修復執行器取代——能對應就補、結構對不上才重試升格。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
        "state": "pending",
-       "text": "真倉（operations）Phase 5 影子版 scripts/repair_bot_shadow.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代。"
+       "text": "正式機的 scripts/repair_bot.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代。"
       }
      ]
     }
    ],
    "sub": "MOM.VERIFIED_CLOSE_PROPOSED",
-   "title": "R2｜孤兒平倉已算出修復方案，附提案通知"
+   "title": "R2｜漏記平倉已算出修復方案，附提案通知"
   },
   {
    "added_recent": false,
@@ -1694,13 +2496,13 @@
        "aspect": "行為",
        "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
        "state": "pending",
-       "text": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 遇到帳本已有半套修復或寫入失敗即停手、開請求、不重試；真倉（operations）的影子版只提案、不寫帳本，不會發生這種情況。"
+       "text": "正式機的 scripts/repair_bot.py 有這條路徑（帳本已有半套修復或寫入失敗就停手、開請求、不重試），但只有開了自動補寫才會走到；正式機開關沒開。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
        "state": "pending",
-       "text": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。"
+       "text": "同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。"
       }
      ]
     }
@@ -1732,7 +2534,7 @@
        "text": "src/btc_competition/runner.py:347 暫停並等人以 btc-competition-resume 解除"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
        "state": "pending",
        "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1767,7 +2569,7 @@
        "text": "目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
        "state": "pending",
        "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1802,7 +2604,7 @@
        "text": "src/btc_competition/runner.py pending_target_weights 下一輪續做（Phase 3）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
        "state": "pending",
        "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1837,7 +2639,7 @@
        "text": "src/btc_competition/runner.py 寫錯誤心跳、隔天重試（Phase 3）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
        "state": "pending",
        "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1872,7 +2674,7 @@
        "text": "mexc_futures_bot.py:713 只記錄差額，不影響交易（Phase 4e 定案）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": null,
        "state": "done",
        "text": "mexc_futures_bot.py:713 append_fleet_event（R0）"
@@ -1907,7 +2709,7 @@
        "text": "目前：每次都照常重試，但沒有計數、連續失敗也不會升格。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
        "state": "pending",
        "text": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1942,7 +2744,7 @@
        "text": "mexc_futures_bot.py:1304 只通知、不自動下單（現行行為即符合 v2）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
        "state": "pending",
        "text": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -1977,7 +2779,7 @@
        "text": "目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
        "state": "pending",
        "text": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -2012,7 +2814,7 @@
        "text": "mexc_futures_bot.py:1317 只通知、不自動下單（現行行為即符合 v2）"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
        "state": "pending",
        "text": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -2047,7 +2849,7 @@
        "text": "下一輪會自動重掛（已符合），但連續失敗不會升格通知。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
        "state": "pending",
        "text": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -2082,7 +2884,7 @@
        "text": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
        "state": "pending",
        "text": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
@@ -2117,7 +2919,7 @@
        "text": "src/seykota_bot/reconcile/compare.py:250 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": null,
        "state": "n/a",
        "text": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
@@ -2134,7 +2936,7 @@
        "text": "src/reconcile_compare.py:107 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": null,
        "state": "n/a",
        "text": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
@@ -2151,7 +2953,7 @@
        "text": "reconcile_compare.py:101 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": null,
        "state": "n/a",
        "text": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
@@ -2168,7 +2970,7 @@
        "text": "src/btc_competition/reconcile_compare.py:228 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": null,
        "state": "n/a",
        "text": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
@@ -2203,7 +3005,7 @@
        "text": "src/seykota_bot/reconcile/google_reconcile.py:137 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": null,
        "state": "n/a",
        "text": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
@@ -2220,7 +3022,7 @@
        "text": "src/google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": null,
        "state": "n/a",
        "text": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
@@ -2237,7 +3039,7 @@
        "text": "google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": null,
        "state": "n/a",
        "text": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
@@ -2254,7 +3056,7 @@
        "text": "src/btc_competition/reconcile_google.py:283 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": null,
        "state": "n/a",
        "text": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
@@ -2266,7 +3068,7 @@
    "title": "R0｜帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-SEY.VERIFIED_CLOSE_PROPOSED",
    "complete": false,
    "dots": {
@@ -2286,29 +3088,30 @@
        "aspect": "行為",
        "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
        "state": "pending",
-       "text": "2026-09-18 補登目錄缺口：真倉（operations）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟 momentum 5b 同一設計原封不動移植），每輪都會偵測孤兒平倉並算出提案，但 v2 目標行為是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提案、從不寫帳本，不符合 v2 目標，升到共用修復執行器（v2-W4）才算做到。"
+       "text": "2026-09-18 補登目錄缺口：正式機（operations 分支）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟動能策略 5b 同一設計），每輪都會找漏記平倉並提出修復建議；但 v2 目標是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提建議、從不寫帳本，升到共用修復執行器（v2-W4）才算做到。"
       },
       {
-       "aspect": "白話通知",
+       "aspect": "寫進事件日誌",
        "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
        "state": "pending",
-       "text": "真倉（operations）Phase 5c 影子版 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代時換成 v2 標籤。"
+       "text": "正式機的 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代時換成 v2 標籤。"
       }
      ]
     }
    ],
    "sub": "SEY.VERIFIED_CLOSE_PROPOSED",
-   "title": "R2｜孤兒平倉已算出修復方案，附提案通知"
+   "title": "R2｜漏記平倉已算出修復方案，附提案通知"
   }
  ],
  "phase_counts": {
   "8-btc-competition": 8,
   "8-momentum": 3,
-  "8-mycrypto": 16,
+  "8-mycrypto": 17,
   "8-seykota": 20,
   "binance-funding-sync": 2,
+  "naming-rollout": 4,
   "v2-W2": 0,
-  "v2-W3": 8,
+  "v2-W3": 7,
   "v2-W4": 5,
   "v2-W6": 4
  },
@@ -2321,7 +3124,8 @@
   "8-seykota",
   "8-mycrypto",
   "8-btc-competition",
-  "binance-funding-sync"
+  "binance-funding-sync",
+  "naming-rollout"
  ],
  "phases": {
   "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
@@ -2329,10 +3133,11 @@
   "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
   "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
   "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
+  "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
   "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
   "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
   "v2-W4": "分級 v2：趨勢策略的修復機器人升到完整版",
-  "v2-W6": "分級 v2：部署到測試機與真倉"
+  "v2-W6": "分級 v2：部署到開發機與正式機"
  },
  "project_order": [
   "seykota",
@@ -2348,32 +3153,44 @@
  },
  "recent_summary": [
   {
-   "anchor": "rule-SEY.VERIFIED_CLOSE_PROPOSED",
-   "note": "使用者核對 5b/5c 時發現趨勢策略的修復機器人完全找不到對應紀錄——查出是 v1 目錄漏登，已補上跟動能策略對等的一條（目前仍是「未做」，因為機器人用的是舊版標籤）。",
+   "anchor": "cap-repair_bot.detect_propose",
+   "note": "新增：5b/5c 部署到正式機的「抓錯並提出修復建議」之前根本沒有登記；現在跟另外兩列並排，一看就知道三列是同一支修復機器人的三個功能。",
    "project": null,
-   "title": "R2｜孤兒平倉已算出修復方案，附提案通知"
+   "title": "修復機器人：抓錯並提出修復建議"
+  },
+  {
+   "anchor": "cap-repair_bot.pause_brake",
+   "note": "更正：動能策略正式機跑的 repair_bot.py 已有停用開關而且每輪都在讀，之前誤標未做。",
+   "project": "動能策略",
+   "title": "修復機器人：停用開關"
+  },
+  {
+   "anchor": "cap-docs.glossary_adopted",
+   "note": "新增：各 repo 的文件與訊息還沒改用統一名詞，列為未做，逐 repo 處理。",
+   "project": null,
+   "title": "文件與訊息已改用統一名詞"
   }
  ],
  "totals": {
   "btc-competition": {
    "done": 10,
-   "n/a": 7,
-   "pending": 8
+   "n/a": 8,
+   "pending": 9
   },
   "momentum": {
-   "done": 11,
+   "done": 13,
    "n/a": 4,
    "pending": 14
   },
   "mycrypto": {
    "done": 10,
    "n/a": 5,
-   "pending": 16
+   "pending": 18
   },
   "seykota": {
-   "done": 17,
+   "done": 18,
    "n/a": 2,
-   "pending": 28
+   "pending": 29
   }
  }
 }
@@ -2394,7 +3211,7 @@ function chipGroup(host, values, onPick){
   });
 }
 
-var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"不相關","recent":"剛完成"};
+var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"跟這支無關","recent":"最新變動"};
 var KINDS=[["cap","機隊功能"],["rule","錯誤處理規則"]];
 function dots(item){
   var s=el("span","dots"); s.setAttribute("aria-hidden","true");
@@ -2482,6 +3299,24 @@ if(DATA.recent_summary && DATA.recent_summary.length){
   });
   recentBox.hidden=false;
 }
+var glossHost=document.getElementById("glossaryHost");
+DATA.glossary.forEach(function(group){
+  var card=el("div","gloss-cat"); card.appendChild(el("h3",null,group.category));
+  group.entries.forEach(function(g){
+    var row=el("div","gloss-row"); row.id="term-"+g.id;
+    var left=el("div"); left.appendChild(el("div","gloss-zh",g.zh)); left.appendChild(el("div","gloss-en",g.en.join("、")));
+    var right=el("div"); right.appendChild(el("div","gloss-def",g.definition));
+    if(g.note) right.appendChild(el("div","gloss-note",g.note));
+    if(g.retired.length){
+      var old=el("div","gloss-old"); old.appendChild(document.createTextNode("不要再用："));
+      g.retired.forEach(function(t){ old.appendChild(el("s",null,t)); });
+      right.appendChild(old);
+    }
+    row.appendChild(left); row.appendChild(right); card.appendChild(row);
+  });
+  glossHost.appendChild(card);
+});
+document.querySelectorAll(".gloss-link").forEach(function(a){ a.addEventListener("click",function(ev){ ev.preventDefault(); document.getElementById("glossary").scrollIntoView({block:"start"}); }); });
 var toc=document.getElementById("toc");
 toc.appendChild(tocColumn("pending","未完成")); toc.appendChild(tocColumn("done","已完成"));
 fillGroup(document.getElementById("pending"),"pending");
@@ -2494,7 +3329,7 @@ DATA.project_order.forEach(function(p){
 });
 var phaseHost=document.getElementById("phases");
 DATA.phase_order.forEach(function(k){
-  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜待做 "+DATA.phase_counts[k]+" 格")); phaseHost.appendChild(c);
+  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜未做 "+DATA.phase_counts[k]+" 格")); phaseHost.appendChild(c);
 });
 var toTop=document.getElementById("totop");
 toTop.addEventListener("click",function(){ window.scrollTo(0,0); var h=document.querySelector("h1"); if(h){ h.setAttribute("tabindex","-1"); h.focus({preventScroll:true}); } });
