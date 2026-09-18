@@ -1075,11 +1075,6 @@ function chipGroup(host, values, onPick){
     buttons.push(b); host.appendChild(b);
   });
 }
-function statusText(s, phases){
-  if(s.state==="done") return "已做："+s.evidence;
-  if(s.state==="n/a") return "不適用："+s.reason;
-  return "未做："+s.reason+"（預定："+(phases[s.phase]||s.phase)+"）";
-}
 
 var register=document.getElementById("register"), filters=document.getElementById("filters");
 var pick={tier:"all",bot:"all",open:"all"};

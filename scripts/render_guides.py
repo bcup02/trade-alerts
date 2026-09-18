@@ -131,9 +131,9 @@ _FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family
           '&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">')
 
 
-def _page(title: str, body: str, data: dict[str, Any], script: str) -> str:
+def _page(title: str, body: str, data: dict[str, Any], script: str, css: str = "") -> str:
     blob = json.dumps(data, ensure_ascii=False, sort_keys=True, indent=1).replace("</", "<\\/")
-    return (f"<title>{title}</title>\n{_FONTS}\n<style>{_CSS}</style>\n\n{body}\n\n"
+    return (f"<title>{title}</title>\n{_FONTS}\n<style>{_CSS}{css}</style>\n\n{body}\n\n"
             f'<script type="application/json" id="data">\n{blob}\n</script>\n'
             f"<script>\n{script}\n</script>\n")
 
@@ -151,11 +151,6 @@ function chipGroup(host, values, onPick){
     b.addEventListener("click", function(){ buttons.forEach(function(x){x.setAttribute("aria-pressed","false");}); b.setAttribute("aria-pressed","true"); onPick(v.id); });
     buttons.push(b); host.appendChild(b);
   });
-}
-function statusText(s, phases){
-  if(s.state==="done") return "已做："+s.evidence;
-  if(s.state==="n/a") return "不適用："+s.reason;
-  return "未做："+s.reason+"（預定："+(phases[s.phase]||s.phase)+"）";
 }
 """
 
@@ -212,54 +207,153 @@ chipGroup(botHost,[{id:"all",label:"全部策略",n:DATA.entries.length}].concat
 chipGroup(openHost,[{id:"all",label:"全部",n:DATA.entries.length},{id:"open",label:"只看還沒做完的",n:count(function(e){return e.open;})}],function(v){pick.open=v;apply();});
 """
 
+_ROLLOUT_CSS = """
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
+  .big{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+  .big a{display:block;text-decoration:none;color:inherit;border:1px solid var(--line);border-inline-start:4px solid var(--c);border-radius:3px;background:var(--paper-raised);padding:12px 14px;}
+  .big a:hover{background:var(--cb);}
+  .big b{display:block;font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:28px;line-height:1.1;color:var(--c);}
+  .big span{font-size:13px;color:var(--ink-soft);}
+  .toc{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin:20px 0 8px;}
+  .toc-col{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);padding:12px 14px;}
+  .toc-col h3{margin:0 0 6px;font-size:15px;color:var(--c);}
+  .toc-col h4{margin:12px 0 4px;font-size:12px;font-weight:700;color:var(--ink-faint);letter-spacing:.06em;}
+  .toc-col ul{list-style:none;margin:0;padding:0;}
+  .toc-col li a{display:flex;align-items:center;gap:8px;padding:5px 6px;margin-inline:-6px;border-radius:3px;text-decoration:none;color:var(--ink);font-size:13.5px;line-height:1.4;}
+  .toc-col li a:hover,.toc-col li a:focus-visible{background:var(--accent-bg);outline:none;}
+  .toc-col li a .t{flex:1;min-width:0;}
+  .dots{display:inline-flex;gap:3px;flex-shrink:0;}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--dc);border:1px solid var(--dc);}
+  .dot-done{--dc:var(--done);} .dot-pending{--dc:var(--pending);} .dot-na{--dc:var(--na);opacity:.55;}
+  .dot-none{--dc:var(--line);background:transparent;}
+  .dot-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-faint);margin:0 0 4px;}
+  .dot-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .group-head{display:flex;align-items:baseline;gap:10px;margin:40px 0 4px;padding-bottom:8px;border-block-end:2px solid var(--c);}
+  .group-head h2{margin:0;color:var(--c);}
+  .group-head .n{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:13px;color:var(--ink-faint);}
+  .group-sub{font-size:13.5px;color:var(--ink-soft);margin:6px 0 12px;line-height:1.6;}
+  h3.kind{font-size:14px;color:var(--ink-faint);margin:22px 0 8px;font-weight:700;}
+  .item{scroll-margin-top:16px;transition:box-shadow .3s,background-color .3s;}
+  .item.flash{box-shadow:0 0 0 3px var(--accent-line);background:var(--accent-bg);}
+  .item-head{display:flex;align-items:flex-start;gap:10px;}
+  .item-head .h{flex:1;min-width:0;}
+  .item-head .dots{margin-top:5px;}
+  .sl{display:grid;grid-template-columns:88px 1fr;margin-top:10px;border-block-start:1px solid var(--line);font-size:13.5px;line-height:1.6;}
+  .sl > .who{font-weight:700;color:var(--ink-soft);padding:8px 0;border-block-end:1px solid var(--line);}
+  .sl > .lines{padding:8px 0;border-block-end:1px solid var(--line);display:flex;flex-direction:column;gap:6px;min-width:0;overflow-wrap:anywhere;}
+  .aspect{font-weight:700;color:var(--ink-soft);margin-inline-end:4px;}
+  .phase{display:inline-block;font-size:11.5px;padding:1px 7px;margin-inline-start:6px;border-radius:3px;border:1px dashed var(--pending);color:var(--pending);}
+  details.done-card{padding:0;margin-bottom:8px;}
+  details.done-card > summary{list-style:none;display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;color:var(--ink);font-weight:400;}
+  details.done-card > summary::-webkit-details-marker{display:none;}
+  details.done-card > summary::before{content:"▸";color:var(--ink-faint);font-size:12px;transition:transform .15s;}
+  details.done-card[open] > summary::before{transform:rotate(90deg);}
+  details.done-card > summary .ok{color:var(--done);font-weight:700;}
+  details.done-card > summary .t{flex:1;min-width:0;font-weight:700;font-size:14.5px;}
+  details.done-card > .body{padding:0 16px 14px;}
+  .phase-list .card p{margin-top:2px;}
+  #totop{position:fixed;right:20px;bottom:20px;width:46px;height:46px;border-radius:50%;border:1px solid var(--accent-line);background:var(--accent-bg);color:var(--accent);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:0;pointer-events:none;transform:translateY(8px);transition:opacity .2s,transform .2s;}
+  #totop.show{opacity:1;pointer-events:auto;transform:none;}
+  #totop:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .c-pending{--c:var(--pending);--cb:var(--pending-bg);} .c-done{--c:var(--done);--cb:var(--done-bg);}
+  @media (max-width:560px){
+    .toc{grid-template-columns:1fr;}
+    .sl{grid-template-columns:1fr;} .sl > .who{padding-bottom:0;border-block-end:0;}
+    #totop{right:16px;bottom:16px;}
+  }
+"""
+
 _ROLLOUT_JS = _JS_HELPERS + r"""
-var pick={project:"all",state:"all"};
-var items=[];
-function card(host, title, sub, subClass, statuses){
-  var c=el("div","card"); c.appendChild(el("h3",null,title)); if(sub) c.appendChild(el("p",subClass,sub));
-  var g=el("div","grid");
-  statuses.forEach(function(s){
-    var who=el("span","who",s.label); var what=el("span");
-    what.appendChild(el("span","st "+STATE_CLASS[s.status.state],STATE_LABEL[s.status.state]));
-    what.appendChild(document.createTextNode(" "+statusText(s.status,DATA.phases)));
-    who.dataset.project=s.project; who.dataset.state=s.status.state; what.dataset.project=s.project; what.dataset.state=s.status.state;
-    g.appendChild(who); g.appendChild(what); items.push(who); items.push(what);
-  });
-  c.appendChild(g); host.appendChild(c); return c;
+var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"不相關"};
+var KINDS=[["cap","機隊功能"],["rule","錯誤處理規則"]];
+function dots(item){
+  var s=el("span","dots"); s.setAttribute("aria-hidden","true");
+  DATA.project_order.forEach(function(p){ var d=el("span","dot dot-"+item.dots[p]); d.title=DATA.projects[p]+"："+DOT_LABEL[item.dots[p]]; s.appendChild(d); });
+  return s;
 }
-var cards=[];
-var capHost=document.getElementById("capabilities");
-DATA.capabilities.forEach(function(cap){
-  var c=card(capHost, cap.title, cap.description, "desc", DATA.project_order.map(function(p){return {project:p,label:DATA.projects[p],status:cap.status[p]};}));
-  cards.push(c);
-});
-var entryHost=document.getElementById("entries");
-DATA.catalog.forEach(function(row){
-  var statuses=[];
-  Object.keys(row.behaviour).sort(function(a,b){return DATA.project_order.indexOf(a)-DATA.project_order.indexOf(b);}).forEach(function(p){
-    statuses.push({project:p,label:DATA.projects[p]+"｜行為",status:row.behaviour[p]});
-    statuses.push({project:p,label:DATA.projects[p]+"｜白話通知",status:row.emits_event[p]});
+function table(item){
+  var g=el("div","sl");
+  item.rows.forEach(function(r){
+    g.appendChild(el("span","who",r.label));
+    var box=el("div","lines");
+    r.lines.forEach(function(l){
+      var line=el("div");
+      line.appendChild(el("span","st "+STATE_CLASS[l.state],STATE_LABEL[l.state]));
+      line.appendChild(document.createTextNode(" "));
+      if(l.aspect) line.appendChild(el("span","aspect",l.aspect));
+      line.appendChild(document.createTextNode(l.text));
+      if(l.phase) line.appendChild(el("span","phase","預定："+l.phase));
+      box.appendChild(line);
+    });
+    g.appendChild(box);
   });
-  cards.push(card(entryHost, row.tier+"｜"+row.title, row.code, "code", statuses));
-});
-var phaseHost=document.getElementById("phases");
-DATA.phase_order.forEach(function(k){
-  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜待做 "+DATA.phase_counts[k]+" 項")); phaseHost.appendChild(c);
-});
+  return g;
+}
+function pendingCard(item){
+  var c=el("div","card item"); c.id=item.anchor;
+  var head=el("div","item-head"), h=el("div","h");
+  h.appendChild(el("h3",null,item.title)); h.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub));
+  head.appendChild(h); head.appendChild(dots(item)); c.appendChild(head);
+  c.appendChild(table(item)); return c;
+}
+function doneCard(item){
+  var d=el("details","card item done-card"); d.id=item.anchor;
+  var s=el("summary"); s.appendChild(el("span","ok","✓")); s.appendChild(el("span","t",item.title)); s.appendChild(dots(item));
+  d.appendChild(s);
+  var body=el("div","body"); body.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub)); body.appendChild(table(item));
+  d.appendChild(body); return d;
+}
+function go(id){
+  var n=document.getElementById(id); if(!n) return;
+  if(n.tagName==="DETAILS") n.open=true;
+  n.scrollIntoView({block:"start"});
+  n.classList.remove("flash"); void n.offsetWidth; n.classList.add("flash");
+  setTimeout(function(){ n.classList.remove("flash"); },1600);
+}
+function tocColumn(group, title){
+  var col=el("div","toc-col c-"+group);
+  var items=DATA.items.filter(function(i){return (group==="done")===i.complete;});
+  col.appendChild(el("h3",null,title+"（"+items.length+"）"));
+  KINDS.forEach(function(k){
+    var list=items.filter(function(i){return i.kind===k[0];}); if(!list.length) return;
+    col.appendChild(el("h4",null,k[1]+" · "+list.length));
+    var ul=el("ul");
+    list.forEach(function(i){
+      var li=el("li"), a=el("a"); a.href="#"+i.anchor;
+      a.appendChild(el("span","t",i.title)); a.appendChild(dots(i));
+      a.addEventListener("click",function(ev){ ev.preventDefault(); go(i.anchor); });
+      li.appendChild(a); ul.appendChild(li);
+    });
+    col.appendChild(ul);
+  });
+  return col;
+}
+function fillGroup(host, group){
+  KINDS.forEach(function(k){
+    var list=DATA.items.filter(function(i){return (group==="done")===i.complete && i.kind===k[0];}); if(!list.length) return;
+    host.appendChild(el("h3","kind",k[1]+"（"+list.length+"）"));
+    list.forEach(function(i){ host.appendChild(group==="done"?doneCard(i):pendingCard(i)); });
+  });
+}
+var toc=document.getElementById("toc");
+toc.appendChild(tocColumn("pending","未完成")); toc.appendChild(tocColumn("done","已完成"));
+fillGroup(document.getElementById("pending"),"pending");
+fillGroup(document.getElementById("done"),"done");
+document.querySelectorAll(".big a").forEach(function(a){ a.addEventListener("click",function(ev){ ev.preventDefault(); go(a.getAttribute("href").slice(1)); }); });
 var sum=document.getElementById("summary");
 DATA.project_order.forEach(function(p){
   var d=el("div"); d.appendChild(el("b",null,DATA.projects[p]));
   var t=DATA.totals[p]; d.appendChild(document.createTextNode("已做 "+t.done+"｜未做 "+t.pending+"｜不適用 "+t["n/a"])); sum.appendChild(d);
 });
-function apply(){
-  items.forEach(function(n){ n.hidden=!((pick.project==="all"||n.dataset.project===pick.project)&&(pick.state==="all"||n.dataset.state===pick.state)); });
-  cards.forEach(function(c){ c.hidden=!Array.prototype.some.call(c.querySelectorAll(".grid > span"),function(n){return !n.hidden;}); });
-}
-var f=document.getElementById("filters"), a=el("div","filters"), b=el("div","filters"); f.appendChild(a); f.appendChild(b);
-function rowsOf(p, s){ var t=DATA.totals[p]; return s ? t[s] : t.done+t.pending+t["n/a"]; }
-function allRows(s){ return DATA.project_order.reduce(function(n,p){return n+rowsOf(p,s);},0); }
-chipGroup(a,[{id:"all",label:"全部策略",n:allRows()}].concat(DATA.project_order.map(function(p){return {id:p,label:DATA.projects[p],n:rowsOf(p)};})),function(v){pick.project=v;apply();});
-chipGroup(b,[{id:"all",label:"全部狀態",n:allRows()},{id:"pending",label:"只看未做",n:allRows("pending")},{id:"done",label:"已做",n:allRows("done")},{id:"n/a",label:"不適用",n:allRows("n/a")}],function(v){pick.state=v;apply();});
+var phaseHost=document.getElementById("phases");
+DATA.phase_order.forEach(function(k){
+  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜待做 "+DATA.phase_counts[k]+" 格")); phaseHost.appendChild(c);
+});
+var toTop=document.getElementById("totop");
+toTop.addEventListener("click",function(){ window.scrollTo(0,0); var h=document.querySelector("h1"); if(h){ h.setAttribute("tabindex","-1"); h.focus({preventScroll:true}); } });
+function syncTop(){ toTop.classList.toggle("show", toc.getBoundingClientRect().bottom<0); }
+window.addEventListener("scroll",syncTop,{passive:true}); syncTop();
 """
 
 
@@ -329,60 +423,112 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
     return _page("機隊風險登記冊", body, data, _RISK_JS)
 
 
+def _line(status: dict[str, Any], aspect: str | None, phases: dict[str, str]) -> dict[str, Any]:
+    state = status["state"]
+    text = status["evidence"] if state == "done" else status["reason"]
+    return {"aspect": aspect, "state": state, "text": text,
+            "phase": phases[status["phase"]] if state == "pending" else None}
+
+
+def _dot(states: set[str]) -> str:
+    """One strategy's colour in the four-dot strip: pending wins, then done."""
+    if not states:
+        return "none"
+    if "pending" in states:
+        return "pending"
+    return "done" if "done" in states else "na"
+
+
+def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every capability and catalog row as one page item.  ``complete`` means no
+    cell is pending -- every applicable strategy is done or n/a, nothing left to do."""
+    projects, phases = registry["projects"], registry["phases"]
+    titles = {entry["code"]: (entry["risk_tier"], entry["title"]) for entry in catalog["entries"]}
+    items = []
+    for capability in registry["capabilities"]:
+        rows = [{"label": projects[p], "lines": [_line(capability["status"][p], None, phases)]}
+                for p in STRATEGY_PROJECTS if p in capability["status"]]
+        states = {p: {capability["status"][p]["state"]} if p in capability["status"] else set() for p in STRATEGY_PROJECTS}
+        items.append({"kind": "cap", "anchor": f"cap-{capability['id']}", "title": capability["title"],
+                      "sub": capability["description"], "rows": rows, "states": states})
+    for row in registry["catalog"]:
+        tier, title = titles[row["code"]]
+        present = [p for p in STRATEGY_PROJECTS if p in row["behaviour"]]
+        rows = [{"label": projects[p], "lines": [_line(row["behaviour"][p], "行為", phases),
+                                                 _line(row["emits_event"][p], "白話通知", phases)]} for p in present]
+        states = {p: ({row["behaviour"][p]["state"], row["emits_event"][p]["state"]} if p in present else set())
+                  for p in STRATEGY_PROJECTS}
+        items.append({"kind": "rule", "anchor": f"rule-{row['code']}", "title": f"{tier}｜{title}",
+                      "sub": row["code"], "rows": rows, "states": states})
+    for item in items:
+        states = item.pop("states")
+        item["dots"] = {p: _dot(s) for p, s in states.items()}
+        item["complete"] = "pending" not in set().union(*states.values())
+    return items
+
+
 def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -> str:
     projects = registry["projects"]
     phases = registry["phases"]
-    titles = {entry["code"]: (entry["risk_tier"], entry["title"]) for entry in catalog["entries"]}
     totals = {p: {"done": 0, "pending": 0, "n/a": 0} for p in STRATEGY_PROJECTS}
     phase_counts = {k: 0 for k in phases}
-    for capability in registry["capabilities"]:
-        for project, status in capability["status"].items():
-            totals[project][status["state"]] += 1
-            if status["state"] == "pending":
-                phase_counts[status["phase"]] += 1
-    catalog_rows = []
-    for row in registry["catalog"]:
-        tier, title = titles[row["code"]]
-        catalog_rows.append({**row, "tier": tier, "title": title})
-        for key in ("behaviour", "emits_event"):
-            for project, status in row[key].items():
-                totals[project][status["state"]] += 1
-                if status["state"] == "pending":
-                    phase_counts[status["phase"]] += 1
+    statuses = [s for c in registry["capabilities"] for s in c["status"].items()]
+    statuses += [s for row in registry["catalog"] for key in ("behaviour", "emits_event") for s in row[key].items()]
+    for project, status in statuses:
+        totals[project][status["state"]] += 1
+        if status["state"] == "pending":
+            phase_counts[status["phase"]] += 1
+    items = rollout_items(catalog, registry)
+    n_done = sum(1 for i in items if i["complete"])
+    n_pending = len(items) - n_done
     data = {
         "projects": projects, "project_order": list(STRATEGY_PROJECTS), "phases": phases,
-        "phase_order": list(phases), "phase_counts": phase_counts, "totals": totals,
-        "capabilities": registry["capabilities"], "catalog": catalog_rows,
+        "phase_order": list(phases), "phase_counts": phase_counts, "totals": totals, "items": items,
     }
     sources = "；".join(
         f"{html.escape(registry['projects'][p])} <code>{html.escape(s['repo'])}@{html.escape(s['branch'])} {html.escape(s['commit'][:7])}</code>"
         for p, s in ((p, registry["sources"][p]) for p in STRATEGY_PROJECTS)
     )
+    order = "、".join(html.escape(projects[p]) for p in STRATEGY_PROJECTS)
     body = f"""<div class="wrap">
   <div class="eyebrow">交易機隊 · 四支策略做到哪裡了</div>
   <h1>機隊一致性登記冊</h1>
   <p class="lede">
-    每一項機隊功能、每一條錯誤處理規則，在四支策略裡<b>實際做到了沒有</b>。規則只有一條：
-    沒做的一定要寫在這裡——<b>「未做」要寫目前狀況和預定在哪一關做</b>，<b>「不適用」要寫理由</b>。
-    漏寫的話，自動檢查（CI）會擋下來，不會再有「只做了一支、沒人記得」。
-    <b>「已做」指的是真倉已經在跑</b>（部署來源 <code>operations</code> 分支上有）；只合併到開發分支或只在測試機上的，一律算「未做」。
+    每一項機隊功能、每一條錯誤處理規則，在四支策略裡<b>實際做到了沒有</b>。
+    <b>「已做」＝真倉已經在跑</b>（部署來源 <code>operations</code> 分支上有），只在開發分支或測試機上的一律算「未做」；
+    「未做」會寫預定在哪一關做，「不適用」會寫理由，漏寫 CI 會擋下來。
   </p>
+  <div class="big">
+    <a class="c-pending" href="#group-pending"><b>{n_pending}</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-done" href="#group-done"><b>{n_done}</b><span>項已完成——四支都到位，不用再動</span></a>
+  </div>
   <div class="summary" id="summary"></div>
-  <div id="filters"></div>
-  <h2>機隊功能</h2>
-  <div id="capabilities"></div>
-  <h2>錯誤處理規則（依錯誤目錄逐條）</h2>
-  <p class="lede">「行為」：這條錯誤發生時，策略有沒有照錯誤目錄說的處理。「白話通知」：有沒有寫進共用事件日誌——只有寫進去的，才會變成你手機上的白話通知。</p>
-  <div id="entries"></div>
-  <h2>預定的關卡</h2>
-  <div id="phases"></div>
+  <p class="dot-legend">
+    <span>每項右邊的四個點依序是 {order}：</span>
+    <span><i class="dot dot-done"></i>已做</span><span><i class="dot dot-pending"></i>未做</span>
+    <span><i class="dot dot-na"></i>不適用</span><span><i class="dot dot-none"></i>跟這支無關</span>
+  </p>
+  <nav class="toc" id="toc" aria-label="目錄"></nav>
+
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">{n_pending} 項</span></div>
+  <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+  <div id="pending"></div>
+
+  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">{n_done} 項</span></div>
+  <p class="group-sub">每支相關的策略都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
+  <div id="done"></div>
+
+  <div class="group-head" id="group-phases" style="--c:var(--ink-soft)"><h2>預定的關卡</h2></div>
+  <p class="group-sub">「待做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
+  <div id="phases" class="phase-list"></div>
   <div class="foot">
     資料來源：trade-alerts <code>{registry['registry_version']}</code>（{registry['updated_at']} 對四個 repo 逐項盤點）與 <code>{catalog['catalog_version']}</code>。
     「檔案:行號」證據對應的版本：{sources}。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
   </div>
-</div>"""
-    return _page("機隊一致性登記冊", body, data, _ROLLOUT_JS)
+</div>
+<button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>"""
+    return _page("機隊一致性登記冊", body, data, _ROLLOUT_JS, _ROLLOUT_CSS)
 
 
 def rendered_pages() -> dict[Path, str]:
