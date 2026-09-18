@@ -1020,6 +1020,35 @@
           "不需要任何動作。"
         ]
       }
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_PROPOSED",
+      "title": "孤兒平倉已算出修復方案，附提案通知",
+      "project": "seykota",
+      "sources": [
+        "scripts/repair_bot_shadow.py:144"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "VERIFIED_CLOSE_PROPOSED (critical=False)",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "（v2 目標，由共用修復執行器取代本條，屆時本代碼退役）以交易所為準自動補寫；只有結構上對不上時才記一次失敗，同一 trade_id 連續 escalate_after 次失敗才升格：開請求、通知，附給 AI 的根因追查指令。",
+      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-09-18 查證發現的目錄缺口：seykota 的 Phase 5c 影子 bot（scripts/repair_bot_shadow.py，把 momentum 5b 的設計原封不動移植過來）從部署起就一直在發這個事件，但 v1 目錄從未收錄——momentum 有對應的 MOM.VERIFIED_CLOSE_PROPOSED，seykota 卻完全沒有登記，導致一致性登記冊上這支策略的修復 bot 沒有任何可見紀錄。補登跟 momentum 完全對等的處置：v1 的「提案、交給人決定」沒有意義——交易所是權威，治標就是照交易所補、讓三方一致；真正需要人的只有結構上對不上的情況，而那時該做的是追查根因。本條已列在 retired_codes：seykota 升到共用修復執行器（v2-W4）時，這個呼叫點會被取代，屆時本代碼真正退役。",
+      "operator_message": {
+        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
+        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
+        "steps": [
+          "治標：到電腦前照 ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+          "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
+      }
     }
   ],
   "retired_codes": [
@@ -1031,7 +1060,7 @@
     {
       "code": "SEY.VERIFIED_CLOSE_PROPOSED",
       "retired_in": "fleet-error-catalog/v2",
-      "reason": "Emitted by seykota's Phase 5 shadow repair bot but never catalogued in v1. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED; seykota moves to the shared repair runner."
+      "reason": "Emitted by seykota's Phase 5c shadow repair bot but never catalogued in v1; backfilled 2026-09-18 so the rollout registry has something to point at. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED. Stays in the catalog until the shared repair runner (v2-W4) replaces the call site."
     }
   ]
 }

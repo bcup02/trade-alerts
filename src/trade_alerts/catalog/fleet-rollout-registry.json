@@ -950,6 +950,23 @@
           "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_PROPOSED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "2026-09-18 補登目錄缺口：真倉（operations）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟 momentum 5b 同一設計原封不動移植），每輪都會偵測孤兒平倉並算出提案，但 v2 目標行為是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提案、從不寫帳本，不符合 v2 目標，升到共用修復執行器（v2-W4）才算做到。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "真倉（operations）Phase 5c 影子版 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代時換成 v2 標籤。"
+        }
+      }
     }
   ],
   "recent_changes": [
