@@ -38,11 +38,15 @@ def registry() -> dict:
     return load_rollout_registry()
 
 
-def _render_guides():
-    spec = importlib.util.spec_from_file_location("render_guides", _ROOT / "scripts" / "render_guides.py")
+def _script(name):
+    spec = importlib.util.spec_from_file_location(name, _ROOT / "scripts" / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _render_guides():
+    return _script("render_guides")
 
 
 # --- the shipped registry --------------------------------------------------
@@ -220,6 +224,50 @@ def test_retired_code_marked_done_is_caught(registry, catalog):
 
     problems = _problems_after(registry, catalog, finish)
     assert any(f"{code} is retired" in p for p in problems)
+
+
+def test_sources_missing_a_strategy_is_caught(registry, catalog):
+    problems = _problems_after(registry, catalog, lambda r: r["sources"].pop("seykota"))
+    assert any(p.startswith("sources must list exactly") for p in problems)
+
+
+def test_sources_on_a_non_live_branch_is_caught(registry, catalog):
+    # The PR #31 review found done evidence pointing at code that only exists
+    # on development; "done" is pinned to what the live host runs.
+    problems = _problems_after(registry, catalog, lambda r: r["sources"]["momentum"].update(branch="development"))
+    assert any("sources / momentum: branch must be 'operations'" in p for p in problems)
+
+
+@pytest.mark.parametrize("commit", ["520cb9e", "HEAD", "Z" * 40, None])
+def test_sources_commit_must_be_a_full_sha(registry, catalog, commit):
+    problems = _problems_after(registry, catalog, lambda r: r["sources"]["momentum"].update(commit=commit))
+    assert any("sources / momentum: commit must be a full 40-character SHA" in p for p in problems)
+
+
+def test_sources_repo_must_be_owner_slash_name(registry, catalog):
+    problems = _problems_after(registry, catalog, lambda r: r["sources"]["momentum"].update(repo="just-a-name"))
+    assert any("sources / momentum: repo must be owner/name" in p for p in problems)
+
+
+# --- evidence citations (the cross-repo check itself runs by hand) ----------
+
+
+def test_citation_parser_reads_paths_lines_and_root_modules():
+    citations = _script("verify_registry_evidence").citations
+    assert citations("src/strategy.py:1067 build_safe_halt") == [("src/strategy.py", 1067)]
+    assert citations("MOMENTUM_REPAIR_PAUSED（scripts/repair_bot.py:90）") == [("scripts/repair_bot.py", 90)]
+    assert citations("mexc_futures_bot.py:713 append_fleet_event") == [("mexc_futures_bot.py", 713)]
+    assert citations("reconcile_compare.py main") == [("reconcile_compare.py", None)]
+    assert citations("src/seykota_bot/bot.py 守衛；src/seykota_bot/safe_halt_resume.py:103") == [
+        ("src/seykota_bot/bot.py", None), ("src/seykota_bot/safe_halt_resume.py", 103)]
+    assert citations("程式已照目錄描述處理（Phase 3）") == []
+
+
+def test_every_done_cell_cites_a_file(registry):
+    citations = _script("verify_registry_evidence").citations
+    for where, project, status in _script("verify_registry_evidence")._cells(registry):
+        if status["state"] == "done":
+            assert citations(status["evidence"]), f"{where} / {project}: done evidence cites no file"
 
 
 # --- generated pages -------------------------------------------------------

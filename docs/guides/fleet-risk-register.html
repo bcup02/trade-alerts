@@ -162,7 +162,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次「停損掛單失敗、緊急市價平倉也失敗」的根本原因：讀 src/seykota_bot/bot.py 開倉後掛保護單與緊急平倉的流程，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是下單規則、API 權限、餘額還是網路問題，說明交易所上現在的部位狀態該怎麼確認，並提出治本修正。",
    "behaviour": {
-    "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）",
+    "evidence": "src/seykota_bot/bot.py:671 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
     "state": "done"
    },
    "bot": "seykota",
@@ -282,7 +282,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼系統無法唯一確認這個倉位的原生保護單：讀 src/seykota_bot/bot.py 的保護單核對邏輯（_verified_exchange_protective_stop 一帶），對照交易所目前的委託清單，判斷是保護單不存在、有多張、還是欄位對不上，並提出治本修正。",
    "behaviour": {
-    "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）",
+    "evidence": "src/seykota_bot/bot.py:883 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
     "state": "done"
    },
    "bot": "seykota",
@@ -311,7 +311,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼交易所回報的部位無法唯一辨識：讀 src/seykota_bot/bot.py 的 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了，並提出治本修正。",
    "behaviour": {
-    "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）",
+    "evidence": "src/seykota_bot/bot.py:1035 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
     "state": "done"
    },
    "bot": "seykota",
@@ -457,7 +457,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "程式已照目錄描述處理（Phase 3）",
+    "evidence": "src/seykota_bot/bot.py:1227 只記錄、下一輪再確認成交（Phase 3）",
     "state": "done"
    },
    "bot": "seykota",
@@ -481,7 +481,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "程式已照目錄描述處理（Phase 3）",
+    "evidence": "src/seykota_bot/bot.py:1262 只記錄出場（Phase 3）",
     "state": "done"
    },
    "bot": "seykota",
@@ -505,7 +505,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "程式已照目錄描述處理（Phase 3）",
+    "evidence": "src/seykota_bot/bot.py:1342 資金不足跳過進場、只記錄（Phase 3）",
     "state": "done"
    },
    "bot": "seykota",
@@ -611,7 +611,7 @@
    "ai_prompt": null,
    "behaviour": {
     "phase": "v2-W3",
-    "reason": "目前受過渡開關控制、成功後還會發事後通知；v2 移除開關、成功不通知。",
+    "reason": "只在 development／測試機（Phase 6b，受過渡開關控制、成功後還會發事後通知）；真倉只提案不補寫。v2 移除開關、成功不通知。",
     "state": "pending"
    },
    "bot": "momentum",
@@ -620,12 +620,12 @@
    "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
    "emits_event": {
     "phase": "v2-W3",
-    "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。",
+    "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。",
     "state": "pending"
    },
    "notes": [
-    "行為未做 — 目前受過渡開關控制、成功後還會發事後通知；v2 移除開關、成功不通知。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
-    "白話通知未做 — 有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+    "行為未做 — 只在 development／測試機（Phase 6b，受過渡開關控制、成功後還會發事後通知）；真倉只提案不補寫。v2 移除開關、成功不通知。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
+    "白話通知未做 — 只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
    ],
    "open": true,
    "steps": [],
@@ -646,12 +646,12 @@
    "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
    "emits_event": {
     "phase": "v2-W3",
-    "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。",
+    "reason": "真倉（operations）Phase 5 影子版 scripts/repair_bot_shadow.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代。",
     "state": "pending"
    },
    "notes": [
     "行為未做 — 退役中：目前會發提案；v2 由共用執行器取代——能對應就補、結構對不上才重試升格。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
-    "白話通知未做 — 有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+    "白話通知未做 — 真倉（operations）Phase 5 影子版 scripts/repair_bot_shadow.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
    ],
    "open": true,
    "steps": [
@@ -665,8 +665,9 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:153 帳本已有半套修復或寫入失敗即停手、開請求、不重試",
-    "state": "done"
+    "phase": "v2-W3",
+    "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 遇到帳本已有半套修復或寫入失敗即停手、開請求、不重試；真倉（operations）的影子版只提案、不寫帳本，不會發生這種情況。",
+    "state": "pending"
    },
    "bot": "momentum",
    "bot_label": "動能策略",
@@ -674,11 +675,12 @@
    "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
    "emits_event": {
     "phase": "v2-W3",
-    "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。",
+    "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。",
     "state": "pending"
    },
    "notes": [
-    "白話通知未做 — 有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+    "行為未做 — 只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 遇到帳本已有半套修復或寫入失敗即停手、開請求、不重試；真倉（operations）的影子版只提案、不寫帳本，不會發生這種情況。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
+    "白話通知未做 — 只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
    ],
    "open": true,
    "steps": [
@@ -852,7 +854,7 @@
   {
    "ai_prompt": "請在 my-crypto-bot 追查為什麼開倉後的停損單被交易所拒絕：讀 mexc_futures_bot.py 掛保護單的流程與交易所回傳的錯誤碼，判斷是價格／數量規則、槓桿設定還是 API 參數問題，並提出治本修正。",
    "behaviour": {
-    "evidence": "不自動下單（現行行為即符合 v2）",
+    "evidence": "mexc_futures_bot.py:1304 只通知、不自動下單（現行行為即符合 v2）",
     "state": "done"
    },
    "bot": "mycrypto",
@@ -910,7 +912,7 @@
   {
    "ai_prompt": "請在 my-crypto-bot 追查掛停損單時拋出的例外：讀 mexc_futures_bot.py 掛保護單的流程，對照 my-crypto 的日誌找出例外訊息與堆疊，判斷原因並提出治本修正。",
    "behaviour": {
-    "evidence": "不自動下單（現行行為即符合 v2）",
+    "evidence": "mexc_futures_bot.py:1317 只通知、不自動下單（現行行為即符合 v2）",
     "state": "done"
    },
    "bot": "mycrypto",

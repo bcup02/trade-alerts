@@ -2,7 +2,7 @@
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
   "updated_at": "2026-09-18",
-  "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
+  "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
     "seykota": "趨勢策略",
@@ -18,6 +18,28 @@
     "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
     "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
     "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試"
+  },
+  "sources": {
+    "momentum": {
+      "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
+      "branch": "operations",
+      "commit": "520cb9e18f84fac8061d8d41ab5a9ca1d9093961"
+    },
+    "seykota": {
+      "repo": "AI-for-column/ed-seykota-systematic-trend-following",
+      "branch": "operations",
+      "commit": "0213a01f4695af7b7820136ecb818f748e861810"
+    },
+    "mycrypto": {
+      "repo": "AI-for-column/my-crypto-bot",
+      "branch": "operations",
+      "commit": "1efbdc01c80a6d0444152d6098e9cb3a95618265"
+    },
+    "btc-competition": {
+      "repo": "AI-for-column/btc-bull-market-competition",
+      "branch": "operations",
+      "commit": "b8eda43089a21cd71200e9fcf090a5a0de229c4a"
+    }
   },
   "capabilities": [
     {
@@ -78,7 +100,7 @@
         "seykota": {
           "state": "pending",
           "phase": "8-seykota",
-          "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（safe_halt_resume.py:103），目前只能手改 state 檔。"
+          "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。"
         },
         "mycrypto": {
           "state": "n/a",
@@ -129,7 +151,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "portfolio_snapshot_adapter.py strategy.runtime_status"
+          "evidence": "portfolio_snapshot_adapter.py:75 _runtime_status（strategy.runtime_status）"
         },
         "btc-competition": {
           "state": "done",
@@ -152,7 +174,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "reconcile_compare.py"
+          "evidence": "reconcile_compare.py:101 main"
         },
         "btc-competition": {
           "state": "done",
@@ -175,7 +197,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "google_reconcile.py"
+          "evidence": "google_reconcile.py:135 main"
         },
         "btc-competition": {
           "state": "done",
@@ -191,7 +213,7 @@
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "有，但是 v1 版：受過渡開關 MOMENTUM_REPAIR_AUTO_APPLY 控制（測試機開、真倉仍是 Phase 5 只提案版），無歧義以外的情況只提案。"
+          "reason": "真倉（operations）只有 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py；會自動補寫的 v1 版 scripts/repair_bot.py（Phase 6b，受過渡開關 MOMENTUM_REPAIR_AUTO_APPLY 控制）只在 development／測試機。v2 由共用執行器取代。"
         },
         "seykota": {
           "state": "pending",
@@ -215,8 +237,9 @@
       "description": "一個設定就讓修復機器人完全停手（不偵測、不查交易所、不寫帳本）。所有修復機器人同名同行為。",
       "status": {
         "momentum": {
-          "state": "done",
-          "evidence": "MOMENTUM_REPAIR_PAUSED（scripts/repair_bot.py:90）"
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 有 MOMENTUM_REPAIR_PAUSED，真倉（operations）仍是 Phase 5 只提案的影子版 scripts/repair_bot_shadow.py，沒有煞車。改用共用執行器時保留煞車，W6 一起上真倉。"
         },
         "seykota": {
           "state": "pending",
@@ -242,7 +265,7 @@
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "有（7b），但寫的是 fleet-ops-export/v1；改用共用執行器時升 v2。"
+          "reason": "只在 development／測試機（Phase 7b，src/ops_export_refresh.py），寫的是 fleet-ops-export/v1；真倉（operations）還沒有。改用共用執行器時升 v2，W6 一起上真倉。"
         },
         "seykota": {
           "state": "pending",
@@ -338,7 +361,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）"
+          "evidence": "src/seykota_bot/bot.py:671 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
         }
       },
       "emits_event": {
@@ -405,7 +428,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）"
+          "evidence": "src/seykota_bot/bot.py:883 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
         }
       },
       "emits_event": {
@@ -421,7 +444,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "暫停並等人解除（seykota-resume），不自動下單（Phase 4c）"
+          "evidence": "src/seykota_bot/bot.py:1035 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
         }
       },
       "emits_event": {
@@ -503,7 +526,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "程式已照目錄描述處理（Phase 3）"
+          "evidence": "src/seykota_bot/bot.py:1227 只記錄、下一輪再確認成交（Phase 3）"
         }
       },
       "emits_event": {
@@ -519,7 +542,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "程式已照目錄描述處理（Phase 3）"
+          "evidence": "src/seykota_bot/bot.py:1262 只記錄出場（Phase 3）"
         }
       },
       "emits_event": {
@@ -535,7 +558,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "程式已照目錄描述處理（Phase 3）"
+          "evidence": "src/seykota_bot/bot.py:1342 資金不足跳過進場、只記錄（Phase 3）"
         }
       },
       "emits_event": {
@@ -600,14 +623,14 @@
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "目前受過渡開關控制、成功後還會發事後通知；v2 移除開關、成功不通知。"
+          "reason": "只在 development／測試機（Phase 6b，受過渡開關控制、成功後還會發事後通知）；真倉只提案不補寫。v2 移除開關、成功不通知。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。"
+          "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。"
         }
       }
     },
@@ -624,7 +647,7 @@
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。"
+          "reason": "真倉（operations）Phase 5 影子版 scripts/repair_bot_shadow.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代。"
         }
       }
     },
@@ -632,15 +655,16 @@
       "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
       "behaviour": {
         "momentum": {
-          "state": "done",
-          "evidence": "scripts/repair_bot.py:153 帳本已有半套修復或寫入失敗即停手、開請求、不重試"
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "只在 development／測試機：Phase 6b 的 scripts/repair_bot.py 遇到帳本已有半套修復或寫入失敗即停手、開請求、不重試；真倉（operations）的影子版只提案、不寫帳本，不會發生這種情況。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "pending",
           "phase": "v2-W3",
-          "reason": "有寫（scripts/repair_bot.py），但用的是 v1 等級標籤；改用共用執行器時換成 v2。"
+          "reason": "只在 development／測試機的 scripts/repair_bot.py 寫（v1 等級標籤）；真倉沒有。改用共用執行器時換成 v2。"
         }
       }
     },
@@ -746,7 +770,7 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "不自動下單（現行行為即符合 v2）"
+          "evidence": "mexc_futures_bot.py:1304 只通知、不自動下單（現行行為即符合 v2）"
         }
       },
       "emits_event": {
@@ -779,7 +803,7 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "不自動下單（現行行為即符合 v2）"
+          "evidence": "mexc_futures_bot.py:1317 只通知、不自動下單（現行行為即符合 v2）"
         }
       },
       "emits_event": {
@@ -829,19 +853,19 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知"
+          "evidence": "src/reconcile_compare.py:107 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
         },
         "seykota": {
           "state": "done",
-          "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知"
+          "evidence": "src/seykota_bot/reconcile/compare.py:250 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知"
+          "evidence": "reconcile_compare.py:101 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知"
+          "evidence": "src/btc_competition/reconcile_compare.py:228 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
         }
       },
       "emits_event": {
@@ -868,19 +892,19 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知"
+          "evidence": "src/google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
         },
         "seykota": {
           "state": "done",
-          "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知"
+          "evidence": "src/seykota_bot/reconcile/google_reconcile.py:137 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知"
+          "evidence": "google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "對帳程式的 exit 2／3 已改回 0（Phase 4b），分歧改由維運通知的帳本／Google 軸通知"
+          "evidence": "src/btc_competition/reconcile_google.py:283 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
         }
       },
       "emits_event": {

@@ -4,7 +4,7 @@
   "title": "Fleet rollout registry v1",
   "description": "Which fleet capability each of the four strategies actually has, and whether each catalog condition's behaviour and event-log wiring exist in the strategy that owns it. Anything not done is pending (with the phase it lands in and why) or n/a (with why). Cross-field rules (all four strategies listed, pending phases registered, one row per catalog code with the right owners) are enforced by trade_alerts.rollout_registry.registry_problems.",
   "type": "object",
-  "required": ["registry_version", "catalog_version", "updated_at", "projects", "phases", "capabilities", "catalog"],
+  "required": ["registry_version", "catalog_version", "updated_at", "projects", "phases", "sources", "capabilities", "catalog"],
   "additionalProperties": false,
   "definitions": {
     "status": {
@@ -13,7 +13,7 @@
       "additionalProperties": false,
       "properties": {
         "state": {"enum": ["done", "pending", "n/a"]},
-        "evidence": {"type": "string", "minLength": 1, "description": "done: where it lives (file:line or tool name)."},
+        "evidence": {"type": "string", "minLength": 1, "description": "done: where it lives on the sources commit (file:line or tool name)."},
         "phase": {"type": "string", "minLength": 1, "description": "pending: a key of phases."},
         "reason": {"type": "string", "minLength": 1, "description": "pending / n/a: plain-language current state or why it does not apply."}
       },
@@ -35,6 +35,24 @@
     "catalog_version": {"type": "string"},
     "updated_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
     "note": {"type": "string"},
+    "sources": {
+      "description": "What 'done' is measured against: per strategy, the repo and the branch the live host deploys from, and the commit the file:line evidence refers to. Merged to development or running on the dev host is not done.",
+      "type": "object",
+      "required": ["momentum", "seykota", "mycrypto", "btc-competition"],
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(momentum|seykota|mycrypto|btc-competition)$": {
+          "type": "object",
+          "required": ["repo", "branch", "commit"],
+          "additionalProperties": false,
+          "properties": {
+            "repo": {"type": "string", "pattern": "^[\\w.-]+/[\\w.-]+$"},
+            "branch": {"const": "operations"},
+            "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+          }
+        }
+      }
+    },
     "projects": {
       "type": "object",
       "required": ["momentum", "seykota", "mycrypto", "btc-competition"],

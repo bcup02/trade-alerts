@@ -8,6 +8,13 @@ enforces: a capability or catalog behaviour a strategy does not have is listed
 as ``pending`` (with the phase it lands in and why) or ``n/a`` (with why) --
 never silently missing.
 
+``done`` means present on the branch the live host deploys from
+(``operations``), at the commit recorded in ``sources`` -- merged to
+development or running on the dev host is still ``pending``.  File:line
+evidence refers to that commit, so it stays reproducible as the branches move;
+``scripts/verify_registry_evidence.py`` checks every such reference against
+local clones of the four repos (cross-repo, so not part of CI).
+
 ``registry_problems`` is the executable form of that rule.  trade-alerts' own
 tests call it; a strategy repo's tests call :func:`project_rows` to check the
 rows that make claims about itself.  The human page
@@ -16,6 +23,7 @@ rows that make claims about itself.  The human page
 from __future__ import annotations
 
 import json
+import re
 from importlib import resources
 from pathlib import Path
 from typing import Any, Mapping
@@ -28,6 +36,10 @@ PACKAGED_REGISTRY_NAME = "fleet-rollout-registry.json"
 #: conditions, not a strategy that can have a capability.
 STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet")
 STATES = ("done", "pending", "n/a")
+#: ``done`` means present where the live host deploys from -- not merely
+#: merged to development or running on the dev host.
+LIVE_BRANCH = "operations"
+_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _OWNER = {prefix: project for project, prefix in PROJECT_CODE_PREFIXES.items()}
 
 
@@ -87,6 +99,19 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
     if set(projects) != set(STRATEGY_PROJECTS):
         problems.append(f"projects must be exactly {sorted(STRATEGY_PROJECTS)}, got {sorted(projects)}")
     phases = registry.get("phases") or {}
+    sources = registry.get("sources") or {}
+    if set(sources) != set(STRATEGY_PROJECTS):
+        problems.append(f"sources must list exactly {sorted(STRATEGY_PROJECTS)}, got {sorted(sources)}")
+    for project, source in sources.items():
+        if not isinstance(source, Mapping):
+            problems.append(f"sources / {project}: not an object")
+            continue
+        if not (isinstance(source.get("repo"), str) and source["repo"].count("/") == 1):
+            problems.append(f"sources / {project}: repo must be owner/name")
+        if source.get("branch") != LIVE_BRANCH:
+            problems.append(f"sources / {project}: branch must be {LIVE_BRANCH!r} (what the live host runs), got {source.get('branch')!r}")
+        if not (isinstance(source.get("commit"), str) and _COMMIT.match(source["commit"])):
+            problems.append(f"sources / {project}: commit must be a full 40-character SHA")
 
     seen_ids: set[str] = set()
     for capability in registry.get("capabilities") or []:

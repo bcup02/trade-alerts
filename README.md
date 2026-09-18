@@ -89,7 +89,11 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
 [`src/trade_alerts/catalog/fleet-rollout-registry.json`](src/trade_alerts/catalog/fleet-rollout-registry.json)
 （格式 [`schemas/fleet-rollout-registry-v1.schema.json`](schemas/fleet-rollout-registry-v1.schema.json)）
 記錄每一項機隊功能、錯誤目錄每一條的行為與事件日誌，在四支策略裡**實際做到了沒有**：`done` 附證據、
-`pending` 附預定 phase 與理由、`n/a` 附理由。規則是「四支一起做，否則寫在這裡」——
+`pending` 附預定 phase 與理由、`n/a` 附理由。**`done` 指真倉已經在跑**：`sources` 記錄每支策略的
+repo、真倉部署來源分支（`operations`）與 commit，證據的「檔案:行號」都對應那個 commit；只合併到
+development 或只在測試機上的算 `pending`。證據是否真的指到程式碼要跨 repo 才查得到，送審前在本機執行
+`python scripts/verify_registry_evidence.py`（對四個 repo 的 clone 逐條檢查，不在 CI 裡）。
+規則是「四支一起做，否則寫在這裡」——
 `trade_alerts.registry_problems()` 是這條規則的可執行版本，`tests/test_rollout_registry.py` 讓 CI 擋下
 漏列、缺理由、目錄與登記冊對不上的情況；策略 repo 的測試可用 `project_rows()` 檢查登記冊對自己的宣稱。
 

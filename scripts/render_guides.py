@@ -15,6 +15,7 @@ All text reaches the page through ``textContent``, never ``innerHTML``.
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import sys
 from pathlib import Path
@@ -353,6 +354,10 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
         "phase_order": list(phases), "phase_counts": phase_counts, "totals": totals,
         "capabilities": registry["capabilities"], "catalog": catalog_rows,
     }
+    sources = "；".join(
+        f"{html.escape(registry['projects'][p])} <code>{html.escape(s['repo'])}@{html.escape(s['branch'])} {html.escape(s['commit'][:7])}</code>"
+        for p, s in ((p, registry["sources"][p]) for p in STRATEGY_PROJECTS)
+    )
     body = f"""<div class="wrap">
   <div class="eyebrow">交易機隊 · 四支策略做到哪裡了</div>
   <h1>機隊一致性登記冊</h1>
@@ -360,6 +365,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
     每一項機隊功能、每一條錯誤處理規則，在四支策略裡<b>實際做到了沒有</b>。規則只有一條：
     沒做的一定要寫在這裡——<b>「未做」要寫目前狀況和預定在哪一關做</b>，<b>「不適用」要寫理由</b>。
     漏寫的話，自動檢查（CI）會擋下來，不會再有「只做了一支、沒人記得」。
+    <b>「已做」指的是真倉已經在跑</b>（部署來源 <code>operations</code> 分支上有）；只合併到開發分支或只在測試機上的，一律算「未做」。
   </p>
   <div class="summary" id="summary"></div>
   <div id="filters"></div>
@@ -372,6 +378,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
   <div id="phases"></div>
   <div class="foot">
     資料來源：trade-alerts <code>{registry['registry_version']}</code>（{registry['updated_at']} 對四個 repo 逐項盤點）與 <code>{catalog['catalog_version']}</code>。
+    「檔案:行號」證據對應的版本：{sources}。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
   </div>
 </div>"""
