@@ -24,7 +24,7 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "520cb9e18f84fac8061d8d41ab5a9ca1d9093961"
+      "commit": "b48b88b264e149e7a272e044b7bf002cef11f314"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
@@ -264,9 +264,8 @@
       "description": "策略自己不推播，把需要人知道的事寫成 audit/ops_export.json，交給維運通知代送。",
       "status": {
         "momentum": {
-          "state": "pending",
-          "phase": "v2-W3",
-          "reason": "只在 development／測試機（Phase 7b，src/ops_export_refresh.py），寫的是 fleet-ops-export/v1；真倉（operations）還沒有。改用共用執行器時升 v2，W6 一起上真倉。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:278 refresh_ops_export（2026-09-18 查證：今天 F3 資金費修復的整支重新部署把它一併帶上真倉，trading-main 每輪都在改寫 audit/ops_export.json，目前內容為空；ops-notify 那端轉送開關尚未開，見 ops_notify.export_relay_enabled）"
         },
         "seykota": {
           "state": "pending",
