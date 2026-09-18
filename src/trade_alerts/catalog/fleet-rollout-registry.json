@@ -17,7 +17,8 @@
     "8-momentum": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
     "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
     "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
-    "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試"
+    "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
+    "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上"
   },
   "sources": {
     "momentum": {
@@ -335,6 +336,31 @@
           "state": "pending",
           "phase": "8-btc-competition",
           "reason": "還沒決定要盯哪些背景服務。"
+        }
+      }
+    },
+    {
+      "id": "reconcile.funding_fee_sync",
+      "title": "資金費用同步",
+      "description": "定時查交易所的資金費結算紀錄、寫進本機帳本，讓帳目跟交易所餘額對得起來。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "binance-funding-sync",
+          "reason": "2026-09-18 查證：scripts/sync_funding_fees.py 存在且會跑，但查的是 MEXC——真倉已於 2026-09-04 切換到 EXCHANGE=binance，這支程式從那天起就一直在查錯的交易所，對現在的真倉交易沒有實質幫助。09-04 起 25 筆真倉交易全部持倉很短（最長 2.83 小時），目前沒有一筆跨過資金費結算時間點，所以尚未造成已知漏記；但只要有一筆撐過 8 小時就會真的漏記且無法事後補回。PR AI-for-column/mexc-4h-momentum-trailing-stop#92 修好了這支程式本身的節流/重試/DRY_RUN 排除問題，但沒有解決「查錯交易所」這件事。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "binance-funding-sync",
+          "reason": "2026-09-18 查證：整個 repo 沒有任何資金費同步腳本，也沒有對應的 systemd unit。已經造成一筆真實漏記：唯一一筆真倉交易（BTCUSDT，2026-09-03T17:31 開倉、2026-09-04T02:41 平倉，持倉 9.16 小時）真的跨過 00:00 UTC 結算時間點，這筆資金費沒有任何程式查過、也永遠補不回來了（金額應該很小，但缺口是真實發生過的，不是推測）。趨勢策略是長線策略、持倉時間本來就比動能策略長，之後再發生同樣情況的機率比動能策略高，建議優先權高於動能。"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "sync_funding_fees_entry.py（固定查 BTC_USDT，配 my-crypto-bot-funding-sync.service/.timer，真倉 2026-09-18 確認執行成功，帳本持續累積資金費紀錄）"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "現貨再平衡策略，不是永續合約，沒有資金費結算這個概念。"
         }
       }
     }
