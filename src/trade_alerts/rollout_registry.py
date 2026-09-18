@@ -149,6 +149,35 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
             for project, value in (row.get("behaviour") or {}).items():
                 if isinstance(value, Mapping) and value.get("state") != "pending":
                     problems.append(f"{code} is retired but its behaviour for {project} is not pending replacement")
+
+    cap_by_id = {capability.get("id"): capability for capability in registry.get("capabilities") or []}
+    for i, change in enumerate(registry.get("recent_changes") or []):
+        where = f"recent_changes[{i}]"
+        if not isinstance(change, Mapping):
+            problems.append(f"{where}: not an object")
+            continue
+        kind, cid, project = change.get("kind"), change.get("id"), change.get("project")
+        if kind == "cap":
+            capability = cap_by_id.get(cid)
+            if capability is None:
+                problems.append(f"{where}: capability {cid!r} not found")
+                continue
+            state = ((capability.get("status") or {}).get(project) or {}).get("state")
+        elif kind == "rule":
+            row = rows.get(cid)
+            aspect = change.get("aspect")
+            if row is None:
+                problems.append(f"{where}: catalog code {cid!r} not found")
+                continue
+            if aspect not in ("behaviour", "emits_event"):
+                problems.append(f"{where}: rule entries need aspect behaviour/emits_event, got {aspect!r}")
+                continue
+            state = ((row.get(aspect) or {}).get(project) or {}).get("state")
+        else:
+            problems.append(f"{where}: kind must be cap or rule, got {kind!r}")
+            continue
+        if state not in ("done", "n/a"):
+            problems.append(f"{where}: {cid} / {project} is {state!r}, not done/n-a -- recent_changes must point at what just became true")
     return problems
 
 

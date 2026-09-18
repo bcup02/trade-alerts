@@ -12,6 +12,7 @@
     --done:#357357; --done-bg:#DEEAE3;
     --pending:#8C6317; --pending-bg:#F1E6C9;
     --na:#6B7566; --na-bg:#E7EAE0;
+    --recent:#A6800A; --recent-bg:#FFF3B0;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -21,6 +22,7 @@
       --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
       --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
       --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
+      --recent:#FFE066; --recent-bg:#4A3B05;
     }
   }
   :root[data-theme="dark"]{
@@ -30,6 +32,7 @@
     --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
     --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
     --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
+    --recent:#FFE066; --recent-bg:#4A3B05;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans TC","IBM Plex Mono",sans-serif;padding:40px 20px 64px;}
@@ -106,8 +109,17 @@
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--dc);border:1px solid var(--dc);}
   .dot-done{--dc:var(--done);} .dot-pending{--dc:var(--pending);} .dot-na{--dc:var(--na);opacity:.55;}
   .dot-none{--dc:var(--line);background:transparent;}
+  .dot-recent{--dc:var(--recent);box-shadow:0 0 0 2px var(--recent-bg);}
   .dot-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-faint);margin:0 0 4px;}
   .dot-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .new-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.03em;color:var(--recent);background:var(--recent-bg);border-radius:999px;padding:1px 7px;margin-inline-start:4px;white-space:nowrap;vertical-align:middle;}
+  .recent-box{border:1px solid var(--recent);border-radius:3px;background:var(--recent-bg);padding:12px 14px;margin-bottom:14px;}
+  .recent-box h3{margin:0 0 8px;font-size:13px;color:var(--recent);}
+  .recent-box ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .recent-box li a{color:inherit;text-decoration:none;font-weight:700;font-size:13.5px;}
+  .recent-box li a:hover,.recent-box li a:focus-visible{text-decoration:underline;}
+  .recent-box .proj{font-weight:600;font-size:11.5px;color:var(--ink-soft);margin-inline-start:6px;}
+  .recent-box .note{display:block;font-weight:400;font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
   .group-head{display:flex;align-items:baseline;gap:10px;margin:40px 0 4px;padding-bottom:8px;border-block-end:2px solid var(--c);}
   .group-head h2{margin:0;color:var(--c);}
   .group-head .n{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:13px;color:var(--ink-faint);}
@@ -160,7 +172,12 @@
     <span>每項右邊的四個點依序是 趨勢策略、動能策略、加密策略、競賽策略：</span>
     <span><i class="dot dot-done"></i>已做</span><span><i class="dot dot-pending"></i>未做</span>
     <span><i class="dot dot-na"></i>不適用</span><span><i class="dot dot-none"></i>跟這支無關</span>
+    <span><i class="dot dot-recent"></i>🆕 最新完成——這次更新才變成已做／不適用</span>
   </p>
+  <div class="recent-box" id="recentBox" hidden>
+    <h3>🆕 最近變動——確認這次更新真的生效了</h3>
+    <ul id="recentList"></ul>
+  </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
   <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">38 項</span></div>
@@ -194,6 +211,8 @@
     "mycrypto": "na",
     "seykota": "done"
    },
+   "has_recent": false,
+   "id": "latch.unified_model",
    "kind": "cap",
    "rows": [
     {
@@ -253,6 +272,8 @@
     "mycrypto": "na",
     "seykota": "done"
    },
+   "has_recent": false,
+   "id": "latch.resume_tool",
    "kind": "cap",
    "rows": [
     {
@@ -312,6 +333,8 @@
     "mycrypto": "na",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "latch.restart_only_clear",
    "kind": "cap",
    "rows": [
     {
@@ -371,6 +394,8 @@
     "mycrypto": "pending",
     "seykota": "done"
    },
+   "has_recent": false,
+   "id": "latch.consecutive_failure_counter",
    "kind": "cap",
    "rows": [
     {
@@ -430,6 +455,8 @@
     "mycrypto": "done",
     "seykota": "done"
    },
+   "has_recent": false,
+   "id": "runtime.status_snapshot",
    "kind": "cap",
    "rows": [
     {
@@ -489,6 +516,8 @@
     "mycrypto": "done",
     "seykota": "done"
    },
+   "has_recent": false,
+   "id": "reconcile.ledger_status",
    "kind": "cap",
    "rows": [
     {
@@ -548,6 +577,8 @@
     "mycrypto": "done",
     "seykota": "done"
    },
+   "has_recent": false,
+   "id": "reconcile.google_status",
    "kind": "cap",
    "rows": [
     {
@@ -607,6 +638,8 @@
     "mycrypto": "pending",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "repair_bot.verified_close",
    "kind": "cap",
    "rows": [
     {
@@ -666,6 +699,8 @@
     "mycrypto": "pending",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "repair_bot.pause_brake",
    "kind": "cap",
    "rows": [
     {
@@ -721,10 +756,12 @@
    "complete": false,
    "dots": {
     "btc-competition": "pending",
-    "momentum": "done",
+    "momentum": "recent",
     "mycrypto": "pending",
     "seykota": "pending"
    },
+   "has_recent": true,
+   "id": "ops_export.writer",
    "kind": "cap",
    "rows": [
     {
@@ -784,6 +821,8 @@
     "mycrypto": "pending",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "ops_notify.export_relay_enabled",
    "kind": "cap",
    "rows": [
     {
@@ -843,6 +882,8 @@
     "mycrypto": "pending",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "ops_notify.units_axis",
    "kind": "cap",
    "rows": [
     {
@@ -902,6 +943,8 @@
     "mycrypto": "done",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "reconcile.funding_fee_sync",
    "kind": "cap",
    "rows": [
     {
@@ -961,6 +1004,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
    "kind": "rule",
    "rows": [
     {
@@ -993,6 +1038,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
    "kind": "rule",
    "rows": [
     {
@@ -1025,6 +1072,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.PROTECTION_REPLACE_FAILED",
    "kind": "rule",
    "rows": [
     {
@@ -1057,6 +1106,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
    "kind": "rule",
    "rows": [
     {
@@ -1089,6 +1140,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
    "kind": "rule",
    "rows": [
     {
@@ -1121,6 +1174,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.PROTECTION_UNVERIFIED",
    "kind": "rule",
    "rows": [
     {
@@ -1153,6 +1208,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.POSITION_AMBIGUOUS",
    "kind": "rule",
    "rows": [
     {
@@ -1185,6 +1242,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.RECONCILE_FAILED",
    "kind": "rule",
    "rows": [
     {
@@ -1217,6 +1276,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.EXCHANGE_TARGET_UNSAFE",
    "kind": "rule",
    "rows": [
     {
@@ -1249,6 +1310,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
    "kind": "rule",
    "rows": [
     {
@@ -1281,6 +1344,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.RUNTIME_CYCLE_FAILED",
    "kind": "rule",
    "rows": [
     {
@@ -1313,6 +1378,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.CLOSE_FILL_PENDING",
    "kind": "rule",
    "rows": [
     {
@@ -1345,6 +1412,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.TRADE_EXIT",
    "kind": "rule",
    "rows": [
     {
@@ -1377,6 +1446,8 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
+   "has_recent": false,
+   "id": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
    "kind": "rule",
    "rows": [
     {
@@ -1409,6 +1480,8 @@
     "mycrypto": "none",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MOM.PROTECTION_UNVERIFIED",
    "kind": "rule",
    "rows": [
     {
@@ -1441,6 +1514,8 @@
     "mycrypto": "none",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MOM.STATE_REPAIRED_SAFE_HALT",
    "kind": "rule",
    "rows": [
     {
@@ -1473,6 +1548,8 @@
     "mycrypto": "none",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MOM.RUNTIME_CYCLE_FAILED",
    "kind": "rule",
    "rows": [
     {
@@ -1505,6 +1582,8 @@
     "mycrypto": "none",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
    "kind": "rule",
    "rows": [
     {
@@ -1537,6 +1616,8 @@
     "mycrypto": "none",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MOM.VERIFIED_CLOSE_PROPOSED",
    "kind": "rule",
    "rows": [
     {
@@ -1569,6 +1650,8 @@
     "mycrypto": "none",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
    "kind": "rule",
    "rows": [
     {
@@ -1601,6 +1684,8 @@
     "mycrypto": "none",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
    "kind": "rule",
    "rows": [
     {
@@ -1633,6 +1718,8 @@
     "mycrypto": "none",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
    "kind": "rule",
    "rows": [
     {
@@ -1665,6 +1752,8 @@
     "mycrypto": "none",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "BTC.REBALANCE_PENDING",
    "kind": "rule",
    "rows": [
     {
@@ -1697,6 +1786,8 @@
     "mycrypto": "none",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "BTC.RUNTIME_CYCLE_FAILED",
    "kind": "rule",
    "rows": [
     {
@@ -1729,6 +1820,8 @@
     "mycrypto": "done",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MYC.RECONCILE_DELTA_EXCEEDED",
    "kind": "rule",
    "rows": [
     {
@@ -1761,6 +1854,8 @@
     "mycrypto": "pending",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MYC.RUNTIME_CYCLE_FAILED",
    "kind": "rule",
    "rows": [
     {
@@ -1793,6 +1888,8 @@
     "mycrypto": "pending",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MYC.PROTECTION_PLACEMENT_REJECTED",
    "kind": "rule",
    "rows": [
     {
@@ -1825,6 +1922,8 @@
     "mycrypto": "pending",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
    "kind": "rule",
    "rows": [
     {
@@ -1857,6 +1956,8 @@
     "mycrypto": "pending",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MYC.PROTECTION_PLACEMENT_ERROR",
    "kind": "rule",
    "rows": [
     {
@@ -1889,6 +1990,8 @@
     "mycrypto": "pending",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MYC.PROTECTION_REPLACE_FAILED",
    "kind": "rule",
    "rows": [
     {
@@ -1921,6 +2024,8 @@
     "mycrypto": "pending",
     "seykota": "none"
    },
+   "has_recent": false,
+   "id": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
    "kind": "rule",
    "rows": [
     {
@@ -1953,6 +2058,8 @@
     "mycrypto": "done",
     "seykota": "done"
    },
+   "has_recent": false,
+   "id": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
    "kind": "rule",
    "rows": [
     {
@@ -2036,6 +2143,8 @@
     "mycrypto": "done",
     "seykota": "done"
    },
+   "has_recent": false,
+   "id": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
    "kind": "rule",
    "rows": [
     {
@@ -2156,6 +2265,14 @@
   "mycrypto": "加密策略",
   "seykota": "趨勢策略"
  },
+ "recent_summary": [
+  {
+   "anchor": "cap-ops_export.writer",
+   "note": "今天 F3 資金費修復整支重新部署，順帶把這支也帶上了真倉；scripts/repair_bot.py:278 refresh_ops_export 每輪都在改寫 audit/ops_export.json（目前內容是空的）。",
+   "project": "動能策略",
+   "title": "把要通知的事寫成匯出檔"
+  }
+ ],
  "totals": {
   "btc-competition": {
    "done": 10,
@@ -2196,13 +2313,14 @@ function chipGroup(host, values, onPick){
   });
 }
 
-var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"不相關"};
+var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"不相關","recent":"剛完成"};
 var KINDS=[["cap","機隊功能"],["rule","錯誤處理規則"]];
 function dots(item){
   var s=el("span","dots"); s.setAttribute("aria-hidden","true");
   DATA.project_order.forEach(function(p){ var d=el("span","dot dot-"+item.dots[p]); d.title=DATA.projects[p]+"："+DOT_LABEL[item.dots[p]]; s.appendChild(d); });
   return s;
 }
+function newBadge(){ var b=el("span","new-badge","🆕 最新"); b.title="這次更新剛變成已做／不適用"; return b; }
 function table(item){
   var g=el("div","sl");
   item.rows.forEach(function(r){
@@ -2224,13 +2342,16 @@ function table(item){
 function pendingCard(item){
   var c=el("div","card item"); c.id=item.anchor;
   var head=el("div","item-head"), h=el("div","h");
-  h.appendChild(el("h3",null,item.title)); h.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub));
+  h.appendChild(el("h3",null,item.title)); if(item.has_recent) h.appendChild(newBadge());
+  h.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub));
   head.appendChild(h); head.appendChild(dots(item)); c.appendChild(head);
   c.appendChild(table(item)); return c;
 }
 function doneCard(item){
   var d=el("details","card item done-card"); d.id=item.anchor;
-  var s=el("summary"); s.appendChild(el("span","ok","✓")); s.appendChild(el("span","t",item.title)); s.appendChild(dots(item));
+  var s=el("summary"); s.appendChild(el("span","ok","✓")); s.appendChild(el("span","t",item.title));
+  if(item.has_recent) s.appendChild(newBadge());
+  s.appendChild(dots(item));
   d.appendChild(s);
   var body=el("div","body"); body.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub)); body.appendChild(table(item));
   d.appendChild(body); return d;
@@ -2252,7 +2373,8 @@ function tocColumn(group, title){
     var ul=el("ul");
     list.forEach(function(i){
       var li=el("li"), a=el("a"); a.href="#"+i.anchor;
-      a.appendChild(el("span","t",i.title)); a.appendChild(dots(i));
+      a.appendChild(el("span","t",i.title)); if(i.has_recent) a.appendChild(newBadge());
+      a.appendChild(dots(i));
       a.addEventListener("click",function(ev){ ev.preventDefault(); go(i.anchor); });
       li.appendChild(a); ul.appendChild(li);
     });
@@ -2266,6 +2388,18 @@ function fillGroup(host, group){
     host.appendChild(el("h3","kind",k[1]+"（"+list.length+"）"));
     list.forEach(function(i){ host.appendChild(group==="done"?doneCard(i):pendingCard(i)); });
   });
+}
+var recentBox=document.getElementById("recentBox"), recentList=document.getElementById("recentList");
+if(DATA.recent_summary && DATA.recent_summary.length){
+  DATA.recent_summary.forEach(function(r){
+    var li=el("li"), a=el("a"); a.href="#"+r.anchor;
+    a.appendChild(document.createTextNode(r.title));
+    a.appendChild(el("span","proj",r.project));
+    a.appendChild(el("span","note",r.note));
+    a.addEventListener("click",function(ev){ ev.preventDefault(); go(r.anchor); });
+    li.appendChild(a); recentList.appendChild(li);
+  });
+  recentBox.hidden=false;
 }
 var toc=document.getElementById("toc");
 toc.appendChild(tocColumn("pending","未完成")); toc.appendChild(tocColumn("done","已完成"));
