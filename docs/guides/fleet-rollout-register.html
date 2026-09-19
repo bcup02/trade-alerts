@@ -177,8 +177,8 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>41</b><span>項未完成——還有策略沒做到</span></a>
-    <a class="c-done" href="#group-done"><b>8</b><span>項已完成——四支都到位，不用再動</span></a>
+    <a class="c-pending" href="#group-pending"><b>40</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-done" href="#group-done"><b>9</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
   <p class="dot-legend">
@@ -193,11 +193,11 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">41 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">40 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
-  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">8 項</span></div>
+  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">9 項</span></div>
   <p class="group-sub">每支相關的策略都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
   <div id="done"></div>
 
@@ -1751,11 +1751,11 @@
   {
    "added_recent": false,
    "anchor": "cap-docs.glossary_adopted",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "done",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "done"
    },
    "has_recent": true,
@@ -1800,9 +1800,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
-       "state": "pending",
-       "text": "還沒改：docs/execution-flow.md 對安全暫停還用舊叫法，也還有「正式機跑模擬帳戶」這種過時說法。"
+       "phase": null,
+       "state": "done",
+       "text": "AI-for-column/btc-bull-market-competition#33（2026-09-19 squash 合併 a878166，外部審閱 PASS）：README、docs/branch-governance.md、docs/btc-competition-onboarding-plan.md、docs/execution-flow.md、docs/recon-strategy4.md 加 src/btc_competition/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。過程中排除了兩處剛好包含子字串、但語意其實是買賣盤報價、跟交易模式無關的詞，也刻意不動 tests/test_portfolio_snapshot_adapter.py 的跨 repo digest 一致性 fixture（要跟 portfolio-query 同步才能改，留給 n6）。"
       }
      ]
     }
@@ -3109,7 +3109,7 @@
   "8-mycrypto": 17,
   "8-seykota": 20,
   "binance-funding-sync": 2,
-  "naming-rollout": 1,
+  "naming-rollout": 0,
   "v2-W2": 0,
   "v2-W3": 7,
   "v2-W4": 5,
@@ -3154,16 +3154,16 @@
  "recent_summary": [
   {
    "anchor": "cap-docs.glossary_adopted",
-   "note": "加密策略（mycrypto）已做：my-crypto-bot#47（外部審閱 PASS）逐一比對對照表 48 條詞條，改了 5 個檔案，189 tests 全過。這支策略沒有 SAFE_HALT latch，涉及舊叫法遠比趨勢/動能兩支少。競賽策略仍未做（n5）。",
-   "project": "加密策略",
+   "note": "競賽策略（btc-competition）已做：btc-bull-market-competition#33（外部審閱 PASS），四支策略的用詞統一（n2→n5）全部完成。過程中抓到一處子字串誤觸的假陽性跟一處跨 repo digest fixture 不能動的邊界情況，留給 n6（portfolio-query）處理。",
+   "project": "競賽策略",
    "title": "文件與訊息已改用統一名詞"
   }
  ],
  "totals": {
   "btc-competition": {
-   "done": 10,
+   "done": 11,
    "n/a": 8,
-   "pending": 9
+   "pending": 8
   },
   "momentum": {
    "done": 14,
