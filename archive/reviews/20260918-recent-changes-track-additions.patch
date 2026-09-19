@@ -1,0 +1,860 @@
+diff --git a/docs/guides/README.md b/docs/guides/README.md
+index 47f3610..0bfe386 100644
+--- a/docs/guides/README.md
++++ b/docs/guides/README.md
+@@ -9,7 +9,7 @@ Perplexity／開發者看的工程規格與流程規則。這個目錄放**給
+ | 檔案 | 說明 | 對應資料源 |
+ |---|---|---|
+ | `fleet-risk-register.html` | 機隊風險登記冊——34 種已知錯誤情況，依四個風險等級（v2）白話說明、處理步驟與給 AI 的追查指令，並標示各策略實際做到了沒有；可依等級／策略／未做完篩選。 | `src/trade_alerts/catalog/fleet-error-catalog-v2.json`＋`fleet-rollout-registry.json` |
+-| `fleet-rollout-register.html` | 機隊一致性登記冊——每項機隊功能與每條錯誤規則在四支策略的已做／未做（含預定哪一關）／不適用（含理由）；分「未完成／已完成」兩組，最上方目錄可點擊跳到該項，已完成項目預設摺疊，右下角有回到最上方按鈕。JSON 的 `recent_changes` 可以標出這次更新剛變成已做／不適用的格子，頁面用「🆕 最新完成」黃色標示並列在最上方的「最近變動」欄，同時兼作「這次更新有沒有真的生效」的視覺確認。 | `src/trade_alerts/catalog/fleet-rollout-registry.json` |
++| `fleet-rollout-register.html` | 機隊一致性登記冊——每項機隊功能與每條錯誤規則在四支策略的已做／未做（含預定哪一關）／不適用（含理由）；分「未完成／已完成」兩組，最上方目錄可點擊跳到該項，已完成項目預設摺疊，右下角有回到最上方按鈕。JSON 的 `recent_changes` 標出這次編輯真正動到的東西（一格變成已做／不適用是 `type: completed`，新增一整列是 `type: added`），頁面上不分兩種、統一用「🆕 最新變動」黃色標示並列在最上方摘要欄，兼作「這次更新有沒有真的生效」的視覺確認——**每次編輯登記冊 JSON 都要同步整份換掉這個欄位，不是累加，沒有東西要標就設成 `[]`**。 | `src/trade_alerts/catalog/fleet-rollout-registry.json` |
+ 
+ ## 慣例
+ 
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 7fc48ac..010687b 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -172,10 +172,10 @@
+     <span>每項右邊的四個點依序是 趨勢策略、動能策略、加密策略、競賽策略：</span>
+     <span><i class="dot dot-done"></i>已做</span><span><i class="dot dot-pending"></i>未做</span>
+     <span><i class="dot dot-na"></i>不適用</span><span><i class="dot dot-none"></i>跟這支無關</span>
+-    <span><i class="dot dot-recent"></i>🆕 最新完成——這次更新才變成已做／不適用</span>
++    <span><i class="dot dot-recent"></i>🆕 最新變動</span>
+   </p>
+   <div class="recent-box" id="recentBox" hidden>
+-    <h3>🆕 最近變動——確認這次更新真的生效了</h3>
++    <h3>🆕 最新變動</h3>
+     <ul id="recentList"></ul>
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+@@ -203,6 +203,7 @@
+ {
+  "items": [
+   {
++   "added_recent": false,
+    "anchor": "cap-latch.unified_model",
+    "complete": true,
+    "dots": {
+@@ -264,6 +265,7 @@
+    "title": "統一格式的暫停（latch）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-latch.resume_tool",
+    "complete": true,
+    "dots": {
+@@ -325,6 +327,7 @@
+    "title": "兩段式解除工具"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-latch.restart_only_clear",
+    "complete": false,
+    "dots": {
+@@ -386,6 +389,7 @@
+    "title": "「改好設定重啟」就能解除的暫停真的會被清掉"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-latch.consecutive_failure_counter",
+    "complete": false,
+    "dots": {
+@@ -447,6 +451,7 @@
+    "title": "連續失敗 3 次才升格（不因一次意外就停）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-runtime.status_snapshot",
+    "complete": true,
+    "dots": {
+@@ -508,6 +513,7 @@
+    "title": "策略運行狀態（維運通知的第四軸）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-reconcile.ledger_status",
+    "complete": true,
+    "dots": {
+@@ -569,6 +575,7 @@
+    "title": "帳本↔交易所對帳狀態檔"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-reconcile.google_status",
+    "complete": true,
+    "dots": {
+@@ -630,6 +637,7 @@
+    "title": "帳本↔Google 表對帳狀態檔"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-repair_bot.verified_close",
+    "complete": false,
+    "dots": {
+@@ -691,6 +699,7 @@
+    "title": "漏記平倉自動修復機器人"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-repair_bot.pause_brake",
+    "complete": false,
+    "dots": {
+@@ -752,15 +761,16 @@
+    "title": "修復機器人緊急煞車"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-ops_export.writer",
+    "complete": false,
+    "dots": {
+     "btc-competition": "pending",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "pending",
+     "seykota": "pending"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "ops_export.writer",
+    "kind": "cap",
+    "rows": [
+@@ -813,6 +823,7 @@
+    "title": "把要通知的事寫成匯出檔"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-ops_notify.export_relay_enabled",
+    "complete": false,
+    "dots": {
+@@ -874,6 +885,7 @@
+    "title": "維運通知已開啟匯出轉送（部署設定）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-ops_notify.units_axis",
+    "complete": false,
+    "dots": {
+@@ -935,6 +947,7 @@
+    "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "cap-reconcile.funding_fee_sync",
+    "complete": false,
+    "dots": {
+@@ -996,6 +1009,7 @@
+    "title": "資金費用同步"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
+    "complete": false,
+    "dots": {
+@@ -1030,6 +1044,7 @@
+    "title": "R1｜開倉後停損掛單失敗，緊急市價平倉成功"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
+    "complete": false,
+    "dots": {
+@@ -1064,6 +1079,7 @@
+    "title": "R3｜停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.PROTECTION_REPLACE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -1098,6 +1114,7 @@
+    "title": "R2｜移動停損換單失敗，舊停損單已取消，部位目前無交易所端保護"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
+    "complete": false,
+    "dots": {
+@@ -1132,6 +1149,7 @@
+    "title": "R2｜換單時舊停損單取消失敗，可能殘留在交易所"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.PROTECTION_CLOSE_CANCEL_FAILED",
+    "complete": false,
+    "dots": {
+@@ -1166,6 +1184,7 @@
+    "title": "R2｜平倉後停損單取消失敗，可能還掛在交易所"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.PROTECTION_UNVERIFIED",
+    "complete": false,
+    "dots": {
+@@ -1200,6 +1219,7 @@
+    "title": "R3｜交易所存在部位，但沒有可唯一確認的原生保護單"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.POSITION_AMBIGUOUS",
+    "complete": false,
+    "dots": {
+@@ -1234,6 +1254,7 @@
+    "title": "R3｜交易所部位資料無法唯一辨識"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.RECONCILE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -1268,6 +1289,7 @@
+    "title": "R2｜非暫時性的持倉同步失敗"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.EXCHANGE_TARGET_UNSAFE",
+    "complete": false,
+    "dots": {
+@@ -1302,6 +1324,7 @@
+    "title": "R3｜執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+    "complete": false,
+    "dots": {
+@@ -1336,6 +1359,7 @@
+    "title": "R3｜真倉固定訂單識別能力不足"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.RUNTIME_CYCLE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -1370,6 +1394,7 @@
+    "title": "R2｜未分類的執行期例外（run_forever catch-all）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.CLOSE_FILL_PENDING",
+    "complete": false,
+    "dots": {
+@@ -1404,6 +1429,7 @@
+    "title": "R0｜交易所部位已消失，等待平倉成交資料回填"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.TRADE_EXIT",
+    "complete": false,
+    "dots": {
+@@ -1438,6 +1464,7 @@
+    "title": "R0｜原生停損觸發的正常平倉"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-SEY.ENTRY_SKIPPED_MIN_CAPITAL",
+    "complete": false,
+    "dots": {
+@@ -1472,6 +1499,7 @@
+    "title": "R0｜權益低於最低下單資金，跳過本次進場"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MOM.PROTECTION_UNVERIFIED",
+    "complete": false,
+    "dots": {
+@@ -1506,6 +1534,7 @@
+    "title": "R3｜原生移動停損無法驗證"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MOM.STATE_REPAIRED_SAFE_HALT",
+    "complete": false,
+    "dots": {
+@@ -1540,6 +1569,7 @@
+    "title": "R3｜工具修復本地 state 後主動 latch，等人明確解除"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MOM.RUNTIME_CYCLE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -1574,6 +1604,7 @@
+    "title": "R0｜run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+    "complete": false,
+    "dots": {
+@@ -1608,6 +1639,7 @@
+    "title": "R1｜無歧義的孤兒平倉已自動補寫進帳本"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MOM.VERIFIED_CLOSE_PROPOSED",
+    "complete": false,
+    "dots": {
+@@ -1642,6 +1674,7 @@
+    "title": "R2｜孤兒平倉已算出修復方案，附提案通知"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+    "complete": false,
+    "dots": {
+@@ -1676,6 +1709,7 @@
+    "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+    "complete": false,
+    "dots": {
+@@ -1710,6 +1744,7 @@
+    "title": "R3｜出現負／不可能的餘額，本地帳本本身不可信"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+    "complete": false,
+    "dots": {
+@@ -1744,6 +1779,7 @@
+    "title": "R2｜連續 3 天該再平衡卻零成交"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-BTC.REBALANCE_PENDING",
+    "complete": false,
+    "dots": {
+@@ -1778,6 +1814,7 @@
+    "title": "R0｜部分成交，目標權重尚未達成"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-BTC.RUNTIME_CYCLE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -1812,6 +1849,7 @@
+    "title": "R0｜runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MYC.RECONCILE_DELTA_EXCEEDED",
+    "complete": true,
+    "dots": {
+@@ -1846,6 +1884,7 @@
+    "title": "R0｜本地帳本與交易所回報損益差額超過容忍值"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MYC.RUNTIME_CYCLE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -1880,6 +1919,7 @@
+    "title": "R2｜未分類的執行期例外（catch-all）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MYC.PROTECTION_PLACEMENT_REJECTED",
+    "complete": false,
+    "dots": {
+@@ -1914,6 +1954,7 @@
+    "title": "R3｜開倉停損單被交易所拒絕，部位可能沒有交易所端保護"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MYC.PROTECTION_PLACEMENT_NO_POSITION",
+    "complete": false,
+    "dots": {
+@@ -1948,6 +1989,7 @@
+    "title": "R2｜開倉後查不到部位資訊，無法掛停損單"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MYC.PROTECTION_PLACEMENT_ERROR",
+    "complete": false,
+    "dots": {
+@@ -1982,6 +2024,7 @@
+    "title": "R3｜掛停損單時拋出例外，部位本身已開"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MYC.PROTECTION_REPLACE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -2016,6 +2059,7 @@
+    "title": "R2｜搬移移動停損單失敗，交易所端目前沒有停損保護"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
+    "complete": false,
+    "dots": {
+@@ -2050,6 +2094,7 @@
+    "title": "R2｜平倉後取消殘留停損單失敗"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-FLEET.LEDGER_DIVERGED_UNIT_EXIT",
+    "complete": true,
+    "dots": {
+@@ -2135,6 +2180,7 @@
+    "title": "R0｜帳本↔交易所對帳 DIVERGED 時故意讓 unit 變紅（exit 2）"
+   },
+   {
++   "added_recent": false,
+    "anchor": "rule-FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
+    "complete": true,
+    "dots": {
+@@ -2220,6 +2266,7 @@
+    "title": "R0｜帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）"
+   },
+   {
++   "added_recent": true,
+    "anchor": "rule-SEY.VERIFIED_CLOSE_PROPOSED",
+    "complete": false,
+    "dots": {
+@@ -2301,10 +2348,10 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "cap-ops_export.writer",
+-   "note": "今天 F3 資金費修復整支重新部署，順帶把這支也帶上了真倉；scripts/repair_bot.py:278 refresh_ops_export 每輪都在改寫 audit/ops_export.json（目前內容是空的）。",
+-   "project": "動能策略",
+-   "title": "把要通知的事寫成匯出檔"
++   "anchor": "rule-SEY.VERIFIED_CLOSE_PROPOSED",
++   "note": "使用者核對 5b/5c 時發現趨勢策略的修復機器人完全找不到對應紀錄——查出是 v1 目錄漏登，已補上跟動能策略對等的一條（目前仍是「未做」，因為機器人用的是舊版標籤）。",
++   "project": null,
++   "title": "R2｜孤兒平倉已算出修復方案，附提案通知"
+   }
+  ],
+  "totals": {
+@@ -2354,7 +2401,7 @@ function dots(item){
+   DATA.project_order.forEach(function(p){ var d=el("span","dot dot-"+item.dots[p]); d.title=DATA.projects[p]+"："+DOT_LABEL[item.dots[p]]; s.appendChild(d); });
+   return s;
+ }
+-function newBadge(){ var b=el("span","new-badge","🆕 最新"); b.title="這次更新剛變成已做／不適用"; return b; }
++function newBadge(){ var b=el("span","new-badge","🆕 最新變動"); b.title="這次更新才有的變化"; return b; }
+ function table(item){
+   var g=el("div","sl");
+   item.rows.forEach(function(r){
+@@ -2376,7 +2423,7 @@ function table(item){
+ function pendingCard(item){
+   var c=el("div","card item"); c.id=item.anchor;
+   var head=el("div","item-head"), h=el("div","h");
+-  h.appendChild(el("h3",null,item.title)); if(item.has_recent) h.appendChild(newBadge());
++  h.appendChild(el("h3",null,item.title)); if(item.has_recent||item.added_recent) h.appendChild(newBadge());
+   h.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub));
+   head.appendChild(h); head.appendChild(dots(item)); c.appendChild(head);
+   c.appendChild(table(item)); return c;
+@@ -2384,7 +2431,7 @@ function pendingCard(item){
+ function doneCard(item){
+   var d=el("details","card item done-card"); d.id=item.anchor;
+   var s=el("summary"); s.appendChild(el("span","ok","✓")); s.appendChild(el("span","t",item.title));
+-  if(item.has_recent) s.appendChild(newBadge());
++  if(item.has_recent||item.added_recent) s.appendChild(newBadge());
+   s.appendChild(dots(item));
+   d.appendChild(s);
+   var body=el("div","body"); body.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub)); body.appendChild(table(item));
+@@ -2407,7 +2454,7 @@ function tocColumn(group, title){
+     var ul=el("ul");
+     list.forEach(function(i){
+       var li=el("li"), a=el("a"); a.href="#"+i.anchor;
+-      a.appendChild(el("span","t",i.title)); if(i.has_recent) a.appendChild(newBadge());
++      a.appendChild(el("span","t",i.title)); if(i.has_recent||i.added_recent) a.appendChild(newBadge());
+       a.appendChild(dots(i));
+       a.addEventListener("click",function(ev){ ev.preventDefault(); go(i.anchor); });
+       li.appendChild(a); ul.appendChild(li);
+@@ -2428,7 +2475,7 @@ if(DATA.recent_summary && DATA.recent_summary.length){
+   DATA.recent_summary.forEach(function(r){
+     var li=el("li"), a=el("a"); a.href="#"+r.anchor;
+     a.appendChild(document.createTextNode(r.title));
+-    a.appendChild(el("span","proj",r.project));
++    if(r.project) a.appendChild(el("span","proj",r.project));
+     a.appendChild(el("span","note",r.note));
+     a.addEventListener("click",function(ev){ ev.preventDefault(); go(r.anchor); });
+     li.appendChild(a); recentList.appendChild(li);
+diff --git a/schemas/fleet-rollout-registry-v1.schema.json b/schemas/fleet-rollout-registry-v1.schema.json
+index 106657d..8b46b74 100644
+--- a/schemas/fleet-rollout-registry-v1.schema.json
++++ b/schemas/fleet-rollout-registry-v1.schema.json
+@@ -239,13 +239,12 @@
+     },
+     "recent_changes": {
+       "type": "array",
+-      "description": "Cells that flipped to done or n/a in the most recent registry edit. Replaced wholesale each time the registry changes -- never appended to -- so the highlighted set on the human page always reflects only the latest edit, giving a visual 'did my update actually land' signal. Omit or set to [] when nothing recent remains.",
++      "description": "What the most recent registry edit touched -- replaced wholesale each time the registry changes, never appended to, so the highlighted set on the human page always reflects only the latest edit (a visual 'did my update actually land' signal). Two kinds of entry: type=completed (default) is a cell that flipped to done/n-a, checked against the live registry so it can't point at something still pending; type=added is a brand-new capability or catalog row this edit introduced, which by definition has no project-specific done/n-a cell to check yet -- both render in the 'recently changed' summary, completed cells additionally get the gold 'recent' dot. Omit or set to [] when nothing from the latest edit remains current.",
+       "items": {
+         "type": "object",
+         "required": [
+           "kind",
+           "id",
+-          "project",
+           "note"
+         ],
+         "additionalProperties": false,
+@@ -261,20 +260,29 @@
+             "minLength": 1,
+             "description": "capability id (kind=cap) or catalog code (kind=rule)."
+           },
++          "type": {
++            "enum": [
++              "completed",
++              "added"
++            ],
++            "default": "completed",
++            "description": "completed: an existing cell just flipped to done/n-a (needs project, checked against current state). added: this whole capability/catalog row is new in this edit (no cell check, project optional)."
++          },
+           "project": {
+             "enum": [
+               "momentum",
+               "seykota",
+               "mycrypto",
+               "btc-competition"
+-            ]
++            ],
++            "description": "Which strategy's cell/row this is about. Required for type=completed; optional for type=added."
+           },
+           "aspect": {
+             "enum": [
+               "behaviour",
+               "emits_event"
+             ],
+-            "description": "kind=rule only: which cell of that row changed."
++            "description": "type=completed, kind=rule only: which cell of that row changed."
+           },
+           "note": {
+             "type": "string",
+@@ -285,12 +293,47 @@
+         "allOf": [
+           {
+             "if": {
+-              "properties": {
+-                "kind": {
+-                  "const": "rule"
+-                }
++              "not": {
++                "properties": {
++                  "type": {
++                    "const": "added"
++                  }
++                },
++                "required": [
++                  "type"
++                ]
+               }
+             },
++            "then": {
++              "required": [
++                "project"
++              ]
++            }
++          },
++          {
++            "if": {
++              "allOf": [
++                {
++                  "properties": {
++                    "kind": {
++                      "const": "rule"
++                    }
++                  }
++                },
++                {
++                  "not": {
++                    "properties": {
++                      "type": {
++                        "const": "added"
++                      }
++                    },
++                    "required": [
++                      "type"
++                    ]
++                  }
++                }
++              ]
++            },
+             "then": {
+               "required": [
+                 "aspect"
+diff --git a/scripts/render_guides.py b/scripts/render_guides.py
+index 5ca5647..493861c 100644
+--- a/scripts/render_guides.py
++++ b/scripts/render_guides.py
+@@ -284,7 +284,7 @@ function dots(item){
+   DATA.project_order.forEach(function(p){ var d=el("span","dot dot-"+item.dots[p]); d.title=DATA.projects[p]+"："+DOT_LABEL[item.dots[p]]; s.appendChild(d); });
+   return s;
+ }
+-function newBadge(){ var b=el("span","new-badge","🆕 最新"); b.title="這次更新剛變成已做／不適用"; return b; }
++function newBadge(){ var b=el("span","new-badge","🆕 最新變動"); b.title="這次更新才有的變化"; return b; }
+ function table(item){
+   var g=el("div","sl");
+   item.rows.forEach(function(r){
+@@ -306,7 +306,7 @@ function table(item){
+ function pendingCard(item){
+   var c=el("div","card item"); c.id=item.anchor;
+   var head=el("div","item-head"), h=el("div","h");
+-  h.appendChild(el("h3",null,item.title)); if(item.has_recent) h.appendChild(newBadge());
++  h.appendChild(el("h3",null,item.title)); if(item.has_recent||item.added_recent) h.appendChild(newBadge());
+   h.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub));
+   head.appendChild(h); head.appendChild(dots(item)); c.appendChild(head);
+   c.appendChild(table(item)); return c;
+@@ -314,7 +314,7 @@ function pendingCard(item){
+ function doneCard(item){
+   var d=el("details","card item done-card"); d.id=item.anchor;
+   var s=el("summary"); s.appendChild(el("span","ok","✓")); s.appendChild(el("span","t",item.title));
+-  if(item.has_recent) s.appendChild(newBadge());
++  if(item.has_recent||item.added_recent) s.appendChild(newBadge());
+   s.appendChild(dots(item));
+   d.appendChild(s);
+   var body=el("div","body"); body.appendChild(el("p",item.kind==="cap"?"desc":"code",item.sub)); body.appendChild(table(item));
+@@ -337,7 +337,7 @@ function tocColumn(group, title){
+     var ul=el("ul");
+     list.forEach(function(i){
+       var li=el("li"), a=el("a"); a.href="#"+i.anchor;
+-      a.appendChild(el("span","t",i.title)); if(i.has_recent) a.appendChild(newBadge());
++      a.appendChild(el("span","t",i.title)); if(i.has_recent||i.added_recent) a.appendChild(newBadge());
+       a.appendChild(dots(i));
+       a.addEventListener("click",function(ev){ ev.preventDefault(); go(i.anchor); });
+       li.appendChild(a); ul.appendChild(li);
+@@ -358,7 +358,7 @@ if(DATA.recent_summary && DATA.recent_summary.length){
+   DATA.recent_summary.forEach(function(r){
+     var li=el("li"), a=el("a"); a.href="#"+r.anchor;
+     a.appendChild(document.createTextNode(r.title));
+-    a.appendChild(el("span","proj",r.project));
++    if(r.project) a.appendChild(el("span","proj",r.project));
+     a.appendChild(el("span","note",r.note));
+     a.addEventListener("click",function(ev){ ev.preventDefault(); go(r.anchor); });
+     li.appendChild(a); recentList.appendChild(li);
+@@ -471,9 +471,12 @@ def _dot(states: set[str]) -> str:
+ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dict[str, Any]]:
+     """Every capability and catalog row as one page item.  ``complete`` means no
+     cell is pending -- every applicable strategy is done or n/a, nothing left to do.
+-    ``recent_changes`` (see the registry schema) overlays a "recent" dot on top of
+-    an otherwise done/n-a cell for exactly the (kind, id, project) triples it lists;
+-    it never affects ``complete``, which always reflects the real pending/done/n-a state."""
++    ``recent_changes`` (see the registry schema) overlays a page-only "recent" marker
++    for whatever the latest edit touched, in two flavours that never affect ``complete``
++    (which always reflects the real pending/done/n-a state): a ``completed`` entry turns
++    an otherwise done/n-a cell's dot gold for exactly the (kind, id, project) it names;
++    an ``added`` entry (a brand-new row this edit introduced, which has no done/n-a cell
++    to point at yet) just flags the whole item so it still shows up as "what changed"."""
+     projects, phases = registry["projects"], registry["phases"]
+     titles = {entry["code"]: (entry["risk_tier"], entry["title"]) for entry in catalog["entries"]}
+     items = []
+@@ -492,15 +495,18 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
+                   for p in STRATEGY_PROJECTS}
+         items.append({"kind": "rule", "id": row["code"], "anchor": f"rule-{row['code']}", "title": f"{tier}｜{title}",
+                       "sub": row["code"], "rows": rows, "states": states})
+-    recent_set = {(c["kind"], c["id"], c["project"]) for c in registry.get("recent_changes") or []}
++    changes = registry.get("recent_changes") or []
++    completed_set = {(c["kind"], c["id"], c["project"]) for c in changes if c.get("type", "completed") == "completed"}
++    added_set = {(c["kind"], c["id"]) for c in changes if c.get("type") == "added"}
+     for item in items:
+         states = item.pop("states")
+         item["dots"] = {p: _dot(s) for p, s in states.items()}
+         item["complete"] = "pending" not in set().union(*states.values())
+         for p in STRATEGY_PROJECTS:
+-            if item["dots"][p] in ("done", "na") and (item["kind"], item["id"], p) in recent_set:
++            if item["dots"][p] in ("done", "na") and (item["kind"], item["id"], p) in completed_set:
+                 item["dots"][p] = "recent"
+         item["has_recent"] = any(v == "recent" for v in item["dots"].values())
++        item["added_recent"] = (item["kind"], item["id"]) in added_set
+     return items
+ 
+ 
+@@ -524,8 +530,11 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
+         item = by_key.get((change["kind"], change["id"]))
+         if item is None:
+             continue
+-        recent_summary.append({"anchor": item["anchor"], "title": item["title"],
+-                                "project": projects[change["project"]], "note": change["note"]})
++        project = change.get("project")
++        recent_summary.append({
++            "anchor": item["anchor"], "title": item["title"],
++            "project": projects[project] if project else None, "note": change["note"],
++        })
+     data = {
+         "projects": projects, "project_order": list(STRATEGY_PROJECTS), "phases": phases,
+         "phase_order": list(phases), "phase_counts": phase_counts, "totals": totals, "items": items,
+@@ -553,10 +562,10 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any]) -
+     <span>每項右邊的四個點依序是 {order}：</span>
+     <span><i class="dot dot-done"></i>已做</span><span><i class="dot dot-pending"></i>未做</span>
+     <span><i class="dot dot-na"></i>不適用</span><span><i class="dot dot-none"></i>跟這支無關</span>
+-    <span><i class="dot dot-recent"></i>🆕 最新完成——這次更新才變成已做／不適用</span>
++    <span><i class="dot dot-recent"></i>🆕 最新變動</span>
+   </p>
+   <div class="recent-box" id="recentBox" hidden>
+-    <h3>🆕 最近變動——確認這次更新真的生效了</h3>
++    <h3>🆕 最新變動</h3>
+     <ul id="recentList"></ul>
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 822f2b6..a4a48a6 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -971,10 +971,10 @@
+   ],
+   "recent_changes": [
+     {
+-      "kind": "cap",
+-      "id": "ops_export.writer",
+-      "project": "momentum",
+-      "note": "今天 F3 資金費修復整支重新部署，順帶把這支也帶上了真倉；scripts/repair_bot.py:278 refresh_ops_export 每輪都在改寫 audit/ops_export.json（目前內容是空的）。"
++      "kind": "rule",
++      "id": "SEY.VERIFIED_CLOSE_PROPOSED",
++      "type": "added",
++      "note": "使用者核對 5b/5c 時發現趨勢策略的修復機器人完全找不到對應紀錄——查出是 v1 目錄漏登，已補上跟動能策略對等的一條（目前仍是「未做」，因為機器人用的是舊版標籤）。"
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/rollout_registry.py b/src/trade_alerts/rollout_registry.py
+index a56d2e8..d0a1164 100644
+--- a/src/trade_alerts/rollout_registry.py
++++ b/src/trade_alerts/rollout_registry.py
+@@ -156,28 +156,45 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
+         if not isinstance(change, Mapping):
+             problems.append(f"{where}: not an object")
+             continue
+-        kind, cid, project = change.get("kind"), change.get("id"), change.get("project")
++        kind, cid = change.get("kind"), change.get("id")
++        change_type = change.get("type", "completed")
++        if change_type not in ("completed", "added"):
++            problems.append(f"{where}: type must be completed or added, got {change_type!r}")
++            continue
+         if kind == "cap":
+-            capability = cap_by_id.get(cid)
+-            if capability is None:
+-                problems.append(f"{where}: capability {cid!r} not found")
+-                continue
+-            state = ((capability.get("status") or {}).get(project) or {}).get("state")
++            row_or_cap = cap_by_id.get(cid)
++            missing_msg = f"{where}: capability {cid!r} not found"
+         elif kind == "rule":
+-            row = rows.get(cid)
+-            aspect = change.get("aspect")
+-            if row is None:
+-                problems.append(f"{where}: catalog code {cid!r} not found")
+-                continue
+-            if aspect not in ("behaviour", "emits_event"):
+-                problems.append(f"{where}: rule entries need aspect behaviour/emits_event, got {aspect!r}")
+-                continue
+-            state = ((row.get(aspect) or {}).get(project) or {}).get("state")
++            row_or_cap = rows.get(cid)
++            missing_msg = f"{where}: catalog code {cid!r} not found"
+         else:
+             problems.append(f"{where}: kind must be cap or rule, got {kind!r}")
+             continue
++        if row_or_cap is None:
++            problems.append(missing_msg)
++            continue
++        if change_type == "added":
++            # A brand-new row/capability this edit introduced -- nothing to
++            # check it against yet, only that it (and its optional project)
++            # are real.
++            project = change.get("project")
++            if project is not None and project not in STRATEGY_PROJECTS:
++                problems.append(f"{where}: project {project!r} is not a known strategy")
++            continue
++        project = change.get("project")
++        if project not in STRATEGY_PROJECTS:
++            problems.append(f"{where}: type=completed needs a valid project, got {project!r}")
++            continue
++        if kind == "cap":
++            state = ((row_or_cap.get("status") or {}).get(project) or {}).get("state")
++        else:
++            aspect = change.get("aspect")
++            if aspect not in ("behaviour", "emits_event"):
++                problems.append(f"{where}: type=completed rule entries need aspect behaviour/emits_event, got {aspect!r}")
++                continue
++            state = ((row_or_cap.get(aspect) or {}).get(project) or {}).get("state")
+         if state not in ("done", "n/a"):
+-            problems.append(f"{where}: {cid} / {project} is {state!r}, not done/n-a -- recent_changes must point at what just became true")
++            problems.append(f"{where}: {cid} / {project} is {state!r}, not done/n-a -- a type=completed entry must point at what just became true")
+     return problems
+ 
+ 
+diff --git a/tests/test_rollout_registry.py b/tests/test_rollout_registry.py
+index 7de9a84..702623c 100644
+--- a/tests/test_rollout_registry.py
++++ b/tests/test_rollout_registry.py
+@@ -352,7 +352,62 @@ def test_recent_change_on_a_rule_without_aspect_is_caught(registry, catalog):
+     assert any("aspect" in p for p in problems)
+ 
+ 
++def test_recent_change_type_added_does_not_need_a_done_cell(registry, catalog):
++    """A brand-new row has nothing to point a done/n-a check at yet -- type=added
++    must not be held to the same rule as type=completed, and doesn't even need
++    a project (the whole row is new, not one strategy's cell)."""
++    capability = registry["capabilities"][0]
++    problems = _problems_after(registry, catalog, lambda r: r.update(recent_changes=[
++        {"kind": "cap", "id": capability["id"], "type": "added", "note": "x"},
++    ]))
++    assert problems == []
++
++
++def test_recent_change_type_added_still_needs_a_real_id(registry, catalog):
++    problems = _problems_after(registry, catalog, lambda r: r.update(recent_changes=[
++        {"kind": "cap", "id": "nonexistent.capability", "type": "added", "note": "x"},
++    ]))
++    assert any("not found" in p for p in problems)
++
++
++def test_recent_change_type_added_with_a_bogus_project_is_caught(registry, catalog):
++    capability = registry["capabilities"][0]
++    problems = _problems_after(registry, catalog, lambda r: r.update(recent_changes=[
++        {"kind": "cap", "id": capability["id"], "type": "added", "project": "not-a-real-project", "note": "x"},
++    ]))
++    assert any("not a known strategy" in p for p in problems)
++
++
++def test_rollout_items_recolors_the_dot_for_a_type_completed_change(registry, catalog):
++    """Synthetic, not data-driven: the live registry's recent_changes can (and
++    currently does) hold only type=added entries, which would leave this
++    render path -- dot recoloring + has_recent for type=completed -- with no
++    regression coverage at all (flagged in PR #39 review). Fabricate a
++    completed entry against whichever cell is actually done in the fixture,
++    independent of what recent_changes currently contains for real."""
++    render_guides = _render_guides()
++    capability = next(
++        c for c in registry["capabilities"]
++        if any(s["state"] == "done" for s in c["status"].values())
++    )
++    project = next(p for p, s in capability["status"].items() if s["state"] == "done")
++    edited = copy.deepcopy(registry)
++    edited["recent_changes"] = [{"kind": "cap", "id": capability["id"], "project": project, "note": "x"}]
++    assert registry_problems(edited, catalog) == []  # sanity: this is a legal completed entry
++
++    items = {i["anchor"]: i for i in render_guides.rollout_items(catalog, edited)}
++    item = items[f"cap-{capability['id']}"]
++    assert item["dots"][project] == "recent"
++    assert item["has_recent"] is True
++    assert item["added_recent"] is False
++
++
+ def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog):
++    """Both flavours of recent_changes entry -- type=completed (an existing cell
++    just flipped to done/n-a) and type=added (a brand-new row, no cell to flip
++    yet) -- must surface as "what changed" on the page, with no visible
++    distinction between them (the person reading the page doesn't care which
++    kind it was, only that this is what the latest edit touched)."""
+     render_guides = _render_guides()
+     items = {i["anchor"]: i for i in render_guides.rollout_items(catalog, registry)}
+     change = registry.get("recent_changes")
+@@ -360,8 +415,11 @@ def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog
+     for entry in change:
+         anchor_prefix = "cap-" if entry["kind"] == "cap" else "rule-"
+         item = items[anchor_prefix + entry["id"]]
+-        assert item["dots"][entry["project"]] == "recent"
+-        assert item["has_recent"] is True
++        if entry.get("type", "completed") == "added":
++            assert item["added_recent"] is True
++        else:
++            assert item["dots"][entry["project"]] == "recent"
++            assert item["has_recent"] is True
+     pages = {path.name: html for path, html in render_guides.rendered_pages().items()}
+-    assert "dot-recent" in pages["fleet-rollout-register.html"]
+     assert "recent_summary" in pages["fleet-rollout-register.html"]
++    assert "最新變動" in pages["fleet-rollout-register.html"]

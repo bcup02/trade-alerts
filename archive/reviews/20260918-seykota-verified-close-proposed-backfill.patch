@@ -1,0 +1,301 @@
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index e8753c4..4cf4fc1 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -60,24 +60,26 @@
+ 
+ ## 3. 目錄總覽
+ 
+-Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（Phase 6 另補 3 條 momentum 修復 bot 條件，目前合計 **33 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
++Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（Phase 6 另補 3 條 momentum 修復 bot 條件，當時合計 **33 條**；
++2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 影子 bot 從部署起就一直在發這個事件，卻從未登記進目錄，
++導致一致性登記冊上這支策略的修復 bot 完全看不到對應紀錄，見下方 §3.1，目前合計 **34 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
+ 
+ | 判定 | 條數 | 佔比 |
+ |---|---|---|
+-| `MECHANICAL`（動作固定） | 11 | 33% |
+-| `JUDGEMENT`（真的要人判斷） | 22 | 67% |
++| `MECHANICAL`（動作固定） | 11 | 32% |
++| `JUDGEMENT`（真的要人判斷） | 23 | 68% |
+ 
+ | 風險等級（v2） | 條數 |
+ |---|---|
+ | R0 只記錄 | 9 |
+ | R1 自動、不通知 | 2 |
+-| R2 自動嘗試、失敗才通知 | 11 |
++| R2 自動嘗試、失敗才通知 | 12 |
+ | R3 必須人工 | 11 |
+ 
+ 下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
+ 
+-### 3.1 ed-seykota（14 條）
++### 3.1 ed-seykota（15 條）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+@@ -95,6 +97,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `SEY.CLOSE_FILL_PENDING` | 誤標 critical | MECHANICAL | R0 | **P3** |
+ | `SEY.TRADE_EXIT` | 誤標 critical | MECHANICAL | R0 | **P3** |
+ | `SEY.ENTRY_SKIPPED_MIN_CAPITAL` | 誤標 critical | MECHANICAL | R0 | **P3** |
++| `SEY.VERIFIED_CLOSE_PROPOSED` | 修復 bot 提案通知（2026-09-18 補登，見下方說明） | JUDGEMENT | R2 | P8（v2） |
+ 
+ **`protective_stop_failed` 拆成兩碼**是本節最重要的改動。現行程式在「停損掛單失敗」之後會立刻
+ 嘗試緊急市價平倉，但不論平倉成功或失敗，都收斂成同一個 latch 原因碼。這兩種結果的真倉風險相差
+@@ -119,8 +122,9 @@ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原
+ 後三條是 Phase 6 的 verified-close-backfill 修復 bot（`scripts/repair_bot.py`）。v2 起：無歧義 → R1 自動寫、不通知；
+ 以交易所為準仍能對應 → 照交易所補寫；只有結構上對不上才重試並升格（R2，`MOM.VERIFIED_CLOSE_PROPOSED` 的呼叫點
+ 由共用修復執行器取代時退役）；帳本已不乾淨 → R3 停手。v1 的過渡開關 `MOMENTUM_REPAIR_AUTO_APPLY`（只有 momentum
+-有、33 條只管 1 條、沒有任何機制會評估並打開它）在 v2 移除；seykota 的影子 bot 發出的
+-`SEY.VERIFIED_CLOSE_PROPOSED` 從未登記進 v1 目錄，v2 列入 `retired_codes`，seykota 改用同一個共用執行器。
++有、當時 33 條只管 1 條、沒有任何機制會評估並打開它）在 v2 移除；seykota 的影子 bot（§3.1 最後一條
++`SEY.VERIFIED_CLOSE_PROPOSED`）發出這個事件從未登記進 v1 目錄，2026-09-18 補登進 v2 目錄——跟 momentum 對等的處置、
++同一個理由、同樣列進 `retired_codes`，seykota 升到共用修復執行器（v2-W4）時一起取代退役。
+ 
+ ### 3.3 btc-competition（4 條）
+ 
+diff --git a/docs/guides/README.md b/docs/guides/README.md
+index 7b37a2d..47f3610 100644
+--- a/docs/guides/README.md
++++ b/docs/guides/README.md
+@@ -8,7 +8,7 @@ Perplexity／開發者看的工程規格與流程規則。這個目錄放**給
+ 
+ | 檔案 | 說明 | 對應資料源 |
+ |---|---|---|
+-| `fleet-risk-register.html` | 機隊風險登記冊——33 種已知錯誤情況，依四個風險等級（v2）白話說明、處理步驟與給 AI 的追查指令，並標示各策略實際做到了沒有；可依等級／策略／未做完篩選。 | `src/trade_alerts/catalog/fleet-error-catalog-v2.json`＋`fleet-rollout-registry.json` |
++| `fleet-risk-register.html` | 機隊風險登記冊——34 種已知錯誤情況，依四個風險等級（v2）白話說明、處理步驟與給 AI 的追查指令，並標示各策略實際做到了沒有；可依等級／策略／未做完篩選。 | `src/trade_alerts/catalog/fleet-error-catalog-v2.json`＋`fleet-rollout-registry.json` |
+ | `fleet-rollout-register.html` | 機隊一致性登記冊——每項機隊功能與每條錯誤規則在四支策略的已做／未做（含預定哪一關）／不適用（含理由）；分「未完成／已完成」兩組，最上方目錄可點擊跳到該項，已完成項目預設摺疊，右下角有回到最上方按鈕。JSON 的 `recent_changes` 可以標出這次更新剛變成已做／不適用的格子，頁面用「🆕 最新完成」黃色標示並列在最上方的「最近變動」欄，同時兼作「這次更新有沒有真的生效」的視覺確認。 | `src/trade_alerts/catalog/fleet-rollout-registry.json` |
+ 
+ ## 慣例
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 2c74fce..329a4b7 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -95,9 +95,9 @@
+   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>33 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    四支策略目前所有已知的「出問題」情況，共 <b>34 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>30 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>31 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -1037,6 +1037,35 @@
+    "tier": "R0",
+    "title": "帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）",
+    "what": "本地帳本跟共用的 Google 表格對不上時，對帳程式故意讓自己的服務顯示紅色失敗。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
++   "behaviour": {
++    "phase": "v2-W4",
++    "reason": "2026-09-18 補登目錄缺口：真倉（operations）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟 momentum 5b 同一設計原封不動移植），每輪都會偵測孤兒平倉並算出提案，但 v2 目標行為是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提案、從不寫帳本，不符合 v2 目標，升到共用修復執行器（v2-W4）才算做到。",
++    "state": "pending"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.VERIFIED_CLOSE_PROPOSED",
++   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
++   "emits_event": {
++    "phase": "v2-W4",
++    "reason": "真倉（operations）Phase 5c 影子版 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代時換成 v2 標籤。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 2026-09-18 補登目錄缺口：真倉（operations）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟 momentum 5b 同一設計原封不動移植），每輪都會偵測孤兒平倉並算出提案，但 v2 目標行為是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提案、從不寫帳本，不符合 v2 目標，升到共用修復執行器（v2-W4）才算做到。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
++    "白話通知未做 — 真倉（operations）Phase 5c 影子版 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代時換成 v2 標籤。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
++   ],
++   "open": true,
++   "steps": [
++    "治標：到電腦前照 ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
++    "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "孤兒平倉已算出修復方案，附提案通知",
++   "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
+   }
+  ],
+  "tiers": [
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 961be72..7fc48ac 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -164,7 +164,7 @@
+     「未做」會寫預定在哪一關做，「不適用」會寫理由，漏寫 CI 會擋下來。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>38</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-pending" href="#group-pending"><b>39</b><span>項未完成——還有策略沒做到</span></a>
+     <a class="c-done" href="#group-done"><b>8</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+@@ -180,7 +180,7 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">38 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">39 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+@@ -2218,6 +2218,40 @@
+    ],
+    "sub": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
+    "title": "R0｜帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）"
++  },
++  {
++   "anchor": "rule-SEY.VERIFIED_CLOSE_PROPOSED",
++   "complete": false,
++   "dots": {
++    "btc-competition": "none",
++    "momentum": "none",
++    "mycrypto": "none",
++    "seykota": "pending"
++   },
++   "has_recent": false,
++   "id": "SEY.VERIFIED_CLOSE_PROPOSED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
++       "state": "pending",
++       "text": "2026-09-18 補登目錄缺口：真倉（operations）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟 momentum 5b 同一設計原封不動移植），每輪都會偵測孤兒平倉並算出提案，但 v2 目標行為是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提案、從不寫帳本，不符合 v2 目標，升到共用修復執行器（v2-W4）才算做到。"
++      },
++      {
++       "aspect": "白話通知",
++       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
++       "state": "pending",
++       "text": "真倉（operations）Phase 5c 影子版 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代時換成 v2 標籤。"
++      }
++     ]
++    }
++   ],
++   "sub": "SEY.VERIFIED_CLOSE_PROPOSED",
++   "title": "R2｜孤兒平倉已算出修復方案，附提案通知"
+   }
+  ],
+  "phase_counts": {
+@@ -2228,7 +2262,7 @@
+   "binance-funding-sync": 2,
+   "v2-W2": 0,
+   "v2-W3": 8,
+-  "v2-W4": 3,
++  "v2-W4": 5,
+   "v2-W6": 4
+  },
+  "phase_order": [
+@@ -2292,7 +2326,7 @@
+   "seykota": {
+    "done": 17,
+    "n/a": 2,
+-   "pending": 26
++   "pending": 28
+   }
+  }
+ }
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 51864e5..8382c9c 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -1020,6 +1020,35 @@
+           "不需要任何動作。"
+         ]
+       }
++    },
++    {
++      "code": "SEY.VERIFIED_CLOSE_PROPOSED",
++      "title": "孤兒平倉已算出修復方案，附提案通知",
++      "project": "seykota",
++      "sources": [
++        "scripts/repair_bot_shadow.py:144"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "VERIFIED_CLOSE_PROPOSED (critical=False)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "（v2 目標，由共用修復執行器取代本條，屆時本代碼退役）以交易所為準自動補寫；只有結構上對不上時才記一次失敗，同一 trade_id 連續 escalate_after 次失敗才升格：開請求、通知，附給 AI 的根因追查指令。",
++      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-09-18 查證發現的目錄缺口：seykota 的 Phase 5c 影子 bot（scripts/repair_bot_shadow.py，把 momentum 5b 的設計原封不動移植過來）從部署起就一直在發這個事件，但 v1 目錄從未收錄——momentum 有對應的 MOM.VERIFIED_CLOSE_PROPOSED，seykota 卻完全沒有登記，導致一致性登記冊上這支策略的修復 bot 沒有任何可見紀錄。補登跟 momentum 完全對等的處置：v1 的「提案、交給人決定」沒有意義——交易所是權威，治標就是照交易所補、讓三方一致；真正需要人的只有結構上對不上的情況，而那時該做的是追查根因。本條已列在 retired_codes：seykota 升到共用修復執行器（v2-W4）時，這個呼叫點會被取代，屆時本代碼真正退役。",
++      "operator_message": {
++        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
++        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
++        "steps": [
++          "治標：到電腦前照 ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
++          "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
++      }
+     }
+   ],
+   "retired_codes": [
+@@ -1031,7 +1060,7 @@
+     {
+       "code": "SEY.VERIFIED_CLOSE_PROPOSED",
+       "retired_in": "fleet-error-catalog/v2",
+-      "reason": "Emitted by seykota's Phase 5 shadow repair bot but never catalogued in v1. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED; seykota moves to the shared repair runner."
++      "reason": "Emitted by seykota's Phase 5c shadow repair bot but never catalogued in v1; backfilled 2026-09-18 so the rollout registry has something to point at. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED. Stays in the catalog until the shared repair runner (v2-W4) replaces the call site."
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index c8466f4..822f2b6 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -950,6 +950,23 @@
+           "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
+         }
+       }
++    },
++    {
++      "code": "SEY.VERIFIED_CLOSE_PROPOSED",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "2026-09-18 補登目錄缺口：真倉（operations）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟 momentum 5b 同一設計原封不動移植），每輪都會偵測孤兒平倉並算出提案，但 v2 目標行為是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提案、從不寫帳本，不符合 v2 目標，升到共用修復執行器（v2-W4）才算做到。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "真倉（operations）Phase 5c 影子版 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用執行器取代時換成 v2 標籤。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
+diff --git a/tests/test_fleet_error_catalog.py b/tests/test_fleet_error_catalog.py
+index 929a077..b886988 100644
+--- a/tests/test_fleet_error_catalog.py
++++ b/tests/test_fleet_error_catalog.py
+@@ -170,3 +170,17 @@ def test_packaged_catalog_is_the_file_the_tests_read():
+     from trade_alerts import load_error_catalog
+ 
+     assert load_error_catalog() == json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
++
++
++def test_seykota_and_momentum_repair_shadow_bots_get_symmetric_catalog_entries(catalog):
++    """seykota's Phase 5c shadow bot is the momentum 5b design ported unmodified
++    (same single event code, same risk tier); the two must be catalogued the
++    same way, or one strategy's rollout-bot activity is invisible on the
++    register while the other's is not -- the exact gap this test guards."""
++    entries = {entry["code"]: entry for entry in catalog["entries"]}
++    mom = entries["MOM.VERIFIED_CLOSE_PROPOSED"]
++    sey = entries["SEY.VERIFIED_CLOSE_PROPOSED"]
++    for key in ("verdict", "risk_tier", "resume", "lands_in_phase"):
++        assert mom[key] == sey[key], key
++    retired = {item["code"] for item in catalog["retired_codes"]}
++    assert {"MOM.VERIFIED_CLOSE_PROPOSED", "SEY.VERIFIED_CLOSE_PROPOSED"} <= retired
