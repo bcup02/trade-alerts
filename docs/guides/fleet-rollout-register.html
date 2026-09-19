@@ -1315,7 +1315,7 @@
    "title": "帳本↔Google 表對帳狀態檔"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-repair_bot.detect_propose",
    "complete": false,
    "dots": {
@@ -1444,11 +1444,11 @@
    "complete": false,
    "dots": {
     "btc-competition": "na",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "pending",
     "seykota": "pending"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "repair_bot.pause_brake",
    "kind": "cap",
    "rows": [
@@ -1749,16 +1749,16 @@
    "title": "資金費同步"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-docs.glossary_adopted",
    "complete": false,
    "dots": {
     "btc-competition": "pending",
     "momentum": "pending",
     "mycrypto": "pending",
-    "seykota": "pending"
+    "seykota": "recent"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "docs.glossary_adopted",
    "kind": "cap",
    "rows": [
@@ -1767,9 +1767,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
-       "state": "pending",
-       "text": "還沒改：README 的安全暫停、docs/operations-modes.md 的修復機器人都還用舊叫法。"
+       "phase": null,
+       "state": "done",
+       "text": "AI-for-column/ed-seykota-systematic-trend-following#61（2026-09-19 squash 合併 993c07f，外部審閱 PASS）：docs/branch-governance.md、docs/kill_switch_runbook.md、docs/operations-modes.md 等 6 份 docs 加 CLAUDE.md、SAFE_HALT 訊息字串（src/seykota_bot/bot.py）、修復機器人顯示名全部改用對照表統一叫法。刻意不動已封存的 archive/reports 與跨專案契約文件（比照 C4/C5 先例）。"
       }
      ]
     },
@@ -3109,7 +3109,7 @@
   "8-mycrypto": 17,
   "8-seykota": 20,
   "binance-funding-sync": 2,
-  "naming-rollout": 4,
+  "naming-rollout": 3,
   "v2-W2": 0,
   "v2-W3": 7,
   "v2-W4": 5,
@@ -3153,21 +3153,9 @@
  },
  "recent_summary": [
   {
-   "anchor": "cap-repair_bot.detect_propose",
-   "note": "新增：5b/5c 部署到正式機的「抓錯並提出修復建議」之前根本沒有登記；現在跟另外兩列並排，一看就知道三列是同一支修復機器人的三個功能。",
-   "project": null,
-   "title": "修復機器人：抓錯並提出修復建議"
-  },
-  {
-   "anchor": "cap-repair_bot.pause_brake",
-   "note": "更正：動能策略正式機跑的 repair_bot.py 已有停用開關而且每輪都在讀，之前誤標未做。",
-   "project": "動能策略",
-   "title": "修復機器人：停用開關"
-  },
-  {
    "anchor": "cap-docs.glossary_adopted",
-   "note": "新增：各 repo 的文件與訊息還沒改用統一名詞，列為未做，逐 repo 處理。",
-   "project": null,
+   "note": "趨勢策略（seykota）已做：ed-seykota-systematic-trend-following#61（外部審閱 PASS）逐一比對對照表 48 條詞條，改了 12 個檔案，418 tests 全過。動能/加密/競賽三支仍未做（n3→n5）。",
+   "project": "趨勢策略",
    "title": "文件與訊息已改用統一名詞"
   }
  ],
@@ -3188,9 +3176,9 @@
    "pending": 18
   },
   "seykota": {
-   "done": 18,
+   "done": 19,
    "n/a": 2,
-   "pending": 29
+   "pending": 28
   }
  }
 }
