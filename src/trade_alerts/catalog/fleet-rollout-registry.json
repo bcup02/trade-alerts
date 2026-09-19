@@ -401,9 +401,8 @@
           "evidence": "AI-for-column/ed-seykota-systematic-trend-following#61（2026-09-19 squash 合併 993c07f，外部審閱 PASS）：docs/branch-governance.md、docs/kill_switch_runbook.md、docs/operations-modes.md 等 6 份 docs 加 CLAUDE.md、SAFE_HALT 訊息字串（src/seykota_bot/bot.py）、修復機器人顯示名全部改用對照表統一叫法。刻意不動已封存的 archive/reports 與跨專案契約文件（比照 C4/C5 先例）。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "naming-rollout",
-          "reason": "還沒改：README 對模擬倉、移動停損還用舊叫法。"
+          "state": "done",
+          "evidence": "AI-for-column/my-crypto-bot#47（2026-09-19 squash 合併 1c2c039，外部審閱 PASS）：README、docs/branch-governance.md、docs/operations-modes.md 加 mexc_futures_bot.py／portfolio_snapshot_adapter.py 的程式註解全部改用對照表統一叫法；README 描述對帳容忍值不會自動停止交易的那句話，原文誤用了保留給未來單日虧損上限的舊詞，已修正成安全暫停（這支 bot 本身無 SAFE_HALT latch，2026-09-12 使用者定案不加）。"
         },
         "btc-competition": {
           "state": "pending",
@@ -1022,8 +1021,8 @@
     {
       "kind": "cap",
       "id": "docs.glossary_adopted",
-      "project": "momentum",
-      "note": "動能策略（momentum）已做：mexc-4h-momentum-trailing-stop#94（外部審閱 PASS）逐一比對對照表 48 條詞條，改了 13 個檔案，691 tests 全過。加密/競賽兩支仍未做（n4→n5）。"
+      "project": "mycrypto",
+      "note": "加密策略（mycrypto）已做：my-crypto-bot#47（外部審閱 PASS）逐一比對對照表 48 條詞條，改了 5 個檔案，189 tests 全過。這支策略沒有 SAFE_HALT latch，涉及舊叫法遠比趨勢/動能兩支少。競賽策略仍未做（n5）。"
     }
   ]
 }
