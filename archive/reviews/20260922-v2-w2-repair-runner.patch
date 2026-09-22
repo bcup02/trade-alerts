@@ -1,0 +1,3106 @@
+diff --git a/README.md b/README.md
+index 0b9fcdf..61ff564 100644
+--- a/README.md
++++ b/README.md
+@@ -84,6 +84,14 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
+ `tests/test_fleet_error_catalog.py` 守住幾條不變式，其中最重要的一條是：判定為 `MECHANICAL`
+ 的條件不得落在任何會通知人的風險等級。
+ 
++## 共用修復執行器（漏記平倉）
++
++`trade_alerts.repair_runner.run_repair_round(adapter, paths)` 是全機隊唯一的漏記平倉自動修復：交易所已平倉、
++帳本只剩 `trade_open` 時，照交易所成交紀錄補寫（損益跟交易所對不上時以交易所為準），多筆依序逐輪補，
++結構對不上才重試、連續 3 次失敗才升格通知，帳本已不乾淨就停手等人。策略只寫 `RepairAdapter`
++轉接器（抓證據、用自己的帳本寫入器 staging、排 Google 投影），緊急煞車統一是 `<PROJECT>_REPAIR_PAUSED`。
++規格見 [`docs/fleet-error-catalog.md`](docs/fleet-error-catalog.md) §4.9。
++
+ ## 機隊一致性登記冊
+ 
+ [`src/trade_alerts/catalog/fleet-rollout-registry.json`](src/trade_alerts/catalog/fleet-rollout-registry.json)
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 1fe8dda..992d9b0 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -624,3 +624,38 @@ trade-alerts：v0.20.0（風險分級 v2，W1b：機隊一致性登記冊）
+ 服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.21.0（風險分級 v2，W2：共用修復執行器）
++變更摘要：1. 新模組 trade_alerts.repair_runner：run_repair_round(adapter, paths) 是全機隊唯一的
++             漏記平倉自動修復，策略只提供 RepairAdapter（fetch_evidence／staging_ledger／
++             queue_projection）。能對應 → R1 寫入、不通知；交易所仍有部位（PositionStillOpen）
++             → 不算失敗；查交易所失敗或結構對不上 → R2 記一次失敗，同一 trade_id 連續 3 次
++             才開請求並標 escalated（ops_export 通知一次），之後靜默重試、成功則 RESOLVED_AUTO；
++             帳本已有修復痕跡或整批寫入失敗 → R3 停手、永不重試；帳本出現該筆 trade_close
++             → 請求 WITHDRAWN。一輪最多寫一筆，多筆依序逐輪補。<PROJECT>_REPAIR_PAUSED
++             統一煞車（停手時仍刷新 ops_export）。執行器不直接推播。
++          2. verified_close_backfill：
++             - build_repair_events：本地毛損益與交易所已實現損益差 > 0.01 時以交易所為準，
++               reconciliation 記 pnl_source=exchange_realized／local_gross_pnl／
++               exchange_pnl_residual；差額在容忍內時產出與 v0.20.0 逐欄相同。成交缺已實現
++               損益時證據標 exchange_profit_reported=false，不以交易所為準。
++             - find_open_event：同一 trade_id 多筆 trade_open（加碼）合併為一個部位。
++             - detect_repair_candidates：加碼的交易算一筆，不再被當成兩筆略過。
++             - 新 assess_repair（repair／unmappable／halt）與 expected_closing_side：
++               平倉方向依開倉方向推導，支援做空。
++             - 破壞性：移除 assess_auto_repair 與 render_repair_proposal_text（v2 沒有
++               「提案」狀態）。momentum／seykota 在 W3／W4 重新釘選時改用執行器。
++          3. 錯誤目錄 34 → 38 條：MOM／SEY.VERIFIED_CLOSE_REPAIR_FAILED（R2，取代退役的
++             *_PROPOSED）、SEY.VERIFIED_CLOSE_AUTO_REPAIRED（R1）、
++             SEY.VERIFIED_CLOSE_REPAIR_BLOCKED（R3）；登記冊同步新增四列（pending W3／W4）。
++受影響消費專案：momentum（v2-W3）、seykota（v2-W4）重新釘選時改用執行器；在那之前
++          它們釘在舊版本，不受影響。my-crypto 的 verify_and_backfill_estimated_close.py
++          只用 build_evidence／build_repair_events 當計算器，重新釘選時損益差額超過 0.01
++          會改用交易所數字（見上）。btc／ops-notify 不受影響。
++部署入口：無（純函式庫 + 目錄資料）。
++版本驗證：pyproject.toml version == 0.21.0；trade_alerts.__version__ ==
++          "0.21.0"。
++服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index 646fadb..e0bd52e 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -62,24 +62,26 @@
+ 
+ Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（Phase 6 另補 3 條 momentum 修復機器人 條件，當時合計 **33 條**；
+ 2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 修復機器人（只抓錯並提出修復建議） 從部署起就一直在發這個事件，卻從未登記進目錄，
+-導致一致性登記冊上這支策略的修復機器人 完全看不到對應紀錄，見下方 §3.1，目前合計 **34 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
++導致一致性登記冊上這支策略的修復機器人 完全看不到對應紀錄，見下方 §3.1，當時合計 **34 條**；2026-09-22 v2-W2 共用修復執行器
++補上它會發出的代碼：兩支策略各一條 `VERIFIED_CLOSE_REPAIR_FAILED`（R2，取代退役的 `*_PROPOSED`），seykota 另補
++`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，目前合計 **38 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
+ 
+ | 判定 | 條數 | 佔比 |
+ |---|---|---|
+-| `MECHANICAL`（動作固定） | 11 | 32% |
+-| `JUDGEMENT`（真的要人判斷） | 23 | 68% |
++| `MECHANICAL`（動作固定） | 12 | 32% |
++| `JUDGEMENT`（真的要人判斷） | 26 | 68% |
+ 
+ | 風險等級（v2） | 條數 |
+ |---|---|
+ | R0 只記錄 | 9 |
+-| R1 自動、不通知 | 2 |
+-| R2 自動嘗試、失敗才通知 | 12 |
+-| R3 必須人工 | 11 |
++| R1 自動、不通知 | 3 |
++| R2 自動嘗試、失敗才通知 | 14 |
++| R3 必須人工 | 12 |
+ 
+ 下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
+ 
+-### 3.1 ed-seykota（15 條）
++### 3.1 ed-seykota（18 條）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+@@ -98,13 +100,16 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `SEY.TRADE_EXIT` | 誤標 critical | MECHANICAL | R0 | **P3** |
+ | `SEY.ENTRY_SKIPPED_MIN_CAPITAL` | 誤標 critical | MECHANICAL | R0 | **P3** |
+ | `SEY.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知（2026-09-18 補登，見下方說明） | JUDGEMENT | R2 | P8（v2） |
++| `SEY.VERIFIED_CLOSE_AUTO_REPAIRED` | 未發出（共用修復執行器，v2-W4 接上） | MECHANICAL | R1 | P8（v2） |
++| `SEY.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R2 | P8（v2） |
++| `SEY.VERIFIED_CLOSE_REPAIR_BLOCKED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R3 | P8（v2） |
+ 
+ **`protective_stop_failed` 拆成兩碼**是本節最重要的改動。現行程式在「停損掛單失敗」之後會立刻
+ 嘗試緊急市價平倉，但不論平倉成功或失敗，都收斂成同一個 latch 原因碼。這兩種結果的真倉風險相差
+ 極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R1 自動清 latch）；平倉也失敗代表真倉
+ 有裸露部位而且程式的補救手段已經失敗過一次（→ R3，全機隊風險最高的一類）。
+ 
+-### 3.2 momentum（6 條）
++### 3.2 momentum（7 條）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+@@ -114,12 +119,13 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `MOM.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知 | JUDGEMENT | R2 | P8（v2） |
+ | `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R1 | **P6** |
+ | `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R3 | **P6** |
++| `MOM.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W3 接上） | JUDGEMENT | R2 | P8（v2） |
+ 
+ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
+ 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
+ 正是 seykota 要改成的樣子。
+ 
+-後三條是 Phase 6 的 verified-close-backfill 修復機器人（`scripts/repair_bot.py`）。v2 起：無歧義 → R1 自動寫、不通知；
++`VERIFIED_CLOSE_*` 四條是 verified-close-backfill 修復機器人（Phase 6 的 `scripts/repair_bot.py`；v2 起由共用修復執行器發出，見 §4.9）。v2 起：無歧義 → R1 自動寫、不通知；
+ 以交易所為準仍能對應 → 照交易所補寫；只有結構上對不上才重試並升格（R2，`MOM.VERIFIED_CLOSE_PROPOSED` 的呼叫點
+ 由共用修復執行器取代時退役）；帳本已不乾淨 → R3 停手。v1 的過渡開關 `MOMENTUM_REPAIR_AUTO_APPLY`（只有 momentum
+ 有、當時 33 條只管 1 條、沒有任何機制會評估並打開它）在 v2 移除；seykota 的修復機器人（只抓錯並提出修復建議）（§3.1 最後一條
+@@ -352,6 +358,35 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停
+ 維持現狀不動（本來就只寫帳本、完全沒有事件產生）。§4.6 的請求佇列基礎設施留著，等以後真的出現
+ 需要它的訊號源再用。
+ 
++### 4.9 共用修復執行器（v2-W2，`trade_alerts.repair_runner`，v0.21.0）
++
++漏記平倉（交易所已平倉、帳本只有 `trade_open`）的自動修復，全機隊只有一份程式。策略只提供轉接器
++`RepairAdapter`：怎麼從自己的交易所抓證據（`fetch_evidence`）、怎麼用自己的帳本寫入器 staging
++（`staging_ledger`）、怎麼排 Google 投影（`queue_projection`）。v2 之前 momentum 與 seykota 各有一份複製。
++
++`run_repair_round(adapter, paths)` 每輪：
++
++| 情況 | 處置 | 等級／代碼 | 通知 |
++|---|---|---|---|
++| `<PROJECT>_REPAIR_PAUSED` 為真 | 不偵測、不查交易所、不寫帳本；仍刷新 `ops_export.json` | — | 無 |
++| 交易所仍有部位（轉接器拋 `PositionStillOpen`） | 還不到修的時候，下一輪再看 | 不記 | 無 |
++| 能對應 | 證據檔落地、staging 後整批原子寫入、排 Google 投影 | R1 `VERIFIED_CLOSE_AUTO_REPAIRED` | 無 |
++| 損益與交易所差超過 0.01 | 照樣寫入，但 `gross_pnl` 用交易所已實現損益、`net_pnl`／`return_on_margin` 隨之重算；`reconciliation` 記 `pnl_source: "exchange_realized"`、本地數字與差額 | R1 | 無 |
++| 多筆同時漏記 | 一輪最多寫一筆，其餘 `deferred`、下一輪依序補（v1 視為阻擋） | — | 無 |
++| 查交易所失敗、或結構對不上（平倉方向與開倉不符、成交早於開倉、缺時間戳／trade_id／incident_id、數量加總不等於開倉量、已有 trade_close） | 記一次失敗；同一 trade_id 連續 `escalate_after`（3）次才開請求、事件標 `escalated` | R2 `VERIFIED_CLOSE_REPAIR_FAILED` | 升格時一次 |
++| 升格後 | 每輪靜默重試（不再記事件）；成功 → 請求 `RESOLVED_AUTO` | — | 無 |
++| 帳本已有這筆的修復痕跡、或整批寫入失敗 | 停手、開請求，永不重試 | R3 `VERIFIED_CLOSE_REPAIR_BLOCKED` | 一次（持續列在 `open_requests`） |
++| 有請求開著，但帳本已出現這筆 `trade_close`（人工補好） | 請求 `WITHDRAWN` | — | 無 |
++
++- 通知一律經 `ops_export` 由 ops-notify 代送，執行器本身不推播（策略的 `ALERTS_ENABLED` 關著）。
++- 「連續」的計數：只有升格會歸零；「交易所仍有部位」那一輪不算成功也不算失敗。請求關閉後同一筆再出事，從 1 重新算。
++- 平倉方向由 `trade_open.side` 推導（long→SELL、short→BUY），沒記方向的開倉用轉接器的 `default_position_side`。
++- 加碼（同一 trade_id 多筆 `trade_open`，seykota）視為同一個部位：`find_open_event` 合併數量、加權平均進場價、加總手續費，
++  以最早一筆的時間界定查詢範圍；`detect_repair_candidates` 也把它算成一筆交易（v0.21.0 前會被當成兩筆而略過）。
++- 「以交易所為準」的判斷寫在 `build_repair_events` 裡，手動流程（`append_repair`）與執行器寫出的帳本列逐欄相同。
++  轉接器拿不到某筆成交的已實現損益時，證據標 `exchange_profit_reported: false`，此時不以交易所為準。
++- 執行器的三個代碼必須在目錄裡有該策略的條目，否則開跑前就拒絕（事件等級查不到＝沒辦法通知任何人）。
++
+ ## 5. Phase 3 實際落地的程式改動
+ 
+ 本 Phase 以設計為主，程式改動限縮在「零風險的標記與命名修正」——不動任何 latch、resume 或交易
+@@ -384,6 +419,8 @@ log 行的 `event=` 與 `severity=` 欄位，不影響任何推播、下單或
+   （entry 不得規定沒有任何策略實作得出來的 resume 路徑）、
+   `test_error_request_queue.py::test_r0_and_r1_conditions_can_never_open_a_request`
+   （逐筆拿目錄裡的 R0／R1 條件去試開請求，必須全部被拒）。
++- v2-W2 起：`test_repair_runner.py::test_the_runner_codes_are_catalogued_the_same_for_every_strategy_that_runs_it`
++  要求每支用共用修復執行器的策略都有三個執行器代碼、等級與判定完全一致（R1／R2／R3）；新策略接上執行器前要先補目錄。
+ - v2 起的白話文字與分級不變式：每條都有 `operator_message` 且三段皆非空、R2／R3 必有 `ai_prompt`
+   而 R0／R1 不得有、四級語意固定、只有 R2 帶 `escalate_after`、退役代碼不得重用。改通知文字就是改這份
+   JSON——它隨套件發佈，策略重新釘選新版本才會生效。
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 678a0e9..655682f 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -95,9 +95,9 @@
+   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>34 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    四支策略目前所有已知的「出問題」情況，共 <b>38 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>31 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>35 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -108,7 +108,7 @@
+   <div id="filters"></div>
+   <div id="register"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-09-18 盤點）。
++    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-09-22 盤點）。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
+   </div>
+ </div>
+@@ -695,6 +695,35 @@
+    "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+    "what": "動能策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。"
+   },
++  {
++   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
++   "behaviour": {
++    "phase": "v2-W3",
++    "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。",
++    "state": "pending"
++   },
++   "bot": "momentum",
++   "bot_label": "動能策略",
++   "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
++   "emits_event": {
++    "phase": "v2-W3",
++    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
++    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
++   ],
++   "open": true,
++   "steps": [
++    "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
++    "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
++   "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
++  },
+   {
+    "ai_prompt": "請在 btc-bull-market-competition 追查為什麼本地帳本出現負的或不可能的餘額：讀 src/btc_competition/runner.py 的 _holdings_unverified 與 executor.fetch_balances，比對本地 state/帳本與交易所實際餘額，找出差異從哪一筆交易開始，提出讓本地與交易所一致的修正步驟（先給我確認再執行）與治本修正。",
+    "behaviour": {
+@@ -1066,6 +1095,91 @@
+    "tier": "R2",
+    "title": "漏記平倉已算出修復方案，附提案通知",
+    "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "phase": "v2-W4",
++    "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。",
++    "state": "pending"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++   "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
++   "emits_event": {
++    "phase": "v2-W4",
++    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
++    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
++   ],
++   "open": true,
++   "steps": [],
++   "tier": "R1",
++   "title": "無歧義的漏記平倉已自動補寫進帳本",
++   "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
++   "behaviour": {
++    "phase": "v2-W4",
++    "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。",
++    "state": "pending"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
++   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
++   "emits_event": {
++    "phase": "v2-W4",
++    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
++    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
++   ],
++   "open": true,
++   "steps": [
++    "治標：到電腦前照ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
++    "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++   ],
++   "tier": "R2",
++   "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
++   "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
++   "behaviour": {
++    "phase": "v2-W4",
++    "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。",
++    "state": "pending"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
++   "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
++   "emits_event": {
++    "phase": "v2-W4",
++    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
++    "state": "pending"
++   },
++   "notes": [
++    "行為未做 — 新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
++    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
++   ],
++   "open": true,
++   "steps": [
++    "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
++    "確認修正步驟後照做（手動流程見ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
++    "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
++   ],
++   "tier": "R3",
++   "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
++   "what": "趨勢策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。"
+   }
+  ],
+  "tiers": [
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index ec5e4c5..ccf48af 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,7 +177,7 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>40</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-pending" href="#group-pending"><b>44</b><span>項未完成——還有策略沒做到</span></a>
+     <a class="c-done" href="#group-done"><b>9</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+@@ -193,7 +193,7 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">40 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">44 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+@@ -209,7 +209,7 @@
+   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+   <div id="glossaryHost"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-18 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
++    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-22 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 0213a01</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations b48b88b</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations b8eda43</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+   </div>
+@@ -1435,7 +1435,7 @@
+      ]
+     }
+    ],
+-   "sub": "修復機器人的第二個功能：證據完全沒有疑慮時，照交易所成交紀錄把漏記的平倉直接寫進帳本；結構對不上才重試並升格。",
++   "sub": "修復機器人的第二個功能：照交易所成交紀錄把漏記的平倉直接寫進帳本（損益跟交易所對不上時以交易所為準）；多筆漏記依序逐輪補；只有結構對不上或交易所查不到才重試，連續 3 次失敗才升格通知。v0.21.0 起由 trade-alerts 的共用修復執行器（trade_alerts.repair_runner）提供，各策略只寫轉接器。",
+    "title": "修復機器人：自動補寫漏記平倉"
+   },
+   {
+@@ -1753,12 +1753,12 @@
+    "anchor": "cap-docs.glossary_adopted",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "done",
+     "momentum": "done",
+     "mycrypto": "done",
+     "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "docs.glossary_adopted",
+    "kind": "cap",
+    "rows": [
+@@ -2510,6 +2510,41 @@
+    "sub": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+    "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+   },
++  {
++   "added_recent": true,
++   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++   "complete": false,
++   "dots": {
++    "btc-competition": "none",
++    "momentum": "pending",
++    "mycrypto": "none",
++    "seykota": "none"
++   },
++   "has_recent": false,
++   "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
++       "state": "pending",
++       "text": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
++       "state": "pending",
++       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++      }
++     ]
++    }
++   ],
++   "sub": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
++  },
+   {
+    "added_recent": false,
+    "anchor": "rule-BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+@@ -3101,6 +3136,111 @@
+    ],
+    "sub": "SEY.VERIFIED_CLOSE_PROPOSED",
+    "title": "R2｜漏記平倉已算出修復方案，附提案通知"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++   "complete": false,
++   "dots": {
++    "btc-competition": "none",
++    "momentum": "none",
++    "mycrypto": "none",
++    "seykota": "pending"
++   },
++   "has_recent": false,
++   "id": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
++       "state": "pending",
++       "text": "新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
++       "state": "pending",
++       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++      }
++     ]
++    }
++   ],
++   "sub": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++   "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_FAILED",
++   "complete": false,
++   "dots": {
++    "btc-competition": "none",
++    "momentum": "none",
++    "mycrypto": "none",
++    "seykota": "pending"
++   },
++   "has_recent": false,
++   "id": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
++       "state": "pending",
++       "text": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
++       "state": "pending",
++       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++      }
++     ]
++    }
++   ],
++   "sub": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
++   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
++   "complete": false,
++   "dots": {
++    "btc-competition": "none",
++    "momentum": "none",
++    "mycrypto": "none",
++    "seykota": "pending"
++   },
++   "has_recent": false,
++   "id": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
++       "state": "pending",
++       "text": "新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
++       "state": "pending",
++       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++      }
++     ]
++    }
++   ],
++   "sub": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
++   "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+   }
+  ],
+  "phase_counts": {
+@@ -3111,8 +3251,8 @@
+   "binance-funding-sync": 2,
+   "naming-rollout": 0,
+   "v2-W2": 0,
+-  "v2-W3": 7,
+-  "v2-W4": 5,
++  "v2-W3": 9,
++  "v2-W4": 11,
+   "v2-W6": 4
+  },
+  "phase_order": [
+@@ -3153,10 +3293,28 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "cap-docs.glossary_adopted",
+-   "note": "四支策略的用詞統一（n2→n5）都已做完後，三個維運小工具（維運通知 bcup02/ops-notify#19、Telegram 遙控 bcup02/ops-control#11、LINE 查詢 bcup02/portfolio-query#22）也已同步完成，n2→n6 全系列到此結案——見本能力的 description 補充說明。",
+-   "project": "競賽策略",
+-   "title": "文件與訊息已改用統一名詞"
++   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
++   "project": "動能策略",
++   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
++  },
++  {
++   "anchor": "rule-SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
++   "project": "趨勢策略",
++   "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
++  },
++  {
++   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_FAILED",
++   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
++   "project": "趨勢策略",
++   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
++  },
++  {
++   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
++   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
++   "project": "趨勢策略",
++   "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+   }
+  ],
+  "totals": {
+@@ -3168,7 +3326,7 @@
+   "momentum": {
+    "done": 14,
+    "n/a": 4,
+-   "pending": 13
++   "pending": 15
+   },
+   "mycrypto": {
+    "done": 11,
+@@ -3178,7 +3336,7 @@
+   "seykota": {
+    "done": 19,
+    "n/a": 2,
+-   "pending": 28
++   "pending": 34
+   }
+  }
+ }
+diff --git a/pyproject.toml b/pyproject.toml
+index c5a5e34..640a4ff 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.20.0"
++version = "0.21.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 4e5e7a1..47d5348 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -107,16 +107,25 @@ from .verified_close_backfill import (
+     VerifiedCloseError,
+     append_repair,
+     append_repair_from_evidence,
+-    assess_auto_repair,
++    assess_repair,
+     build_evidence,
+     build_repair_events,
+     detect_repair_candidates,
++    expected_closing_side,
+     find_open_event,
+     incident_traces,
+     load_evidence,
+-    render_repair_proposal_text,
+     validate_evidence,
+ )
++from .repair_runner import (
++    RUNNER_CODES,
++    PositionStillOpen,
++    RepairAdapter,
++    RepairPaths,
++    pause_env_name,
++    repair_paused,
++    run_repair_round,
++)
+ from .ledger_reconcile import (
+     CLOSE_MARKERS,
+     DRY_RUN_SOURCES,
+@@ -180,15 +189,22 @@ __all__ = [
+     "stage_lines",
+     "append_repair",
+     "append_repair_from_evidence",
+-    "assess_auto_repair",
++    "assess_repair",
+     "build_evidence",
+     "build_repair_events",
+     "detect_repair_candidates",
++    "expected_closing_side",
+     "find_open_event",
+     "incident_traces",
+     "load_evidence",
+-    "render_repair_proposal_text",
+     "validate_evidence",
++    "RUNNER_CODES",
++    "PositionStillOpen",
++    "RepairAdapter",
++    "RepairPaths",
++    "pause_env_name",
++    "repair_paused",
++    "run_repair_round",
+     "FLEET_EVENT_KIND",
+     "PROJECT_CODE_PREFIXES",
+     "RISK_TIERS",
+@@ -289,4 +305,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.20.0"
++__version__ = "0.21.0"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index ad427e2..b8356e0 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -561,7 +561,7 @@
+       },
+       "verdict": "MECHANICAL",
+       "risk_tier": "R1",
+-      "auto_action": "assess_auto_repair 判定無歧義時：證據檔落地、以 momentum 自己的 TradeLedger staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、記事件日誌。一輪最多一筆。不通知。（v1 的 MOMENTUM_REPAIR_AUTO_APPLY 開關與事後稽核通知在 v2 移除，由共用修復執行器落實。）",
++      "auto_action": "共用修復執行器（trade_alerts.repair_runner）判定能對應時：證據檔落地、以本策略自己的帳本寫入器 staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、記事件日誌。本地算的毛損益與交易所已實現損益差超過 0.01 時以交易所數字寫入，reconciliation 區塊記 pnl_source=exchange_realized 與本地數字。一輪最多寫一筆，多筆漏記依序逐輪補。不通知。（v1 的 MOMENTUM_REPAIR_AUTO_APPLY 開關與事後稽核通知在 v2 移除，v2-W3 改用共用修復執行器時落實。）",
+       "human_action": "無需決定。證據檔與事件日誌留有完整紀錄。",
+       "resume": "n/a",
+       "lands_in_phase": 6,
+@@ -618,7 +618,7 @@
+       },
+       "verdict": "JUDGEMENT",
+       "risk_tier": "R3",
+-      "auto_action": "不寫、不重試。開請求、記事件日誌、通知；此 trade_id 之後一律跳過，直到請求關閉。",
++      "auto_action": "不寫、不重試。開請求、記事件日誌，由 ops_export 通知；此 trade_id 之後一律跳過，直到請求關閉（帳本出現這筆 trade_close 時自動 WITHDRAWN）。",
+       "human_action": "帳本裡這筆已有補到一半的紀錄（或這次寫入無法驗證），自動補完可能重複記帳。先讀清楚帳本現況，再以交易所成交紀錄為準讓帳本、交易所、Google 表三方一致，最後關閉請求。",
+       "resume": "n/a",
+       "lands_in_phase": 6,
+@@ -634,6 +634,36 @@
+         "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
+       }
+     },
++    {
++      "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++      "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
++      "project": "momentum",
++      "sources": [
++        "trade-alerts/src/trade_alerts/repair_runner.py:332",
++        "trade-alerts/src/trade_alerts/repair_runner.py:346"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "共用修復執行器每輪重試：查交易所失敗（網路／API）或 assess_repair 判定結構對不上（平倉成交方向與開倉不符、成交早於開倉、缺 trade_id／incident_id、成交數量加總不等於開倉量、已有 trade_close）各記一次失敗事件、不通知；同一 trade_id 連續 escalate_after 次失敗才開請求、事件標 escalated、由 ops_export 通知一次（附 ai_prompt）。升格後每輪靜默重試，成功則請求 RESOLVED_AUTO；帳本出現這筆 trade_close（人工補好）則 WITHDRAWN。交易所仍有部位不算失敗。",
++      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "v2 取代 MOM.VERIFIED_CLOSE_PROPOSED：交易所是權威，能對應的一律照交易所補（損益差額也以交易所已實現損益為準），真正需要人的只剩結構上對不上或交易所一直查不到的情況，而那時該做的是追查根因。查交易所失敗也算一次失敗（2026-09-22 使用者拍板），否則 API 長期壞掉不會有人知道。",
++      "operator_message": {
++        "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
++        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
++        "steps": [
++          "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
++          "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
++      }
++    },
+     {
+       "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+       "title": "出現負／不可能的餘額，本地帳本本身不可信",
+@@ -1049,18 +1079,106 @@
+         ],
+         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
+       }
++    },
++    {
++      "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++      "title": "無歧義的漏記平倉已自動補寫進帳本",
++      "project": "seykota",
++      "sources": [
++        "trade-alerts/src/trade_alerts/repair_runner.py:299"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R1",
++      "auto_action": "共用修復執行器（trade_alerts.repair_runner）判定能對應時：證據檔落地、以本策略自己的帳本寫入器 staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、記事件日誌。本地算的毛損益與交易所已實現損益差超過 0.01 時以交易所數字寫入，reconciliation 區塊記 pnl_source=exchange_realized 與本地數字。一輪最多寫一筆，多筆漏記依序逐輪補。不通知。",
++      "human_action": "無需決定。證據檔與事件日誌留有完整紀錄。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "跟 MOM.VERIFIED_CLOSE_AUTO_REPAIRED 同一個條件、同一份共用修復執行器。seykota 在 v2 之前只有修復機器人（只抓錯並提出修復建議）（只抓錯並提出修復建議），沒有自動補寫這條路徑；v2-W4 改用共用修復執行器時才開始發這個事件。seykota 會做空，平倉方向依 trade_open 的方向判斷；加碼過的交易（同一 trade_id 多筆 trade_open）合併成一個部位再比對。",
++      "operator_message": {
++        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。",
++        "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
++        "steps": [
++          "不需要任何動作。",
++          "想核對：audit/fleet_event_log.jsonl 裡這筆事件記著交易編號、出場價和損益，可以跟交易所 App 比對。"
++        ]
++      }
++    },
++    {
++      "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
++      "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
++      "project": "seykota",
++      "sources": [
++        "trade-alerts/src/trade_alerts/repair_runner.py:332",
++        "trade-alerts/src/trade_alerts/repair_runner.py:346"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "共用修復執行器每輪重試：查交易所失敗（網路／API）或 assess_repair 判定結構對不上（平倉成交方向與開倉不符、成交早於開倉、缺 trade_id／incident_id、成交數量加總不等於開倉量、已有 trade_close）各記一次失敗事件、不通知；同一 trade_id 連續 escalate_after 次失敗才開請求、事件標 escalated、由 ops_export 通知一次（附 ai_prompt）。升格後每輪靜默重試，成功則請求 RESOLVED_AUTO；帳本出現這筆 trade_close（人工補好）則 WITHDRAWN。交易所仍有部位不算失敗。",
++      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "v2 取代 SEY.VERIFIED_CLOSE_PROPOSED：交易所是權威，能對應的一律照交易所補（損益差額也以交易所已實現損益為準），真正需要人的只剩結構上對不上或交易所一直查不到的情況，而那時該做的是追查根因。查交易所失敗也算一次失敗（2026-09-22 使用者拍板），否則 API 長期壞掉不會有人知道。",
++      "operator_message": {
++        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
++        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
++        "steps": [
++          "治標：到電腦前照ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
++          "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
++      }
++    },
++    {
++      "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
++      "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
++      "project": "seykota",
++      "sources": [
++        "trade-alerts/src/trade_alerts/repair_runner.py:364"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不寫、不重試。開請求、記事件日誌，由 ops_export 通知；此 trade_id 之後一律跳過，直到請求關閉（帳本出現這筆 trade_close 時自動 WITHDRAWN）。",
++      "human_action": "帳本裡這筆已有補到一半的紀錄（或這次寫入無法驗證），自動補完可能重複記帳。先讀清楚帳本現況，再以交易所成交紀錄為準讓帳本、交易所、Google 表三方一致，最後關閉請求。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "跟 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED 同一個條件、同一份共用修復執行器（v2-W4 起）。帳本裡已有這筆交易的修復紀錄或這次寫入無法驗證，代表真實帳本已經不是「乾淨的孤兒開倉」，自動補完後半段等於猜，猜錯會重複或錯記真實損益。",
++      "operator_message": {
++        "what": "趨勢策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。",
++        "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
++        "steps": [
++          "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
++          "確認修正步驟後照做（手動流程見ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
++          "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
++      }
+     }
+   ],
+   "retired_codes": [
+     {
+       "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+       "retired_in": "fleet-error-catalog/v2",
+-      "reason": "v1 R1 'propose, never write'. v2 has no proposal state: an unambiguous orphan close is repaired (R1), a mappable-but-imperfect one is repaired using the exchange as the authority, and only a structurally unmappable one retries and escalates (R2). Stays in the catalog until the shared repair runner replaces the call site."
++      "reason": "v1 R1 'propose, never write'. v2 has no proposal state: an unambiguous orphan close is repaired (R1), a mappable-but-imperfect one is repaired using the exchange as the authority, and only a structurally unmappable one retries and escalates (R2). Stays in the catalog until the shared repair runner replaces the call site. Successor: MOM.VERIFIED_CLOSE_REPAIR_FAILED (R2), emitted by trade_alerts.repair_runner (v0.21.0)."
+     },
+     {
+       "code": "SEY.VERIFIED_CLOSE_PROPOSED",
+       "retired_in": "fleet-error-catalog/v2",
+-      "reason": "Emitted by seykota's Phase 5c shadow repair bot but never catalogued in v1; backfilled 2026-09-18 so the rollout registry has something to point at. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED. Stays in the catalog until the shared repair runner (v2-W4) replaces the call site."
++      "reason": "Emitted by seykota's Phase 5c shadow repair bot but never catalogued in v1; backfilled 2026-09-18 so the rollout registry has something to point at. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED. Stays in the catalog until the shared repair runner (v2-W4) replaces the call site. Successor: SEY.VERIFIED_CLOSE_REPAIR_FAILED (R2), emitted by trade_alerts.repair_runner (v0.21.0)."
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 3ff3774..57fbbd4 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1,7 +1,7 @@
+ {
+   "registry_version": "fleet-rollout-registry/v1",
+   "catalog_version": "fleet-error-catalog/v2",
+-  "updated_at": "2026-09-18",
++  "updated_at": "2026-09-22",
+   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
+   "projects": {
+     "momentum": "動能策略",
+@@ -234,7 +234,7 @@
+     {
+       "id": "repair_bot.verified_close",
+       "title": "修復機器人：自動補寫漏記平倉",
+-      "description": "修復機器人的第二個功能：證據完全沒有疑慮時，照交易所成交紀錄把漏記的平倉直接寫進帳本；結構對不上才重試並升格。",
++      "description": "修復機器人的第二個功能：照交易所成交紀錄把漏記的平倉直接寫進帳本（損益跟交易所對不上時以交易所為準）；多筆漏記依序逐輪補；只有結構對不上或交易所查不到才重試，連續 3 次失敗才升格通知。v0.21.0 起由 trade-alerts 的共用修復執行器（trade_alerts.repair_runner）提供，各策略只寫轉接器。",
+       "status": {
+         "momentum": {
+           "state": "pending",
+@@ -740,6 +740,23 @@
+         }
+       }
+     },
++    {
++      "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++      "behaviour": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "v2-W3",
++          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++        }
++      }
++    },
+     {
+       "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+       "behaviour": {
+@@ -1014,14 +1031,87 @@
+           "reason": "正式機的 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代時換成 v2 標籤。"
+         }
+       }
++    },
++    {
++      "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++        }
++      }
++    },
++    {
++      "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++        }
++      }
++    },
++    {
++      "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "v2-W4",
++          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
+     {
+-      "kind": "cap",
+-      "id": "docs.glossary_adopted",
+-      "project": "btc-competition",
+-      "note": "四支策略的用詞統一（n2→n5）都已做完後，三個維運小工具（維運通知 bcup02/ops-notify#19、Telegram 遙控 bcup02/ops-control#11、LINE 查詢 bcup02/portfolio-query#22）也已同步完成，n2→n6 全系列到此結案——見本能力的 description 補充說明。"
++      "kind": "rule",
++      "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++      "type": "added",
++      "project": "momentum",
++      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
++    },
++    {
++      "kind": "rule",
++      "id": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++      "type": "added",
++      "project": "seykota",
++      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
++    },
++    {
++      "kind": "rule",
++      "id": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
++      "type": "added",
++      "project": "seykota",
++      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
++    },
++    {
++      "kind": "rule",
++      "id": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
++      "type": "added",
++      "project": "seykota",
++      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/repair_runner.py b/src/trade_alerts/repair_runner.py
+new file mode 100644
+index 0000000..5def976
+--- /dev/null
++++ b/src/trade_alerts/repair_runner.py
+@@ -0,0 +1,433 @@
++"""The fleet's one verified-close repair runner (fleet-error-catalog/v2).
++
++A tracked position that closed on the exchange without the strategy writing a
++``trade_close`` leaves an orphan ``trade_open`` in the ledger. The exchange is
++the authority, so the fix is to write what the exchange says happened. This
++module is that repair, run unattended on a timer, for every strategy: each
++strategy supplies a ``RepairAdapter`` (how to fetch evidence from its exchange,
++how to stage rows in its own ledger format, how to queue its Google projection)
++and nothing else. Before v2 momentum and seykota each carried their own copy
++of this loop.
++
++One round:
++
++  1. ``<PROJECT>_REPAIR_PAUSED`` true -> no detection, no exchange query, no
++     ledger write. ``audit/ops_export.json`` is still refreshed, so a paused
++     strategy whose only export writer is this timer is not reported STALE.
++  2. Close requests the ledger has overtaken: an open request for a trade
++     that now has a ``trade_close`` (someone repaired it by hand) is
++     ``WITHDRAWN``.
++  3. Map the ``DIVERGED`` verdict in ``audit/ledger_status.json`` to candidate
++     ``trade_id`` s (``detect_repair_candidates``) and take them in order:
++
++     * open R3 request for the trade -> leave it alone until a human has
++       dealt with it;
++     * a write already attempted this round -> defer to the next round (at
++       most one ledger write per round; several orphans are repaired one per
++       round, in order, rather than refused);
++     * exchange still holds the position (``PositionStillOpen``) -> not yet
++       time, not a failure;
++     * fetch raised anything else, or ``assess_repair`` says ``unmappable``
++       -> one failed attempt (R2). The ``escalate_after``-th consecutive one
++       opens a request and marks the event ``escalated`` -- the only R2 event
++       ops-notify relays. After that the runner keeps retrying silently; a
++       later success closes the request ``RESOLVED_AUTO``;
++     * ``assess_repair`` says ``halt`` (the ledger already carries part of a
++       repair), or the batch write fails -> stop (R3), one request, never
++       retried;
++     * otherwise write it (R1, no notification): evidence file, rows staged
++       through the strategy's own ledger writer, one locked append, Google
++       projection queued.
++
++The runner never notifies anyone directly. Strategies keep ``ALERTS_ENABLED``
++off; what needs a human is the escalated R2 or R3 event, which
++``ops_export`` hands to ops-notify.
++"""
++from __future__ import annotations
++
++import logging
++import os
++import tempfile
++from dataclasses import dataclass
++from datetime import datetime, timezone
++from pathlib import Path
++from typing import Any, Callable, Mapping
++
++from .atomic_ledger_append import append_lines_atomically, stage_lines
++from .error_request_queue import open_error_request, outstanding_error_requests, record_request_outcome
++from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for
++from .ledger_reconcile import atomic_write, norm_symbol_plain, read_json, read_ledger
++from .ops_export import build_ops_export, write_ops_export
++from .verified_close_backfill import (
++    HALT,
++    UNMAPPABLE,
++    VerifiedCloseError,
++    append_repair_from_evidence,
++    assess_repair,
++    build_repair_events,
++    detect_repair_candidates,
++)
++
++LOGGER = logging.getLogger("trade_alerts.repair_runner")
++
++CODE_AUTO_REPAIRED = "VERIFIED_CLOSE_AUTO_REPAIRED"
++CODE_REPAIR_FAILED = "VERIFIED_CLOSE_REPAIR_FAILED"
++CODE_REPAIR_BLOCKED = "VERIFIED_CLOSE_REPAIR_BLOCKED"
++RUNNER_CODES = (CODE_AUTO_REPAIRED, CODE_REPAIR_FAILED, CODE_REPAIR_BLOCKED)
++
++_TRUE = {"1", "true", "yes", "on"}
++
++
++class PositionStillOpen(Exception):
++    """Raised by an adapter's ``fetch_evidence`` when the exchange still holds
++    the position: the close has not happened yet, so there is nothing to
++    repair and nothing has failed."""
++
++
++@dataclass(frozen=True)
++class RepairAdapter:
++    """What one strategy tells the runner.
++
++    ``fetch_evidence(trade_id)`` returns a schema-1.0 evidence dict built with
++    ``verified_close_backfill.build_evidence`` from a read-only exchange query;
++    it raises ``PositionStillOpen`` while the exchange still holds the
++    position, and anything else it raises counts as a failed attempt.
++    ``staging_ledger(path)`` returns the ``append`` of the strategy's own
++    ledger writer pointed at ``path``, so staged rows are in exactly the format
++    the strategy writes. ``queue_projection(trade_id)`` queues the
++    ``trade_close`` row for the Google sheet.
++    """
++
++    project: str
++    fetch_evidence: Callable[[str], dict[str, Any]]
++    staging_ledger: Callable[[Path], Callable[..., str]]
++    queue_projection: Callable[[str], Any]
++    norm_symbol: Callable[[Any], str] = norm_symbol_plain
++    #: Position side assumed for a ``trade_open`` that records none.
++    default_position_side: str = "long"
++
++
++@dataclass(frozen=True)
++class RepairPaths:
++    """Where one strategy keeps its files; defaults are the fleet's layout,
++    relative to the strategy's working directory."""
++
++    ledger: str = "audit/trading_ledger.jsonl"
++    ledger_status: str = "audit/ledger_status.json"
++    fleet_event_log: str = "audit/fleet_event_log.jsonl"
++    request_queue: str = "audit/error_requests.jsonl"
++    evidence_dir: str = "audit/verified-close-evidence"
++    ops_export: str = "audit/ops_export.json"
++
++
++def pause_env_name(project: str) -> str:
++    """``MOMENTUM_REPAIR_PAUSED``, ``SEYKOTA_REPAIR_PAUSED``, ... -- one name
++    per strategy, same behaviour everywhere."""
++    return f"{project.upper().replace('-', '_')}_REPAIR_PAUSED"
++
++
++def repair_paused(project: str, environ: Mapping[str, str] | None = None) -> bool:
++    env = os.environ if environ is None else environ
++    return str(env.get(pause_env_name(project), "false")).strip().lower() in _TRUE
++
++
++def run_repair_round(
++    adapter: RepairAdapter,
++    paths: RepairPaths = RepairPaths(),
++    *,
++    paused: bool | None = None,
++    catalog: Mapping[str, Any] | None = None,
++    environ: Mapping[str, str] | None = None,
++) -> dict[str, Any]:
++    """One repair round; returns what it did, for the caller to print.
++
++    A strategy without all three runner codes in the catalog raises before
++    touching anything: an event the catalog cannot place in a tier is an
++    event nobody can be told about.
++    """
++    catalog = catalog if catalog is not None else load_error_catalog()
++    tiers = {code: risk_tier_for(catalog, adapter.project, code) for code in RUNNER_CODES}
++    escalate_after = int(catalog["risk_tiers"]["R2"]["escalate_after"])
++    if paused is None:
++        paused = repair_paused(adapter.project, environ)
++
++    result: dict[str, Any] = {
++        "project": adapter.project, "paused": paused, "candidates": [], "repaired": [], "failed": [],
++        "escalated": [], "blocked": [], "still_open": [], "awaiting_human": [], "deferred": [],
++        "closed_requests": [], "ops_export_written": False,
++    }
++    try:
++        if not paused:
++            _Round(adapter, paths, tiers, escalate_after, result).run()
++    finally:
++        result["ops_export_written"] = _refresh_ops_export(adapter.project, paths, catalog)
++    return result
++
++
++def _refresh_ops_export(project: str, paths: RepairPaths, catalog: Mapping[str, Any]) -> bool:
++    """Best-effort: ops-notify reports an export that stops refreshing as
++    ``STALE``, so a failure here must never break the round."""
++    try:
++        write_ops_export(paths.ops_export, build_ops_export(
++            paths.fleet_event_log, paths.request_queue, project=project, catalog=catalog,
++        ))
++    except Exception as exc:  # noqa: BLE001 -- see docstring
++        LOGGER.warning("ops_export_refresh_failed path=%s error=%s: %s", paths.ops_export, type(exc).__name__, exc)
++        return False
++    return True
++
++
++class _Round:
++    def __init__(
++        self, adapter: RepairAdapter, paths: RepairPaths, tiers: dict[str, str], escalate_after: int,
++        result: dict[str, Any],
++    ) -> None:
++        self.adapter = adapter
++        self.project = adapter.project
++        self.paths = paths
++        self.tiers = tiers
++        self.escalate_after = escalate_after
++        self.result = result
++        self.fleet_events: list[dict[str, Any]] = []
++
++    def run(self) -> None:
++        ledger_events = read_ledger(self.paths.ledger)
++        self.fleet_events = [
++            event for event in read_fleet_events(self.paths.fleet_event_log) if event.get("project") == self.project
++        ]
++        open_requests = self._close_overtaken_requests(ledger_events)
++
++        candidates = detect_repair_candidates(
++            read_json(self.paths.ledger_status) or {}, ledger_events, norm_symbol=self.adapter.norm_symbol,
++        )
++        self.result["candidates"] = candidates
++
++        write_attempted = False
++        for trade_id in candidates:
++            request = open_requests.get(trade_id)
++            if request is not None and request["code"] == CODE_REPAIR_BLOCKED:
++                self.result["awaiting_human"].append({"trade_id": trade_id, "request_id": request["request_id"]})
++                continue
++            if write_attempted:
++                self.result["deferred"].append(trade_id)
++                continue
++            write_attempted = self._handle(trade_id, ledger_events, request)
++
++    # -- one candidate ------------------------------------------------------ #
++    def _handle(
++        self, trade_id: str, ledger_events: list[dict[str, Any]], escalated_request: dict[str, Any] | None,
++    ) -> bool:
++        """Returns whether a ledger write was attempted."""
++        identity = {"trade_id": trade_id, "symbol": _symbol_of(ledger_events, trade_id)}
++        try:
++            evidence = self.adapter.fetch_evidence(trade_id)
++        except PositionStillOpen as exc:
++            self.result["still_open"].append({"trade_id": trade_id, "reason": str(exc)})
++            return False
++        except Exception as exc:  # noqa: BLE001 -- any fetch failure is one failed attempt
++            self._fail(identity, [f"evidence fetch failed: {type(exc).__name__}: {exc}"], {}, escalated_request)
++            return False
++
++        identity = {"incident_id": evidence.get("incident_id"), **identity}
++        assessment = assess_repair(
++            evidence, ledger_events, default_position_side=self.adapter.default_position_side,
++        )
++        if assessment["verdict"] == HALT:
++            self._block(identity, "the ledger already carries repair records for this trade",
++                        {"reasons": assessment["reasons"], "checks": assessment["checks"]}, escalated_request)
++            return False
++        if assessment["verdict"] == UNMAPPABLE:
++            self._fail(identity, assessment["reasons"], {"checks": assessment["checks"]}, escalated_request)
++            return False
++
++        self._write(identity, evidence, escalated_request)
++        return True
++
++    def _write(self, identity: dict[str, Any], evidence: dict[str, Any], escalated_request: dict[str, Any] | None) -> None:
++        trade_id = identity["trade_id"]
++        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
++        evidence_path = Path(self.paths.evidence_dir) / f"{trade_id}-{stamp}.json"
++        try:
++            atomic_write(evidence_path, evidence)
++        except Exception as exc:  # noqa: BLE001 -- nothing written to the ledger yet, so retry next round
++            self._fail(identity, [f"could not persist the evidence file: {type(exc).__name__}: {exc}"], {},
++                       escalated_request)
++            return
++
++        # Stage through the strategy's own ledger writer so every line is in
++        # exactly the format it writes, then land the batch in one locked
++        # write. The idempotency checks inside append_repair_from_evidence
++        # read the REAL ledger; only the writes go to the scratch file.
++        try:
++            with tempfile.TemporaryDirectory(prefix=f"{self.project}-repair-") as scratch_dir:
++                scratch = Path(scratch_dir) / "staged.jsonl"
++                staged = append_repair_from_evidence(
++                    self.paths.ledger, evidence, ledger_append=self.adapter.staging_ledger(scratch), apply=True,
++                )
++                lines = stage_lines(scratch)
++                if len(lines) != staged["event_count"]:
++                    raise VerifiedCloseError(
++                        f"staged {len(lines)} lines but the repair has {staged['event_count']} events"
++                    )
++                appended = append_lines_atomically(self.paths.ledger, lines)
++        except Exception as exc:  # noqa: BLE001 -- any failure here must stop, never retry
++            self._block(identity, f"ledger write failed or could not be verified: {exc}",
++                        {"evidence_path": str(evidence_path)}, escalated_request)
++            return
++
++        projection: dict[str, Any] = {}
++        try:
++            projection["intent_id"] = self.adapter.queue_projection(trade_id)
++        except Exception as exc:  # noqa: BLE001 -- the ledger is already right; the sheet check reports the gap
++            projection["error"] = f"{type(exc).__name__}: {exc}"
++
++        trade_close = next(fields for event_type, fields in build_repair_events(evidence) if event_type == "trade_close")
++        reconciliation = trade_close["reconciliation"]
++        measurements = {
++            "gross_pnl": trade_close["gross_pnl"],
++            "net_pnl": trade_close["net_pnl"],
++            "exchange_profit": trade_close["exchange_profit"],
++            "reconciliation_delta": trade_close["reconciliation_delta"],
++        }
++        details: dict[str, Any] = {
++            "evidence_path": str(evidence_path), "appended_event_count": appended, "projection": projection,
++            "pnl_source": reconciliation.get("pnl_source", "local"),
++        }
++        if "local_gross_pnl" in reconciliation:
++            details["local_gross_pnl"] = reconciliation["local_gross_pnl"]
++            details["exchange_pnl_residual"] = reconciliation["exchange_pnl_residual"]
++        event = append_fleet_event(
++            self.paths.fleet_event_log, project=self.project, code=CODE_AUTO_REPAIRED,
++            risk_tier=self.tiers[CODE_AUTO_REPAIRED],
++            summary=f"verified close written from exchange evidence for trade_id={trade_id}",
++            evidence=identity, details=details, measurements=measurements,
++        )
++        if escalated_request is not None:
++            self._close_request(escalated_request, "RESOLVED_AUTO", "a later automatic retry repaired it",
++                                {"event_id": event["event_id"]})
++        self.result["repaired"].append({**identity, "appended_event_count": appended, "projection": projection,
++                                        "pnl_source": details["pnl_source"]})
++
++    # -- outcomes ----------------------------------------------------------- #
++    def _fail(
++        self, identity: dict[str, Any], reasons: list[str], extra: dict[str, Any],
++        escalated_request: dict[str, Any] | None,
++    ) -> None:
++        """One failed attempt. Already escalated: retry silently -- the human
++        has been told once, and a line every 15 minutes would bury it."""
++        trade_id = identity["trade_id"]
++        if escalated_request is not None:
++            self.result["failed"].append({**identity, "reasons": reasons, "silent": True,
++                                          "request_id": escalated_request["request_id"]})
++            return
++
++        attempt = _failures_since_last_escalation(self.fleet_events, trade_id) + 1
++        tier = self.tiers[CODE_REPAIR_FAILED]
++        details: dict[str, Any] = {
++            **extra, "reasons": reasons, "attempt": attempt, "escalate_after": self.escalate_after,
++            "escalated": False,
++        }
++        summary = f"verified close for trade_id={trade_id} could not be written (attempt {attempt}): {reasons[0]}"
++        if attempt < self.escalate_after:
++            append_fleet_event(
++                self.paths.fleet_event_log, project=self.project, code=CODE_REPAIR_FAILED, risk_tier=tier,
++                summary=summary, evidence=identity, details=details,
++            )
++            self.result["failed"].append({**identity, "reasons": reasons, "attempt": attempt})
++            return
++
++        request = open_error_request(
++            self.paths.request_queue, project=self.project, code=CODE_REPAIR_FAILED, risk_tier=tier,
++            summary=summary, evidence={"trade_id": trade_id, "symbol": identity["symbol"]},
++            details={"reasons": reasons, "attempts": attempt},
++        )
++        details.update(escalated=True, request_id=request["request_id"],
++                       notice_text=_notice_text(identity, reasons, f"已連續 {attempt} 次自動補寫失敗"))
++        append_fleet_event(
++            self.paths.fleet_event_log, project=self.project, code=CODE_REPAIR_FAILED, risk_tier=tier,
++            summary=summary, evidence=identity, details=details,
++        )
++        self.result["escalated"].append({**identity, "reasons": reasons, "attempt": attempt,
++                                         "request_id": request["request_id"]})
++
++    def _block(
++        self, identity: dict[str, Any], reason: str, extra: dict[str, Any],
++        escalated_request: dict[str, Any] | None,
++    ) -> None:
++        tier = self.tiers[CODE_REPAIR_BLOCKED]
++        request = open_error_request(
++            self.paths.request_queue, project=self.project, code=CODE_REPAIR_BLOCKED, risk_tier=tier,
++            summary=reason, evidence={"trade_id": identity["trade_id"], "symbol": identity["symbol"]},
++            details=extra,
++        )
++        reasons = [reason, *extra.get("reasons", [])]
++        append_fleet_event(
++            self.paths.fleet_event_log, project=self.project, code=CODE_REPAIR_BLOCKED, risk_tier=tier,
++            summary=reason, evidence=identity,
++            details={**extra, "request_id": request["request_id"],
++                     "notice_text": _notice_text(identity, reasons, "自動補寫已停手，這筆不會再自動重試")},
++        )
++        if escalated_request is not None:
++            self._close_request(escalated_request, "SUPERSEDED", "the repair stopped; see the R3 request",
++                                {"superseded_by": request["request_id"]})
++        self.result["blocked"].append({**identity, "reason": reason, "request_id": request["request_id"]})
++
++    # -- requests ----------------------------------------------------------- #
++    def _close_overtaken_requests(self, ledger_events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
++        """Withdraw requests whose trade now has a ``trade_close``; return the
++        rest keyed by trade_id."""
++        closed = {
++            str(event.get("trade_id")) for event in ledger_events if event.get("event_type") == "trade_close"
++        }
++        still_open: dict[str, dict[str, Any]] = {}
++        for request in outstanding_error_requests(self.paths.request_queue):
++            if request.get("project") != self.project or request.get("code") not in (
++                CODE_REPAIR_FAILED, CODE_REPAIR_BLOCKED,
++            ):
++                continue
++            trade_id = str((request.get("evidence") or {}).get("trade_id") or "")
++            if trade_id in closed:
++                self._close_request(request, "WITHDRAWN", "the ledger now has a trade_close for this trade", {})
++            elif trade_id:
++                still_open[trade_id] = request
++        return still_open
++
++    def _close_request(self, request: dict[str, Any], status: str, note: str, details: dict[str, Any]) -> None:
++        record_request_outcome(
++            self.paths.request_queue, request_id=request["request_id"], status=status, note=note, details=details,
++        )
++        self.result["closed_requests"].append({
++            "request_id": request["request_id"], "code": request["code"],
++            "trade_id": (request.get("evidence") or {}).get("trade_id"), "status": status,
++        })
++
++
++def _symbol_of(ledger_events: list[dict[str, Any]], trade_id: str) -> str | None:
++    for event in ledger_events:
++        if event.get("event_type") == "trade_open" and str(event.get("trade_id")) == trade_id:
++            return event.get("symbol")
++    return None
++
++
++def _failures_since_last_escalation(fleet_events: list[dict[str, Any]], trade_id: str) -> int:
++    """Failed attempts for this trade after its last escalation. Nothing but
++    an escalation resets the count: a round that finds the position still
++    open is not a success, and a success ends the candidate altogether."""
++    count = 0
++    for event in fleet_events:
++        if event.get("code") != CODE_REPAIR_FAILED or (event.get("evidence") or {}).get("trade_id") != trade_id:
++            continue
++        count = 0 if (event.get("details") or {}).get("escalated") is True else count + 1
++    return count
++
++
++def _notice_text(identity: dict[str, Any], reasons: list[str], headline: str) -> str:
++    lines = [
++        headline,
++        f"trade_id: {identity['trade_id']}  symbol: {identity.get('symbol')}",
++    ]
++    if identity.get("incident_id"):
++        lines.append(f"incident_id: {identity['incident_id']}")
++    lines.append("原因：")
++    lines += [f"- {reason}" for reason in reasons]
++    return "\n".join(lines)
+diff --git a/src/trade_alerts/verified_close_backfill.py b/src/trade_alerts/verified_close_backfill.py
+index ebb779f..9395868 100644
+--- a/src/trade_alerts/verified_close_backfill.py
++++ b/src/trade_alerts/verified_close_backfill.py
+@@ -32,8 +32,11 @@ evidence first, only append after an explicit second step.
+      ``trade_close`` / ``position_reconciled_closed`` events via the injected
+      ``ledger_append``.
+ 
+-Consumers: ``mexc-4h-momentum-trailing-stop`` (Binance today); ``ed-seykota``
+-and ``my-crypto-bot`` planned.
++Consumers: ``trade_alerts.repair_runner`` (the unattended path, which drives
++stages 0-2 plus ``assess_repair`` for each strategy's adapter), and each
++strategy's manual tools (``fetch_verified_close_evidence.py`` /
++``append_reconciled_close.py``) -- momentum and seykota on Binance today,
++my-crypto's estimated-close tool as a calculator.
+ """
+ from __future__ import annotations
+ 
+@@ -83,15 +86,59 @@ def _epoch_ms_to_iso(epoch_ms: int) -> str:
+ # stage 1: build evidence from a local trade_open + exchange fills
+ # --------------------------------------------------------------------------- #
+ def find_open_event(events: list[dict[str, Any]], trade_id: str) -> dict[str, Any]:
+-    """The most recent ``trade_open`` for ``trade_id``. Refuses if the trade
+-    already has a ``trade_close`` -- this tool is only for a genuinely missing
+-    close, never a second opinion on an existing one."""
++    """The ``trade_open`` for ``trade_id``, folded into one entry leg when the
++    strategy pyramids. Refuses if the trade already has a ``trade_close`` --
++    this tool is only for a genuinely missing close, never a second opinion on
++    an existing one.
++
++    A strategy that adds to a position (seykota) writes one more
++    ``trade_open`` per add under the same ``trade_id``, each carrying only
++    that leg's ``volume``/``price``/``fee``. The exchange's closing fills
++    close the whole position, so the evidence has to be built against the
++    whole position: volumes and fees summed, the entry price volume-weighted,
++    and the earliest ``event_epoch_ms`` -- the fetch window must reach back to
++    the first leg, not the last. A single open (momentum, or seykota without
++    adds) is returned unchanged.
++    """
+     opens = [e for e in events if e.get("event_type") == "trade_open" and e.get("trade_id") == trade_id]
+     if not opens:
+         raise VerifiedCloseError(f"no trade_open in the ledger for trade_id {trade_id}")
+     if any(e.get("event_type") == "trade_close" and e.get("trade_id") == trade_id for e in events):
+         raise VerifiedCloseError(f"trade_id {trade_id} already has a trade_close -- nothing to back-fill")
+-    return opens[-1]
++    if len(opens) == 1:
++        return opens[0]
++    return _fold_open_legs(opens)
++
++
++def _fold_open_legs(opens: list[dict[str, Any]]) -> dict[str, Any]:
++    for key in ("symbol", "side"):
++        values = {str(leg.get(key)) for leg in opens}
++        if len(values) != 1:
++            raise VerifiedCloseError(
++                f"the trade_open legs of trade_id {opens[0].get('trade_id')} disagree on {key} "
++                f"({sorted(values)}); refusing to fold them into one position"
++            )
++    volumes = [_as_decimal(leg["volume"], field="open_event.volume") for leg in opens]
++    volume = sum(volumes, Decimal("0"))
++    if volume <= 0:
++        raise VerifiedCloseError("the trade_open legs sum to a non-positive volume")
++    price = sum(
++        (_as_decimal(leg["price"], field="open_event.price") * leg_volume
++         for leg, leg_volume in zip(opens, volumes)),
++        Decimal("0"),
++    ) / volume
++    fee = sum((_as_decimal(leg.get("fee") or "0", field="open_event.fee") for leg in opens), Decimal("0"))
++    epochs = [int(leg.get("event_epoch_ms") or 0) for leg in opens]
++    return {
++        **opens[0],
++        "volume": str(volume),
++        "price": str(price),
++        "fee": str(fee),
++        # 0 (unknown) on any leg makes the whole window unknown, never "the
++        # other legs' minimum" -- callers refuse a trade_open without it.
++        "event_epoch_ms": min(epochs) if all(epochs) else 0,
++        "open_leg_count": len(opens),
++    }
+ 
+ 
+ def build_evidence(
+@@ -132,6 +179,12 @@ def build_evidence(
+ 
+     deals: list[dict[str, Any]] = []
+     exit_volume = Decimal("0")
++    # A fill the adapter could not attach realized P&L to is recorded as 0,
++    # as before -- but then the summed exchange_profit is not the exchange's
++    # word on this close, and build_repair_events must not treat it as the
++    # authority. Flagged only when it happens, so evidence built from a
++    # complete exchange response is unchanged.
++    profit_unreported = any(f.get("realized_pnl") is None for f in sell_fills)
+     for f in sorted(sell_fills, key=lambda r: int(r.get("time_ms") or 0)):
+         qty = _as_decimal(f.get("quantity"), field="fill.quantity")
+         deals.append({
+@@ -165,6 +218,16 @@ def build_evidence(
+     exchange_profit = sum((Decimal(d["profit"]) for d in deals), Decimal("0"))
+     artifact_sha256 = hashlib.sha256(_canonical(sorted(deals, key=lambda d: d["deal_id"])).encode()).hexdigest()
+ 
++    close: dict[str, Any] = {
++        "order_id": str(last.get("order_id")),
++        "occurred_at": occurred_at,
++        "exchange_profit": str(exchange_profit),
++        "originating_trailing_order_id": trailing_order_id,
++        "deals": deals,
++        "method": method,
++    }
++    if profit_unreported:
++        close["exchange_profit_reported"] = False
+     return {
+         "audit_schema_version": _SCHEMA_VERSION,
+         "incident_id": f"{incident_prefix}-{str(open_event['trade_id'])[:12]}",
+@@ -183,14 +246,7 @@ def build_evidence(
+                 "volume": str(entry_volume),
+                 "fee": str(_as_decimal(open_event.get("fee") or "0", field="open_event.fee")),
+             },
+-            "close": {
+-                "order_id": str(last.get("order_id")),
+-                "occurred_at": occurred_at,
+-                "exchange_profit": str(exchange_profit),
+-                "originating_trailing_order_id": trailing_order_id,
+-                "deals": deals,
+-                "method": method,
+-            },
++            "close": close,
+         },
+     }
+ 
+@@ -255,8 +311,44 @@ def incident_traces(events: list[dict[str, Any]], *, incident_id: str) -> list[d
+     ]
+ 
+ 
+-def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+-    """Build deterministic append-only events from verified exchange evidence."""
++#: Default ceiling, in quote currency, on how far our own gross P&L may sit
++#: from the exchange's reported realized P&L before the exchange's figure is
++#: written instead of ours (fleet-error-catalog/v2: the exchange is the
++#: authority).
++#:
++#: Note this is *not* a bound on ``reconciliation_delta`` itself. Phase 4e
++#: measured that delta to be exactly ``-(entry_fee + exit_fee)`` on every real
++#: sample -- for a typical trade that is ~0.5 USDT, so bounding it directly by
++#: a small number would reject every genuine repair. What a human actually
++#: checks by eye is the part the fees do not explain: ``gross_pnl`` against the
++#: exchange's own ``realized_pnl``. Those two describe the same quantity from
++#: two sources, so anything past rounding noise means the evidence and the
++#: local arithmetic disagree about what happened -- and the exchange wins.
++#: The bound is absolute, not a fraction of notional: both sides are Decimal
++#: sums over the same deals, so an agreeing exchange yields a residual of
++#: exactly zero at any position size; the slack only absorbs exchange-side
++#: rounding of each fill's realized P&L. The bound is inclusive.
++DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL = Decimal("0.01")
++
++
++def build_repair_events(
++    evidence: dict[str, Any],
++    *,
++    max_exchange_pnl_residual: Decimal = DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL,
++) -> list[tuple[str, dict[str, Any]]]:
++    """Build deterministic append-only events from verified exchange evidence.
++
++    P&L follows the exchange when the two sources disagree. Our gross P&L is
++    recomputed from the deals; when it sits more than
++    ``max_exchange_pnl_residual`` from the exchange's own realized P&L (and the
++    exchange reported one for every deal), ``gross_pnl`` is the exchange's
++    figure, ``net_pnl`` / ``return_on_margin`` follow from it, and the
++    ``reconciliation`` block records ``pnl_source: "exchange_realized"`` with
++    our figure and the gap, so the override is visible on every repair row.
++    Within the tolerance the rows are exactly what they always were. This is
++    the single place that decides it, so the manual flow
++    (``append_repair``) and the repair runner write identical rows.
++    """
+     source = evidence["source"]
+     trade = evidence["trade"]
+     entry = trade["entry"]
+@@ -291,6 +383,14 @@ def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, A
+     closing_side = str(deals[0].get("exchange_side") or "").upper()
+     direction = Decimal("-1") if closing_side == "BUY" else Decimal("1")
+     gross_pnl = direction * (exit_price - entry_price) * exit_volume * contract_size
++    local_gross_pnl = gross_pnl
++    exchange_pnl_residual = abs(gross_pnl - exchange_profit)
++    exchange_is_authority = (
++        close.get("exchange_profit_reported") is not False
++        and exchange_pnl_residual > max_exchange_pnl_residual
++    )
++    if exchange_is_authority:
++        gross_pnl = exchange_profit
+     total_fees = entry_fee + exit_fee
+     net_pnl = gross_pnl - total_fees
+     margin = entry_price * entry_volume * contract_size / Decimal(leverage) if leverage else Decimal("0")
+@@ -304,6 +404,10 @@ def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, A
+         "exchange_occurred_at": close["occurred_at"],
+         "originating_trailing_order_id": close["originating_trailing_order_id"],
+     }
++    if exchange_is_authority:
++        reconciliation["pnl_source"] = "exchange_realized"
++        reconciliation["local_gross_pnl"] = float(local_gross_pnl)
++        reconciliation["exchange_pnl_residual"] = float(exchange_pnl_residual)
+     common = {
+         "trade_id": trade["trade_id"],
+         "symbol": evidence["symbol"],
+@@ -383,8 +487,7 @@ def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, A
+ 
+ 
+ # --------------------------------------------------------------------------- #
+-# stage 0 (Phase 5 repair-bot shadow mode): detect candidates + render a
+-# human-readable proposal, both pure -- neither function writes anything.
++# stage 0: detect candidates (pure -- writes nothing)
+ # --------------------------------------------------------------------------- #
+ def detect_repair_candidates(
+     ledger_status: dict[str, Any],
+@@ -407,7 +510,8 @@ def detect_repair_candidates(
+     symbol, so a single candidate per symbol is unambiguous. A symbol with
+     zero or more than one still-open ``trade_id`` is skipped rather than
+     guessed at -- shadow mode logs what it can act on, it never picks
+-    between two plausible answers.
++    between two plausible answers. Several ``trade_open`` legs under one
++    ``trade_id`` (a pyramided position) count as that one trade.
+     """
+     if ledger_status.get("value") != "DIVERGED":
+         return []
+@@ -416,7 +520,9 @@ def detect_repair_candidates(
+     if not diff_symbols:
+         return []
+ 
+-    open_by_symbol: dict[str, list[str]] = {}
++    # dict-as-ordered-set: a pyramiding strategy writes one trade_open per
++    # add under the same trade_id, and that is still one open trade.
++    open_by_symbol: dict[str, dict[str, None]] = {}
+     closed_trade_ids: set[str] = set()
+     for event in ledger_events:
+         trade_id = event.get("trade_id")
+@@ -424,136 +530,118 @@ def detect_repair_candidates(
+             continue
+         event_type = event.get("event_type")
+         if event_type == "trade_open":
+-            open_by_symbol.setdefault(norm_symbol(event.get("symbol")), []).append(str(trade_id))
++            open_by_symbol.setdefault(norm_symbol(event.get("symbol")), {})[str(trade_id)] = None
+         elif event_type == "trade_close":
+             closed_trade_ids.add(str(trade_id))
+ 
+     candidates: list[str] = []
+     for symbol in sorted(diff_symbols):
+-        still_open = [tid for tid in open_by_symbol.get(symbol, []) if tid not in closed_trade_ids]
++        still_open = [tid for tid in open_by_symbol.get(symbol, {}) if tid not in closed_trade_ids]
+         if len(still_open) == 1:
+             candidates.append(still_open[0])
+     return candidates
+ 
+ 
+-def render_repair_proposal_text(
+-    evidence: dict[str, Any],
+-    repair_events: list[tuple[str, dict[str, Any]]],
+-    *,
+-    project: str,
+-) -> str:
+-    """Render a computed verified-close-backfill repair as a human-readable
+-    notification body -- v1 R1 ``PROPOSE`` semantics (§2 of the fleet error
+-    catalog): the notification carries the already-computed fix as a
+-    proposal, and nothing in this module ever executes it. Shadow mode
+-    passes this text straight to ``AlertDispatcher.publish``; nothing here
+-    talks to a notification channel."""
+-    trade_close = next(fields for event_type, fields in repair_events if event_type == "trade_close")
+-    reconciliation = trade_close["reconciliation"]
+-    lines = [
+-        f"[{project}] verified-close-backfill 提案（僅記錄事件日誌，未寫入帳本，需人工核准）",
+-        f"incident_id: {evidence['incident_id']}",
+-        f"trade_id: {trade_close['trade_id']}  symbol: {trade_close['symbol']}",
+-        f"數量: {trade_close['entry_volume']}  進場價: {trade_close['entry_price']}"
+-        f"  出場價: {trade_close['exit_price']}",
+-        f"手續費合計: {trade_close['total_fees']:.6f}",
+-        f"本地淨損益: {trade_close['net_pnl']:.6f}  交易所毛損益: {trade_close['exchange_profit']:.6f}"
+-        f"  差額: {trade_close['reconciliation_delta']:.6f}",
+-        f"證據來源: {reconciliation['method']}",
+-        f"平倉時間 (UTC): {trade_close['closed_at']}",
+-    ]
+-    return "\n".join(lines)
+-
+-
+ # --------------------------------------------------------------------------- #
+-# Phase 6: is this repair unambiguous enough to write without a human?
++# fleet-error-catalog/v2: can this repair be written, and if not, why not?
+ # --------------------------------------------------------------------------- #
+-#: Default ceiling, in quote currency, on how far our own gross P&L may sit
+-#: from the exchange's reported realized P&L.
+-#:
+-#: Note this is *not* a bound on ``reconciliation_delta`` itself. Phase 4e
+-#: measured that delta to be exactly ``-(entry_fee + exit_fee)`` on every real
+-#: sample -- for a typical trade that is ~0.5 USDT, so bounding it directly by
+-#: a small number would reject every genuine repair. What a human actually
+-#: checks by eye is the part the fees do not explain: ``gross_pnl`` against the
+-#: exchange's own ``realized_pnl``. Those two describe the same quantity from
+-#: two sources, so anything past rounding noise means the evidence and the
+-#: local arithmetic disagree about what happened -- and that is a human's call.
+-#: The bound is absolute, not a fraction of notional: both sides are Decimal
+-#: sums over the same deals, so an agreeing exchange yields a residual of
+-#: exactly zero at any position size; the slack only absorbs exchange-side
+-#: rounding of each fill's realized P&L. The bound is inclusive.
+-DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL = Decimal("0.01")
++#: ``assess_repair`` verdicts. ``repair``: write it (R1). ``unmappable``: the
++#: evidence does not line up with the ledger's trade -- count one failed
++#: attempt (R2). ``halt``: the ledger already carries part of a repair for
++#: this trade, so writing anything would be a guess -- stop (R3).
++REPAIR = "repair"
++UNMAPPABLE = "unmappable"
++HALT = "halt"
+ 
++_CLOSING_SIDE = {"long": "SELL", "buy": "SELL", "short": "BUY", "sell": "BUY"}
+ 
+-def assess_auto_repair(
++
++def expected_closing_side(open_event: dict[str, Any], *, default_position_side: str = "long") -> str | None:
++    """``SELL`` for a long ``trade_open``, ``BUY`` for a short one; ``None``
++    when the recorded side is something else. A ``trade_open`` without a side
++    at all falls back to ``default_position_side`` (the strategy's adapter
++    says what it trades), never to a guess."""
++    raw = open_event.get("side")
++    side = str(raw if raw not in (None, "") else default_position_side).strip().lower()
++    return _CLOSING_SIDE.get(side)
++
++
++def assess_repair(
+     evidence: dict[str, Any],
+     ledger_events: list[dict[str, Any]],
+     *,
+-    candidate_count: int,
+-    still_open_checked: bool,
++    default_position_side: str = "long",
+     max_exchange_pnl_residual: Decimal = DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL,
+ ) -> dict[str, Any]:
+-    """Decide whether one computed repair is unambiguous enough to append
+-    without a human, returning ``{"eligible", "blockers", "checks"}``.
+-
+-    This is the single place that answers that question -- callers must not
+-    assemble their own version of it. It never raises on a "no": an input that
+-    cannot be assessed is a blocker, because every blocker means the same
+-    thing, which is fall back to proposing rather than doing.
++    """Decide what the repair runner does with one freshly fetched evidence
++    dict, returning ``{"verdict", "reasons", "checks"}``.
++
++    This is the single place that answers the question -- callers must not
++    assemble their own version of it. It never raises: an input that cannot be
++    assessed is itself a reason.
++
++    What is *not* a reason any more (v1 treated all three as "ask a human"):
++    other candidates this round (the runner repairs them one per round, in
++    order), a P&L gap to the exchange (``build_repair_events`` writes the
++    exchange's figure), and a short position (the closing side is derived
++    from the ``trade_open``). What remains is structural -- the fills cannot
++    be this trade's close -- or a ledger that is no longer clean.
+     """
+-    blockers: list[str] = []
++    unmappable: list[str] = []
++    halt: list[str] = []
+     checks: dict[str, Any] = {}
+ 
+-    checks["candidate_count"] = candidate_count
+-    if candidate_count != 1:
+-        blockers.append(
+-            f"{candidate_count} repair candidates this round -- more than one divergence at "
+-            "once means something else is wrong, and neither is safe to fix unattended"
+-        )
+-
+-    checks["still_open_checked"] = bool(still_open_checked)
+-    if not still_open_checked:
+-        blockers.append("the exchange was not confirmed flat for this symbol")
+-
+     trade = evidence.get("trade") or {}
+     close = trade.get("close") or {}
+     deals = close.get("deals") or []
+     trade_id = trade.get("trade_id")
+     incident_id = evidence.get("incident_id")
+ 
+-    sides = {str(deal.get("exchange_side") or "").upper() for deal in deals}
+-    checks["closing_sides"] = sorted(sides)
+-    if sides != {"SELL"}:
+-        blockers.append(
+-            f"closing fills are not unambiguously long-side SELL ({sorted(sides)}) -- "
+-            "auto-repair is long-only, a short's P&L sign is not decided here"
++    # Identity first: without both ids the trace and close checks below cannot
++    # run, and a check that cannot run must refuse rather than pass by silence.
++    if not trade_id:
++        unmappable.append("evidence carries no trade_id, so the ledger cannot be checked for this trade")
++    if not incident_id:
++        unmappable.append("evidence carries no incident_id, so the ledger cannot be checked for repair traces")
++
++    opens = [
++        event for event in ledger_events
++        if event.get("event_type") == "trade_open" and trade_id and str(event.get("trade_id")) == str(trade_id)
++    ]
++    if trade_id and not opens:
++        unmappable.append("the ledger has no trade_open for this trade_id")
++
++    expected = None
++    if opens:
++        sides = {expected_closing_side(event, default_position_side=default_position_side) for event in opens}
++        if len(sides) == 1 and None not in sides:
++            expected = sides.pop()
++        else:
++            unmappable.append(f"the trade_open side cannot be read as long or short ({sorted(map(str, sides))})")
++    closing_sides = {str(deal.get("exchange_side") or "").upper() for deal in deals}
++    checks["expected_closing_side"] = expected
++    checks["closing_sides"] = sorted(closing_sides)
++    if expected and closing_sides != {expected}:
++        unmappable.append(
++            f"closing fills are {sorted(closing_sides)} but this position closes with {expected} -- "
++            "these fills are not this trade's close"
+         )
+ 
+-    open_epoch_ms = 0
+-    for event in ledger_events:
+-        if event.get("event_type") == "trade_open" and str(event.get("trade_id")) == str(trade_id):
+-            open_epoch_ms = int(event.get("event_epoch_ms") or 0)
++    epochs = [int(event.get("event_epoch_ms") or 0) for event in opens]
++    open_epoch_ms = min(epochs) if epochs and all(epochs) else 0
+     deal_times = [int(deal.get("time_ms") or 0) for deal in deals]
+     checks["earliest_deal_ms"] = min(deal_times) if deal_times else None
+     checks["trade_open_ms"] = open_epoch_ms or None
+     if not deal_times or not all(deal_times):
+-        blockers.append("evidence predates per-deal timestamps, so the fetch window cannot be verified")
+-    elif not open_epoch_ms:
+-        blockers.append("the trade_open carries no event_epoch_ms to bound the fetch window against")
+-    elif min(deal_times) < open_epoch_ms:
+-        blockers.append(
++        unmappable.append("evidence has deals without a timestamp, so the fetch window cannot be verified")
++    elif opens and not open_epoch_ms:
++        unmappable.append("a trade_open carries no event_epoch_ms to bound the fetch window against")
++    elif open_epoch_ms and min(deal_times) < open_epoch_ms:
++        unmappable.append(
+             "a closing fill predates the trade_open, so the fetch window caught a fill "
+             "belonging to some earlier position"
+         )
+ 
+-    # Identity first: without both ids the trace and close checks below cannot
+-    # run, and a check that cannot run must block rather than pass by silence.
+-    if not trade_id:
+-        blockers.append("evidence carries no trade_id, so the ledger cannot be checked for this trade")
+-    if not incident_id:
+-        blockers.append("evidence carries no incident_id, so the ledger cannot be checked for repair traces")
+-
+     traces = incident_traces(ledger_events, incident_id=str(incident_id)) if incident_id else []
+     # Also any reconciliation-carrying event for this trade under *another*
+     # incident_id: a differently-labelled earlier repair is still a repair.
+@@ -567,39 +655,33 @@ def assess_auto_repair(
+     checks["incident_trace_count"] = len(traces)
+     checks["other_repair_trace_count"] = len(trade_traces)
+     if traces:
+-        blockers.append(
++        halt.append(
+             f"{len(traces)} ledger events already carry this incident_id -- a previous repair "
+             "left traces; do not write the rest of it on a guess"
+         )
+     if trade_traces:
+-        blockers.append(
++        halt.append(
+             f"{len(trade_traces)} ledger events for this trade carry a different repair's "
+             "reconciliation record -- an earlier repair under another incident_id"
+         )
+     if trade_id and _existing_close(ledger_events, trade_id=str(trade_id)):
+-        blockers.append("the trade already has a trade_close")
++        unmappable.append("the trade already has a trade_close")
+ 
+     try:
+-        repair_events = build_repair_events(evidence)
+-    except (VerifiedCloseError, KeyError, TypeError) as exc:
+-        blockers.append(f"the repair does not compute cleanly: {exc}")
++        repair_events = build_repair_events(evidence, max_exchange_pnl_residual=max_exchange_pnl_residual)
++    except (VerifiedCloseError, KeyError, TypeError, ValueError) as exc:
++        unmappable.append(f"the repair does not compute cleanly: {exc}")
+         repair_events = []
+-
+     if repair_events:
+         trade_close = next(fields for event_type, fields in repair_events if event_type == "trade_close")
+-        gross_pnl = _as_decimal(trade_close["gross_pnl"], field="gross_pnl")
+-        exchange_profit = _as_decimal(trade_close["exchange_profit"], field="exchange_profit")
+-        residual = abs(gross_pnl - exchange_profit)
+         checks["reconciliation_delta"] = str(trade_close["reconciliation_delta"])
+-        checks["exchange_pnl_residual"] = str(residual)
+-        checks["max_exchange_pnl_residual"] = str(max_exchange_pnl_residual)
+-        if residual > max_exchange_pnl_residual:
+-            blockers.append(
+-                f"our gross P&L and the exchange's realized P&L differ by {residual}, past the "
+-                f"{max_exchange_pnl_residual} tolerance -- the two sources disagree about this close"
+-            )
++        checks["pnl_source"] = trade_close["reconciliation"].get("pnl_source", "local")
+ 
+-    return {"eligible": not blockers, "blockers": blockers, "checks": checks}
++    if halt:
++        return {"verdict": HALT, "reasons": halt + unmappable, "checks": checks}
++    if unmappable:
++        return {"verdict": UNMAPPABLE, "reasons": unmappable, "checks": checks}
++    return {"verdict": REPAIR, "reasons": [], "checks": checks}
+ 
+ 
+ def append_repair_from_evidence(
+diff --git a/tests/test_repair_runner.py b/tests/test_repair_runner.py
+new file mode 100644
+index 0000000..b86e119
+--- /dev/null
++++ b/tests/test_repair_runner.py
+@@ -0,0 +1,537 @@
++"""The shared verified-close repair runner (fleet-error-catalog/v2).
++
++Every test drives ``run_repair_round`` end to end against files in a temp
++directory, with a fake adapter in place of the exchange: what is asserted is
++what lands in the ledger, the fleet event log, the request queue and
++``ops_export.json`` -- the four things a strategy host actually keeps.
++"""
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import pytest
++
++from trade_alerts import (
++    RUNNER_CODES,
++    PositionStillOpen,
++    RepairAdapter,
++    RepairPaths,
++    build_evidence,
++    catalog_entry,
++    find_open_event,
++    load_error_catalog,
++    outstanding_error_requests,
++    pause_env_name,
++    read_fleet_events,
++    read_ledger,
++    record_request_outcome,
++    repair_paused,
++    run_repair_round,
++)
++from trade_alerts import repair_runner
++from trade_alerts.fleet_event_log import FleetEventLogError
++
++OPENED_MS = 1788408032535
++
++
++def _open(trade_id="T1", symbol="PUFFER_USDT", side="long"):
++    return {
++        "event_id": f"open-{trade_id}", "event_type": "trade_open", "trade_id": trade_id, "symbol": symbol,
++        "side": side, "volume": 27376.0, "price": 0.0183, "fee": 0.2504904, "contract_size": 1.0, "leverage": 3,
++        "event_epoch_ms": OPENED_MS,
++    }
++
++
++def _fill(*, realized_pnl="-23.81712", side="sell", time_ms=OPENED_MS + 2_400_000):
++    return {"trade_id": "900", "order_id": "222798734", "price": "0.01743", "quantity": "27376",
++            "commission": "0.23858184", "realized_pnl": realized_pnl, "time_ms": time_ms, "side": side}
++
++
++class _Ledger:
++    """A strategy's own ledger writer: one JSON line per append."""
++
++    def __init__(self, path):
++        self.path = Path(path)
++
++    def append(self, event_type, **fields):
++        event_id = f"{event_type}-{fields.get('trade_id')}"
++        with self.path.open("a", encoding="utf-8") as handle:
++            handle.write(json.dumps({"event_id": event_id, "event_type": event_type, "writer": "strategy",
++                                     **fields}) + "\n")
++        return event_id
++
++
++class _Exchange:
++    """Fake adapter. ``script[trade_id]`` is a list consumed one item per
++    fetch: a list of fills, ``"open"`` (still holding the position), or an
++    exception instance to raise. The last item repeats."""
++
++    def __init__(self, ledger_path, script):
++        self.ledger_path = ledger_path
++        self.script = script
++        self.fetches: list[str] = []
++        self.projections: list[str] = []
++        self.projection_error: Exception | None = None
++        self.staging_error: Exception | None = None
++
++    def fetch(self, trade_id):
++        self.fetches.append(trade_id)
++        steps = self.script[trade_id]
++        step = steps.pop(0) if len(steps) > 1 else steps[0]
++        if step == "open":
++            raise PositionStillOpen(f"{trade_id} still open")
++        if isinstance(step, Exception):
++            raise step
++        return build_evidence(
++            open_event=find_open_event(read_ledger(self.ledger_path), trade_id), sell_fills=step,
++            trailing_order_id=None, artifact_name="binance_user_trades:PUFFERUSDT",
++            method="read_only_binance_user_trades",
++        )
++
++    def staging(self, path):
++        if self.staging_error is not None:
++            raise self.staging_error
++        return _Ledger(path).append
++
++    def project(self, trade_id):
++        if self.projection_error is not None:
++            raise self.projection_error
++        self.projections.append(trade_id)
++        return f"intent-{trade_id}"
++
++    def adapter(self, project="momentum"):
++        return RepairAdapter(project=project, fetch_evidence=self.fetch, staging_ledger=self.staging,
++                             queue_projection=self.project)
++
++
++@pytest.fixture
++def host(tmp_path):
++    audit = tmp_path / "audit"
++    audit.mkdir()
++    paths = RepairPaths(
++        ledger=str(audit / "trading_ledger.jsonl"), ledger_status=str(audit / "ledger_status.json"),
++        fleet_event_log=str(audit / "fleet_event_log.jsonl"), request_queue=str(audit / "error_requests.jsonl"),
++        evidence_dir=str(audit / "verified-close-evidence"), ops_export=str(audit / "ops_export.json"),
++    )
++    return paths
++
++
++def _seed(paths, *opens):
++    with open(paths.ledger, "a", encoding="utf-8") as handle:
++        for event in opens:
++            handle.write(json.dumps(event) + "\n")
++    Path(paths.ledger_status).write_text(json.dumps({
++        "value": "DIVERGED",
++        "evidence": {"position_diffs": [{"symbol": event["symbol"]} for event in opens]},
++    }), encoding="utf-8")
++
++
++def _events(paths, code=None):
++    return [event for event in read_fleet_events(paths.fleet_event_log) if code is None or event["code"] == code]
++
++
++def _export(paths):
++    return json.loads(Path(paths.ops_export).read_text(encoding="utf-8"))
++
++
++def _round(exchange, paths, **kwargs):
++    kwargs.setdefault("paused", False)
++    return run_repair_round(exchange.adapter(kwargs.pop("project", "momentum")), paths, **kwargs)
++
++
++FAILED, REPAIRED, BLOCKED = "VERIFIED_CLOSE_REPAIR_FAILED", "VERIFIED_CLOSE_AUTO_REPAIRED", "VERIFIED_CLOSE_REPAIR_BLOCKED"
++WRONG_SIDE = [_fill(side="buy")]  # a long closed by a BUY: structurally not this trade's close
++
++
++# --------------------------------------------------------------------------- #
++# R1: repaired, silently
++# --------------------------------------------------------------------------- #
++def test_a_clean_orphan_is_written_through_the_strategys_writer_and_nobody_is_told(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
++
++    result = _round(exchange, host)
++
++    assert [item["trade_id"] for item in result["repaired"]] == ["T1"]
++    rows = read_ledger(host.ledger)
++    assert [row["event_type"] for row in rows] == [
++        "trade_open", "reconciliation_evidence_recorded", "fill", "trade_close", "position_reconciled_closed",
++    ]
++    assert all(row["writer"] == "strategy" for row in rows[1:])
++    assert exchange.projections == ["T1"]
++    [event] = _events(host)
++    assert (event["code"], event["risk_tier"]) == (REPAIRED, "R1")
++    assert event["details"]["pnl_source"] == "local"
++    assert event["measurements"]["net_pnl"] == rows[3]["net_pnl"]
++    assert list(Path(host.evidence_dir).glob("T1-*.json"))
++    assert outstanding_error_requests(host.request_queue) == []   # R1 never opens a request
++    assert _export(host)["notices"] == []
++
++
++def test_a_pnl_disagreement_is_written_with_the_exchanges_figure(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [[_fill(realized_pnl="-20.0")]]})
++
++    _round(exchange, host)
++
++    close = read_ledger(host.ledger)[3]
++    assert close["gross_pnl"] == -20.0
++    assert close["reconciliation"]["pnl_source"] == "exchange_realized"
++    [event] = _events(host)
++    assert event["details"]["pnl_source"] == "exchange_realized"
++    assert event["details"]["local_gross_pnl"] == close["reconciliation"]["local_gross_pnl"]
++    assert _export(host)["notices"] == []
++
++
++def test_a_short_position_is_repaired_with_a_buy_close(host):
++    _seed(host, _open(side="short"))
++    exchange = _Exchange(host.ledger, {"T1": [[_fill(side="buy", realized_pnl="23.81712")]]})
++
++    assert [item["trade_id"] for item in _round(exchange, host)["repaired"]] == ["T1"]
++
++
++def test_a_failed_projection_does_not_undo_the_repair(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
++    exchange.projection_error = RuntimeError("outbox locked")
++
++    result = _round(exchange, host)
++
++    assert result["repaired"][0]["projection"] == {"error": "RuntimeError: outbox locked"}
++    assert _events(host)[0]["details"]["projection"]["error"] == "RuntimeError: outbox locked"
++    assert _export(host)["notices"] == []
++
++
++# --------------------------------------------------------------------------- #
++# ordering: one write per round, several orphans in turn
++# --------------------------------------------------------------------------- #
++def test_several_orphans_are_repaired_one_per_round_in_order(host):
++    _seed(host, _open("T1", "AAA_USDT"), _open("T2", "BBB_USDT"))
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]], "T2": [[_fill()]]})
++
++    first = _round(exchange, host)
++    assert [item["trade_id"] for item in first["repaired"]] == ["T1"]
++    assert first["deferred"] == ["T2"]
++    assert exchange.fetches == ["T1"]          # the deferred one is not even queried
++
++    second = _round(exchange, host)
++    assert [item["trade_id"] for item in second["repaired"]] == ["T2"]
++    assert second["candidates"] == ["T2"]
++
++
++def test_a_failing_orphan_does_not_hold_up_the_next_one(host):
++    _seed(host, _open("T1", "AAA_USDT"), _open("T2", "BBB_USDT"))
++    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE], "T2": [[_fill()]]})
++
++    result = _round(exchange, host)
++
++    assert [item["trade_id"] for item in result["failed"]] == ["T1"]
++    assert [item["trade_id"] for item in result["repaired"]] == ["T2"]
++
++
++def test_a_position_still_open_is_not_a_failure(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": ["open"]})
++
++    for _ in range(5):
++        result = _round(exchange, host)
++
++    assert result["still_open"] == [{"trade_id": "T1", "reason": "T1 still open"}]
++    assert _events(host) == []
++    assert outstanding_error_requests(host.request_queue) == []
++
++
++# --------------------------------------------------------------------------- #
++# R2: retry, escalate once on the Nth consecutive failure
++# --------------------------------------------------------------------------- #
++def test_structural_failures_escalate_on_the_third_and_notify_exactly_once(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE]})
++
++    for expected_attempt in (1, 2):
++        result = _round(exchange, host)
++        assert result["failed"][0]["attempt"] == expected_attempt
++        assert _export(host)["notices"] == []
++    third = _round(exchange, host)
++
++    assert third["escalated"][0]["attempt"] == 3
++    events = _events(host, FAILED)
++    assert [event["details"]["escalated"] for event in events] == [False, False, True]
++    assert {event["risk_tier"] for event in events} == {"R2"}
++    [request] = outstanding_error_requests(host.request_queue)
++    assert (request["code"], request["risk_tier"]) == (FAILED, "R2")
++    assert events[-1]["details"]["request_id"] == request["request_id"]
++    [notice] = _export(host)["notices"]
++    assert notice["code"] == "MOM.VERIFIED_CLOSE_REPAIR_FAILED" and notice["critical"] is False
++    assert "給 AI 的追查指令" in notice["text"]
++    assert "not this trade's close" in notice["text"]
++
++    # rounds 4 and 5 keep trying, silently
++    for _ in range(2):
++        later = _round(exchange, host)
++        assert later["failed"][0]["silent"] is True
++    assert len(_events(host, FAILED)) == 3
++    assert len(_export(host)["notices"]) == 1
++    assert len(outstanding_error_requests(host.request_queue)) == 1
++
++
++def test_an_exchange_that_cannot_be_queried_counts_as_a_failure(host):
++    """Decision B (2026-09-22): otherwise a broken API key would never reach
++    anyone."""
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [ConnectionError("api.binance.com timed out")]})
++
++    for _ in range(3):
++        result = _round(exchange, host)
++
++    assert result["escalated"][0]["reasons"] == ["evidence fetch failed: ConnectionError: api.binance.com timed out"]
++    assert len(_export(host)["notices"]) == 1
++
++
++def test_a_still_open_round_neither_counts_nor_resets(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE, "open", WRONG_SIDE, WRONG_SIDE]})
++
++    outcomes = [_round(exchange, host) for _ in range(4)]
++
++    assert outcomes[1]["still_open"] and not outcomes[1]["failed"]
++    assert outcomes[3]["escalated"][0]["attempt"] == 3
++
++
++def test_a_later_success_after_escalating_closes_the_request_automatically(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE, WRONG_SIDE, WRONG_SIDE, [_fill()]]})
++
++    for _ in range(3):
++        _round(exchange, host)
++    result = _round(exchange, host)
++
++    assert [item["trade_id"] for item in result["repaired"]] == ["T1"]
++    assert result["closed_requests"][0]["status"] == "RESOLVED_AUTO"
++    assert outstanding_error_requests(host.request_queue) == []
++    assert _export(host)["open_requests"] == []
++
++
++def test_a_request_is_withdrawn_once_someone_writes_the_close_by_hand(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE]})
++    for _ in range(3):
++        _round(exchange, host)
++    with open(host.ledger, "a", encoding="utf-8") as handle:
++        handle.write(json.dumps({"event_type": "trade_close", "trade_id": "T1", "symbol": "PUFFER_USDT"}) + "\n")
++
++    result = _round(exchange, host)
++
++    assert result["closed_requests"] == [
++        {"request_id": result["closed_requests"][0]["request_id"], "code": FAILED, "trade_id": "T1",
++         "status": "WITHDRAWN"},
++    ]
++    assert result["candidates"] == []
++    assert outstanding_error_requests(host.request_queue) == []
++
++
++def test_after_a_request_closes_a_recurrence_counts_from_zero(host):
++    """Nothing but an escalation resets the count, so a trade whose request
++    was closed starts a fresh three-strike count if it diverges again."""
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE]})
++    for _ in range(3):
++        _round(exchange, host)
++    [request] = outstanding_error_requests(host.request_queue)
++    record_request_outcome(host.request_queue, request_id=request["request_id"], status="RESOLVED_HUMAN")
++
++    result = _round(exchange, host)
++
++    assert result["failed"][0]["attempt"] == 1
++    assert len(_export(host)["notices"]) == 1
++
++
++# --------------------------------------------------------------------------- #
++# R3: a ledger that is no longer clean, or a write that failed
++# --------------------------------------------------------------------------- #
++def _half_applied(incident_id="verified-close-backfill-T1"):
++    return {"event_type": "fill", "trade_id": "T1", "symbol": "PUFFER_USDT",
++            "reconciliation": {"incident_id": incident_id}}
++
++
++def test_repair_traces_in_the_ledger_stop_the_runner_for_good(host):
++    _seed(host, _open(), _half_applied())
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
++    before = Path(host.ledger).read_text(encoding="utf-8")
++
++    first = _round(exchange, host)
++
++    assert first["blocked"][0]["reason"] == "the ledger already carries repair records for this trade"
++    assert Path(host.ledger).read_text(encoding="utf-8") == before
++    [event] = _events(host)
++    assert (event["code"], event["risk_tier"]) == (BLOCKED, "R3")
++    [request] = outstanding_error_requests(host.request_queue)
++    assert (request["code"], request["risk_tier"]) == (BLOCKED, "R3")
++    [notice] = _export(host)["notices"]
++    assert notice["critical"] is True
++
++    second = _round(exchange, host)
++    assert second["awaiting_human"] == [{"trade_id": "T1", "request_id": request["request_id"]}]
++    assert exchange.fetches == ["T1"]           # never queried again
++    assert len(_events(host)) == 1
++
++
++def test_a_failed_batch_write_stops_and_leaves_the_ledger_untouched(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
++    exchange.staging_error = OSError("read-only file system")
++    before = Path(host.ledger).read_text(encoding="utf-8")
++
++    result = _round(exchange, host)
++
++    assert "ledger write failed" in result["blocked"][0]["reason"]
++    assert Path(host.ledger).read_text(encoding="utf-8") == before
++    assert _events(host)[0]["code"] == BLOCKED
++    assert exchange.projections == []
++
++
++def test_an_escalated_failure_that_turns_into_a_stop_is_superseded(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE, WRONG_SIDE, WRONG_SIDE, [_fill()]]})
++    for _ in range(3):
++        _round(exchange, host)
++    exchange.staging_error = OSError("disk full")
++
++    result = _round(exchange, host)
++
++    assert [item["status"] for item in result["closed_requests"]] == ["SUPERSEDED"]
++    [request] = outstanding_error_requests(host.request_queue)
++    assert request["code"] == BLOCKED
++
++
++def test_a_blocked_trade_is_withdrawn_once_the_close_is_in_the_ledger(host):
++    _seed(host, _open(), _half_applied())
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
++    _round(exchange, host)
++    with open(host.ledger, "a", encoding="utf-8") as handle:
++        handle.write(json.dumps({"event_type": "trade_close", "trade_id": "T1", "symbol": "PUFFER_USDT"}) + "\n")
++
++    result = _round(exchange, host)
++
++    assert [item["status"] for item in result["closed_requests"]] == ["WITHDRAWN"]
++    assert outstanding_error_requests(host.request_queue) == []
++
++
++# --------------------------------------------------------------------------- #
++# the brake, the export, configuration
++# --------------------------------------------------------------------------- #
++def test_paused_does_nothing_but_keep_the_export_fresh(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
++    before = Path(host.ledger).read_text(encoding="utf-8")
++
++    result = run_repair_round(exchange.adapter(), host, environ={"MOMENTUM_REPAIR_PAUSED": "true"})
++
++    assert result["paused"] is True
++    assert result["candidates"] == []
++    assert exchange.fetches == []
++    assert Path(host.ledger).read_text(encoding="utf-8") == before
++    assert _events(host) == []
++    assert result["ops_export_written"] is True
++    assert _export(host)["project"] == "momentum"
++
++
++@pytest.mark.parametrize("project, name", [
++    ("momentum", "MOMENTUM_REPAIR_PAUSED"), ("seykota", "SEYKOTA_REPAIR_PAUSED"),
++    ("mycrypto", "MYCRYPTO_REPAIR_PAUSED"), ("btc-competition", "BTC_COMPETITION_REPAIR_PAUSED"),
++])
++def test_one_brake_name_per_strategy(project, name):
++    assert pause_env_name(project) == name
++
++
++@pytest.mark.parametrize("value, paused", [("true", True), ("1", True), (" ON ", True), ("false", False),
++                                           ("", False), (None, False)])
++def test_brake_parsing(value, paused):
++    environ = {} if value is None else {"SEYKOTA_REPAIR_PAUSED": value}
++    assert repair_paused("seykota", environ) is paused
++
++
++def test_an_export_that_cannot_be_written_does_not_break_the_round(host, tmp_path):
++    _seed(host, _open())
++    blocker = tmp_path / "not-a-dir"
++    blocker.write_text("x", encoding="utf-8")
++    paths = RepairPaths(**{**host.__dict__, "ops_export": str(blocker / "ops_export.json")})
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
++
++    result = _round(exchange, paths)
++
++    assert result["repaired"] and result["ops_export_written"] is False
++
++
++def test_a_corrupt_event_log_stops_the_round_before_any_exchange_query(host):
++    """The log is evidence: a round that cannot read it must not act on a
++    partial view of what it already tried."""
++    _seed(host, _open())
++    Path(host.fleet_event_log).write_text("{not json\n", encoding="utf-8")
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
++
++    with pytest.raises(FleetEventLogError):
++        _round(exchange, host)
++    assert exchange.fetches == []
++
++
++def test_a_strategy_without_the_runner_codes_is_refused_before_anything_runs(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
++
++    with pytest.raises(FleetEventLogError, match="no catalog entry for BTC.VERIFIED_CLOSE_AUTO_REPAIRED"):
++        _round(exchange, host, project="btc-competition")
++    assert exchange.fetches == []
++    assert not Path(host.ops_export).exists()
++
++
++def test_seykota_runs_the_same_round(host):
++    """Pyramided entry, short side, seykota's own catalog codes."""
++    entry = {**_open(side="short"), "volume": 27375.0}
++    add = {**_open(side="short"), "event_id": "add-1", "volume": 1.0, "fee": 0.0,
++           "event_epoch_ms": OPENED_MS + 60_000}
++    _seed(host, entry, add)
++    exchange = _Exchange(host.ledger, {"T1": [[_fill(side="buy", realized_pnl="23.81712")]]})
++
++    result = _round(exchange, host, project="seykota")
++
++    assert [item["trade_id"] for item in result["repaired"]] == ["T1"]
++    assert _events(host)[0]["project"] == "seykota"
++    assert read_ledger(host.ledger)[-2]["entry_volume"] == 27376.0
++    assert _export(host)["project"] == "seykota"
++
++
++def test_the_runner_codes_are_catalogued_the_same_for_every_strategy_that_runs_it():
++    """The fleet rule: one capability, catalogued identically for each
++    strategy using it -- or the rollout register shows one strategy's repair
++    activity and hides the other's."""
++    catalog = load_error_catalog()
++    for code in RUNNER_CODES:
++        mom, sey = (catalog_entry(catalog, project, code) for project in ("momentum", "seykota"))
++        for key in ("verdict", "risk_tier", "resume"):
++            assert mom[key] == sey[key], (code, key)
++    tiers = {code: catalog_entry(catalog, "momentum", code)["risk_tier"] for code in RUNNER_CODES}
++    assert tiers == {REPAIRED: "R1", FAILED: "R2", BLOCKED: "R3"}
++
++
++def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
++    """Catalog entries emitted by the runner cite ``trade-alerts/...:line``;
++    an edit above that line would otherwise leave the citation pointing at
++    some other statement."""
++    root = Path(__file__).resolve().parents[1]
++    cited = 0
++    for entry in load_error_catalog()["entries"]:
++        bare = entry["code"].split(".", 1)[1]
++        for source in entry["sources"]:
++            if not source.startswith("trade-alerts/"):
++                continue
++            path, _, line = source[len("trade-alerts/"):].rpartition(":")
++            lines = (root / path).read_text(encoding="utf-8").splitlines()
++            call = " ".join(lines[int(line) - 1:int(line) + 2])
++            assert "append_fleet_event(" in call, source
++            constant = next(name for name, value in vars(repair_runner).items()
++                            if name.startswith("CODE_") and value == bare)
++            assert f"code={constant}" in call, source
++            cited += 1
++    assert cited == 6
+diff --git a/tests/test_verified_close_backfill.py b/tests/test_verified_close_backfill.py
+index ea6064b..a8cdaa3 100644
+--- a/tests/test_verified_close_backfill.py
++++ b/tests/test_verified_close_backfill.py
+@@ -15,7 +15,8 @@ import pytest
+ 
+ from trade_alerts import (
+     append_repair_from_evidence,
+-    assess_auto_repair,
++    assess_repair,
++    expected_closing_side,
+     incident_traces,
+     REPAIR_EVENT_TYPES,
+     VerifiedCloseError,
+@@ -25,7 +26,6 @@ from trade_alerts import (
+     detect_repair_candidates,
+     find_open_event,
+     load_evidence,
+-    render_repair_proposal_text,
+ )
+ from trade_alerts.ledger_reconcile import read_ledger
+ 
+@@ -254,7 +254,7 @@ def test_build_repair_events_short_close_profits_when_price_falls():
+     # volume 1, contract_size 1 -> gross_pnl must be +10, not -10.
+     ev = build_evidence(
+         open_event=_open_event(price=100.0, fee=0.0),
+-        sell_fills=[_sell_fill(price="90.0", quantity="27376", commission="0", realized_pnl="10", side="buy")],
++        sell_fills=[_sell_fill(price="90.0", quantity="27376", commission="0", realized_pnl="273760", side="buy")],
+         trailing_order_id=None, artifact_name="x", method="m",
+     )
+     events = {event_type: fields for event_type, fields in build_repair_events(ev)}
+@@ -266,7 +266,7 @@ def test_build_repair_events_long_close_still_profits_when_price_rises():
+     # Same shape, SELL-closing (long) fill: unchanged long-only direction.
+     ev = build_evidence(
+         open_event=_open_event(price=100.0, fee=0.0),
+-        sell_fills=[_sell_fill(price="110.0", quantity="27376", commission="0", realized_pnl="10", side="sell")],
++        sell_fills=[_sell_fill(price="110.0", quantity="27376", commission="0", realized_pnl="273760", side="sell")],
+         trailing_order_id=None, artifact_name="x", method="m",
+     )
+     events = {event_type: fields for event_type, fields in build_repair_events(ev)}
+@@ -286,6 +286,185 @@ def test_build_repair_events_legacy_numeric_exchange_side_defaults_to_long_direc
+     assert events["trade_close"]["net_pnl"] == pytest.approx(-0.1828984)
+ 
+ 
++# --------------------------------------------------------------------------- #
++# v2: the exchange's realized P&L is the authority
++# --------------------------------------------------------------------------- #
++def _close_of(evidence, **kwargs):
++    return next(fields for event_type, fields in build_repair_events(evidence, **kwargs) if event_type == "trade_close")
++
++
++def _puffer_evidence(realized_pnl):
++    return build_evidence(
++        open_event=_open_event(), sell_fills=[_sell_fill(realized_pnl=realized_pnl, side="sell")],
++        trailing_order_id=None, artifact_name="x",
++    )
++
++
++@pytest.mark.parametrize(
++    "realized_pnl, source",
++    [
++        ("-23.81712", "local"),               # agrees exactly
++        ("-23.81212", "local"),               # residual 0.005: inside the absolute tolerance
++        ("-23.80712", "local"),               # residual exactly 0.01: the bound is inclusive
++        ("-23.80711", "exchange_realized"),   # residual 0.01001: just past it
++    ],
++)
++def test_exchange_pnl_takes_over_only_past_the_tolerance(realized_pnl, source):
++    close = _close_of(_puffer_evidence(realized_pnl))
++    assert close["reconciliation"].get("pnl_source", "local") == source
++
++
++def test_exchange_pnl_override_rewrites_every_pnl_field_consistently():
++    local = _close_of(_puffer_evidence("-23.81712"))
++    close = _close_of(_puffer_evidence("-20.0"))
++    fees = Decimal(str(close["total_fees"]))
++
++    assert close["gross_pnl"] == -20.0
++    assert Decimal(str(close["net_pnl"])) == Decimal("-20.0") - fees
++    margin = Decimal("0.0183") * Decimal("27376") / Decimal(3)
++    assert close["return_on_margin"] == pytest.approx(float((Decimal("-20.0") - fees) / margin))
++    assert close["reconciliation_delta"] == pytest.approx(-float(fees))
++    # what was replaced is on the row, not lost
++    assert close["reconciliation"]["pnl_source"] == "exchange_realized"
++    assert close["reconciliation"]["local_gross_pnl"] == local["gross_pnl"]
++    assert close["reconciliation"]["exchange_pnl_residual"] == pytest.approx(3.81712)
++    # the prices are what the fills say either way
++    for key in ("entry_price", "exit_price", "entry_volume", "exit_volume", "entry_fee", "exit_fee"):
++        assert close[key] == local[key], key
++
++
++def test_every_repair_row_carries_the_same_override_record():
++    rows = build_repair_events(_puffer_evidence("-20.0"))
++    assert {fields["reconciliation"]["pnl_source"] for _event_type, fields in rows} == {"exchange_realized"}
++    reconciled = next(fields for event_type, fields in rows if event_type == "position_reconciled_closed")
++    assert reconciled["net_pnl"] == _close_of(_puffer_evidence("-20.0"))["net_pnl"]
++
++
++def test_agreeing_evidence_writes_byte_identical_rows_to_before():
++    """Within the tolerance nothing about a repair changes -- no new keys, so
++    rows written by v0.20.0 and v0.21.0 from the same evidence are identical."""
++    close = _close_of(_puffer_evidence("-23.81712"))
++    assert set(close["reconciliation"]) == {
++        "incident_id", "artifact_sha256", "github_actions_run_id", "method",
++        "exchange_occurred_at", "originating_trailing_order_id",
++    }
++
++
++def test_a_fill_without_realized_pnl_never_makes_the_sum_an_authority():
++    """An adapter that could not attach realized P&L records 0 for that fill,
++    as before; the resulting sum is not the exchange's word, so it must never
++    overwrite ours."""
++    evidence = build_evidence(
++        open_event=_open_event(), sell_fills=[_sell_fill(realized_pnl=None, side="sell")],
++        trailing_order_id=None, artifact_name="x",
++    )
++    assert evidence["trade"]["close"]["exchange_profit_reported"] is False
++    assert "pnl_source" not in _close_of(evidence)["reconciliation"]
++    assert "exchange_profit_reported" not in _puffer_evidence("-23.81712")["trade"]["close"]
++
++
++def test_the_manual_and_unattended_paths_write_identical_rows(tmp_path):
++    """append_repair (the manual tool) and append_repair_from_evidence (the
++    runner) both go through build_repair_events, override included."""
++    evidence = _puffer_evidence("-20.0")
++    evidence_path = tmp_path / "evidence.json"
++    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
++    manual, unattended = tmp_path / "manual.jsonl", tmp_path / "unattended.jsonl"
++    for path in (manual, unattended):
++        path.write_text(json.dumps(_open_event()) + "\n", encoding="utf-8")
++
++    append_repair(manual, evidence_path, ledger_append=_FakeLedger(manual).append, apply=True)
++    append_repair_from_evidence(unattended, evidence, ledger_append=_FakeLedger(unattended).append, apply=True)
++
++    assert manual.read_text(encoding="utf-8") == unattended.read_text(encoding="utf-8")
++    assert read_ledger(manual)[-2]["reconciliation"]["pnl_source"] == "exchange_realized"
++
++
++def test_residual_is_exact_on_a_large_high_priced_position():
++    """The residual compares two Decimal sums over the same deals, so it does
++    not grow with notional: a ~1.3M USDT BTC-sized close still reconciles to
++    exactly zero when the exchange agrees. The 0.01 tolerance is therefore
++    absolute by design -- it absorbs exchange-side rounding of realized_pnl,
++    not a percentage of position size."""
++    open_event = _open_event(symbol="BTC_USDT", volume=12.5, price=104250.7, fee=651.566875)
++    gross = (Decimal("105012.3") - Decimal("104250.7")) * Decimal("12.5")
++    evidence = build_evidence(
++        open_event=open_event,
++        sell_fills=[
++            _sell_fill(trade_id="1", price="105012.3", quantity="7.5", commission="393.79612",
++                       realized_pnl=str((Decimal("105012.3") - Decimal("104250.7")) * Decimal("7.5")),
++                       side="sell"),
++            _sell_fill(trade_id="2", price="105012.3", quantity="5", commission="262.53075",
++                       realized_pnl=str((Decimal("105012.3") - Decimal("104250.7")) * Decimal("5")),
++                       time_ms=1788410434000, side="sell"),
++        ],
++        trailing_order_id=None, artifact_name="x",
++    )
++    assert Decimal(evidence["trade"]["close"]["exchange_profit"]) == gross
++    assert "pnl_source" not in _close_of(evidence)["reconciliation"]
++
++
++# --------------------------------------------------------------------------- #
++# v2: a pyramided position (seykota) is one trade
++# --------------------------------------------------------------------------- #
++def _leg(volume, price, fee, epoch, source="add"):
++    return {**_open_event(volume=volume, price=price, fee=fee), "side": "long",
++            "event_epoch_ms": epoch, "source": source}
++
++
++def test_find_open_event_folds_pyramided_legs_into_one_position():
++    legs = [_leg(0.006, 80000.0, 0.24, 1_000, "entry"), _leg(0.004, 81000.0, 0.162, 2_000)]
++    folded = find_open_event(legs, "T1")
++    assert Decimal(folded["volume"]) == Decimal("0.010")
++    assert Decimal(folded["price"]) == (Decimal("80000.0") * Decimal("0.006") + Decimal("81000.0") * Decimal("0.004")) \
++        / Decimal("0.010")
++    assert Decimal(folded["fee"]) == Decimal("0.402")
++    assert folded["event_epoch_ms"] == 1_000     # the window reaches back to the first leg
++    assert folded["open_leg_count"] == 2
++    assert folded["trade_id"] == "T1" and folded["side"] == "long"
++
++
++def test_a_pyramided_position_closed_in_full_builds_evidence():
++    """Before v0.21.0 the close was compared against the *last* leg's volume,
++    so every seykota trade with an add failed on volume forever."""
++    legs = [_leg(0.006, 80000.0, 0.0, 1_000, "entry"), _leg(0.004, 81000.0, 0.0, 2_000)]
++    evidence = build_evidence(
++        open_event=find_open_event(legs, "T1"),
++        sell_fills=[_sell_fill(price="82000", quantity="0.010", commission="0", realized_pnl="16", side="sell",
++                               time_ms=3_000)],
++        trailing_order_id=None, artifact_name="x",
++    )
++    close = _close_of(evidence)
++    assert close["entry_volume"] == pytest.approx(0.010)
++    assert close["gross_pnl"] == pytest.approx(16.0)  # (82000 - 80400) * 0.010 -- agrees, so local
++    assert "pnl_source" not in close["reconciliation"]
++    assert assess_repair(evidence, legs)["verdict"] == "repair"
++
++
++def test_find_open_event_returns_a_single_open_unchanged():
++    single = _open_event()
++    assert find_open_event([single], "T1") is single
++
++
++def test_find_open_event_refuses_legs_that_disagree_on_side():
++    legs = [_leg(1, 1.0, 0, 1_000), {**_leg(1, 1.0, 0, 2_000), "side": "short"}]
++    with pytest.raises(VerifiedCloseError, match="disagree on side"):
++        find_open_event(legs, "T1")
++
++
++def test_find_open_event_leaves_the_window_unknown_if_any_leg_lacks_a_time():
++    legs = [_leg(1, 1.0, 0, 1_000), _leg(1, 1.0, 0, 0)]
++    assert find_open_event(legs, "T1")["event_epoch_ms"] == 0
++
++
++def test_detect_repair_candidates_counts_a_pyramided_trade_once():
++    """One trade_open per add used to read as two still-open trades on the
++    symbol, so the only candidate a seykota add could produce was skipped as
++    ambiguous."""
++    legs = [_leg(1, 1.0, 0, 1_000, "entry"), _leg(1, 1.0, 0, 2_000)]
++    assert detect_repair_candidates(_diverged_status("PUFFER_USDT"), legs) == ["T1"]
++
++
+ def test_repair_event_types_matches_what_build_repair_events_emits():
+     evidence = load_evidence(EVIDENCE)
+     event_types = {event_type for event_type, _fields in build_repair_events(evidence)}
+@@ -331,260 +510,198 @@ def test_detect_repair_candidates_returns_nothing_when_not_diverged():
+ 
+ 
+ # --------------------------------------------------------------------------- #
+-# render_repair_proposal_text
+-# --------------------------------------------------------------------------- #
+-def test_render_repair_proposal_text_includes_the_key_decision_fields():
+-    evidence = load_evidence(EVIDENCE)
+-    repair_events = build_repair_events(evidence)
+-    text = render_repair_proposal_text(evidence, repair_events, project="momentum")
+-    trade_close = dict(next(fields for event_type, fields in repair_events if event_type == "trade_close"))
+-    assert "[momentum]" in text
+-    assert evidence["incident_id"] in text
+-    assert trade_close["trade_id"] in text
+-    assert trade_close["symbol"] in text
+-    assert f"{trade_close['net_pnl']:.6f}" in text
+-    assert f"{trade_close['exchange_profit']:.6f}" in text
+-    assert trade_close["reconciliation"]["method"] in text
+-
+-
+-# --------------------------------------------------------------------------- #
+-# Phase 6: assess_auto_repair / incident_traces / append_repair_from_evidence
++# v2: assess_repair / incident_traces / append_repair_from_evidence
+ #
+-# These gate an *unattended* ledger write, so each blocker gets its own test:
++# These gate an *unattended* ledger write, so each reason gets its own test:
+ # a check that silently stops firing would not fail anything else here.
+ # --------------------------------------------------------------------------- #
+-def _clean_evidence(**fill_overrides):
+-    fill = _sell_fill(side="sell", **fill_overrides)
++def _clean_evidence(open_event=None, **fill_overrides):
++    fill_overrides.setdefault("side", "sell")
+     return build_evidence(
+-        open_event=_open_event(), sell_fills=[fill],
++        open_event=open_event or _open_event(), sell_fills=[_sell_fill(**fill_overrides)],
+         trailing_order_id=None, artifact_name="binance_user_trades:PUFFERUSDT",
+     )
+ 
+ 
+ def _assess(evidence, events=None, **kwargs):
+-    kwargs.setdefault("candidate_count", 1)
+-    kwargs.setdefault("still_open_checked", True)
+-    return assess_auto_repair(evidence, events if events is not None else [_open_event()], **kwargs)
++    return assess_repair(evidence, events if events is not None else [_open_event()], **kwargs)
++
++
++def _reasons(result):
++    return " | ".join(result["reasons"])
+ 
+ 
+-def test_assess_accepts_an_unambiguous_single_long_close():
++def test_assess_repairs_an_unambiguous_single_long_close():
+     result = _assess(_clean_evidence())
+-    assert result["eligible"] is True
+-    assert result["blockers"] == []
++    assert result == {"verdict": "repair", "reasons": [], "checks": result["checks"]}
+     assert result["checks"]["closing_sides"] == ["SELL"]
++    assert result["checks"]["expected_closing_side"] == "SELL"
++    assert result["checks"]["pnl_source"] == "local"
+ 
+ 
+-def test_assess_bounds_the_gap_between_our_gross_pnl_and_the_exchanges_not_the_fee_delta():
++def test_assess_keeps_the_fee_delta_out_of_the_decision():
+     """reconciliation_delta is *expected* to be about -(entry_fee + exit_fee) --
+-    roughly -0.49 here. Bounding that number directly by a small tolerance
+-    would reject every genuine repair; what must stay near zero is the part
+-    the fees do not explain."""
++    roughly -0.49 here -- and is reported, never judged."""
+     result = _assess(_clean_evidence())
+     assert Decimal(result["checks"]["reconciliation_delta"]) < Decimal("-0.4")
+-    assert Decimal(result["checks"]["exchange_pnl_residual"]) == Decimal("0")
++    assert result["verdict"] == "repair"
+ 
+ 
+-def test_assess_refuses_when_the_exchange_disagrees_about_realized_pnl():
++def test_assess_repairs_with_the_exchange_pnl_when_the_two_disagree():
++    """v1 refused this and asked a human; v2 writes the exchange's figure."""
+     result = _assess(_clean_evidence(realized_pnl="-20.0"))
+-    assert result["eligible"] is False
+-    assert any("disagree about this close" in blocker for blocker in result["blockers"])
++    assert result["verdict"] == "repair", _reasons(result)
++    assert result["checks"]["pnl_source"] == "exchange_realized"
+ 
+ 
+-def test_assess_refuses_more_than_one_candidate_this_round():
+-    result = _assess(_clean_evidence(), candidate_count=2)
+-    assert result["eligible"] is False
+-    assert any("more than one divergence" in blocker for blocker in result["blockers"])
++def test_assess_repairs_a_short_close_when_the_trade_open_is_short():
++    short_open = {**_open_event(), "side": "short"}
++    result = _assess(_clean_evidence(open_event=short_open, side="buy"), events=[short_open])
++    assert result["verdict"] == "repair", _reasons(result)
++    assert result["checks"]["expected_closing_side"] == "BUY"
+ 
+ 
+-def test_assess_refuses_when_the_exchange_was_not_confirmed_flat():
+-    result = _assess(_clean_evidence(), still_open_checked=False)
+-    assert result["eligible"] is False
+-    assert any("not confirmed flat" in blocker for blocker in result["blockers"])
++def test_assess_calls_a_close_on_the_wrong_side_unmappable():
++    result = _assess(_clean_evidence(side="buy"))
++    assert result["verdict"] == "unmappable"
++    assert "not this trade's close" in _reasons(result)
+ 
+ 
+-def test_assess_refuses_a_short_close_because_auto_repair_is_long_only():
+-    evidence = build_evidence(
+-        open_event=_open_event(), sell_fills=[_sell_fill(side="buy")],
+-        trailing_order_id=None, artifact_name="x",
+-    )
+-    result = _assess(evidence)
+-    assert result["eligible"] is False
+-    assert any("long-only" in blocker for blocker in result["blockers"])
++def test_assess_calls_a_sell_close_of_a_short_position_unmappable():
++    short_open = {**_open_event(), "side": "short"}
++    result = _assess(_clean_evidence(open_event=short_open, side="sell"), events=[short_open])
++    assert result["verdict"] == "unmappable"
++    assert "closes with BUY" in _reasons(result)
+ 
+ 
+-def test_assess_refuses_a_fill_that_predates_the_trade_open():
+-    evidence = _clean_evidence(time_ms=_open_event()["event_epoch_ms"] - 1)
+-    result = _assess(evidence)
+-    assert result["eligible"] is False
+-    assert any("predates the trade_open" in blocker for blocker in result["blockers"])
++def test_assess_uses_the_adapters_default_side_only_when_the_open_records_none():
++    no_side = _open_event()
++    assert "side" not in no_side
++    assert _assess(_clean_evidence(side="buy"), events=[no_side], default_position_side="short")["verdict"] == "repair"
++    recorded_long = {**no_side, "side": "long"}
++    assert _assess(_clean_evidence(side="buy"), events=[recorded_long], default_position_side="short")["verdict"] \
++        == "unmappable"
++
+ 
++def test_assess_refuses_to_guess_an_unreadable_trade_open_side():
++    odd = {**_open_event(), "side": "sideways"}
++    result = _assess(_clean_evidence(), events=[odd])
++    assert result["verdict"] == "unmappable"
++    assert "cannot be read as long or short" in _reasons(result)
+ 
+-def test_assess_refuses_legacy_evidence_without_per_deal_timestamps():
++
++@pytest.mark.parametrize("raw, expected", [
++    ("long", "SELL"), ("LONG", "SELL"), ("buy", "SELL"), ("short", "BUY"), ("sell", "BUY"), ("flat", None),
++])
++def test_expected_closing_side(raw, expected):
++    assert expected_closing_side({"side": raw}) == expected
++
++
++def test_assess_calls_a_fill_that_predates_the_trade_open_unmappable():
++    result = _assess(_clean_evidence(time_ms=_open_event()["event_epoch_ms"] - 1))
++    assert result["verdict"] == "unmappable"
++    assert "predates the trade_open" in _reasons(result)
++
++
++def test_assess_calls_deals_without_timestamps_unmappable():
+     evidence = _clean_evidence()
+     for deal in evidence["trade"]["close"]["deals"]:
+         deal.pop("time_ms")
+     result = _assess(evidence)
+-    assert result["eligible"] is False
+-    assert any("predates per-deal timestamps" in blocker for blocker in result["blockers"])
++    assert result["verdict"] == "unmappable"
++    assert "without a timestamp" in _reasons(result)
+ 
+ 
+-def test_assess_refuses_when_a_previous_repair_left_traces():
++def test_assess_halts_when_a_previous_repair_left_traces():
+     evidence = _clean_evidence()
+     half_applied = {
+         "event_type": "fill", "trade_id": "T1",
+         "reconciliation": {"incident_id": evidence["incident_id"]},
+     }
+     result = _assess(evidence, events=[_open_event(), half_applied])
+-    assert result["eligible"] is False
+-    assert any("left traces" in blocker for blocker in result["blockers"])
+-
++    assert result["verdict"] == "halt"
++    assert "left traces" in _reasons(result)
+ 
+-def test_assess_refuses_when_the_trade_already_has_a_close():
+-    result = _assess(_clean_evidence(), events=[_open_event(), {"event_type": "trade_close", "trade_id": "T1"}])
+-    assert result["eligible"] is False
+-    assert any("already has a trade_close" in blocker for blocker in result["blockers"])
+-
+-
+-def test_assess_reports_malformed_evidence_as_a_blocker_rather_than_raising():
+-    result = _assess({"trade": {"close": {"deals": []}}})
+-    assert result["eligible"] is False
+-    assert result["blockers"]
+ 
++def test_assess_halts_on_an_earlier_repair_of_this_trade_under_another_incident_id():
++    earlier = {
++        "event_type": "reconciliation_evidence_recorded", "trade_id": "T1",
++        "reconciliation": {"incident_id": "some-earlier-manual-repair"},
++    }
++    result = _assess(_clean_evidence(), events=[_open_event(), earlier])
++    assert result["verdict"] == "halt"
++    assert "different repair" in _reasons(result)
+ 
+-def test_incident_traces_sees_a_half_applied_repair_that_the_terminal_check_misses():
+-    """_existing_repair only looks at trade_close / position_reconciled_closed.
+-    A batch that stopped after the fills leaves neither -- the exact state an
+-    unattended repair must never write the rest of."""
+-    incident = "verified-close-backfill-abc"
+-    events = [
+-        {"event_type": "reconciliation_evidence_recorded", "trade_id": "T1",
+-         "reconciliation": {"incident_id": incident}},
+-        {"event_type": "fill", "trade_id": "T1", "reconciliation": {"incident_id": incident}},
+-    ]
+-    assert len(incident_traces(events, incident_id=incident)) == 2
+-    assert incident_traces(events, incident_id="some-other-incident") == []
+ 
++def test_halt_wins_over_unmappable():
++    """A ledger that is no longer clean is the more dangerous finding: it must
++    not be downgraded to a retry just because the evidence is also off."""
++    evidence = _clean_evidence(side="buy")
++    half_applied = {"event_type": "fill", "trade_id": "T1", "reconciliation": {"incident_id": evidence["incident_id"]}}
++    result = _assess(evidence, events=[_open_event(), half_applied])
++    assert result["verdict"] == "halt"
++    assert "not this trade's close" in _reasons(result)
+ 
+-def test_append_repair_from_evidence_matches_the_file_based_path(tmp_path):
+-    from_file = tmp_path / "from_file.jsonl"
+-    from_dict = tmp_path / "from_dict.jsonl"
+-    _write_open_trade(from_file)
+-    _write_open_trade(from_dict)
+ 
+-    file_result = append_repair(from_file, EVIDENCE, ledger_append=_FakeLedger(from_file).append, apply=True)
+-    dict_result = append_repair_from_evidence(
+-        from_dict, load_evidence(EVIDENCE), ledger_append=_FakeLedger(from_dict).append, apply=True,
+-    )
++def test_assess_calls_a_trade_that_already_has_a_close_unmappable():
++    result = _assess(_clean_evidence(), events=[_open_event(), {"event_type": "trade_close", "trade_id": "T1"}])
++    assert result["verdict"] == "unmappable"
++    assert "already has a trade_close" in _reasons(result)
+ 
+-    assert file_result == dict_result
+-    assert from_file.read_text(encoding="utf-8") == from_dict.read_text(encoding="utf-8")
+ 
++def test_assess_reports_malformed_evidence_rather_than_raising():
++    result = _assess({"trade": {"close": {"deals": []}}})
++    assert result["verdict"] == "unmappable"
++    assert result["reasons"]
+ 
+-def test_append_repair_from_evidence_validates_the_dict_like_load_evidence_does(tmp_path):
+-    ledger_path = tmp_path / "ledger.jsonl"
+-    _write_open_trade(ledger_path)
+-    with pytest.raises(VerifiedCloseError, match="unsupported or malformed"):
+-        append_repair_from_evidence(
+-            ledger_path, {"audit_schema_version": "0.9"},
+-            ledger_append=_FakeLedger(ledger_path).append, apply=False,
+-        )
+ 
++def test_assess_calls_a_trade_missing_from_the_ledger_unmappable():
++    result = _assess(_clean_evidence(), events=[])
++    assert result["verdict"] == "unmappable"
++    assert "no trade_open for this trade_id" in _reasons(result)
+ 
+-def test_assess_refuses_when_no_trade_open_bounds_the_window():
+-    """Deal timestamps are all present, but there is nothing to compare them to."""
+-    missing_open = _assess(_clean_evidence(), events=[])
+-    assert missing_open["eligible"] is False
+-    assert any("no event_epoch_ms" in blocker for blocker in missing_open["blockers"])
+ 
++def test_assess_calls_a_trade_open_without_epoch_unmappable():
+     open_without_epoch = dict(_open_event())
+     open_without_epoch.pop("event_epoch_ms")
+-    no_epoch = _assess(_clean_evidence(), events=[open_without_epoch])
+-    assert no_epoch["eligible"] is False
+-    assert any("no event_epoch_ms" in blocker for blocker in no_epoch["blockers"])
++    result = _assess(_clean_evidence(), events=[open_without_epoch])
++    assert result["verdict"] == "unmappable"
++    assert "no event_epoch_ms" in _reasons(result)
+ 
+ 
+ @pytest.mark.parametrize("incident_id", ["", None])
+ def test_assess_refuses_evidence_without_an_incident_id(incident_id):
+     """Review repro (PR #21): with an empty incident_id the trace check used to
+     be skipped outright, so a half-applied repair already in the ledger could
+-    not block anything."""
++    not block anything. It still halts on the other-incident trace."""
+     evidence = _clean_evidence()
+     evidence["incident_id"] = incident_id
+     half_applied = {"event_type": "fill", "trade_id": "T1", "reconciliation": {"incident_id": "whatever"}}
+ 
+     result = _assess(evidence, events=[_open_event(), half_applied])
+ 
+-    assert result["eligible"] is False
+-    assert any("no incident_id" in blocker for blocker in result["blockers"])
++    assert result["verdict"] == "halt"
++    assert "no incident_id" in _reasons(result)
++    assert _assess(evidence)["verdict"] == "unmappable"
+ 
+ 
+ def test_assess_refuses_evidence_without_a_trade_id():
+     evidence = _clean_evidence()
+     evidence["trade"]["trade_id"] = ""
+     result = _assess(evidence)
+-    assert result["eligible"] is False
+-    assert any("no trade_id" in blocker for blocker in result["blockers"])
+-
+-
+-def test_assess_refuses_an_earlier_repair_of_this_trade_under_another_incident_id():
+-    earlier = {
+-        "event_type": "reconciliation_evidence_recorded", "trade_id": "T1",
+-        "reconciliation": {"incident_id": "some-earlier-manual-repair"},
+-    }
+-    result = _assess(_clean_evidence(), events=[_open_event(), earlier])
+-    assert result["eligible"] is False
+-    assert any("different repair" in blocker for blocker in result["blockers"])
++    assert result["verdict"] == "unmappable"
++    assert "no trade_id" in _reasons(result)
+ 
+ 
+ def test_assess_ignores_repair_records_that_belong_to_other_trades():
+     other = {"event_type": "fill", "trade_id": "T9", "reconciliation": {"incident_id": "other"}}
+-    assert _assess(_clean_evidence(), events=[_open_event(), other])["eligible"] is True
+-
+-
+-@pytest.mark.parametrize(
+-    "realized_pnl, eligible",
+-    [
+-        ("-23.81212", True),    # residual 0.005: inside the absolute tolerance
+-        ("-23.80712", True),    # residual exactly 0.01: the bound is inclusive
+-        ("-23.80711", False),   # residual 0.01001: just past it
+-    ],
+-)
+-def test_assess_exchange_pnl_residual_boundary(realized_pnl, eligible):
+-    result = _assess(_clean_evidence(realized_pnl=realized_pnl))
+-    assert result["eligible"] is eligible, result["blockers"]
+-
+-
+-def test_assess_residual_is_exact_on_a_large_high_priced_position():
+-    """The residual compares two Decimal sums over the same deals, so it does
+-    not grow with notional: a ~1.3M USDT BTC-sized close still reconciles to
+-    exactly zero when the exchange agrees. The 0.01 tolerance is therefore
+-    absolute by design -- it absorbs exchange-side rounding of realized_pnl,
+-    not a percentage of position size."""
+-    open_event = _open_event(symbol="BTC_USDT", volume=12.5, price=104250.7, fee=651.566875)
+-    gross = (Decimal("105012.3") - Decimal("104250.7")) * Decimal("12.5")
+-    evidence = build_evidence(
+-        open_event=open_event,
+-        sell_fills=[
+-            _sell_fill(trade_id="1", price="105012.3", quantity="7.5", commission="393.79612",
+-                       realized_pnl=str((Decimal("105012.3") - Decimal("104250.7")) * Decimal("7.5")),
+-                       side="sell"),
+-            _sell_fill(trade_id="2", price="105012.3", quantity="5", commission="262.53075",
+-                       realized_pnl=str((Decimal("105012.3") - Decimal("104250.7")) * Decimal("5")),
+-                       time_ms=1788410434000, side="sell"),
+-        ],
+-        trailing_order_id=None, artifact_name="x",
+-    )
+-    result = assess_auto_repair(evidence, [open_event], candidate_count=1, still_open_checked=True)
+-    assert Decimal(evidence["trade"]["close"]["exchange_profit"]) == gross
+-    assert Decimal(result["checks"]["exchange_pnl_residual"]) == 0
+-    assert result["eligible"] is True, result["blockers"]
++    assert _assess(_clean_evidence(), events=[_open_event(), other])["verdict"] == "repair"
+ 
+ 
+ def test_assess_matches_trade_ids_across_str_and_int():
+-    """Review note on #21: the trade-level checks compared trade_id without the
+-    str() the neighbouring checks use, so an int id in evidence would silently
+-    miss a string id in the ledger. Every trade_id comparison in the assessment
+-    now agrees on str()."""
++    """Review note on #21: every trade_id comparison in the assessment agrees
++    on str(), so an int id in evidence cannot silently miss a string id in the
++    ledger."""
+     evidence = build_evidence(
+         open_event=_open_event(trade_id="12345"), sell_fills=[_sell_fill(side="sell")],
+         trailing_order_id=None, artifact_name="x",
+@@ -594,5 +711,45 @@ def test_assess_matches_trade_ids_across_str_and_int():
+ 
+     result = _assess(evidence, events=[_open_event(trade_id="12345"), earlier])
+ 
+-    assert any("different repair" in blocker for blocker in result["blockers"])
+-    assert not any("no event_epoch_ms" in blocker for blocker in result["blockers"])
++    assert "different repair" in _reasons(result)
++    assert "no trade_open" not in _reasons(result)
++    assert "no event_epoch_ms" not in _reasons(result)
++
++
++def test_incident_traces_sees_a_half_applied_repair_that_the_terminal_check_misses():
++    """_existing_repair only looks at trade_close / position_reconciled_closed.
++    A batch that stopped after the fills leaves neither -- the exact state an
++    unattended repair must never write the rest of."""
++    incident = "verified-close-backfill-abc"
++    events = [
++        {"event_type": "reconciliation_evidence_recorded", "trade_id": "T1",
++         "reconciliation": {"incident_id": incident}},
++        {"event_type": "fill", "trade_id": "T1", "reconciliation": {"incident_id": incident}},
++    ]
++    assert len(incident_traces(events, incident_id=incident)) == 2
++    assert incident_traces(events, incident_id="some-other-incident") == []
++
++
++def test_append_repair_from_evidence_matches_the_file_based_path(tmp_path):
++    from_file = tmp_path / "from_file.jsonl"
++    from_dict = tmp_path / "from_dict.jsonl"
++    _write_open_trade(from_file)
++    _write_open_trade(from_dict)
++
++    file_result = append_repair(from_file, EVIDENCE, ledger_append=_FakeLedger(from_file).append, apply=True)
++    dict_result = append_repair_from_evidence(
++        from_dict, load_evidence(EVIDENCE), ledger_append=_FakeLedger(from_dict).append, apply=True,
++    )
++
++    assert file_result == dict_result
++    assert from_file.read_text(encoding="utf-8") == from_dict.read_text(encoding="utf-8")
++
++
++def test_append_repair_from_evidence_validates_the_dict_like_load_evidence_does(tmp_path):
++    ledger_path = tmp_path / "ledger.jsonl"
++    _write_open_trade(ledger_path)
++    with pytest.raises(VerifiedCloseError, match="unsupported or malformed"):
++        append_repair_from_evidence(
++            ledger_path, {"audit_schema_version": "0.9"},
++            ledger_append=_FakeLedger(ledger_path).append, apply=False,
++        )
