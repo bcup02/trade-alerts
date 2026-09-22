@@ -390,7 +390,7 @@
     {
       "id": "docs.glossary_adopted",
       "title": "文件與訊息已改用統一名詞",
-      "description": "這支策略 repo 裡給人看的文字（README、docs、通知與 LINE 訊息）已照中英對照表改用統一名詞，不再出現「不要再用」的舊叫法。對照表見本頁下方「名詞對照表」。",
+      "description": "這支策略 repo 裡給人看的文字（README、docs、通知與 LINE 訊息）已照中英對照表改用統一名詞，不再出現「不要再用」的舊叫法。對照表見本頁下方「名詞對照表」。四支策略全部完成後，三個維運小工具（維運通知 bcup02/ops-notify#19、Telegram 遙控 bcup02/ops-control#11、LINE 查詢 bcup02/portfolio-query#22）也已同步做完，其中 portfolio-query 的 config.py/render.py 是 LINE 選單與執行方式顯示字（真倉/模擬倉/紙上模擬）的實際權威來源，改完後四支策略 repo 程式註解引用的行為才真正對上真實輸出。n2→n6 全系列到此結案。",
       "status": {
         "momentum": {
           "state": "done",
@@ -1021,7 +1021,7 @@
       "kind": "cap",
       "id": "docs.glossary_adopted",
       "project": "btc-competition",
-      "note": "競賽策略（btc-competition）已做：btc-bull-market-competition#33（外部審閱 PASS），四支策略的用詞統一（n2→n5）全部完成。過程中抓到一處子字串誤觸的假陽性跟一處跨 repo digest fixture 不能動的邊界情況，留給 n6（portfolio-query）處理。"
+      "note": "四支策略的用詞統一（n2→n5）都已做完後，三個維運小工具（維運通知 bcup02/ops-notify#19、Telegram 遙控 bcup02/ops-control#11、LINE 查詢 bcup02/portfolio-query#22）也已同步完成，n2→n6 全系列到此結案——見本能力的 description 補充說明。"
     }
   ]
 }
