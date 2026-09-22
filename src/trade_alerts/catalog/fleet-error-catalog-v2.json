@@ -561,7 +561,7 @@
       },
       "verdict": "MECHANICAL",
       "risk_tier": "R1",
-      "auto_action": "assess_auto_repair 判定無歧義時：證據檔落地、以 momentum 自己的 TradeLedger staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、記事件日誌。一輪最多一筆。不通知。（v1 的 MOMENTUM_REPAIR_AUTO_APPLY 開關與事後稽核通知在 v2 移除，由共用修復執行器落實。）",
+      "auto_action": "共用修復執行器（trade_alerts.repair_runner）判定能對應時：證據檔落地、以本策略自己的帳本寫入器 staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、記事件日誌。本地算的毛損益與交易所已實現損益差超過 0.01 時以交易所數字寫入，reconciliation 區塊記 pnl_source=exchange_realized 與本地數字。一輪最多寫一筆，多筆漏記依序逐輪補。不通知。（v1 的 MOMENTUM_REPAIR_AUTO_APPLY 開關與事後稽核通知在 v2 移除，v2-W3 改用共用修復執行器時落實。）",
       "human_action": "無需決定。證據檔與事件日誌留有完整紀錄。",
       "resume": "n/a",
       "lands_in_phase": 6,
@@ -618,7 +618,7 @@
       },
       "verdict": "JUDGEMENT",
       "risk_tier": "R3",
-      "auto_action": "不寫、不重試。開請求、記事件日誌、通知；此 trade_id 之後一律跳過，直到請求關閉。",
+      "auto_action": "不寫、不重試。開請求、記事件日誌，由 ops_export 通知；此 trade_id 之後一律跳過，直到請求關閉（帳本出現這筆 trade_close 時自動 WITHDRAWN）。",
       "human_action": "帳本裡這筆已有補到一半的紀錄（或這次寫入無法驗證），自動補完可能重複記帳。先讀清楚帳本現況，再以交易所成交紀錄為準讓帳本、交易所、Google 表三方一致，最後關閉請求。",
       "resume": "n/a",
       "lands_in_phase": 6,
@@ -632,6 +632,36 @@
           "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
         ],
         "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
+      }
+    },
+    {
+      "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+      "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+      "project": "momentum",
+      "sources": [
+        "trade-alerts/src/trade_alerts/repair_runner.py:332",
+        "trade-alerts/src/trade_alerts/repair_runner.py:346"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "共用修復執行器每輪重試：查交易所失敗（網路／API）或 assess_repair 判定結構對不上（平倉成交方向與開倉不符、成交早於開倉、缺 trade_id／incident_id、成交數量加總不等於開倉量、已有 trade_close）各記一次失敗事件、不通知；同一 trade_id 連續 escalate_after 次失敗才開請求、事件標 escalated、由 ops_export 通知一次（附 ai_prompt）。升格後每輪靜默重試，成功則請求 RESOLVED_AUTO；帳本出現這筆 trade_close（人工補好）則 WITHDRAWN。交易所仍有部位不算失敗。",
+      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "v2 取代 MOM.VERIFIED_CLOSE_PROPOSED：交易所是權威，能對應的一律照交易所補（損益差額也以交易所已實現損益為準），真正需要人的只剩結構上對不上或交易所一直查不到的情況，而那時該做的是追查根因。查交易所失敗也算一次失敗（2026-09-22 使用者拍板），否則 API 長期壞掉不會有人知道。",
+      "operator_message": {
+        "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
+        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+        "steps": [
+          "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+          "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+        ],
+        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
       }
     },
     {
@@ -1049,18 +1079,106 @@
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
       }
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "title": "無歧義的漏記平倉已自動補寫進帳本",
+      "project": "seykota",
+      "sources": [
+        "trade-alerts/src/trade_alerts/repair_runner.py:299"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "MECHANICAL",
+      "risk_tier": "R1",
+      "auto_action": "共用修復執行器（trade_alerts.repair_runner）判定能對應時：證據檔落地、以本策略自己的帳本寫入器 staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、記事件日誌。本地算的毛損益與交易所已實現損益差超過 0.01 時以交易所數字寫入，reconciliation 區塊記 pnl_source=exchange_realized 與本地數字。一輪最多寫一筆，多筆漏記依序逐輪補。不通知。",
+      "human_action": "無需決定。證據檔與事件日誌留有完整紀錄。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "跟 MOM.VERIFIED_CLOSE_AUTO_REPAIRED 同一個條件、同一份共用修復執行器。seykota 在 v2 之前只有修復機器人（只抓錯並提出修復建議）（只抓錯並提出修復建議），沒有自動補寫這條路徑；v2-W4 改用共用修復執行器時才開始發這個事件。seykota 會做空，平倉方向依 trade_open 的方向判斷；加碼過的交易（同一 trade_id 多筆 trade_open）合併成一個部位再比對。",
+      "operator_message": {
+        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。",
+        "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
+        "steps": [
+          "不需要任何動作。",
+          "想核對：audit/fleet_event_log.jsonl 裡這筆事件記著交易編號、出場價和損益，可以跟交易所 App 比對。"
+        ]
+      }
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+      "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+      "project": "seykota",
+      "sources": [
+        "trade-alerts/src/trade_alerts/repair_runner.py:332",
+        "trade-alerts/src/trade_alerts/repair_runner.py:346"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "共用修復執行器每輪重試：查交易所失敗（網路／API）或 assess_repair 判定結構對不上（平倉成交方向與開倉不符、成交早於開倉、缺 trade_id／incident_id、成交數量加總不等於開倉量、已有 trade_close）各記一次失敗事件、不通知；同一 trade_id 連續 escalate_after 次失敗才開請求、事件標 escalated、由 ops_export 通知一次（附 ai_prompt）。升格後每輪靜默重試，成功則請求 RESOLVED_AUTO；帳本出現這筆 trade_close（人工補好）則 WITHDRAWN。交易所仍有部位不算失敗。",
+      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "v2 取代 SEY.VERIFIED_CLOSE_PROPOSED：交易所是權威，能對應的一律照交易所補（損益差額也以交易所已實現損益為準），真正需要人的只剩結構上對不上或交易所一直查不到的情況，而那時該做的是追查根因。查交易所失敗也算一次失敗（2026-09-22 使用者拍板），否則 API 長期壞掉不會有人知道。",
+      "operator_message": {
+        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
+        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+        "steps": [
+          "治標：到電腦前照ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+          "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
+      }
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+      "project": "seykota",
+      "sources": [
+        "trade-alerts/src/trade_alerts/repair_runner.py:364"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不寫、不重試。開請求、記事件日誌，由 ops_export 通知；此 trade_id 之後一律跳過，直到請求關閉（帳本出現這筆 trade_close 時自動 WITHDRAWN）。",
+      "human_action": "帳本裡這筆已有補到一半的紀錄（或這次寫入無法驗證），自動補完可能重複記帳。先讀清楚帳本現況，再以交易所成交紀錄為準讓帳本、交易所、Google 表三方一致，最後關閉請求。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "跟 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED 同一個條件、同一份共用修復執行器（v2-W4 起）。帳本裡已有這筆交易的修復紀錄或這次寫入無法驗證，代表真實帳本已經不是「乾淨的孤兒開倉」，自動補完後半段等於猜，猜錯會重複或錯記真實損益。",
+      "operator_message": {
+        "what": "趨勢策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。",
+        "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
+        "steps": [
+          "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
+          "確認修正步驟後照做（手動流程見ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
+          "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
+      }
     }
   ],
   "retired_codes": [
     {
       "code": "MOM.VERIFIED_CLOSE_PROPOSED",
       "retired_in": "fleet-error-catalog/v2",
-      "reason": "v1 R1 'propose, never write'. v2 has no proposal state: an unambiguous orphan close is repaired (R1), a mappable-but-imperfect one is repaired using the exchange as the authority, and only a structurally unmappable one retries and escalates (R2). Stays in the catalog until the shared repair runner replaces the call site."
+      "reason": "v1 R1 'propose, never write'. v2 has no proposal state: an unambiguous orphan close is repaired (R1), a mappable-but-imperfect one is repaired using the exchange as the authority, and only a structurally unmappable one retries and escalates (R2). Stays in the catalog until the shared repair runner replaces the call site. Successor: MOM.VERIFIED_CLOSE_REPAIR_FAILED (R2), emitted by trade_alerts.repair_runner (v0.21.0)."
     },
     {
       "code": "SEY.VERIFIED_CLOSE_PROPOSED",
       "retired_in": "fleet-error-catalog/v2",
-      "reason": "Emitted by seykota's Phase 5c shadow repair bot but never catalogued in v1; backfilled 2026-09-18 so the rollout registry has something to point at. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED. Stays in the catalog until the shared repair runner (v2-W4) replaces the call site."
+      "reason": "Emitted by seykota's Phase 5c shadow repair bot but never catalogued in v1; backfilled 2026-09-18 so the rollout registry has something to point at. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED. Stays in the catalog until the shared repair runner (v2-W4) replaces the call site. Successor: SEY.VERIFIED_CLOSE_REPAIR_FAILED (R2), emitted by trade_alerts.repair_runner (v0.21.0)."
     }
   ]
 }

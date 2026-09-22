@@ -107,15 +107,24 @@ from .verified_close_backfill import (
     VerifiedCloseError,
     append_repair,
     append_repair_from_evidence,
-    assess_auto_repair,
+    assess_repair,
     build_evidence,
     build_repair_events,
     detect_repair_candidates,
+    expected_closing_side,
     find_open_event,
     incident_traces,
     load_evidence,
-    render_repair_proposal_text,
     validate_evidence,
+)
+from .repair_runner import (
+    RUNNER_CODES,
+    PositionStillOpen,
+    RepairAdapter,
+    RepairPaths,
+    pause_env_name,
+    repair_paused,
+    run_repair_round,
 )
 from .ledger_reconcile import (
     CLOSE_MARKERS,
@@ -180,15 +189,22 @@ __all__ = [
     "stage_lines",
     "append_repair",
     "append_repair_from_evidence",
-    "assess_auto_repair",
+    "assess_repair",
     "build_evidence",
     "build_repair_events",
     "detect_repair_candidates",
+    "expected_closing_side",
     "find_open_event",
     "incident_traces",
     "load_evidence",
-    "render_repair_proposal_text",
     "validate_evidence",
+    "RUNNER_CODES",
+    "PositionStillOpen",
+    "RepairAdapter",
+    "RepairPaths",
+    "pause_env_name",
+    "repair_paused",
+    "run_repair_round",
     "FLEET_EVENT_KIND",
     "PROJECT_CODE_PREFIXES",
     "RISK_TIERS",
@@ -289,4 +305,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.20.0"
+__version__ = "0.21.0"

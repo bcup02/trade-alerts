@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>40</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>44</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>9</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">40 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">44 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -209,7 +209,7 @@
   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
   <div id="glossaryHost"></div>
   <div class="foot">
-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-18 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-22 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 0213a01</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations b48b88b</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations b8eda43</code>。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
   </div>
@@ -1435,7 +1435,7 @@
      ]
     }
    ],
-   "sub": "修復機器人的第二個功能：證據完全沒有疑慮時，照交易所成交紀錄把漏記的平倉直接寫進帳本；結構對不上才重試並升格。",
+   "sub": "修復機器人的第二個功能：照交易所成交紀錄把漏記的平倉直接寫進帳本（損益跟交易所對不上時以交易所為準）；多筆漏記依序逐輪補；只有結構對不上或交易所查不到才重試，連續 3 次失敗才升格通知。v0.21.0 起由 trade-alerts 的共用修復執行器（trade_alerts.repair_runner）提供，各策略只寫轉接器。",
    "title": "修復機器人：自動補寫漏記平倉"
   },
   {
@@ -1753,12 +1753,12 @@
    "anchor": "cap-docs.glossary_adopted",
    "complete": true,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "done",
     "momentum": "done",
     "mycrypto": "done",
     "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "docs.glossary_adopted",
    "kind": "cap",
    "rows": [
@@ -2511,6 +2511,41 @@
    "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
   },
   {
+   "added_recent": true,
+   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "pending",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+       "state": "pending",
+       "text": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+       "state": "pending",
+       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
+      }
+     ]
+    }
+   ],
+   "sub": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
+  },
+  {
    "added_recent": false,
    "anchor": "rule-BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
    "complete": false,
@@ -3101,6 +3136,111 @@
    ],
    "sub": "SEY.VERIFIED_CLOSE_PROPOSED",
    "title": "R2｜漏記平倉已算出修復方案，附提案通知"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+       "state": "pending",
+       "text": "新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+       "state": "pending",
+       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
+      }
+     ]
+    }
+   ],
+   "sub": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+   "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+       "state": "pending",
+       "text": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+       "state": "pending",
+       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
+      }
+     ]
+    }
+   ],
+   "sub": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+       "state": "pending",
+       "text": "新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+       "state": "pending",
+       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
+      }
+     ]
+    }
+   ],
+   "sub": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+   "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
   }
  ],
  "phase_counts": {
@@ -3111,8 +3251,8 @@
   "binance-funding-sync": 2,
   "naming-rollout": 0,
   "v2-W2": 0,
-  "v2-W3": 7,
-  "v2-W4": 5,
+  "v2-W3": 9,
+  "v2-W4": 11,
   "v2-W6": 4
  },
  "phase_order": [
@@ -3153,10 +3293,28 @@
  },
  "recent_summary": [
   {
-   "anchor": "cap-docs.glossary_adopted",
-   "note": "四支策略的用詞統一（n2→n5）都已做完後，三個維運小工具（維運通知 bcup02/ops-notify#19、Telegram 遙控 bcup02/ops-control#11、LINE 查詢 bcup02/portfolio-query#22）也已同步完成，n2→n6 全系列到此結案——見本能力的 description 補充說明。",
-   "project": "競賽策略",
-   "title": "文件與訊息已改用統一名詞"
+   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
+   "project": "動能策略",
+   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
+  },
+  {
+   "anchor": "rule-SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
+   "project": "趨勢策略",
+   "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
+  },
+  {
+   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
+   "project": "趨勢策略",
+   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
+  },
+  {
+   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
+   "project": "趨勢策略",
+   "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
   }
  ],
  "totals": {
@@ -3168,7 +3326,7 @@
   "momentum": {
    "done": 14,
    "n/a": 4,
-   "pending": 13
+   "pending": 15
   },
   "mycrypto": {
    "done": 11,
@@ -3178,7 +3336,7 @@
   "seykota": {
    "done": 19,
    "n/a": 2,
-   "pending": 28
+   "pending": 34
   }
  }
 }

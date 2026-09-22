@@ -32,8 +32,11 @@ evidence first, only append after an explicit second step.
      ``trade_close`` / ``position_reconciled_closed`` events via the injected
      ``ledger_append``.
 
-Consumers: ``mexc-4h-momentum-trailing-stop`` (Binance today); ``ed-seykota``
-and ``my-crypto-bot`` planned.
+Consumers: ``trade_alerts.repair_runner`` (the unattended path, which drives
+stages 0-2 plus ``assess_repair`` for each strategy's adapter), and each
+strategy's manual tools (``fetch_verified_close_evidence.py`` /
+``append_reconciled_close.py``) -- momentum and seykota on Binance today,
+my-crypto's estimated-close tool as a calculator.
 """
 from __future__ import annotations
 
@@ -83,15 +86,59 @@ def _epoch_ms_to_iso(epoch_ms: int) -> str:
 # stage 1: build evidence from a local trade_open + exchange fills
 # --------------------------------------------------------------------------- #
 def find_open_event(events: list[dict[str, Any]], trade_id: str) -> dict[str, Any]:
-    """The most recent ``trade_open`` for ``trade_id``. Refuses if the trade
-    already has a ``trade_close`` -- this tool is only for a genuinely missing
-    close, never a second opinion on an existing one."""
+    """The ``trade_open`` for ``trade_id``, folded into one entry leg when the
+    strategy pyramids. Refuses if the trade already has a ``trade_close`` --
+    this tool is only for a genuinely missing close, never a second opinion on
+    an existing one.
+
+    A strategy that adds to a position (seykota) writes one more
+    ``trade_open`` per add under the same ``trade_id``, each carrying only
+    that leg's ``volume``/``price``/``fee``. The exchange's closing fills
+    close the whole position, so the evidence has to be built against the
+    whole position: volumes and fees summed, the entry price volume-weighted,
+    and the earliest ``event_epoch_ms`` -- the fetch window must reach back to
+    the first leg, not the last. A single open (momentum, or seykota without
+    adds) is returned unchanged.
+    """
     opens = [e for e in events if e.get("event_type") == "trade_open" and e.get("trade_id") == trade_id]
     if not opens:
         raise VerifiedCloseError(f"no trade_open in the ledger for trade_id {trade_id}")
     if any(e.get("event_type") == "trade_close" and e.get("trade_id") == trade_id for e in events):
         raise VerifiedCloseError(f"trade_id {trade_id} already has a trade_close -- nothing to back-fill")
-    return opens[-1]
+    if len(opens) == 1:
+        return opens[0]
+    return _fold_open_legs(opens)
+
+
+def _fold_open_legs(opens: list[dict[str, Any]]) -> dict[str, Any]:
+    for key in ("symbol", "side"):
+        values = {str(leg.get(key)) for leg in opens}
+        if len(values) != 1:
+            raise VerifiedCloseError(
+                f"the trade_open legs of trade_id {opens[0].get('trade_id')} disagree on {key} "
+                f"({sorted(values)}); refusing to fold them into one position"
+            )
+    volumes = [_as_decimal(leg["volume"], field="open_event.volume") for leg in opens]
+    volume = sum(volumes, Decimal("0"))
+    if volume <= 0:
+        raise VerifiedCloseError("the trade_open legs sum to a non-positive volume")
+    price = sum(
+        (_as_decimal(leg["price"], field="open_event.price") * leg_volume
+         for leg, leg_volume in zip(opens, volumes)),
+        Decimal("0"),
+    ) / volume
+    fee = sum((_as_decimal(leg.get("fee") or "0", field="open_event.fee") for leg in opens), Decimal("0"))
+    epochs = [int(leg.get("event_epoch_ms") or 0) for leg in opens]
+    return {
+        **opens[0],
+        "volume": str(volume),
+        "price": str(price),
+        "fee": str(fee),
+        # 0 (unknown) on any leg makes the whole window unknown, never "the
+        # other legs' minimum" -- callers refuse a trade_open without it.
+        "event_epoch_ms": min(epochs) if all(epochs) else 0,
+        "open_leg_count": len(opens),
+    }
 
 
 def build_evidence(
@@ -132,6 +179,12 @@ def build_evidence(
 
     deals: list[dict[str, Any]] = []
     exit_volume = Decimal("0")
+    # A fill the adapter could not attach realized P&L to is recorded as 0,
+    # as before -- but then the summed exchange_profit is not the exchange's
+    # word on this close, and build_repair_events must not treat it as the
+    # authority. Flagged only when it happens, so evidence built from a
+    # complete exchange response is unchanged.
+    profit_unreported = any(f.get("realized_pnl") is None for f in sell_fills)
     for f in sorted(sell_fills, key=lambda r: int(r.get("time_ms") or 0)):
         qty = _as_decimal(f.get("quantity"), field="fill.quantity")
         deals.append({
@@ -165,6 +218,16 @@ def build_evidence(
     exchange_profit = sum((Decimal(d["profit"]) for d in deals), Decimal("0"))
     artifact_sha256 = hashlib.sha256(_canonical(sorted(deals, key=lambda d: d["deal_id"])).encode()).hexdigest()
 
+    close: dict[str, Any] = {
+        "order_id": str(last.get("order_id")),
+        "occurred_at": occurred_at,
+        "exchange_profit": str(exchange_profit),
+        "originating_trailing_order_id": trailing_order_id,
+        "deals": deals,
+        "method": method,
+    }
+    if profit_unreported:
+        close["exchange_profit_reported"] = False
     return {
         "audit_schema_version": _SCHEMA_VERSION,
         "incident_id": f"{incident_prefix}-{str(open_event['trade_id'])[:12]}",
@@ -183,14 +246,7 @@ def build_evidence(
                 "volume": str(entry_volume),
                 "fee": str(_as_decimal(open_event.get("fee") or "0", field="open_event.fee")),
             },
-            "close": {
-                "order_id": str(last.get("order_id")),
-                "occurred_at": occurred_at,
-                "exchange_profit": str(exchange_profit),
-                "originating_trailing_order_id": trailing_order_id,
-                "deals": deals,
-                "method": method,
-            },
+            "close": close,
         },
     }
 
@@ -255,8 +311,44 @@ def incident_traces(events: list[dict[str, Any]], *, incident_id: str) -> list[d
     ]
 
 
-def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
-    """Build deterministic append-only events from verified exchange evidence."""
+#: Default ceiling, in quote currency, on how far our own gross P&L may sit
+#: from the exchange's reported realized P&L before the exchange's figure is
+#: written instead of ours (fleet-error-catalog/v2: the exchange is the
+#: authority).
+#:
+#: Note this is *not* a bound on ``reconciliation_delta`` itself. Phase 4e
+#: measured that delta to be exactly ``-(entry_fee + exit_fee)`` on every real
+#: sample -- for a typical trade that is ~0.5 USDT, so bounding it directly by
+#: a small number would reject every genuine repair. What a human actually
+#: checks by eye is the part the fees do not explain: ``gross_pnl`` against the
+#: exchange's own ``realized_pnl``. Those two describe the same quantity from
+#: two sources, so anything past rounding noise means the evidence and the
+#: local arithmetic disagree about what happened -- and the exchange wins.
+#: The bound is absolute, not a fraction of notional: both sides are Decimal
+#: sums over the same deals, so an agreeing exchange yields a residual of
+#: exactly zero at any position size; the slack only absorbs exchange-side
+#: rounding of each fill's realized P&L. The bound is inclusive.
+DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL = Decimal("0.01")
+
+
+def build_repair_events(
+    evidence: dict[str, Any],
+    *,
+    max_exchange_pnl_residual: Decimal = DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL,
+) -> list[tuple[str, dict[str, Any]]]:
+    """Build deterministic append-only events from verified exchange evidence.
+
+    P&L follows the exchange when the two sources disagree. Our gross P&L is
+    recomputed from the deals; when it sits more than
+    ``max_exchange_pnl_residual`` from the exchange's own realized P&L (and the
+    exchange reported one for every deal), ``gross_pnl`` is the exchange's
+    figure, ``net_pnl`` / ``return_on_margin`` follow from it, and the
+    ``reconciliation`` block records ``pnl_source: "exchange_realized"`` with
+    our figure and the gap, so the override is visible on every repair row.
+    Within the tolerance the rows are exactly what they always were. This is
+    the single place that decides it, so the manual flow
+    (``append_repair``) and the repair runner write identical rows.
+    """
     source = evidence["source"]
     trade = evidence["trade"]
     entry = trade["entry"]
@@ -291,6 +383,14 @@ def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, A
     closing_side = str(deals[0].get("exchange_side") or "").upper()
     direction = Decimal("-1") if closing_side == "BUY" else Decimal("1")
     gross_pnl = direction * (exit_price - entry_price) * exit_volume * contract_size
+    local_gross_pnl = gross_pnl
+    exchange_pnl_residual = abs(gross_pnl - exchange_profit)
+    exchange_is_authority = (
+        close.get("exchange_profit_reported") is not False
+        and exchange_pnl_residual > max_exchange_pnl_residual
+    )
+    if exchange_is_authority:
+        gross_pnl = exchange_profit
     total_fees = entry_fee + exit_fee
     net_pnl = gross_pnl - total_fees
     margin = entry_price * entry_volume * contract_size / Decimal(leverage) if leverage else Decimal("0")
@@ -304,6 +404,10 @@ def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, A
         "exchange_occurred_at": close["occurred_at"],
         "originating_trailing_order_id": close["originating_trailing_order_id"],
     }
+    if exchange_is_authority:
+        reconciliation["pnl_source"] = "exchange_realized"
+        reconciliation["local_gross_pnl"] = float(local_gross_pnl)
+        reconciliation["exchange_pnl_residual"] = float(exchange_pnl_residual)
     common = {
         "trade_id": trade["trade_id"],
         "symbol": evidence["symbol"],
@@ -383,8 +487,7 @@ def build_repair_events(evidence: dict[str, Any]) -> list[tuple[str, dict[str, A
 
 
 # --------------------------------------------------------------------------- #
-# stage 0 (Phase 5 repair-bot shadow mode): detect candidates + render a
-# human-readable proposal, both pure -- neither function writes anything.
+# stage 0: detect candidates (pure -- writes nothing)
 # --------------------------------------------------------------------------- #
 def detect_repair_candidates(
     ledger_status: dict[str, Any],
@@ -407,7 +510,8 @@ def detect_repair_candidates(
     symbol, so a single candidate per symbol is unambiguous. A symbol with
     zero or more than one still-open ``trade_id`` is skipped rather than
     guessed at -- shadow mode logs what it can act on, it never picks
-    between two plausible answers.
+    between two plausible answers. Several ``trade_open`` legs under one
+    ``trade_id`` (a pyramided position) count as that one trade.
     """
     if ledger_status.get("value") != "DIVERGED":
         return []
@@ -416,7 +520,9 @@ def detect_repair_candidates(
     if not diff_symbols:
         return []
 
-    open_by_symbol: dict[str, list[str]] = {}
+    # dict-as-ordered-set: a pyramiding strategy writes one trade_open per
+    # add under the same trade_id, and that is still one open trade.
+    open_by_symbol: dict[str, dict[str, None]] = {}
     closed_trade_ids: set[str] = set()
     for event in ledger_events:
         trade_id = event.get("trade_id")
@@ -424,97 +530,66 @@ def detect_repair_candidates(
             continue
         event_type = event.get("event_type")
         if event_type == "trade_open":
-            open_by_symbol.setdefault(norm_symbol(event.get("symbol")), []).append(str(trade_id))
+            open_by_symbol.setdefault(norm_symbol(event.get("symbol")), {})[str(trade_id)] = None
         elif event_type == "trade_close":
             closed_trade_ids.add(str(trade_id))
 
     candidates: list[str] = []
     for symbol in sorted(diff_symbols):
-        still_open = [tid for tid in open_by_symbol.get(symbol, []) if tid not in closed_trade_ids]
+        still_open = [tid for tid in open_by_symbol.get(symbol, {}) if tid not in closed_trade_ids]
         if len(still_open) == 1:
             candidates.append(still_open[0])
     return candidates
 
 
-def render_repair_proposal_text(
-    evidence: dict[str, Any],
-    repair_events: list[tuple[str, dict[str, Any]]],
-    *,
-    project: str,
-) -> str:
-    """Render a computed verified-close-backfill repair as a human-readable
-    notification body -- v1 R1 ``PROPOSE`` semantics (§2 of the fleet error
-    catalog): the notification carries the already-computed fix as a
-    proposal, and nothing in this module ever executes it. Shadow mode
-    passes this text straight to ``AlertDispatcher.publish``; nothing here
-    talks to a notification channel."""
-    trade_close = next(fields for event_type, fields in repair_events if event_type == "trade_close")
-    reconciliation = trade_close["reconciliation"]
-    lines = [
-        f"[{project}] verified-close-backfill 提案（僅記錄事件日誌，未寫入帳本，需人工核准）",
-        f"incident_id: {evidence['incident_id']}",
-        f"trade_id: {trade_close['trade_id']}  symbol: {trade_close['symbol']}",
-        f"數量: {trade_close['entry_volume']}  進場價: {trade_close['entry_price']}"
-        f"  出場價: {trade_close['exit_price']}",
-        f"手續費合計: {trade_close['total_fees']:.6f}",
-        f"本地淨損益: {trade_close['net_pnl']:.6f}  交易所毛損益: {trade_close['exchange_profit']:.6f}"
-        f"  差額: {trade_close['reconciliation_delta']:.6f}",
-        f"證據來源: {reconciliation['method']}",
-        f"平倉時間 (UTC): {trade_close['closed_at']}",
-    ]
-    return "\n".join(lines)
-
-
 # --------------------------------------------------------------------------- #
-# Phase 6: is this repair unambiguous enough to write without a human?
+# fleet-error-catalog/v2: can this repair be written, and if not, why not?
 # --------------------------------------------------------------------------- #
-#: Default ceiling, in quote currency, on how far our own gross P&L may sit
-#: from the exchange's reported realized P&L.
-#:
-#: Note this is *not* a bound on ``reconciliation_delta`` itself. Phase 4e
-#: measured that delta to be exactly ``-(entry_fee + exit_fee)`` on every real
-#: sample -- for a typical trade that is ~0.5 USDT, so bounding it directly by
-#: a small number would reject every genuine repair. What a human actually
-#: checks by eye is the part the fees do not explain: ``gross_pnl`` against the
-#: exchange's own ``realized_pnl``. Those two describe the same quantity from
-#: two sources, so anything past rounding noise means the evidence and the
-#: local arithmetic disagree about what happened -- and that is a human's call.
-#: The bound is absolute, not a fraction of notional: both sides are Decimal
-#: sums over the same deals, so an agreeing exchange yields a residual of
-#: exactly zero at any position size; the slack only absorbs exchange-side
-#: rounding of each fill's realized P&L. The bound is inclusive.
-DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL = Decimal("0.01")
+#: ``assess_repair`` verdicts. ``repair``: write it (R1). ``unmappable``: the
+#: evidence does not line up with the ledger's trade -- count one failed
+#: attempt (R2). ``halt``: the ledger already carries part of a repair for
+#: this trade, so writing anything would be a guess -- stop (R3).
+REPAIR = "repair"
+UNMAPPABLE = "unmappable"
+HALT = "halt"
+
+_CLOSING_SIDE = {"long": "SELL", "buy": "SELL", "short": "BUY", "sell": "BUY"}
 
 
-def assess_auto_repair(
+def expected_closing_side(open_event: dict[str, Any], *, default_position_side: str = "long") -> str | None:
+    """``SELL`` for a long ``trade_open``, ``BUY`` for a short one; ``None``
+    when the recorded side is something else. A ``trade_open`` without a side
+    at all falls back to ``default_position_side`` (the strategy's adapter
+    says what it trades), never to a guess."""
+    raw = open_event.get("side")
+    side = str(raw if raw not in (None, "") else default_position_side).strip().lower()
+    return _CLOSING_SIDE.get(side)
+
+
+def assess_repair(
     evidence: dict[str, Any],
     ledger_events: list[dict[str, Any]],
     *,
-    candidate_count: int,
-    still_open_checked: bool,
+    default_position_side: str = "long",
     max_exchange_pnl_residual: Decimal = DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL,
 ) -> dict[str, Any]:
-    """Decide whether one computed repair is unambiguous enough to append
-    without a human, returning ``{"eligible", "blockers", "checks"}``.
+    """Decide what the repair runner does with one freshly fetched evidence
+    dict, returning ``{"verdict", "reasons", "checks"}``.
 
-    This is the single place that answers that question -- callers must not
-    assemble their own version of it. It never raises on a "no": an input that
-    cannot be assessed is a blocker, because every blocker means the same
-    thing, which is fall back to proposing rather than doing.
+    This is the single place that answers the question -- callers must not
+    assemble their own version of it. It never raises: an input that cannot be
+    assessed is itself a reason.
+
+    What is *not* a reason any more (v1 treated all three as "ask a human"):
+    other candidates this round (the runner repairs them one per round, in
+    order), a P&L gap to the exchange (``build_repair_events`` writes the
+    exchange's figure), and a short position (the closing side is derived
+    from the ``trade_open``). What remains is structural -- the fills cannot
+    be this trade's close -- or a ledger that is no longer clean.
     """
-    blockers: list[str] = []
+    unmappable: list[str] = []
+    halt: list[str] = []
     checks: dict[str, Any] = {}
-
-    checks["candidate_count"] = candidate_count
-    if candidate_count != 1:
-        blockers.append(
-            f"{candidate_count} repair candidates this round -- more than one divergence at "
-            "once means something else is wrong, and neither is safe to fix unattended"
-        )
-
-    checks["still_open_checked"] = bool(still_open_checked)
-    if not still_open_checked:
-        blockers.append("the exchange was not confirmed flat for this symbol")
 
     trade = evidence.get("trade") or {}
     close = trade.get("close") or {}
@@ -522,37 +597,50 @@ def assess_auto_repair(
     trade_id = trade.get("trade_id")
     incident_id = evidence.get("incident_id")
 
-    sides = {str(deal.get("exchange_side") or "").upper() for deal in deals}
-    checks["closing_sides"] = sorted(sides)
-    if sides != {"SELL"}:
-        blockers.append(
-            f"closing fills are not unambiguously long-side SELL ({sorted(sides)}) -- "
-            "auto-repair is long-only, a short's P&L sign is not decided here"
+    # Identity first: without both ids the trace and close checks below cannot
+    # run, and a check that cannot run must refuse rather than pass by silence.
+    if not trade_id:
+        unmappable.append("evidence carries no trade_id, so the ledger cannot be checked for this trade")
+    if not incident_id:
+        unmappable.append("evidence carries no incident_id, so the ledger cannot be checked for repair traces")
+
+    opens = [
+        event for event in ledger_events
+        if event.get("event_type") == "trade_open" and trade_id and str(event.get("trade_id")) == str(trade_id)
+    ]
+    if trade_id and not opens:
+        unmappable.append("the ledger has no trade_open for this trade_id")
+
+    expected = None
+    if opens:
+        sides = {expected_closing_side(event, default_position_side=default_position_side) for event in opens}
+        if len(sides) == 1 and None not in sides:
+            expected = sides.pop()
+        else:
+            unmappable.append(f"the trade_open side cannot be read as long or short ({sorted(map(str, sides))})")
+    closing_sides = {str(deal.get("exchange_side") or "").upper() for deal in deals}
+    checks["expected_closing_side"] = expected
+    checks["closing_sides"] = sorted(closing_sides)
+    if expected and closing_sides != {expected}:
+        unmappable.append(
+            f"closing fills are {sorted(closing_sides)} but this position closes with {expected} -- "
+            "these fills are not this trade's close"
         )
 
-    open_epoch_ms = 0
-    for event in ledger_events:
-        if event.get("event_type") == "trade_open" and str(event.get("trade_id")) == str(trade_id):
-            open_epoch_ms = int(event.get("event_epoch_ms") or 0)
+    epochs = [int(event.get("event_epoch_ms") or 0) for event in opens]
+    open_epoch_ms = min(epochs) if epochs and all(epochs) else 0
     deal_times = [int(deal.get("time_ms") or 0) for deal in deals]
     checks["earliest_deal_ms"] = min(deal_times) if deal_times else None
     checks["trade_open_ms"] = open_epoch_ms or None
     if not deal_times or not all(deal_times):
-        blockers.append("evidence predates per-deal timestamps, so the fetch window cannot be verified")
-    elif not open_epoch_ms:
-        blockers.append("the trade_open carries no event_epoch_ms to bound the fetch window against")
-    elif min(deal_times) < open_epoch_ms:
-        blockers.append(
+        unmappable.append("evidence has deals without a timestamp, so the fetch window cannot be verified")
+    elif opens and not open_epoch_ms:
+        unmappable.append("a trade_open carries no event_epoch_ms to bound the fetch window against")
+    elif open_epoch_ms and min(deal_times) < open_epoch_ms:
+        unmappable.append(
             "a closing fill predates the trade_open, so the fetch window caught a fill "
             "belonging to some earlier position"
         )
-
-    # Identity first: without both ids the trace and close checks below cannot
-    # run, and a check that cannot run must block rather than pass by silence.
-    if not trade_id:
-        blockers.append("evidence carries no trade_id, so the ledger cannot be checked for this trade")
-    if not incident_id:
-        blockers.append("evidence carries no incident_id, so the ledger cannot be checked for repair traces")
 
     traces = incident_traces(ledger_events, incident_id=str(incident_id)) if incident_id else []
     # Also any reconciliation-carrying event for this trade under *another*
@@ -567,39 +655,33 @@ def assess_auto_repair(
     checks["incident_trace_count"] = len(traces)
     checks["other_repair_trace_count"] = len(trade_traces)
     if traces:
-        blockers.append(
+        halt.append(
             f"{len(traces)} ledger events already carry this incident_id -- a previous repair "
             "left traces; do not write the rest of it on a guess"
         )
     if trade_traces:
-        blockers.append(
+        halt.append(
             f"{len(trade_traces)} ledger events for this trade carry a different repair's "
             "reconciliation record -- an earlier repair under another incident_id"
         )
     if trade_id and _existing_close(ledger_events, trade_id=str(trade_id)):
-        blockers.append("the trade already has a trade_close")
+        unmappable.append("the trade already has a trade_close")
 
     try:
-        repair_events = build_repair_events(evidence)
-    except (VerifiedCloseError, KeyError, TypeError) as exc:
-        blockers.append(f"the repair does not compute cleanly: {exc}")
+        repair_events = build_repair_events(evidence, max_exchange_pnl_residual=max_exchange_pnl_residual)
+    except (VerifiedCloseError, KeyError, TypeError, ValueError) as exc:
+        unmappable.append(f"the repair does not compute cleanly: {exc}")
         repair_events = []
-
     if repair_events:
         trade_close = next(fields for event_type, fields in repair_events if event_type == "trade_close")
-        gross_pnl = _as_decimal(trade_close["gross_pnl"], field="gross_pnl")
-        exchange_profit = _as_decimal(trade_close["exchange_profit"], field="exchange_profit")
-        residual = abs(gross_pnl - exchange_profit)
         checks["reconciliation_delta"] = str(trade_close["reconciliation_delta"])
-        checks["exchange_pnl_residual"] = str(residual)
-        checks["max_exchange_pnl_residual"] = str(max_exchange_pnl_residual)
-        if residual > max_exchange_pnl_residual:
-            blockers.append(
-                f"our gross P&L and the exchange's realized P&L differ by {residual}, past the "
-                f"{max_exchange_pnl_residual} tolerance -- the two sources disagree about this close"
-            )
+        checks["pnl_source"] = trade_close["reconciliation"].get("pnl_source", "local")
 
-    return {"eligible": not blockers, "blockers": blockers, "checks": checks}
+    if halt:
+        return {"verdict": HALT, "reasons": halt + unmappable, "checks": checks}
+    if unmappable:
+        return {"verdict": UNMAPPABLE, "reasons": unmappable, "checks": checks}
+    return {"verdict": REPAIR, "reasons": [], "checks": checks}
 
 
 def append_repair_from_evidence(

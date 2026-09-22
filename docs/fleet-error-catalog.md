@@ -62,24 +62,26 @@
 
 Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（Phase 6 另補 3 條 momentum 修復機器人 條件，當時合計 **33 條**；
 2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 修復機器人（只抓錯並提出修復建議） 從部署起就一直在發這個事件，卻從未登記進目錄，
-導致一致性登記冊上這支策略的修復機器人 完全看不到對應紀錄，見下方 §3.1，目前合計 **34 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+導致一致性登記冊上這支策略的修復機器人 完全看不到對應紀錄，見下方 §3.1，當時合計 **34 條**；2026-09-22 v2-W2 共用修復執行器
+補上它會發出的代碼：兩支策略各一條 `VERIFIED_CLOSE_REPAIR_FAILED`（R2，取代退役的 `*_PROPOSED`），seykota 另補
+`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，目前合計 **38 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
 Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
 
 | 判定 | 條數 | 佔比 |
 |---|---|---|
-| `MECHANICAL`（動作固定） | 11 | 32% |
-| `JUDGEMENT`（真的要人判斷） | 23 | 68% |
+| `MECHANICAL`（動作固定） | 12 | 32% |
+| `JUDGEMENT`（真的要人判斷） | 26 | 68% |
 
 | 風險等級（v2） | 條數 |
 |---|---|
 | R0 只記錄 | 9 |
-| R1 自動、不通知 | 2 |
-| R2 自動嘗試、失敗才通知 | 12 |
-| R3 必須人工 | 11 |
+| R1 自動、不通知 | 3 |
+| R2 自動嘗試、失敗才通知 | 14 |
+| R3 必須人工 | 12 |
 
 下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
 
-### 3.1 ed-seykota（15 條）
+### 3.1 ed-seykota（18 條）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
@@ -98,13 +100,16 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `SEY.TRADE_EXIT` | 誤標 critical | MECHANICAL | R0 | **P3** |
 | `SEY.ENTRY_SKIPPED_MIN_CAPITAL` | 誤標 critical | MECHANICAL | R0 | **P3** |
 | `SEY.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知（2026-09-18 補登，見下方說明） | JUDGEMENT | R2 | P8（v2） |
+| `SEY.VERIFIED_CLOSE_AUTO_REPAIRED` | 未發出（共用修復執行器，v2-W4 接上） | MECHANICAL | R1 | P8（v2） |
+| `SEY.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R2 | P8（v2） |
+| `SEY.VERIFIED_CLOSE_REPAIR_BLOCKED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R3 | P8（v2） |
 
 **`protective_stop_failed` 拆成兩碼**是本節最重要的改動。現行程式在「停損掛單失敗」之後會立刻
 嘗試緊急市價平倉，但不論平倉成功或失敗，都收斂成同一個 latch 原因碼。這兩種結果的真倉風險相差
 極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R1 自動清 latch）；平倉也失敗代表真倉
 有裸露部位而且程式的補救手段已經失敗過一次（→ R3，全機隊風險最高的一類）。
 
-### 3.2 momentum（6 條）
+### 3.2 momentum（7 條）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
@@ -114,12 +119,13 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `MOM.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知 | JUDGEMENT | R2 | P8（v2） |
 | `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R1 | **P6** |
 | `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R3 | **P6** |
+| `MOM.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W3 接上） | JUDGEMENT | R2 | P8（v2） |
 
 momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
 正是 seykota 要改成的樣子。
 
-後三條是 Phase 6 的 verified-close-backfill 修復機器人（`scripts/repair_bot.py`）。v2 起：無歧義 → R1 自動寫、不通知；
+`VERIFIED_CLOSE_*` 四條是 verified-close-backfill 修復機器人（Phase 6 的 `scripts/repair_bot.py`；v2 起由共用修復執行器發出，見 §4.9）。v2 起：無歧義 → R1 自動寫、不通知；
 以交易所為準仍能對應 → 照交易所補寫；只有結構上對不上才重試並升格（R2，`MOM.VERIFIED_CLOSE_PROPOSED` 的呼叫點
 由共用修復執行器取代時退役）；帳本已不乾淨 → R3 停手。v1 的過渡開關 `MOMENTUM_REPAIR_AUTO_APPLY`（只有 momentum
 有、當時 33 條只管 1 條、沒有任何機制會評估並打開它）在 v2 移除；seykota 的修復機器人（只抓錯並提出修復建議）（§3.1 最後一條
@@ -352,6 +358,35 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
 維持現狀不動（本來就只寫帳本、完全沒有事件產生）。§4.6 的請求佇列基礎設施留著，等以後真的出現
 需要它的訊號源再用。
 
+### 4.9 共用修復執行器（v2-W2，`trade_alerts.repair_runner`，v0.21.0）
+
+漏記平倉（交易所已平倉、帳本只有 `trade_open`）的自動修復，全機隊只有一份程式。策略只提供轉接器
+`RepairAdapter`：怎麼從自己的交易所抓證據（`fetch_evidence`）、怎麼用自己的帳本寫入器 staging
+（`staging_ledger`）、怎麼排 Google 投影（`queue_projection`）。v2 之前 momentum 與 seykota 各有一份複製。
+
+`run_repair_round(adapter, paths)` 每輪：
+
+| 情況 | 處置 | 等級／代碼 | 通知 |
+|---|---|---|---|
+| `<PROJECT>_REPAIR_PAUSED` 為真 | 不偵測、不查交易所、不寫帳本；仍刷新 `ops_export.json` | — | 無 |
+| 交易所仍有部位（轉接器拋 `PositionStillOpen`） | 還不到修的時候，下一輪再看 | 不記 | 無 |
+| 能對應 | 證據檔落地、staging 後整批原子寫入、排 Google 投影 | R1 `VERIFIED_CLOSE_AUTO_REPAIRED` | 無 |
+| 損益與交易所差超過 0.01 | 照樣寫入，但 `gross_pnl` 用交易所已實現損益、`net_pnl`／`return_on_margin` 隨之重算；`reconciliation` 記 `pnl_source: "exchange_realized"`、本地數字與差額 | R1 | 無 |
+| 多筆同時漏記 | 一輪最多寫一筆，其餘 `deferred`、下一輪依序補（v1 視為阻擋） | — | 無 |
+| 查交易所失敗、或結構對不上（平倉方向與開倉不符、成交早於開倉、缺時間戳／trade_id／incident_id、數量加總不等於開倉量、已有 trade_close） | 記一次失敗；同一 trade_id 連續 `escalate_after`（3）次才開請求、事件標 `escalated` | R2 `VERIFIED_CLOSE_REPAIR_FAILED` | 升格時一次 |
+| 升格後 | 每輪靜默重試（不再記事件）；成功 → 請求 `RESOLVED_AUTO` | — | 無 |
+| 帳本已有這筆的修復痕跡、或整批寫入失敗 | 停手、開請求，永不重試 | R3 `VERIFIED_CLOSE_REPAIR_BLOCKED` | 一次（持續列在 `open_requests`） |
+| 有請求開著，但帳本已出現這筆 `trade_close`（人工補好） | 請求 `WITHDRAWN` | — | 無 |
+
+- 通知一律經 `ops_export` 由 ops-notify 代送，執行器本身不推播（策略的 `ALERTS_ENABLED` 關著）。
+- 「連續」的計數：只有升格會歸零；「交易所仍有部位」那一輪不算成功也不算失敗。請求關閉後同一筆再出事，從 1 重新算。
+- 平倉方向由 `trade_open.side` 推導（long→SELL、short→BUY），沒記方向的開倉用轉接器的 `default_position_side`。
+- 加碼（同一 trade_id 多筆 `trade_open`，seykota）視為同一個部位：`find_open_event` 合併數量、加權平均進場價、加總手續費，
+  以最早一筆的時間界定查詢範圍；`detect_repair_candidates` 也把它算成一筆交易（v0.21.0 前會被當成兩筆而略過）。
+- 「以交易所為準」的判斷寫在 `build_repair_events` 裡，手動流程（`append_repair`）與執行器寫出的帳本列逐欄相同。
+  轉接器拿不到某筆成交的已實現損益時，證據標 `exchange_profit_reported: false`，此時不以交易所為準。
+- 執行器的三個代碼必須在目錄裡有該策略的條目，否則開跑前就拒絕（事件等級查不到＝沒辦法通知任何人）。
+
 ## 5. Phase 3 實際落地的程式改動
 
 本 Phase 以設計為主，程式改動限縮在「零風險的標記與命名修正」——不動任何 latch、resume 或交易
@@ -384,6 +419,8 @@ log 行的 `event=` 與 `severity=` 欄位，不影響任何推播、下單或�
   （entry 不得規定沒有任何策略實作得出來的 resume 路徑）、
   `test_error_request_queue.py::test_r0_and_r1_conditions_can_never_open_a_request`
   （逐筆拿目錄裡的 R0／R1 條件去試開請求，必須全部被拒）。
+- v2-W2 起：`test_repair_runner.py::test_the_runner_codes_are_catalogued_the_same_for_every_strategy_that_runs_it`
+  要求每支用共用修復執行器的策略都有三個執行器代碼、等級與判定完全一致（R1／R2／R3）；新策略接上執行器前要先補目錄。
 - v2 起的白話文字與分級不變式：每條都有 `operator_message` 且三段皆非空、R2／R3 必有 `ai_prompt`
   而 R0／R1 不得有、四級語意固定、只有 R2 帶 `escalate_after`、退役代碼不得重用。改通知文字就是改這份
   JSON——它隨套件發佈，策略重新釘選新版本才會生效。
