@@ -95,9 +95,9 @@
   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>34 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    四支策略目前所有已知的「出問題」情況，共 <b>38 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>31 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>35 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -108,7 +108,7 @@
   <div id="filters"></div>
   <div id="register"></div>
   <div class="foot">
-    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-09-18 盤點）。
+    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-09-22 盤點）。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
   </div>
 </div>
@@ -696,6 +696,35 @@
    "what": "動能策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。"
   },
   {
+   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
+   "behaviour": {
+    "phase": "v2-W3",
+    "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。",
+    "state": "pending"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+   "emits_event": {
+    "phase": "v2-W3",
+    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
+    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+   ],
+   "open": true,
+   "steps": [
+    "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+    "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+   "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
+  },
+  {
    "ai_prompt": "請在 btc-bull-market-competition 追查為什麼本地帳本出現負的或不可能的餘額：讀 src/btc_competition/runner.py 的 _holdings_unverified 與 executor.fetch_balances，比對本地 state/帳本與交易所實際餘額，找出差異從哪一筆交易開始，提出讓本地與交易所一致的修正步驟（先給我確認再執行）與治本修正。",
    "behaviour": {
     "evidence": "src/btc_competition/runner.py:347 暫停並等人以 btc-competition-resume 解除",
@@ -1066,6 +1095,91 @@
    "tier": "R2",
    "title": "漏記平倉已算出修復方案，附提案通知",
    "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "phase": "v2-W4",
+    "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+   "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
+   "emits_event": {
+    "phase": "v2-W4",
+    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
+    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
+   ],
+   "open": true,
+   "steps": [],
+   "tier": "R1",
+   "title": "無歧義的漏記平倉已自動補寫進帳本",
+   "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
+   "behaviour": {
+    "phase": "v2-W4",
+    "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+   "emits_event": {
+    "phase": "v2-W4",
+    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
+    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
+   ],
+   "open": true,
+   "steps": [
+    "治標：到電腦前照ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+    "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+   "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
+   "behaviour": {
+    "phase": "v2-W4",
+    "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+   "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
+   "emits_event": {
+    "phase": "v2-W4",
+    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
+    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
+   ],
+   "open": true,
+   "steps": [
+    "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
+    "確認修正步驟後照做（手動流程見ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
+    "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
+   ],
+   "tier": "R3",
+   "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+   "what": "趨勢策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。"
   }
  ],
  "tiers": [

@@ -84,6 +84,14 @@ Token 必須由部署環境的 secret 管理或本機未納入版本控制的 `.
 `tests/test_fleet_error_catalog.py` 守住幾條不變式，其中最重要的一條是：判定為 `MECHANICAL`
 的條件不得落在任何會通知人的風險等級。
 
+## 共用修復執行器（漏記平倉）
+
+`trade_alerts.repair_runner.run_repair_round(adapter, paths)` 是全機隊唯一的漏記平倉自動修復：交易所已平倉、
+帳本只剩 `trade_open` 時，照交易所成交紀錄補寫（損益跟交易所對不上時以交易所為準），多筆依序逐輪補，
+結構對不上才重試、連續 3 次失敗才升格通知，帳本已不乾淨就停手等人。策略只寫 `RepairAdapter`
+轉接器（抓證據、用自己的帳本寫入器 staging、排 Google 投影），緊急煞車統一是 `<PROJECT>_REPAIR_PAUSED`。
+規格見 [`docs/fleet-error-catalog.md`](docs/fleet-error-catalog.md) §4.9。
+
 ## 機隊一致性登記冊
 
 [`src/trade_alerts/catalog/fleet-rollout-registry.json`](src/trade_alerts/catalog/fleet-rollout-registry.json)

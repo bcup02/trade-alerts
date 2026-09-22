@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-09-18",
+  "updated_at": "2026-09-22",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -234,7 +234,7 @@
     {
       "id": "repair_bot.verified_close",
       "title": "修復機器人：自動補寫漏記平倉",
-      "description": "修復機器人的第二個功能：證據完全沒有疑慮時，照交易所成交紀錄把漏記的平倉直接寫進帳本；結構對不上才重試並升格。",
+      "description": "修復機器人的第二個功能：照交易所成交紀錄把漏記的平倉直接寫進帳本（損益跟交易所對不上時以交易所為準）；多筆漏記依序逐輪補；只有結構對不上或交易所查不到才重試，連續 3 次失敗才升格通知。v0.21.0 起由 trade-alerts 的共用修復執行器（trade_alerts.repair_runner）提供，各策略只寫轉接器。",
       "status": {
         "momentum": {
           "state": "pending",
@@ -741,6 +741,23 @@
       }
     },
     {
+      "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W3",
+          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
+        }
+      }
+    },
+    {
       "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
       "behaviour": {
         "btc-competition": {
@@ -1014,14 +1031,87 @@
           "reason": "正式機的 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代時換成 v2 標籤。"
         }
       }
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
+        }
+      }
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
+        }
+      }
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W4",
+          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "docs.glossary_adopted",
-      "project": "btc-competition",
-      "note": "四支策略的用詞統一（n2→n5）都已做完後，三個維運小工具（維運通知 bcup02/ops-notify#19、Telegram 遙控 bcup02/ops-control#11、LINE 查詢 bcup02/portfolio-query#22）也已同步完成，n2→n6 全系列到此結案——見本能力的 description 補充說明。"
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+      "type": "added",
+      "project": "momentum",
+      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "type": "added",
+      "project": "seykota",
+      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+      "type": "added",
+      "project": "seykota",
+      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "type": "added",
+      "project": "seykota",
+      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
     }
   ]
 }

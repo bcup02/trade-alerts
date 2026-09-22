@@ -624,3 +624,38 @@ trade-alerts：v0.20.0（風險分級 v2，W1b：機隊一致性登記冊）
 服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.21.0（風險分級 v2，W2：共用修復執行器）
+變更摘要：1. 新模組 trade_alerts.repair_runner：run_repair_round(adapter, paths) 是全機隊唯一的
+             漏記平倉自動修復，策略只提供 RepairAdapter（fetch_evidence／staging_ledger／
+             queue_projection）。能對應 → R1 寫入、不通知；交易所仍有部位（PositionStillOpen）
+             → 不算失敗；查交易所失敗或結構對不上 → R2 記一次失敗，同一 trade_id 連續 3 次
+             才開請求並標 escalated（ops_export 通知一次），之後靜默重試、成功則 RESOLVED_AUTO；
+             帳本已有修復痕跡或整批寫入失敗 → R3 停手、永不重試；帳本出現該筆 trade_close
+             → 請求 WITHDRAWN。一輪最多寫一筆，多筆依序逐輪補。<PROJECT>_REPAIR_PAUSED
+             統一煞車（停手時仍刷新 ops_export）。執行器不直接推播。
+          2. verified_close_backfill：
+             - build_repair_events：本地毛損益與交易所已實現損益差 > 0.01 時以交易所為準，
+               reconciliation 記 pnl_source=exchange_realized／local_gross_pnl／
+               exchange_pnl_residual；差額在容忍內時產出與 v0.20.0 逐欄相同。成交缺已實現
+               損益時證據標 exchange_profit_reported=false，不以交易所為準。
+             - find_open_event：同一 trade_id 多筆 trade_open（加碼）合併為一個部位。
+             - detect_repair_candidates：加碼的交易算一筆，不再被當成兩筆略過。
+             - 新 assess_repair（repair／unmappable／halt）與 expected_closing_side：
+               平倉方向依開倉方向推導，支援做空。
+             - 破壞性：移除 assess_auto_repair 與 render_repair_proposal_text（v2 沒有
+               「提案」狀態）。momentum／seykota 在 W3／W4 重新釘選時改用執行器。
+          3. 錯誤目錄 34 → 38 條：MOM／SEY.VERIFIED_CLOSE_REPAIR_FAILED（R2，取代退役的
+             *_PROPOSED）、SEY.VERIFIED_CLOSE_AUTO_REPAIRED（R1）、
+             SEY.VERIFIED_CLOSE_REPAIR_BLOCKED（R3）；登記冊同步新增四列（pending W3／W4）。
+受影響消費專案：momentum（v2-W3）、seykota（v2-W4）重新釘選時改用執行器；在那之前
+          它們釘在舊版本，不受影響。my-crypto 的 verify_and_backfill_estimated_close.py
+          只用 build_evidence／build_repair_events 當計算器，重新釘選時損益差額超過 0.01
+          會改用交易所數字（見上）。btc／ops-notify 不受影響。
+部署入口：無（純函式庫 + 目錄資料）。
+版本驗證：pyproject.toml version == 0.21.0；trade_alerts.__version__ ==
+          "0.21.0"。
+服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```
