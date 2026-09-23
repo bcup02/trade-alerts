@@ -1939,9 +1939,9 @@
    "anchor": "cap-orders.single_send",
    "complete": false,
    "dots": {
-    "btc-competition": "done",
-    "momentum": "done",
-    "mycrypto": "done",
+    "btc-competition": "pending",
+    "momentum": "pending",
+    "mycrypto": "pending",
     "seykota": "pending"
    },
    "has_recent": false,
@@ -1964,9 +1964,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": null,
-       "state": "done",
-       "text": "src/binance_exchange.py:258 place_market_order 單次送出；src/binance_client.py:380 只在 -1021 時間戳被拒（交易所未受理）時重送一次"
+       "phase": "逐支查核市價單的所有呼叫端：送出結果不明（逾時、查不到）時，同一輪或下一輪會不會對同一個訊號再送一張",
+       "state": "pending",
+       "text": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：src/strategy.py:1561 進場用固定 client id open-{K線}-{幣種}，例外時存檔後往外拋（:1596）；註解說下一輪開頭會先向交易所同步部位——要確認這道保護在所有路徑都成立，以及這根 K 線是否已標記處理過。固定 client id 本身擋不住重複（Binance 不擋已成交市價單）。"
       }
      ]
     },
@@ -1975,9 +1975,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": null,
-       "state": "done",
-       "text": "mexc_futures_bot.py:398 _place_market_order_with_ledger 單次送出，失敗記帳後往外拋、不重送"
+       "phase": "逐支查核市價單的所有呼叫端：送出結果不明（逾時、查不到）時，同一輪或下一輪會不會對同一個訊號再送一張",
+       "state": "pending",
+       "text": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：mexc_futures_bot.py:398 _place_market_order_with_ledger 單次呼叫 create_market_order，失敗記帳後往外拋；呼叫端與主迴圈尚未查。"
       }
      ]
     },
@@ -1986,9 +1986,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": null,
-       "state": "done",
-       "text": "src/btc_competition/executor.py:154 market_order 只在交易所明確回餘額不足（沒有下單）時縮量重試，網路或逾時錯誤直接往外拋"
+       "phase": "逐支查核市價單的所有呼叫端：送出結果不明（逾時、查不到）時，同一輪或下一輪會不會對同一個訊號再送一張",
+       "state": "pending",
+       "text": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：src/btc_competition/executor.py:154 只在 ccxt.InsufficientFunds 時換用新 client id {cid}-r{i} 縮量重試，其他例外往外拋；runner.py 的呼叫端與下一輪行為尚未查。"
       }
      ]
     }
@@ -3626,6 +3626,7 @@
   "hotfix-seykota-order-resend": 1,
   "naming-rollout": 0,
   "repair-recurrence": 4,
+  "single-send-audit": 3,
   "unrecorded-fill": 4,
   "v2-W2": 0,
   "v2-W3": 9,
@@ -3647,7 +3648,8 @@
   "hotfix-seykota-order-resend",
   "unrecorded-fill",
   "repair-recurrence",
-  "error-ids"
+  "error-ids",
+  "single-send-audit"
  ],
  "phases": {
   "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
@@ -3660,6 +3662,7 @@
   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
   "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
   "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+  "single-send-audit": "逐支查核市價單的所有呼叫端：送出結果不明（逾時、查不到）時，同一輪或下一輪會不會對同一個訊號再送一張",
   "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
   "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
   "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
@@ -3681,7 +3684,7 @@
  "recent_summary": [
   {
    "anchor": "cap-orders.single_send",
-   "note": "趨勢策略真倉 09-21 重複開倉：市價單送出後查不到就重送。其他三支已查證只送一次；趨勢策略修正在 PR #65。",
+   "note": "趨勢策略真倉 09-21 重複開倉：市價單送出後查不到就重送（修正 PR #65 已合併，未部署）。其他三支的下單函式只送一次，但呼叫端還沒查完，先列 pending。",
    "project": null,
    "title": "市價單只送一次，不因查不到就重送"
   },
@@ -3706,19 +3709,19 @@
  ],
  "totals": {
   "btc-competition": {
-   "done": 12,
+   "done": 11,
    "n/a": 8,
-   "pending": 13
+   "pending": 14
   },
   "momentum": {
-   "done": 15,
+   "done": 14,
    "n/a": 4,
-   "pending": 20
+   "pending": 21
   },
   "mycrypto": {
-   "done": 12,
+   "done": 11,
    "n/a": 5,
-   "pending": 22
+   "pending": 23
   },
   "seykota": {
    "done": 19,
