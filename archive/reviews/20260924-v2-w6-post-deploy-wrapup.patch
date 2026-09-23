@@ -1,0 +1,1887 @@
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 7a76217..c7ffe66 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -95,9 +95,9 @@
+   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>38 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    四支策略目前所有已知的「出問題」情況，共 <b>36 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>35 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>27 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -141,7 +141,7 @@
+   {
+    "ai_prompt": null,
+    "behaviour": {
+-    "evidence": "src/seykota_bot/bot.py:399 _clear_automatic_safe_halt 確認已平倉後自動解除",
++    "evidence": "src/seykota_bot/bot.py:405 _clear_automatic_safe_halt 確認已平倉後自動解除",
+     "state": "done"
+    },
+    "bot": "seykota",
+@@ -165,7 +165,7 @@
+   {
+    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次「停損掛單失敗、緊急市價平倉也失敗」的根本原因：讀 src/seykota_bot/bot.py 開倉後掛保護單與緊急平倉的流程，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是下單規則、API 權限、餘額還是網路問題，說明交易所上現在的部位狀態該怎麼確認，並提出治本修正。",
+    "behaviour": {
+-    "evidence": "src/seykota_bot/bot.py:671 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
++    "evidence": "src/seykota_bot/bot.py:716 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
+     "state": "done"
+    },
+    "bot": "seykota",
+@@ -285,7 +285,7 @@
+   {
+    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼系統無法唯一確認這個倉位的原生保護單：讀 src/seykota_bot/bot.py 的保護單核對邏輯（_verified_exchange_protective_stop 一帶），對照交易所目前的委託清單，判斷是保護單不存在、有多張、還是欄位對不上，並提出治本修正。",
+    "behaviour": {
+-    "evidence": "src/seykota_bot/bot.py:883 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
++    "evidence": "src/seykota_bot/bot.py:928 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
+     "state": "done"
+    },
+    "bot": "seykota",
+@@ -312,9 +312,9 @@
+    "what": "交易所上有倉位，但系統找不到能確定屬於這個倉位的停損單。"
+   },
+   {
+-   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼交易所回報的部位無法唯一辨識：讀 src/seykota_bot/bot.py 的 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了，並提出治本修正。",
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼策略對自己的部位失去把握。先看暫停證據（seykota-resume preview）：若有 client_order_id／submitted_at，代表市價單送出後 60 秒在交易所查不到——讀 src/seykota_bot/bot.py 的 _resolve_market_order，用這個 client id 向交易所查單（GET /fapi/v1/order 帶 origClientOrderId）確認它到底有沒有成交、成交幾張，對照帳本與實際部位；否則是交易所回報的部位無法唯一辨識——讀 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了。兩種情況都要提出治本修正。",
+    "behaviour": {
+-    "evidence": "src/seykota_bot/bot.py:1035 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
++    "evidence": "src/seykota_bot/bot.py:1080 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :644 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）",
+     "state": "done"
+    },
+    "bot": "seykota",
+@@ -343,7 +343,7 @@
+   {
+    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。",
+    "behaviour": {
+-    "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）",
++    "evidence": "src/seykota_bot/bot.py:52 連續 3 次失敗才暫停（Phase 4d）",
+     "state": "done"
+    },
+    "bot": "seykota",
+@@ -432,7 +432,7 @@
+   {
+    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這個未分類的執行期例外：從 seykota-bot 的 journal 找出連續失敗的例外訊息與堆疊，定位 src/seykota_bot/ 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。",
+    "behaviour": {
+-    "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）",
++    "evidence": "src/seykota_bot/bot.py:52 連續 3 次失敗才暫停（Phase 4d）",
+     "state": "done"
+    },
+    "bot": "seykota",
+@@ -460,7 +460,7 @@
+   {
+    "ai_prompt": null,
+    "behaviour": {
+-    "evidence": "src/seykota_bot/bot.py:1227 只記錄、下一輪再確認成交（Phase 3）",
++    "evidence": "src/seykota_bot/bot.py:1226 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）",
+     "state": "done"
+    },
+    "bot": "seykota",
+@@ -484,7 +484,7 @@
+   {
+    "ai_prompt": null,
+    "behaviour": {
+-    "evidence": "src/seykota_bot/bot.py:1262 只記錄出場（Phase 3）",
++    "evidence": "src/seykota_bot/bot.py:1307 只記錄出場（Phase 3）",
+     "state": "done"
+    },
+    "bot": "seykota",
+@@ -508,7 +508,7 @@
+   {
+    "ai_prompt": null,
+    "behaviour": {
+-    "evidence": "src/seykota_bot/bot.py:1342 資金不足跳過進場、只記錄（Phase 3）",
++    "evidence": "src/seykota_bot/bot.py:1387 資金不足跳過進場、只記錄（Phase 3）",
+     "state": "done"
+    },
+    "bot": "seykota",
+@@ -613,79 +613,40 @@
+   {
+    "ai_prompt": null,
+    "behaviour": {
+-    "phase": "v2-W3",
+-    "reason": "正式機跑的 scripts/repair_bot.py 已有這條路徑，但自動補寫開關在正式機沒打開，所以不會發生。v2 拿掉開關、成功不通知。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
++    "state": "done"
+    },
+    "bot": "momentum",
+    "bot_label": "動能策略",
+    "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+    "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
+    "emits_event": {
+-    "phase": "v2-W3",
+-    "reason": "同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
++    "state": "done"
+    },
+-   "notes": [
+-    "行為未做 — 正式機跑的 scripts/repair_bot.py 已有這條路徑，但自動補寫開關在正式機沒打開，所以不會發生。v2 拿掉開關、成功不通知。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
+-    "寫進事件日誌未做 — 同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+-   ],
+-   "open": true,
++   "notes": [],
++   "open": false,
+    "steps": [],
+    "tier": "R1",
+    "title": "無歧義的漏記平倉已自動補寫進帳本",
+    "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。"
+   },
+-  {
+-   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
+-   "behaviour": {
+-    "phase": "v2-W3",
+-    "reason": "退役中：正式機目前會提出修復建議；v2 由共用修復執行器取代——能對應就補、結構對不上才重試升格。",
+-    "state": "pending"
+-   },
+-   "bot": "momentum",
+-   "bot_label": "動能策略",
+-   "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+-   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
+-   "emits_event": {
+-    "phase": "v2-W3",
+-    "reason": "正式機的 scripts/repair_bot.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代。",
+-    "state": "pending"
+-   },
+-   "notes": [
+-    "行為未做 — 退役中：正式機目前會提出修復建議；v2 由共用修復執行器取代——能對應就補、結構對不上才重試升格。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
+-    "寫進事件日誌未做 — 正式機的 scripts/repair_bot.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+-   ],
+-   "open": true,
+-   "steps": [
+-    "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」的三步，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+-    "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+-   ],
+-   "tier": "R2",
+-   "title": "漏記平倉已算出修復方案，附提案通知",
+-   "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
+-  },
+   {
+    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
+    "behaviour": {
+-    "phase": "v2-W3",
+-    "reason": "正式機的 scripts/repair_bot.py 有這條路徑（帳本已有半套修復或寫入失敗就停手、開請求、不重試），但只有開了自動補寫才會走到；正式機開關沒開。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
++    "state": "done"
+    },
+    "bot": "momentum",
+    "bot_label": "動能策略",
+    "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+    "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
+    "emits_event": {
+-    "phase": "v2-W3",
+-    "reason": "同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
++    "state": "done"
+    },
+-   "notes": [
+-    "行為未做 — 正式機的 scripts/repair_bot.py 有這條路徑（帳本已有半套修復或寫入失敗就停手、開請求、不重試），但只有開了自動補寫才會走到；正式機開關沒開。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
+-    "寫進事件日誌未做 — 同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+-   ],
+-   "open": true,
++   "notes": [],
++   "open": false,
+    "steps": [
+     "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
+     "確認修正步驟後照做（手動流程見momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
+@@ -698,24 +659,19 @@
+   {
+    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
+    "behaviour": {
+-    "phase": "v2-W3",
+-    "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
++    "state": "done"
+    },
+    "bot": "momentum",
+    "bot_label": "動能策略",
+    "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+    "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+    "emits_event": {
+-    "phase": "v2-W3",
+-    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
++    "state": "done"
+    },
+-   "notes": [
+-    "行為未做 — 新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）",
+-    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：動能策略改用共用修復執行器、拿掉過渡開關）"
+-   ],
+-   "open": true,
++   "notes": [],
++   "open": false,
+    "steps": [
+     "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+     "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+@@ -1067,56 +1023,22 @@
+    "title": "帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）",
+    "what": "本地帳本跟共用的 Google 表格對不上時，對帳程式故意讓自己的服務顯示紅色失敗。"
+   },
+-  {
+-   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
+-   "behaviour": {
+-    "phase": "v2-W4",
+-    "reason": "2026-09-18 補登目錄缺口：正式機（operations 分支）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟動能策略 5b 同一設計），每輪都會找漏記平倉並提出修復建議；但 v2 目標是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提建議、從不寫帳本，升到共用修復執行器（v2-W4）才算做到。",
+-    "state": "pending"
+-   },
+-   "bot": "seykota",
+-   "bot_label": "趨勢策略",
+-   "code": "SEY.VERIFIED_CLOSE_PROPOSED",
+-   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
+-   "emits_event": {
+-    "phase": "v2-W4",
+-    "reason": "正式機的 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代時換成 v2 標籤。",
+-    "state": "pending"
+-   },
+-   "notes": [
+-    "行為未做 — 2026-09-18 補登目錄缺口：正式機（operations 分支）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟動能策略 5b 同一設計），每輪都會找漏記平倉並提出修復建議；但 v2 目標是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提建議、從不寫帳本，升到共用修復執行器（v2-W4）才算做到。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
+-    "寫進事件日誌未做 — 正式機的 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代時換成 v2 標籤。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
+-   ],
+-   "open": true,
+-   "steps": [
+-    "治標：到電腦前照 ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+-    "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+-   ],
+-   "tier": "R2",
+-   "title": "漏記平倉已算出修復方案，附提案通知",
+-   "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
+-  },
+   {
+    "ai_prompt": null,
+    "behaviour": {
+-    "phase": "v2-W4",
+-    "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
++    "state": "done"
+    },
+    "bot": "seykota",
+    "bot_label": "趨勢策略",
+    "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+    "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
+    "emits_event": {
+-    "phase": "v2-W4",
+-    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
++    "state": "done"
+    },
+-   "notes": [
+-    "行為未做 — 新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
+-    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
+-   ],
+-   "open": true,
++   "notes": [],
++   "open": false,
+    "steps": [],
+    "tier": "R1",
+    "title": "無歧義的漏記平倉已自動補寫進帳本",
+@@ -1125,24 +1047,19 @@
+   {
+    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
+    "behaviour": {
+-    "phase": "v2-W4",
+-    "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
++    "state": "done"
+    },
+    "bot": "seykota",
+    "bot_label": "趨勢策略",
+    "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+    "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+    "emits_event": {
+-    "phase": "v2-W4",
+-    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
++    "state": "done"
+    },
+-   "notes": [
+-    "行為未做 — 新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
+-    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
+-   ],
+-   "open": true,
++   "notes": [],
++   "open": false,
+    "steps": [
+     "治標：到電腦前照ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+     "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+@@ -1154,24 +1071,19 @@
+   {
+    "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
+    "behaviour": {
+-    "phase": "v2-W4",
+-    "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
++    "state": "done"
+    },
+    "bot": "seykota",
+    "bot_label": "趨勢策略",
+    "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+    "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
+    "emits_event": {
+-    "phase": "v2-W4",
+-    "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
++    "state": "done"
+    },
+-   "notes": [
+-    "行為未做 — 新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。（預定：分級 v2：趨勢策略的修復機器人升到完整版）",
+-    "寫進事件日誌未做 — 同上：共用修復執行器會寫，但正式機還沒改用它。（預定：分級 v2：趨勢策略的修復機器人升到完整版）"
+-   ],
+-   "open": true,
++   "notes": [],
++   "open": false,
+    "steps": [
+     "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
+     "確認修正步驟後照做（手動流程見ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 261e8bb..e3ae30f 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,8 +177,8 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>50</b><span>項未完成——還有策略沒做到</span></a>
+-    <a class="c-done" href="#group-done"><b>9</b><span>項已完成——四支都到位，不用再動</span></a>
++    <a class="c-pending" href="#group-pending"><b>42</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-done" href="#group-done"><b>15</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+   <p class="dot-legend">
+@@ -193,11 +193,11 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">50 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">42 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+-  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">9 項</span></div>
++  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">15 項</span></div>
+   <p class="group-sub">每支相關的策略都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
+   <div id="done"></div>
+ 
+@@ -210,7 +210,7 @@
+   <div id="glossaryHost"></div>
+   <div class="foot">
+     資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-24 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+-    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 0213a01</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations b48b88b</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations b8eda43</code>。
++    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations f9946ba</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 3a91dd0</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations b8eda43</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+   </div>
+ </div>
+@@ -901,7 +901,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:386 build_safe_halt（Phase 4c）"
++       "text": "src/seykota_bot/bot.py:392 build_safe_halt（Phase 4c）"
+       }
+      ]
+     },
+@@ -1087,7 +1087,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:123 Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）"
++       "text": "src/seykota_bot/bot.py:52 _CONSECUTIVE_FAILURE_LATCH_THRESHOLD Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）"
+       }
+      ]
+     },
+@@ -1335,7 +1335,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot_shadow.py:144 append_fleet_event VERIFIED_CLOSE_PROPOSED（正式機每 15 分鐘跑一次，2026-09-18 查證 137 輪零候選）"
++       "text": "scripts/repair_bot.py:100 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       }
+      ]
+     },
+@@ -1346,7 +1346,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:127 append_fleet_event VERIFIED_CLOSE_PROPOSED（正式機每 15 分鐘跑一次，2026-09-18 查證 137 輪零候選）"
++       "text": "scripts/repair_bot.py:87 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       }
+      ]
+     },
+@@ -1382,11 +1382,11 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "na",
+-    "momentum": "pending",
++    "momentum": "recent",
+     "mycrypto": "pending",
+-    "seykota": "pending"
++    "seykota": "recent"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "repair_bot.verified_close",
+    "kind": "cap",
+    "rows": [
+@@ -1395,9 +1395,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "正式機跑的是只抓錯提建議的 scripts/repair_bot_shadow.py，沒有自動補寫這條路徑；升到共用修復執行器時才有。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 run_repair_round＋:83 staging_ledger（本策略帳本寫入器整批原子寫入），含加碼與做空（v2-W4）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       }
+      ]
+     },
+@@ -1406,9 +1406,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+-       "state": "pending",
+-       "text": "正式機（operations 分支）跑的已是 scripts/repair_bot.py，但自動補寫開關 MOMENTUM_REPAIR_AUTO_APPLY 在正式機沒打開（6d 關著觀察到 9/24），所以實際上還不會自動補寫。v2 由共用修復執行器取代並拿掉開關。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:87 run_repair_round＋:70 staging_ledger（本策略帳本寫入器整批原子寫入）；自動補寫開關已拿掉（v2-W3）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       }
+      ]
+     },
+@@ -1446,7 +1446,7 @@
+     "btc-competition": "na",
+     "momentum": "done",
+     "mycrypto": "pending",
+-    "seykota": "pending"
++    "seykota": "done"
+    },
+    "has_recent": false,
+    "id": "repair_bot.pause_brake",
+@@ -1457,9 +1457,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "正式機跑的 scripts/repair_bot_shadow.py 沒有停用開關；升到共用修復執行器時一起加 SEYKOTA_REPAIR_PAUSED。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 run_repair_round 由共用修復執行器讀 SEYKOTA_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔；正式機每輪輸出都帶 paused 欄位。"
+       }
+      ]
+     },
+@@ -1470,7 +1470,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:268 MOMENTUM_REPAIR_PAUSED 為真就整輪跳過（第 374 行讀設定；正式機每輪輸出都帶 paused 欄位）"
++       "text": "scripts/repair_bot.py:87 run_repair_round 由共用修復執行器讀 MOMENTUM_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔、不查交易所不寫帳本；正式機每輪輸出都帶 paused 欄位。"
+       }
+      ]
+     },
+@@ -1508,7 +1508,7 @@
+     "btc-competition": "pending",
+     "momentum": "done",
+     "mycrypto": "pending",
+-    "seykota": "pending"
++    "seykota": "done"
+    },
+    "has_recent": false,
+    "id": "ops_export.writer",
+@@ -1519,9 +1519,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "還沒有；升到共用修復執行器時一起寫。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
+       }
+      ]
+     },
+@@ -1532,7 +1532,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:278 refresh_ops_export（2026-09-18 查證：當天資金費同步修復整支重新部署時一併帶上正式機，trading-main 每輪都在改寫 audit/ops_export.json，目前內容為空；維運通知那端的轉送開關還沒開，見「維運通知已開啟匯出轉送」）"
++       "text": "scripts/repair_bot.py:87 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
+       }
+      ]
+     },
+@@ -1568,9 +1568,9 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "pending",
+-    "momentum": "pending",
++    "momentum": "done",
+     "mycrypto": "pending",
+-    "seykota": "pending"
++    "seykota": "done"
+    },
+    "has_recent": false,
+    "id": "ops_notify.export_relay_enabled",
+@@ -1581,9 +1581,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "分級 v2：部署到開發機與正式機",
+-       "state": "pending",
+-       "text": "兩台都還沒開。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機尚未開（開發機的通知路徑會在「通知分兩則」那包重整）。"
+       }
+      ]
+     },
+@@ -1592,9 +1592,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "分級 v2：部署到開發機與正式機",
+-       "state": "pending",
+-       "text": "開發機已開（2026-09-17，閘門驗證通過）；正式機等 v2 一起推。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:87 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機另計（2026-09-17 已開）。"
+       }
+      ]
+     },
+@@ -1630,11 +1630,11 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "pending",
+-    "momentum": "pending",
++    "momentum": "recent",
+     "mycrypto": "pending",
+     "seykota": "pending"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "notify.line_first_notice",
+    "kind": "cap",
+    "rows": [
+@@ -1645,7 +1645,7 @@
+        "aspect": null,
+        "phase": "分級 v2：部署到開發機與正式機",
+        "state": "pending",
+-       "text": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。"
++       "text": "2026-09-24：正式機轉送開關（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）與匯出軸首輪 OK 已確認，且與動能策略共用同一個 ops-notify 與 LINE 憑證（動能策略受控測試已送達、只送一次）；但趨勢策略自己還沒有任何一則通知真的經匯出檔→維運通知→LINE 送達過。要做一次趨勢策略專屬的受控測試（sent=1、手機收到、下一輪不重送）才算完成（trade-alerts #52 審閱指出）。"
+       }
+      ]
+     },
+@@ -1654,9 +1654,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "分級 v2：部署到開發機與正式機",
+-       "state": "pending",
+-       "text": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:87 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 受控測試事件 3ee1c8c932f14b0e8ba7ca0ba4bf31b8（標明測試、只寫事件未開請求）19:20 UTC sent=1、使用者手機確認收到、19:30 attempted=0 未重送。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
+       }
+      ]
+     },
+@@ -1754,11 +1754,11 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "pending",
+-    "momentum": "pending",
++    "momentum": "recent",
+     "mycrypto": "pending",
+-    "seykota": "pending"
++    "seykota": "recent"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "ops_notify.units_axis",
+    "kind": "cap",
+    "rows": [
+@@ -1767,9 +1767,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "分級 v2：部署到開發機與正式機",
+-       "state": "pending",
+-       "text": "兩台都還沒設定；修復機器人升級後一起盯。"
++       "phase": null,
++       "state": "done",
++       "text": "deploy/seykota-repair-shadow.service 與 deploy/seykota-repair-shadow.timer 列入正式機 OPS_NOTIFY_SEYKOTA_UNITS（2026-09-24），服務單元狀態 OK。開發機尚未設定。"
+       }
+      ]
+     },
+@@ -1778,9 +1778,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "分級 v2：部署到開發機與正式機",
+-       "state": "pending",
+-       "text": "開發機已設定（盯修復機器人的 unit／timer）；正式機還沒設定。"
++       "phase": null,
++       "state": "done",
++       "text": "deploy/mexc-momentum-repair-shadow.service 與 deploy/mexc-momentum-repair-shadow.timer 列入正式機 OPS_NOTIFY_MOMENTUM_UNITS（2026-09-24），服務單元狀態 OK。"
+       }
+      ]
+     },
+@@ -1935,16 +1935,16 @@
+    "title": "文件與訊息已改用統一名詞"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-orders.single_send",
+    "complete": false,
+    "dots": {
+     "btc-competition": "pending",
+     "momentum": "pending",
+     "mycrypto": "pending",
+-    "seykota": "pending"
++    "seykota": "recent"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "orders.single_send",
+    "kind": "cap",
+    "rows": [
+@@ -1953,9 +1953,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
+-       "state": "pending",
+-       "text": "2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162，已向 Binance 查單確認）。原因：src/seykota_bot/bot.py _resolve_market_order 把送出後的 -2013（查無訂單，其實是剛成交還查不到）當成可以重送。修正在 PR #65：送出前先記下已送出，之後只查不送，60 秒還查不到就 R3 暫停。"
++       "phase": null,
++       "state": "done",
++       "text": "src/seykota_bot/bot.py:586 _resolve_market_order：送出前先記下已送出（:621 mark_pending_submitted），之後查不到只繼續查、絕不重送；:58 _MARKET_ORDER_VISIBILITY_SECONDS 60 秒仍查不到就以 POSITION_AMBIGUOUS 安全暫停（:644）。PR #65，2026-09-24 18:40 UTC 上正式機。"
+       }
+      ]
+     },
+@@ -1997,7 +1997,7 @@
+    "title": "市價單只送一次，不因查不到就重送"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-reconcile.unrecorded_fill_handling",
+    "complete": false,
+    "dots": {
+@@ -2059,7 +2059,7 @@
+    "title": "帳本少記交易所成交時，升格通知並以交易所為準更正"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-repair_bot.recurrence_escalation",
+    "complete": false,
+    "dots": {
+@@ -2121,7 +2121,7 @@
+    "title": "自動修補重複發生時升格通知"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-notify.error_id",
+    "complete": false,
+    "dots": {
+@@ -2203,7 +2203,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:399 _clear_automatic_safe_halt 確認已平倉後自動解除"
++       "text": "src/seykota_bot/bot.py:405 _clear_automatic_safe_halt 確認已平倉後自動解除"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -2238,7 +2238,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:671 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
++       "text": "src/seykota_bot/bot.py:716 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -2378,7 +2378,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:883 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
++       "text": "src/seykota_bot/bot.py:928 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -2413,7 +2413,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:1035 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
++       "text": "src/seykota_bot/bot.py:1080 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :644 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -2448,7 +2448,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）"
++       "text": "src/seykota_bot/bot.py:52 連續 3 次失敗才暫停（Phase 4d）"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -2553,7 +2553,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）"
++       "text": "src/seykota_bot/bot.py:52 連續 3 次失敗才暫停（Phase 4d）"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -2588,7 +2588,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:1227 只記錄、下一輪再確認成交（Phase 3）"
++       "text": "src/seykota_bot/bot.py:1226 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -2623,7 +2623,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:1262 只記錄出場（Phase 3）"
++       "text": "src/seykota_bot/bot.py:1307 只記錄出場（Phase 3）"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -2658,7 +2658,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/bot.py:1342 資金不足跳過進場、只記錄（Phase 3）"
++       "text": "src/seykota_bot/bot.py:1387 資金不足跳過進場、只記錄（Phase 3）"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -2780,10 +2780,10 @@
+   {
+    "added_recent": false,
+    "anchor": "rule-MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+-   "complete": false,
++   "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "pending",
++    "momentum": "done",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+@@ -2796,15 +2796,15 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+-       "state": "pending",
+-       "text": "正式機跑的 scripts/repair_bot.py 已有這條路徑，但自動補寫開關在正式機沒打開，所以不會發生。v2 拿掉開關、成功不通知。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+-       "state": "pending",
+-       "text": "同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+       }
+      ]
+     }
+@@ -2812,48 +2812,13 @@
+    "sub": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+    "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
+   },
+-  {
+-   "added_recent": false,
+-   "anchor": "rule-MOM.VERIFIED_CLOSE_PROPOSED",
+-   "complete": false,
+-   "dots": {
+-    "btc-competition": "none",
+-    "momentum": "pending",
+-    "mycrypto": "none",
+-    "seykota": "none"
+-   },
+-   "has_recent": false,
+-   "id": "MOM.VERIFIED_CLOSE_PROPOSED",
+-   "kind": "rule",
+-   "rows": [
+-    {
+-     "label": "動能策略",
+-     "lines": [
+-      {
+-       "aspect": "行為",
+-       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+-       "state": "pending",
+-       "text": "退役中：正式機目前會提出修復建議；v2 由共用修復執行器取代——能對應就補、結構對不上才重試升格。"
+-      },
+-      {
+-       "aspect": "寫進事件日誌",
+-       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+-       "state": "pending",
+-       "text": "正式機的 scripts/repair_bot.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代。"
+-      }
+-     ]
+-    }
+-   ],
+-   "sub": "MOM.VERIFIED_CLOSE_PROPOSED",
+-   "title": "R2｜漏記平倉已算出修復方案，附提案通知"
+-  },
+   {
+    "added_recent": false,
+    "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+-   "complete": false,
++   "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "pending",
++    "momentum": "done",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+@@ -2866,15 +2831,15 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+-       "state": "pending",
+-       "text": "正式機的 scripts/repair_bot.py 有這條路徑（帳本已有半套修復或寫入失敗就停手、開請求、不重試），但只有開了自動補寫才會走到；正式機開關沒開。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+-       "state": "pending",
+-       "text": "同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+       }
+      ]
+     }
+@@ -2885,10 +2850,10 @@
+   {
+    "added_recent": false,
+    "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+-   "complete": false,
++   "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "pending",
++    "momentum": "done",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+@@ -2901,15 +2866,15 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+-       "state": "pending",
+-       "text": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+-       "state": "pending",
+-       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+       }
+      ]
+     }
+@@ -3474,50 +3439,15 @@
+    "sub": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
+    "title": "R0｜帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）"
+   },
+-  {
+-   "added_recent": false,
+-   "anchor": "rule-SEY.VERIFIED_CLOSE_PROPOSED",
+-   "complete": false,
+-   "dots": {
+-    "btc-competition": "none",
+-    "momentum": "none",
+-    "mycrypto": "none",
+-    "seykota": "pending"
+-   },
+-   "has_recent": false,
+-   "id": "SEY.VERIFIED_CLOSE_PROPOSED",
+-   "kind": "rule",
+-   "rows": [
+-    {
+-     "label": "趨勢策略",
+-     "lines": [
+-      {
+-       "aspect": "行為",
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "2026-09-18 補登目錄缺口：正式機（operations 分支）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟動能策略 5b 同一設計），每輪都會找漏記平倉並提出修復建議；但 v2 目標是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提建議、從不寫帳本，升到共用修復執行器（v2-W4）才算做到。"
+-      },
+-      {
+-       "aspect": "寫進事件日誌",
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "正式機的 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代時換成 v2 標籤。"
+-      }
+-     ]
+-    }
+-   ],
+-   "sub": "SEY.VERIFIED_CLOSE_PROPOSED",
+-   "title": "R2｜漏記平倉已算出修復方案，附提案通知"
+-  },
+   {
+    "added_recent": false,
+    "anchor": "rule-SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+-   "complete": false,
++   "complete": true,
+    "dots": {
+     "btc-competition": "none",
+     "momentum": "none",
+     "mycrypto": "none",
+-    "seykota": "pending"
++    "seykota": "done"
+    },
+    "has_recent": false,
+    "id": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+@@ -3528,15 +3458,15 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+       }
+      ]
+     }
+@@ -3547,12 +3477,12 @@
+   {
+    "added_recent": false,
+    "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+-   "complete": false,
++   "complete": true,
+    "dots": {
+     "btc-competition": "none",
+     "momentum": "none",
+     "mycrypto": "none",
+-    "seykota": "pending"
++    "seykota": "done"
+    },
+    "has_recent": false,
+    "id": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+@@ -3563,15 +3493,15 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+       }
+      ]
+     }
+@@ -3582,12 +3512,12 @@
+   {
+    "added_recent": false,
+    "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+-   "complete": false,
++   "complete": true,
+    "dots": {
+     "btc-competition": "none",
+     "momentum": "none",
+     "mycrypto": "none",
+-    "seykota": "pending"
++    "seykota": "done"
+    },
+    "has_recent": false,
+    "id": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+@@ -3598,15 +3528,15 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "分級 v2：趨勢策略的修復機器人升到完整版",
+-       "state": "pending",
+-       "text": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+       }
+      ]
+     }
+@@ -3623,15 +3553,15 @@
+   "8-seykota": 20,
+   "binance-funding-sync": 2,
+   "error-ids": 4,
+-  "hotfix-seykota-order-resend": 1,
++  "hotfix-seykota-order-resend": 0,
+   "naming-rollout": 0,
+   "repair-recurrence": 4,
+   "single-send-audit": 3,
+   "unrecorded-fill": 4,
+   "v2-W2": 0,
+-  "v2-W3": 9,
+-  "v2-W4": 11,
+-  "v2-W6": 6
++  "v2-W3": 0,
++  "v2-W4": 0,
++  "v2-W6": 1
+  },
+  "phase_order": [
+   "v2-W2",
+@@ -3683,28 +3613,40 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "cap-orders.single_send",
+-   "note": "趨勢策略真倉 09-21 重複開倉：市價單送出後查不到就重送（修正 PR #65 已合併，未部署）。其他三支的下單函式只送一次，但呼叫端還沒查完，先列 pending。",
+-   "project": null,
+-   "title": "市價單只送一次，不因查不到就重送"
++   "anchor": "cap-repair_bot.verified_close",
++   "note": "分級 v2 上正式機（2026-09-24）：動能、趨勢兩支的修復機器人都改用共用修復執行器，能對應的漏記平倉直接以交易所為準補寫。",
++   "project": "動能策略",
++   "title": "修復機器人：自動補寫漏記平倉"
+   },
+   {
+-   "anchor": "cap-reconcile.unrecorded_fill_handling",
+-   "note": "同一事件暴露的缺口：帳本少記成交時只有對帳顯示不一致，沒有人被持續提醒，修復機器人也不處理這一類。",
+-   "project": null,
+-   "title": "帳本少記交易所成交時，升格通知並以交易所為準更正"
++   "anchor": "cap-repair_bot.verified_close",
++   "note": "分級 v2 上正式機（2026-09-24）：動能、趨勢兩支的修復機器人都改用共用修復執行器，能對應的漏記平倉直接以交易所為準補寫。",
++   "project": "趨勢策略",
++   "title": "修復機器人：自動補寫漏記平倉"
+   },
+   {
+-   "anchor": "cap-repair_bot.recurrence_escalation",
+-   "note": "自動修補目前不通知、也不數重複次數；一個持續漏記的 bug 會被默默補掉而永遠不被發現。",
+-   "project": null,
+-   "title": "自動修補重複發生時升格通知"
++   "anchor": "cap-notify.line_first_notice",
++   "note": "正式機轉送開關打開，LINE 受控測試真的送到你的手機、而且只送一次。",
++   "project": "動能策略",
++   "title": "需要人處理的通知真的送到 LINE（只發第一則）"
+   },
+   {
+-   "anchor": "cap-notify.error_id",
+-   "note": "新需求：每種錯誤固定編號，通知一定附編號、標題跟風險登記冊一致；LINE 上的對帳狀態告警目前連目錄條目都沒有。",
+-   "project": null,
+-   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
++   "anchor": "cap-orders.single_send",
++   "note": "趨勢策略的「查不到就重送」修正（PR #65）已上正式機。",
++   "project": "趨勢策略",
++   "title": "市價單只送一次，不因查不到就重送"
++  },
++  {
++   "anchor": "cap-ops_notify.units_axis",
++   "note": "正式機開始監控兩支修復機器人的背景服務有沒有掛掉。",
++   "project": "動能策略",
++   "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
++  },
++  {
++   "anchor": "cap-ops_notify.units_axis",
++   "note": "正式機開始監控兩支修復機器人的背景服務有沒有掛掉。",
++   "project": "趨勢策略",
++   "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
+   }
+  ],
+  "totals": {
+@@ -3714,9 +3656,9 @@
+    "pending": 14
+   },
+   "momentum": {
+-   "done": 14,
++   "done": 24,
+    "n/a": 4,
+-   "pending": 21
++   "pending": 9
+   },
+   "mycrypto": {
+    "done": 11,
+@@ -3724,9 +3666,9 @@
+    "pending": 23
+   },
+   "seykota": {
+-   "done": 19,
++   "done": 31,
+    "n/a": 2,
+-   "pending": 40
++   "pending": 26
+   }
+  }
+ }
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index b8356e0..30612fb 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -227,7 +227,8 @@
+       "title": "交易所部位資料無法唯一辨識",
+       "project": "seykota",
+       "sources": [
+-        "src/seykota_bot/bot.py:819"
++        "src/seykota_bot/bot.py:1080",
++        "src/seykota_bot/bot.py:644"
+       ],
+       "current": {
+         "latch": "exchange_position_ambiguous",
+@@ -250,7 +251,7 @@
+           "確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+         ],
+-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼交易所回報的部位無法唯一辨識：讀 src/seykota_bot/bot.py 的 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了，並提出治本修正。"
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼策略對自己的部位失去把握。先看暫停證據（seykota-resume preview）：若有 client_order_id／submitted_at，代表市價單送出後 60 秒在交易所查不到——讀 src/seykota_bot/bot.py 的 _resolve_market_order，用這個 client id 向交易所查單（GET /fapi/v1/order 帶 origClientOrderId）確認它到底有沒有成交、成交幾張，對照帳本與實際部位；否則是交易所回報的部位無法唯一辨識——讀 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了。兩種情況都要提出治本修正。"
+       }
+     },
+     {
+@@ -552,11 +553,12 @@
+       "title": "無歧義的漏記平倉已自動補寫進帳本",
+       "project": "momentum",
+       "sources": [
+-        "scripts/repair_bot.py:228"
++        "scripts/repair_bot.py:87",
++        "trade-alerts/src/trade_alerts/repair_runner.py:299"
+       ],
+       "current": {
+         "latch": null,
+-        "notify": "VERIFIED_CLOSE_AUTO_REPAIRED (critical=False，事後稽核通知)",
++        "notify": null,
+         "unit_exit": null
+       },
+       "verdict": "MECHANICAL",
+@@ -575,45 +577,17 @@
+         ]
+       }
+     },
+-    {
+-      "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+-      "title": "漏記平倉已算出修復方案，附提案通知",
+-      "project": "momentum",
+-      "sources": [
+-        "scripts/repair_bot.py:128"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "VERIFIED_CLOSE_PROPOSED (critical=False)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R2",
+-      "auto_action": "（v2 目標，由共用修復執行器取代本條，屆時本代碼退役）以交易所為準自動補寫；只有結構上對不上時才記一次失敗，同一 trade_id 連續 escalate_after 次失敗才升格：開請求、通知，附給 AI 的根因追查指令。",
+-      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
+-      "resume": "n/a",
+-      "lands_in_phase": 8,
+-      "rationale": "補登 Phase 5 影子模式既有行為（該階段只在程式碼註解宣告 v1 R1）。這條落在這裡代表機器沒把握：可能是自動模式關閉，也可能是有判準不成立（多筆同時分歧、損益對不上、證據缺時間戳等），這些情況照交易所寫下去不一定對，需要人決定。 v2（2026-09-18）：v1 的「提案、交給人決定」沒有意義——交易所是權威，治標就是照交易所補、讓三方一致；真正需要人的只有結構上對不上的情況，而那時該做的是追查根因。本條的呼叫點由共用修復執行器取代時退役（見 retired_codes）。",
+-      "operator_message": {
+-        "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
+-        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
+-        "steps": [
+-          "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」的三步，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+-          "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+-        ],
+-        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
+-      }
+-    },
+     {
+       "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+       "project": "momentum",
+       "sources": [
+-        "scripts/repair_bot.py:153"
++        "scripts/repair_bot.py:87",
++        "trade-alerts/src/trade_alerts/repair_runner.py:364"
+       ],
+       "current": {
+         "latch": null,
+-        "notify": "VERIFIED_CLOSE_REPAIR_BLOCKED (critical=True)",
++        "notify": null,
+         "unit_exit": null
+       },
+       "verdict": "JUDGEMENT",
+@@ -639,6 +613,7 @@
+       "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+       "project": "momentum",
+       "sources": [
++        "scripts/repair_bot.py:87",
+         "trade-alerts/src/trade_alerts/repair_runner.py:332",
+         "trade-alerts/src/trade_alerts/repair_runner.py:346"
+       ],
+@@ -1051,40 +1026,12 @@
+         ]
+       }
+     },
+-    {
+-      "code": "SEY.VERIFIED_CLOSE_PROPOSED",
+-      "title": "漏記平倉已算出修復方案，附提案通知",
+-      "project": "seykota",
+-      "sources": [
+-        "scripts/repair_bot_shadow.py:144"
+-      ],
+-      "current": {
+-        "latch": null,
+-        "notify": "VERIFIED_CLOSE_PROPOSED (critical=False)",
+-        "unit_exit": null
+-      },
+-      "verdict": "JUDGEMENT",
+-      "risk_tier": "R2",
+-      "auto_action": "（v2 目標，由共用修復執行器取代本條，屆時本代碼退役）以交易所為準自動補寫；只有結構上對不上時才記一次失敗，同一 trade_id 連續 escalate_after 次失敗才升格：開請求、通知，附給 AI 的根因追查指令。",
+-      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
+-      "resume": "n/a",
+-      "lands_in_phase": 8,
+-      "rationale": "2026-09-18 查證發現的目錄缺口：seykota 的 Phase 5c 影子 bot（scripts/repair_bot_shadow.py，把 momentum 5b 的設計原封不動移植過來）從部署起就一直在發這個事件，但 v1 目錄從未收錄——momentum 有對應的 MOM.VERIFIED_CLOSE_PROPOSED，seykota 卻完全沒有登記，導致一致性登記冊上這支策略的修復 bot 沒有任何可見紀錄。補登跟 momentum 完全對等的處置：v1 的「提案、交給人決定」沒有意義——交易所是權威，治標就是照交易所補、讓三方一致；真正需要人的只有結構上對不上的情況，而那時該做的是追查根因。本條已列在 retired_codes：seykota 升到共用修復執行器（v2-W4）時，這個呼叫點會被取代，屆時本代碼真正退役。",
+-      "operator_message": {
+-        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
+-        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都對不上，代表這筆資料在結構上有問題（例如成交方向或時間跟開倉對不起來），需要追查原因。",
+-        "steps": [
+-          "治標：到電腦前照 ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+-          "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+-        ],
+-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_auto_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
+-      }
+-    },
+     {
+       "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+       "title": "無歧義的漏記平倉已自動補寫進帳本",
+       "project": "seykota",
+       "sources": [
++        "scripts/repair_bot.py:100",
+         "trade-alerts/src/trade_alerts/repair_runner.py:299"
+       ],
+       "current": {
+@@ -1113,6 +1060,7 @@
+       "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+       "project": "seykota",
+       "sources": [
++        "scripts/repair_bot.py:100",
+         "trade-alerts/src/trade_alerts/repair_runner.py:332",
+         "trade-alerts/src/trade_alerts/repair_runner.py:346"
+       ],
+@@ -1143,6 +1091,7 @@
+       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+       "project": "seykota",
+       "sources": [
++        "scripts/repair_bot.py:100",
+         "trade-alerts/src/trade_alerts/repair_runner.py:364"
+       ],
+       "current": {
+@@ -1173,12 +1122,12 @@
+     {
+       "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+       "retired_in": "fleet-error-catalog/v2",
+-      "reason": "v1 R1 'propose, never write'. v2 has no proposal state: an unambiguous orphan close is repaired (R1), a mappable-but-imperfect one is repaired using the exchange as the authority, and only a structurally unmappable one retries and escalates (R2). Stays in the catalog until the shared repair runner replaces the call site. Successor: MOM.VERIFIED_CLOSE_REPAIR_FAILED (R2), emitted by trade_alerts.repair_runner (v0.21.0)."
++      "reason": "v1 R1 'propose, never write'. v2 has no proposal state: an unambiguous orphan close is repaired (R1), a mappable-but-imperfect one is repaired using the exchange as the authority, and only a structurally unmappable one retries and escalates (R2). Stays in the catalog until the shared repair runner replaces the call site. Successor: MOM.VERIFIED_CLOSE_REPAIR_FAILED (R2), emitted by trade_alerts.repair_runner (v0.21.0). Entry removed 2026-09-24 after v2-W6 put the shared repair runner on the live host (momentum operations 3a91dd0, seykota operations f9946ba); the code stays here so it is never reused."
+     },
+     {
+       "code": "SEY.VERIFIED_CLOSE_PROPOSED",
+       "retired_in": "fleet-error-catalog/v2",
+-      "reason": "Emitted by seykota's Phase 5c shadow repair bot but never catalogued in v1; backfilled 2026-09-18 so the rollout registry has something to point at. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED. Stays in the catalog until the shared repair runner (v2-W4) replaces the call site. Successor: SEY.VERIFIED_CLOSE_REPAIR_FAILED (R2), emitted by trade_alerts.repair_runner (v0.21.0)."
++      "reason": "Emitted by seykota's Phase 5c shadow repair bot but never catalogued in v1; backfilled 2026-09-18 so the rollout registry has something to point at. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED. Stays in the catalog until the shared repair runner (v2-W4) replaces the call site. Successor: SEY.VERIFIED_CLOSE_REPAIR_FAILED (R2), emitted by trade_alerts.repair_runner (v0.21.0). Entry removed 2026-09-24 after v2-W6 put the shared repair runner on the live host (momentum operations 3a91dd0, seykota operations f9946ba); the code stays here so it is never reused."
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 5145d0d..95c7aaa 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -31,12 +31,12 @@
+     "momentum": {
+       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
+       "branch": "operations",
+-      "commit": "b48b88b264e149e7a272e044b7bf002cef11f314"
++      "commit": "3a91dd065894f42bd24cf964fd54c7dae13c3e64"
+     },
+     "seykota": {
+       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
+       "branch": "operations",
+-      "commit": "0213a01f4695af7b7820136ecb818f748e861810"
++      "commit": "f9946ba222e9080bb4a7573bac1408c988733b4e"
+     },
+     "mycrypto": {
+       "repo": "AI-for-column/my-crypto-bot",
+@@ -61,7 +61,7 @@
+         },
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:386 build_safe_halt（Phase 4c）"
++          "evidence": "src/seykota_bot/bot.py:392 build_safe_halt（Phase 4c）"
+         },
+         "mycrypto": {
+           "state": "n/a",
+@@ -131,7 +131,7 @@
+         },
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:123 Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）"
++          "evidence": "src/seykota_bot/bot.py:52 _CONSECUTIVE_FAILURE_LATCH_THRESHOLD Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -220,11 +220,11 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:127 append_fleet_event VERIFIED_CLOSE_PROPOSED（正式機每 15 分鐘跑一次，2026-09-18 查證 137 輪零候選）"
++          "evidence": "scripts/repair_bot.py:87 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         },
+         "seykota": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot_shadow.py:144 append_fleet_event VERIFIED_CLOSE_PROPOSED（正式機每 15 分鐘跑一次，2026-09-18 查證 137 輪零候選）"
++          "evidence": "scripts/repair_bot.py:100 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -243,14 +243,12 @@
+       "description": "修復機器人的第二個功能：照交易所成交紀錄把漏記的平倉直接寫進帳本（損益跟交易所對不上時以交易所為準）；多筆漏記依序逐輪補；只有結構對不上或交易所查不到才重試，連續 3 次失敗才升格通知。v0.21.0 起由 trade-alerts 的共用修復執行器（trade_alerts.repair_runner）提供，各策略只寫轉接器。",
+       "status": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W3",
+-          "reason": "正式機（operations 分支）跑的已是 scripts/repair_bot.py，但自動補寫開關 MOMENTUM_REPAIR_AUTO_APPLY 在正式機沒打開（6d 關著觀察到 9/24），所以實際上還不會自動補寫。v2 由共用修復執行器取代並拿掉開關。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:87 run_repair_round＋:70 staging_ledger（本策略帳本寫入器整批原子寫入）；自動補寫開關已拿掉（v2-W3）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         },
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "正式機跑的是只抓錯提建議的 scripts/repair_bot_shadow.py，沒有自動補寫這條路徑；升到共用修復執行器時才有。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 run_repair_round＋:83 staging_ledger（本策略帳本寫入器整批原子寫入），含加碼與做空（v2-W4）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -270,12 +268,11 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:268 MOMENTUM_REPAIR_PAUSED 為真就整輪跳過（第 374 行讀設定；正式機每輪輸出都帶 paused 欄位）"
++          "evidence": "scripts/repair_bot.py:87 run_repair_round 由共用修復執行器讀 MOMENTUM_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔、不查交易所不寫帳本；正式機每輪輸出都帶 paused 欄位。"
+         },
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "正式機跑的 scripts/repair_bot_shadow.py 沒有停用開關；升到共用修復執行器時一起加 SEYKOTA_REPAIR_PAUSED。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 run_repair_round 由共用修復執行器讀 SEYKOTA_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔；正式機每輪輸出都帶 paused 欄位。"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -295,12 +292,11 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:278 refresh_ops_export（2026-09-18 查證：當天資金費同步修復整支重新部署時一併帶上正式機，trading-main 每輪都在改寫 audit/ops_export.json，目前內容為空；維運通知那端的轉送開關還沒開，見「維運通知已開啟匯出轉送」）"
++          "evidence": "scripts/repair_bot.py:87 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
+         },
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "還沒有；升到共用修復執行器時一起寫。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -320,14 +316,12 @@
+       "description": "正式機／開發機上維運通知（ops-notify）的設定檔對這支策略開了 OPS_NOTIFY_<KEY>_OPS_EXPORT=on。部署狀態，無法由 CI 檢查，每次部署後人工更新。",
+       "status": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W6",
+-          "reason": "開發機已開（2026-09-17，閘門驗證通過）；正式機等 v2 一起推。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:87 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機另計（2026-09-17 已開）。"
+         },
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W6",
+-          "reason": "兩台都還沒開。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機尚未開（開發機的通知路徑會在「通知分兩則」那包重整）。"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -349,12 +343,11 @@
+         "seykota": {
+           "state": "pending",
+           "phase": "v2-W6",
+-          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。"
++          "reason": "2026-09-24：正式機轉送開關（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）與匯出軸首輪 OK 已確認，且與動能策略共用同一個 ops-notify 與 LINE 憑證（動能策略受控測試已送達、只送一次）；但趨勢策略自己還沒有任何一則通知真的經匯出檔→維運通知→LINE 送達過。要做一次趨勢策略專屬的受控測試（sent=1、手機收到、下一輪不重送）才算完成（trade-alerts #52 審閱指出）。"
+         },
+         "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W6",
+-          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:87 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 受控測試事件 3ee1c8c932f14b0e8ba7ca0ba4bf31b8（標明測試、只寫事件未開請求）19:20 UTC sent=1、使用者手機確認收到、19:30 attempted=0 未重送。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -401,14 +394,12 @@
+       "description": "正式機／開發機上維運通知（ops-notify）的設定檔列出這支策略要盯的 systemd unit。部署狀態，每次部署後人工更新。",
+       "status": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W6",
+-          "reason": "開發機已設定（盯修復機器人的 unit／timer）；正式機還沒設定。"
++          "state": "done",
++          "evidence": "deploy/mexc-momentum-repair-shadow.service 與 deploy/mexc-momentum-repair-shadow.timer 列入正式機 OPS_NOTIFY_MOMENTUM_UNITS（2026-09-24），服務單元狀態 OK。"
+         },
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W6",
+-          "reason": "兩台都還沒設定；修復機器人升級後一起盯。"
++          "state": "done",
++          "evidence": "deploy/seykota-repair-shadow.service 與 deploy/seykota-repair-shadow.timer 列入正式機 OPS_NOTIFY_SEYKOTA_UNITS（2026-09-24），服務單元狀態 OK。開發機尚未設定。"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -481,9 +472,8 @@
+           "reason": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：src/strategy.py:1561 進場用固定 client id open-{K線}-{幣種}，例外時存檔後往外拋（:1596）；註解說下一輪開頭會先向交易所同步部位——要確認這道保護在所有路徑都成立，以及這根 K 線是否已標記處理過。固定 client id 本身擋不住重複（Binance 不擋已成交市價單）。"
+         },
+         "seykota": {
+-          "state": "pending",
+-          "phase": "hotfix-seykota-order-resend",
+-          "reason": "2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162，已向 Binance 查單確認）。原因：src/seykota_bot/bot.py _resolve_market_order 把送出後的 -2013（查無訂單，其實是剛成交還查不到）當成可以重送。修正在 PR #65：送出前先記下已送出，之後只查不送，60 秒還查不到就 R3 暫停。"
++          "state": "done",
++          "evidence": "src/seykota_bot/bot.py:586 _resolve_market_order：送出前先記下已送出（:621 mark_pending_submitted），之後查不到只繼續查、絕不重送；:58 _MARKET_ORDER_VISIBILITY_SECONDS 60 秒仍查不到就以 POSITION_AMBIGUOUS 安全暫停（:644）。PR #65，2026-09-24 18:40 UTC 上正式機。"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -585,7 +575,7 @@
+       "behaviour": {
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:399 _clear_automatic_safe_halt 確認已平倉後自動解除"
++          "evidence": "src/seykota_bot/bot.py:405 _clear_automatic_safe_halt 確認已平倉後自動解除"
+         }
+       },
+       "emits_event": {
+@@ -601,7 +591,7 @@
+       "behaviour": {
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:671 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
++          "evidence": "src/seykota_bot/bot.py:716 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+         }
+       },
+       "emits_event": {
+@@ -668,7 +658,7 @@
+       "behaviour": {
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:883 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
++          "evidence": "src/seykota_bot/bot.py:928 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+         }
+       },
+       "emits_event": {
+@@ -684,7 +674,7 @@
+       "behaviour": {
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:1035 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
++          "evidence": "src/seykota_bot/bot.py:1080 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :644 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）"
+         }
+       },
+       "emits_event": {
+@@ -700,7 +690,7 @@
+       "behaviour": {
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）"
++          "evidence": "src/seykota_bot/bot.py:52 連續 3 次失敗才暫停（Phase 4d）"
+         }
+       },
+       "emits_event": {
+@@ -750,7 +740,7 @@
+       "behaviour": {
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:123 連續 3 次失敗才暫停（Phase 4d）"
++          "evidence": "src/seykota_bot/bot.py:52 連續 3 次失敗才暫停（Phase 4d）"
+         }
+       },
+       "emits_event": {
+@@ -766,7 +756,7 @@
+       "behaviour": {
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:1227 只記錄、下一輪再確認成交（Phase 3）"
++          "evidence": "src/seykota_bot/bot.py:1226 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）"
+         }
+       },
+       "emits_event": {
+@@ -782,7 +772,7 @@
+       "behaviour": {
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:1262 只記錄出場（Phase 3）"
++          "evidence": "src/seykota_bot/bot.py:1307 只記錄出場（Phase 3）"
+         }
+       },
+       "emits_event": {
+@@ -798,7 +788,7 @@
+       "behaviour": {
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/bot.py:1342 資金不足跳過進場、只記錄（Phase 3）"
++          "evidence": "src/seykota_bot/bot.py:1387 資金不足跳過進場、只記錄（Phase 3）"
+         }
+       },
+       "emits_event": {
+@@ -861,33 +851,14 @@
+       "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+       "behaviour": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W3",
+-          "reason": "正式機跑的 scripts/repair_bot.py 已有這條路徑，但自動補寫開關在正式機沒打開，所以不會發生。v2 拿掉開關、成功不通知。"
+-        }
+-      },
+-      "emits_event": {
+-        "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W3",
+-          "reason": "同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。"
+-        }
+-      }
+-    },
+-    {
+-      "code": "MOM.VERIFIED_CLOSE_PROPOSED",
+-      "behaviour": {
+-        "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W3",
+-          "reason": "退役中：正式機目前會提出修復建議；v2 由共用修復執行器取代——能對應就補、結構對不上才重試升格。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         }
+       },
+       "emits_event": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W3",
+-          "reason": "正式機的 scripts/repair_bot.py 有寫，但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+         }
+       }
+     },
+@@ -895,16 +866,14 @@
+       "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+       "behaviour": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W3",
+-          "reason": "正式機的 scripts/repair_bot.py 有這條路徑（帳本已有半套修復或寫入失敗就停手、開請求、不重試），但只有開了自動補寫才會走到；正式機開關沒開。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         }
+       },
+       "emits_event": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W3",
+-          "reason": "同上：正式機的程式會寫（v1 等級標籤），但開關沒開所以不會走到。改用共用修復執行器時換成 v2。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+         }
+       }
+     },
+@@ -912,16 +881,14 @@
+       "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+       "behaviour": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W3",
+-          "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機跑的還是 scripts/repair_bot.py，沒有「重試、連續失敗才升格」這條路徑；改用共用修復執行器時才有。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         }
+       },
+       "emits_event": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "v2-W3",
+-          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+         }
+       }
+     },
+@@ -1183,37 +1150,18 @@
+         }
+       }
+     },
+-    {
+-      "code": "SEY.VERIFIED_CLOSE_PROPOSED",
+-      "behaviour": {
+-        "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "2026-09-18 補登目錄缺口：正式機（operations 分支）已在跑 scripts/repair_bot_shadow.py（Phase 5c，跟動能策略 5b 同一設計），每輪都會找漏記平倉並提出修復建議；但 v2 目標是「以交易所為準自動補寫，只有結構對不上才重試升格」——現在只提建議、從不寫帳本，升到共用修復執行器（v2-W4）才算做到。"
+-        }
+-      },
+-      "emits_event": {
+-        "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "正式機的 scripts/repair_bot_shadow.py 有寫（每輪都跑，137 輪零候選），但用的是 v1 等級標籤 R1；此碼退役，由共用修復執行器取代時換成 v2 標籤。"
+-        }
+-      }
+-    },
+     {
+       "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+       "behaviour": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。正式機跑的 scripts/repair_bot_shadow.py 只提建議、從不寫帳本；升到共用修復執行器才會自動補寫。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         }
+       },
+       "emits_event": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+         }
+       }
+     },
+@@ -1221,16 +1169,14 @@
+       "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+       "behaviour": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "新代碼（v0.21.0 共用修復執行器發出，取代退役的 VERIFIED_CLOSE_PROPOSED）。正式機的修復機器人（只抓錯並提出修復建議） 沒有重試與升格；升到共用修復執行器時才有。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         }
+       },
+       "emits_event": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+         }
+       }
+     },
+@@ -1238,16 +1184,14 @@
+       "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+       "behaviour": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "新代碼（v0.21.0 補登，跟動能策略對等）。修復機器人（只抓錯並提出修復建議） 從不寫帳本，所以沒有「帳本不乾淨就停手」這一步；升到共用修復執行器時才有。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         }
+       },
+       "emits_event": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W4",
+-          "reason": "同上：共用修復執行器會寫，但正式機還沒改用它。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+         }
+       }
+     }
+@@ -1255,27 +1199,45 @@
+   "recent_changes": [
+     {
+       "kind": "cap",
+-      "id": "orders.single_send",
+-      "type": "added",
+-      "note": "趨勢策略真倉 09-21 重複開倉：市價單送出後查不到就重送（修正 PR #65 已合併，未部署）。其他三支的下單函式只送一次，但呼叫端還沒查完，先列 pending。"
++      "id": "repair_bot.verified_close",
++      "type": "completed",
++      "note": "分級 v2 上正式機（2026-09-24）：動能、趨勢兩支的修復機器人都改用共用修復執行器，能對應的漏記平倉直接以交易所為準補寫。",
++      "project": "momentum"
+     },
+     {
+       "kind": "cap",
+-      "id": "reconcile.unrecorded_fill_handling",
+-      "type": "added",
+-      "note": "同一事件暴露的缺口：帳本少記成交時只有對帳顯示不一致，沒有人被持續提醒，修復機器人也不處理這一類。"
++      "id": "repair_bot.verified_close",
++      "type": "completed",
++      "note": "分級 v2 上正式機（2026-09-24）：動能、趨勢兩支的修復機器人都改用共用修復執行器，能對應的漏記平倉直接以交易所為準補寫。",
++      "project": "seykota"
+     },
+     {
+       "kind": "cap",
+-      "id": "repair_bot.recurrence_escalation",
+-      "type": "added",
+-      "note": "自動修補目前不通知、也不數重複次數；一個持續漏記的 bug 會被默默補掉而永遠不被發現。"
++      "id": "notify.line_first_notice",
++      "type": "completed",
++      "note": "正式機轉送開關打開，LINE 受控測試真的送到你的手機、而且只送一次。",
++      "project": "momentum"
+     },
+     {
+       "kind": "cap",
+-      "id": "notify.error_id",
+-      "type": "added",
+-      "note": "新需求：每種錯誤固定編號，通知一定附編號、標題跟風險登記冊一致；LINE 上的對帳狀態告警目前連目錄條目都沒有。"
++      "id": "orders.single_send",
++      "type": "completed",
++      "note": "趨勢策略的「查不到就重送」修正（PR #65）已上正式機。",
++      "project": "seykota"
++    },
++    {
++      "kind": "cap",
++      "id": "ops_notify.units_axis",
++      "type": "completed",
++      "note": "正式機開始監控兩支修復機器人的背景服務有沒有掛掉。",
++      "project": "momentum"
++    },
++    {
++      "kind": "cap",
++      "id": "ops_notify.units_axis",
++      "type": "completed",
++      "note": "正式機開始監控兩支修復機器人的背景服務有沒有掛掉。",
++      "project": "seykota"
+     }
+   ]
+ }
+diff --git a/tests/test_fleet_error_catalog.py b/tests/test_fleet_error_catalog.py
+index b886988..9f0e584 100644
+--- a/tests/test_fleet_error_catalog.py
++++ b/tests/test_fleet_error_catalog.py
+@@ -172,15 +172,11 @@ def test_packaged_catalog_is_the_file_the_tests_read():
+     assert load_error_catalog() == json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+ 
+ 
+-def test_seykota_and_momentum_repair_shadow_bots_get_symmetric_catalog_entries(catalog):
+-    """seykota's Phase 5c shadow bot is the momentum 5b design ported unmodified
+-    (same single event code, same risk tier); the two must be catalogued the
+-    same way, or one strategy's rollout-bot activity is invisible on the
+-    register while the other's is not -- the exact gap this test guards."""
+-    entries = {entry["code"]: entry for entry in catalog["entries"]}
+-    mom = entries["MOM.VERIFIED_CLOSE_PROPOSED"]
+-    sey = entries["SEY.VERIFIED_CLOSE_PROPOSED"]
+-    for key in ("verdict", "risk_tier", "resume", "lands_in_phase"):
+-        assert mom[key] == sey[key], key
+-    retired = {item["code"] for item in catalog["retired_codes"]}
+-    assert {"MOM.VERIFIED_CLOSE_PROPOSED", "SEY.VERIFIED_CLOSE_PROPOSED"} <= retired
++def test_both_proposed_codes_are_retired_and_removed_together(catalog):
++    """The two repair bots' v1 "propose only" code was catalogued symmetrically
++    (a missing seykota entry once hid its bot from the register); since v2-W6
++    put the shared repair runner on the live host, both entries are gone and
++    both codes stay in retired_codes so they are never reused."""
++    codes = {"MOM.VERIFIED_CLOSE_PROPOSED", "SEY.VERIFIED_CLOSE_PROPOSED"}
++    assert not codes & {entry["code"] for entry in catalog["entries"]}
++    assert codes <= {item["code"] for item in catalog["retired_codes"]}
+diff --git a/tests/test_repair_runner.py b/tests/test_repair_runner.py
+index b86e119..3039e0a 100644
+--- a/tests/test_repair_runner.py
++++ b/tests/test_repair_runner.py
+@@ -534,4 +534,5 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
+                             if name.startswith("CODE_") and value == bare)
+             assert f"code={constant}" in call, source
+             cited += 1
+-    assert cited == 6
++    # 3 runner codes x 2 strategies; FAILED is emitted from two call sites.
++    assert cited == 8
+diff --git a/tests/test_rollout_registry.py b/tests/test_rollout_registry.py
+index 702623c..56a64b5 100644
+--- a/tests/test_rollout_registry.py
++++ b/tests/test_rollout_registry.py
+@@ -213,16 +213,26 @@ def test_row_claiming_another_strategy_is_caught(registry, catalog):
+ 
+ 
+ def test_retired_code_marked_done_is_caught(registry, catalog):
++    """While a retired code is still catalogued (its call site not yet replaced
++    on the live host), its behaviour may only be pending replacement. The real
++    catalog has no such code left since v2-W6 removed both PROPOSED entries, so
++    build one: put a retired code back into the catalog with a done row."""
+     retired = [item["code"] for item in catalog.get("retired_codes") or []]
+     assert retired, "the v2 catalog retires codes; this test needs one"
+     code = retired[0]
+-
+-    def finish(r):
+-        row = next(row for row in r["catalog"] if row["code"] == code)
++    template = next(entry for entry in catalog["entries"] if entry["code"].split(".")[0] == code.split(".")[0])
++    catalog = copy.deepcopy(catalog)
++    catalog["entries"].append({**copy.deepcopy(template), "code": code})
++    template_row = next(row for row in registry["catalog"] if row["code"] == template["code"])
++
++    def add_done_row(r):
++        row = copy.deepcopy(template_row)
++        row["code"] = code
+         for project in row["behaviour"]:
+             row["behaviour"][project] = {"state": "done", "evidence": "somewhere"}
++        r["catalog"].append(row)
+ 
+-    problems = _problems_after(registry, catalog, finish)
++    problems = _problems_after(registry, catalog, add_done_row)
+     assert any(f"{code} is retired" in p for p in problems)
+ 
+ 
