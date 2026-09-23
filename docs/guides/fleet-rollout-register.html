@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>48</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>49</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>9</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">48 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">49 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -2055,8 +2055,70 @@
      ]
     }
    ],
-   "sub": "交易所有成交、帳本沒記到（例如重複成交、數量記錯）時，要有人被通知，並用追加的更正事件把帳本改成跟交易所一致，而不是只在對帳頁面顯示不一致。",
+   "sub": "交易所有成交、帳本沒記到（例如重複成交、數量記錯）時，要有人被通知，並用追加的更正事件把帳本改成跟交易所一致，而不是只在對帳頁面顯示不一致。判斷規則：多出來的成交如果跟帳本裡已記錄的某張單 clientOrderId 相同，就是策略自己重複送單，一律 R3 立刻通知並附根因追查指令；部位還開著時是否減倉交給人決定，不自動做。",
    "title": "帳本少記交易所成交時，升格通知並以交易所為準更正"
+  },
+  {
+   "added_recent": true,
+   "anchor": "cap-repair_bot.recurrence_escalation",
+   "complete": false,
+   "dots": {
+    "btc-competition": "pending",
+    "momentum": "pending",
+    "mycrypto": "pending",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "repair_bot.recurrence_escalation",
+   "kind": "cap",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+       "state": "pending",
+       "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
+      }
+     ]
+    },
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+       "state": "pending",
+       "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
+      }
+     ]
+    },
+    {
+     "label": "加密策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+       "state": "pending",
+       "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+      }
+     ]
+    },
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+       "state": "pending",
+       "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+      }
+     ]
+    }
+   ],
+   "sub": "自動修補（R1）本身不通知，但同一支策略在一段期間內修補次數超過門檻時，要發一次 R2 通知「這個修補一直在發生，請追根因」，讓修復機器人不會變成掩蓋 bug 的工具。門檻與期間待定。",
+   "title": "自動修補重複發生時升格通知"
   },
   {
    "added_recent": false,
@@ -3500,6 +3562,7 @@
   "binance-funding-sync": 2,
   "hotfix-seykota-order-resend": 1,
   "naming-rollout": 0,
+  "repair-recurrence": 4,
   "unrecorded-fill": 4,
   "v2-W2": 0,
   "v2-W3": 9,
@@ -3519,7 +3582,8 @@
   "naming-rollout",
   "7e",
   "hotfix-seykota-order-resend",
-  "unrecorded-fill"
+  "unrecorded-fill",
+  "repair-recurrence"
  ],
  "phases": {
   "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
@@ -3530,6 +3594,7 @@
   "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
   "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
+  "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
   "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
   "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
   "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
@@ -3560,28 +3625,34 @@
    "note": "同一事件暴露的缺口：帳本少記成交時只有對帳顯示不一致，沒有人被持續提醒，修復機器人也不處理這一類。",
    "project": null,
    "title": "帳本少記交易所成交時，升格通知並以交易所為準更正"
+  },
+  {
+   "anchor": "cap-repair_bot.recurrence_escalation",
+   "note": "自動修補目前不通知、也不數重複次數；一個持續漏記的 bug 會被默默補掉而永遠不被發現。",
+   "project": null,
+   "title": "自動修補重複發生時升格通知"
   }
  ],
  "totals": {
   "btc-competition": {
    "done": 12,
    "n/a": 8,
-   "pending": 11
+   "pending": 12
   },
   "momentum": {
    "done": 15,
    "n/a": 4,
-   "pending": 18
+   "pending": 19
   },
   "mycrypto": {
    "done": 12,
    "n/a": 5,
-   "pending": 20
+   "pending": 21
   },
   "seykota": {
    "done": 19,
    "n/a": 2,
-   "pending": 38
+   "pending": 39
   }
  }
 }

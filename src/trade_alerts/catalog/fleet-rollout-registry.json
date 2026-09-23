@@ -22,7 +22,8 @@
     "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
     "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
     "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
-    "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED"
+    "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+    "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug"
   },
   "sources": {
     "momentum": {
@@ -494,7 +495,7 @@
     {
       "id": "reconcile.unrecorded_fill_handling",
       "title": "帳本少記交易所成交時，升格通知並以交易所為準更正",
-      "description": "交易所有成交、帳本沒記到（例如重複成交、數量記錯）時，要有人被通知，並用追加的更正事件把帳本改成跟交易所一致，而不是只在對帳頁面顯示不一致。",
+      "description": "交易所有成交、帳本沒記到（例如重複成交、數量記錯）時，要有人被通知，並用追加的更正事件把帳本改成跟交易所一致，而不是只在對帳頁面顯示不一致。判斷規則：多出來的成交如果跟帳本裡已記錄的某張單 clientOrderId 相同，就是策略自己重複送單，一律 R3 立刻通知並附根因追查指令；部位還開著時是否減倉交給人決定，不自動做。",
       "status": {
         "seykota": {
           "state": "pending",
@@ -515,6 +516,33 @@
           "state": "pending",
           "phase": "unrecorded-fill",
           "reason": "對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
+        }
+      }
+    },
+    {
+      "id": "repair_bot.recurrence_escalation",
+      "title": "自動修補重複發生時升格通知",
+      "description": "自動修補（R1）本身不通知，但同一支策略在一段期間內修補次數超過門檻時，要發一次 R2 通知「這個修補一直在發生，請追根因」，讓修復機器人不會變成掩蓋 bug 的工具。門檻與期間待定。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "repair-recurrence",
+          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "repair-recurrence",
+          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "repair-recurrence",
+          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "repair-recurrence",
+          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
         }
       }
     }
@@ -1204,6 +1232,12 @@
       "id": "reconcile.unrecorded_fill_handling",
       "type": "added",
       "note": "同一事件暴露的缺口：帳本少記成交時只有對帳顯示不一致，沒有人被持續提醒，修復機器人也不處理這一類。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.recurrence_escalation",
+      "type": "added",
+      "note": "自動修補目前不通知、也不數重複次數；一個持續漏記的 bug 會被默默補掉而永遠不被發現。"
     }
   ]
 }
