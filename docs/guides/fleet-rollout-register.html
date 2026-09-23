@@ -1988,7 +1988,7 @@
        "aspect": null,
        "phase": "逐支查核市價單的所有呼叫端：送出結果不明（逾時、查不到）時，同一輪或下一輪會不會對同一個訊號再送一張",
        "state": "pending",
-       "text": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：src/btc_competition/executor.py:154 只在 ccxt.InsufficientFunds 時換用新 client id {cid}-r{i} 縮量重試，其他例外往外拋；runner.py 的呼叫端與下一輪行為尚未查。"
+       "text": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：src/btc_competition/executor.py:154 只在 ccxt.InsufficientFunds 時換用新 client id {cid}-r{i} 縮量重試，其他例外往外拋；src/btc_competition/runner.py 的呼叫端與下一輪行為尚未查。"
       }
      ]
     }
