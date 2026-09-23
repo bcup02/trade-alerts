@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>44</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>46</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>9</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">44 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">46 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -209,7 +209,7 @@
   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
   <div id="glossaryHost"></div>
   <div class="foot">
-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-22 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-23 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 0213a01</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations b48b88b</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations b8eda43</code>。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
   </div>
@@ -1625,6 +1625,130 @@
    "title": "維運通知已開啟匯出轉送（部署設定）"
   },
   {
+   "added_recent": true,
+   "anchor": "cap-notify.line_first_notice",
+   "complete": false,
+   "dots": {
+    "btc-competition": "pending",
+    "momentum": "pending",
+    "mycrypto": "pending",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "notify.line_first_notice",
+   "kind": "cap",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "分級 v2：部署到開發機與正式機",
+       "state": "pending",
+       "text": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。"
+      }
+     ]
+    },
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "分級 v2：部署到開發機與正式機",
+       "state": "pending",
+       "text": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。"
+      }
+     ]
+    },
+    {
+     "label": "加密策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
+       "state": "pending",
+       "text": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。　這支策略目前還沒有任何會通知人的事件來源。"
+      }
+     ]
+    },
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
+       "state": "pending",
+       "text": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。　這支策略目前還沒有任何會通知人的事件來源。"
+      }
+     ]
+    }
+   ],
+   "sub": "維運通知讀策略的匯出檔後，把需要人處理的事送一則到 LINE。LINE 有每月額度，所以刻意只發第一則、不重複提醒；重複提醒是 Telegram 的工作（見下一列）。兩台主機都要有這條路。",
+   "title": "需要人處理的通知真的送到 LINE（只發第一則）"
+  },
+  {
+   "added_recent": true,
+   "anchor": "cap-notify.telegram_repeat",
+   "complete": false,
+   "dots": {
+    "btc-competition": "pending",
+    "momentum": "pending",
+    "mycrypto": "pending",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "notify.telegram_repeat",
+   "kind": "cap",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+       "state": "pending",
+       "text": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+      }
+     ]
+    },
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+       "state": "pending",
+       "text": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+      }
+     ]
+    },
+    {
+     "label": "加密策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+       "state": "pending",
+       "text": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+      }
+     ]
+    },
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+       "state": "pending",
+       "text": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+      }
+     ]
+    }
+   ],
+   "sub": "Telegram 沒有額度問題，所以從第一則起持續提醒到有人處理，並附「開始處理」「處理完成」兩顆按鈕；由 Telegram 遙控（ops-control）負責發送。兩台主機都要有這條路。",
+   "title": "需要人處理的通知在 Telegram 持續提醒（含兩顆按鈕）"
+  },
+  {
    "added_recent": false,
    "anchor": "cap-ops_notify.units_axis",
    "complete": false,
@@ -2511,7 +2635,7 @@
    "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_FAILED",
    "complete": false,
    "dots": {
@@ -3138,7 +3262,7 @@
    "title": "R2｜漏記平倉已算出修復方案，附提案通知"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
    "complete": false,
    "dots": {
@@ -3173,7 +3297,7 @@
    "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_FAILED",
    "complete": false,
    "dots": {
@@ -3208,7 +3332,7 @@
    "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
    "complete": false,
    "dots": {
@@ -3244,16 +3368,17 @@
   }
  ],
  "phase_counts": {
-  "8-btc-competition": 8,
+  "7e": 4,
+  "8-btc-competition": 9,
   "8-momentum": 3,
-  "8-mycrypto": 17,
+  "8-mycrypto": 18,
   "8-seykota": 20,
   "binance-funding-sync": 2,
   "naming-rollout": 0,
   "v2-W2": 0,
   "v2-W3": 9,
   "v2-W4": 11,
-  "v2-W6": 4
+  "v2-W6": 6
  },
  "phase_order": [
   "v2-W2",
@@ -3265,9 +3390,11 @@
   "8-mycrypto",
   "8-btc-competition",
   "binance-funding-sync",
-  "naming-rollout"
+  "naming-rollout",
+  "7e"
  ],
  "phases": {
+  "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
   "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
   "8-momentum": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
   "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
@@ -3293,50 +3420,38 @@
  },
  "recent_summary": [
   {
-   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_FAILED",
-   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
-   "project": "動能策略",
-   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
+   "anchor": "cap-notify.line_first_notice",
+   "note": "登記通知渠道的缺口：正式機的 LINE 轉送開關還沒開、開發機根本沒有 LINE（目前用 Telegram 暫代）。",
+   "project": null,
+   "title": "需要人處理的通知真的送到 LINE（只發第一則）"
   },
   {
-   "anchor": "rule-SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
-   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
-   "project": "趨勢策略",
-   "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
-  },
-  {
-   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_FAILED",
-   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
-   "project": "趨勢策略",
-   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
-  },
-  {
-   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
-   "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。",
-   "project": "趨勢策略",
-   "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+   "anchor": "cap-notify.telegram_repeat",
+   "note": "登記 Telegram 持續提醒（第 7 關 e）整條還沒做——之前只存在於計畫書，登記冊上看不到。",
+   "project": null,
+   "title": "需要人處理的通知在 Telegram 持續提醒（含兩顆按鈕）"
   }
  ],
  "totals": {
   "btc-competition": {
    "done": 11,
    "n/a": 8,
-   "pending": 8
+   "pending": 10
   },
   "momentum": {
    "done": 14,
    "n/a": 4,
-   "pending": 15
+   "pending": 17
   },
   "mycrypto": {
    "done": 11,
    "n/a": 5,
-   "pending": 17
+   "pending": 19
   },
   "seykota": {
    "done": 19,
    "n/a": 2,
-   "pending": 34
+   "pending": 36
   }
  }
 }

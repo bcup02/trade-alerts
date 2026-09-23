@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-09-22",
+  "updated_at": "2026-09-23",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -19,7 +19,8 @@
     "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
     "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
     "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
-    "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞"
+    "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
+    "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）"
   },
   "sources": {
     "momentum": {
@@ -332,6 +333,60 @@
           "state": "pending",
           "phase": "8-btc-competition",
           "reason": "還沒有匯出檔。"
+        }
+      }
+    },
+    {
+      "id": "notify.line_first_notice",
+      "title": "需要人處理的通知真的送到 LINE（只發第一則）",
+      "description": "維運通知讀策略的匯出檔後，把需要人處理的事送一則到 LINE。LINE 有每月額度，所以刻意只發第一則、不重複提醒；重複提醒是 Telegram 的工作（見下一列）。兩台主機都要有這條路。",
+      "status": {
+        "seykota": {
+          "state": "pending",
+          "phase": "v2-W6",
+          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。"
+        },
+        "momentum": {
+          "state": "pending",
+          "phase": "v2-W6",
+          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。　這支策略目前還沒有任何會通知人的事件來源。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "8-btc-competition",
+          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。　這支策略目前還沒有任何會通知人的事件來源。"
+        }
+      }
+    },
+    {
+      "id": "notify.telegram_repeat",
+      "title": "需要人處理的通知在 Telegram 持續提醒（含兩顆按鈕）",
+      "description": "Telegram 沒有額度問題，所以從第一則起持續提醒到有人處理，並附「開始處理」「處理完成」兩顆按鈕；由 Telegram 遙控（ops-control）負責發送。兩台主機都要有這條路。",
+      "status": {
+        "seykota": {
+          "state": "pending",
+          "phase": "7e",
+          "reason": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+        },
+        "momentum": {
+          "state": "pending",
+          "phase": "7e",
+          "reason": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "7e",
+          "reason": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "7e",
+          "reason": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
         }
       }
     },
@@ -1086,32 +1141,16 @@
   ],
   "recent_changes": [
     {
-      "kind": "rule",
-      "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+      "kind": "cap",
+      "id": "notify.line_first_notice",
       "type": "added",
-      "project": "momentum",
-      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
+      "note": "登記通知渠道的缺口：正式機的 LINE 轉送開關還沒開、開發機根本沒有 LINE（目前用 Telegram 暫代）。"
     },
     {
-      "kind": "rule",
-      "id": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "kind": "cap",
+      "id": "notify.telegram_repeat",
       "type": "added",
-      "project": "seykota",
-      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
-      "type": "added",
-      "project": "seykota",
-      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
-      "type": "added",
-      "project": "seykota",
-      "note": "v2-W2：共用修復執行器（trade-alerts v0.21.0）的新代碼，已在錯誤目錄與登記冊登記；策略改用執行器前一律未做。"
+      "note": "登記 Telegram 持續提醒（第 7 關 e）整條還沒做——之前只存在於計畫書，登記冊上看不到。"
     }
   ]
 }
