@@ -1632,7 +1632,7 @@
     "btc-competition": "pending",
     "momentum": "recent",
     "mycrypto": "pending",
-    "seykota": "recent"
+    "seykota": "pending"
    },
    "has_recent": true,
    "id": "notify.line_first_notice",
@@ -1643,9 +1643,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": null,
-       "state": "done",
-       "text": "scripts/repair_bot.py:100 匯出檔與動能策略走同一條正式機維運通知→LINE 路徑（同一個 ops-notify、同一組 LINE 憑證，2026-09-24 動能策略受控測試已確認送達、只送一次）；趨勢策略本身尚未有真實通知送出過。開發機仍無 LINE 帳號。"
+       "phase": "分級 v2：部署到開發機與正式機",
+       "state": "pending",
+       "text": "2026-09-24：正式機轉送開關（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）與匯出軸首輪 OK 已確認，且與動能策略共用同一個 ops-notify 與 LINE 憑證（動能策略受控測試已送達、只送一次）；但趨勢策略自己還沒有任何一則通知真的經匯出檔→維運通知→LINE 送達過。要做一次趨勢策略專屬的受控測試（sent=1、手機收到、下一輪不重送）才算完成（trade-alerts #52 審閱指出）。"
       }
      ]
     },
@@ -3561,7 +3561,7 @@
   "v2-W2": 0,
   "v2-W3": 0,
   "v2-W4": 0,
-  "v2-W6": 0
+  "v2-W6": 1
  },
  "phase_order": [
   "v2-W2",
@@ -3631,12 +3631,6 @@
    "title": "需要人處理的通知真的送到 LINE（只發第一則）"
   },
   {
-   "anchor": "cap-notify.line_first_notice",
-   "note": "正式機轉送開關打開，LINE 受控測試真的送到你的手機、而且只送一次。",
-   "project": "趨勢策略",
-   "title": "需要人處理的通知真的送到 LINE（只發第一則）"
-  },
-  {
    "anchor": "cap-orders.single_send",
    "note": "趨勢策略的「查不到就重送」修正（PR #65）已上正式機。",
    "project": "趨勢策略",
@@ -3672,9 +3666,9 @@
    "pending": 23
   },
   "seykota": {
-   "done": 32,
+   "done": 31,
    "n/a": 2,
-   "pending": 25
+   "pending": 26
   }
  }
 }
