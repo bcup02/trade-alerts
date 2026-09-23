@@ -213,16 +213,26 @@ def test_row_claiming_another_strategy_is_caught(registry, catalog):
 
 
 def test_retired_code_marked_done_is_caught(registry, catalog):
+    """While a retired code is still catalogued (its call site not yet replaced
+    on the live host), its behaviour may only be pending replacement. The real
+    catalog has no such code left since v2-W6 removed both PROPOSED entries, so
+    build one: put a retired code back into the catalog with a done row."""
     retired = [item["code"] for item in catalog.get("retired_codes") or []]
     assert retired, "the v2 catalog retires codes; this test needs one"
     code = retired[0]
+    template = next(entry for entry in catalog["entries"] if entry["code"].split(".")[0] == code.split(".")[0])
+    catalog = copy.deepcopy(catalog)
+    catalog["entries"].append({**copy.deepcopy(template), "code": code})
+    template_row = next(row for row in registry["catalog"] if row["code"] == template["code"])
 
-    def finish(r):
-        row = next(row for row in r["catalog"] if row["code"] == code)
+    def add_done_row(r):
+        row = copy.deepcopy(template_row)
+        row["code"] = code
         for project in row["behaviour"]:
             row["behaviour"][project] = {"state": "done", "evidence": "somewhere"}
+        r["catalog"].append(row)
 
-    problems = _problems_after(registry, catalog, finish)
+    problems = _problems_after(registry, catalog, add_done_row)
     assert any(f"{code} is retired" in p for p in problems)
 
 

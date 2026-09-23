@@ -172,15 +172,11 @@ def test_packaged_catalog_is_the_file_the_tests_read():
     assert load_error_catalog() == json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
 
 
-def test_seykota_and_momentum_repair_shadow_bots_get_symmetric_catalog_entries(catalog):
-    """seykota's Phase 5c shadow bot is the momentum 5b design ported unmodified
-    (same single event code, same risk tier); the two must be catalogued the
-    same way, or one strategy's rollout-bot activity is invisible on the
-    register while the other's is not -- the exact gap this test guards."""
-    entries = {entry["code"]: entry for entry in catalog["entries"]}
-    mom = entries["MOM.VERIFIED_CLOSE_PROPOSED"]
-    sey = entries["SEY.VERIFIED_CLOSE_PROPOSED"]
-    for key in ("verdict", "risk_tier", "resume", "lands_in_phase"):
-        assert mom[key] == sey[key], key
-    retired = {item["code"] for item in catalog["retired_codes"]}
-    assert {"MOM.VERIFIED_CLOSE_PROPOSED", "SEY.VERIFIED_CLOSE_PROPOSED"} <= retired
+def test_both_proposed_codes_are_retired_and_removed_together(catalog):
+    """The two repair bots' v1 "propose only" code was catalogued symmetrically
+    (a missing seykota entry once hid its bot from the register); since v2-W6
+    put the shared repair runner on the live host, both entries are gone and
+    both codes stay in retired_codes so they are never reused."""
+    codes = {"MOM.VERIFIED_CLOSE_PROPOSED", "SEY.VERIFIED_CLOSE_PROPOSED"}
+    assert not codes & {entry["code"] for entry in catalog["entries"]}
+    assert codes <= {item["code"] for item in catalog["retired_codes"]}

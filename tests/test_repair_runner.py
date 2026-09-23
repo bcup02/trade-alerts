@@ -534,4 +534,5 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
                             if name.startswith("CODE_") and value == bare)
             assert f"code={constant}" in call, source
             cited += 1
-    assert cited == 6
+    # 3 runner codes x 2 strategies; FAILED is emitted from two call sites.
+    assert cited == 8
