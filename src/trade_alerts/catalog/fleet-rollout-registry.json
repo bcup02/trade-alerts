@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-09-23",
+  "updated_at": "2026-09-24",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -20,7 +20,12 @@
     "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
     "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
     "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
-    "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）"
+    "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+    "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
+    "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+    "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+    "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+    "single-send-audit": "逐支查核市價單的所有呼叫端：送出結果不明（逾時、查不到）時，同一輪或下一輪會不會對同一個訊號再送一張"
   },
   "sources": {
     "momentum": {
@@ -462,6 +467,114 @@
         "btc-competition": {
           "state": "done",
           "evidence": "AI-for-column/btc-bull-market-competition#33（2026-09-19 squash 合併 a878166，外部審閱 PASS）：README、docs/branch-governance.md、docs/btc-competition-onboarding-plan.md、docs/execution-flow.md、docs/recon-strategy4.md 加 src/btc_competition/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。過程中排除了兩處剛好包含子字串、但語意其實是買賣盤報價、跟交易模式無關的詞，也刻意不動 tests/test_portfolio_snapshot_adapter.py 的跨 repo digest 一致性 fixture（要跟 portfolio-query 同步才能改，留給 n6）。"
+        }
+      }
+    },
+    {
+      "id": "orders.single_send",
+      "title": "市價單只送一次，不因查不到就重送",
+      "description": "送出市價單之後，如果交易所一時查不到這張單，只能繼續查、不能再送一次——Binance 對已成交的市價單不會擋重複的 client id，重送就是重複開倉。只有交易所明確拒絕（根本沒受理）時才可以重送。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "single-send-audit",
+          "reason": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：src/strategy.py:1561 進場用固定 client id open-{K線}-{幣種}，例外時存檔後往外拋（:1596）；註解說下一輪開頭會先向交易所同步部位——要確認這道保護在所有路徑都成立，以及這根 K 線是否已標記處理過。固定 client id 本身擋不住重複（Binance 不擋已成交市價單）。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "hotfix-seykota-order-resend",
+          "reason": "2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162，已向 Binance 查單確認）。原因：src/seykota_bot/bot.py _resolve_market_order 把送出後的 -2013（查無訂單，其實是剛成交還查不到）當成可以重送。修正在 PR #65：送出前先記下已送出，之後只查不送，60 秒還查不到就 R3 暫停。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "single-send-audit",
+          "reason": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：mexc_futures_bot.py:398 _place_market_order_with_ledger 單次呼叫 create_market_order，失敗記帳後往外拋；呼叫端與主迴圈尚未查。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "single-send-audit",
+          "reason": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：src/btc_competition/executor.py:154 只在 ccxt.InsufficientFunds 時換用新 client id {cid}-r{i} 縮量重試，其他例外往外拋；src/btc_competition/runner.py 的呼叫端與下一輪行為尚未查。"
+        }
+      }
+    },
+    {
+      "id": "reconcile.unrecorded_fill_handling",
+      "title": "帳本少記交易所成交時，升格通知並以交易所為準更正",
+      "description": "交易所有成交、帳本沒記到（例如重複成交、數量記錯）時，要有人被通知，並用追加的更正事件把帳本改成跟交易所一致，而不是只在對帳頁面顯示不一致。判斷規則：多出來的成交如果跟帳本裡已記錄的某張單 clientOrderId 相同，就是策略自己重複送單，一律 R3 立刻通知並附根因追查指令；部位還開著時是否減倉交給人決定，不自動做。",
+      "status": {
+        "seykota": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "實例：2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162，已向 Binance 查單確認）；帳本以為部位 0.008、實際 0.011，這筆交易帳本淨損益 −10.387、以交易所為準 −13.233。DIVERGED 從 09-21 16:10 UTC 起持續，只在變化當下發過一次狀態告警。對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
+        },
+        "momentum": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
+        }
+      }
+    },
+    {
+      "id": "repair_bot.recurrence_escalation",
+      "title": "自動修補重複發生時升格通知",
+      "description": "自動修補（R1）本身不通知，但同一支策略在一段期間內修補次數超過門檻時，要發一次 R2 通知「這個修補一直在發生，請追根因」，讓修復機器人不會變成掩蓋 bug 的工具。門檻與期間待定。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "repair-recurrence",
+          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "repair-recurrence",
+          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "repair-recurrence",
+          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "repair-recurrence",
+          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+        }
+      }
+    },
+    {
+      "id": "notify.error_id",
+      "title": "通知一定附錯誤編號，標題與風險登記冊一致",
+      "description": "錯誤目錄每條有固定編號（ERR-001 起，全機隊一個流水號、永不重用，退役保留原號）；每則通知第一行是【編號】＋目錄標題，自動檢查擋住標題不一致。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "error-ids",
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "error-ids",
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "error-ids",
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "error-ids",
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
         }
       }
     }
@@ -1142,15 +1255,27 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "notify.line_first_notice",
+      "id": "orders.single_send",
       "type": "added",
-      "note": "登記通知渠道的缺口：正式機的 LINE 轉送開關還沒開、開發機根本沒有 LINE（目前用 Telegram 暫代）。"
+      "note": "趨勢策略真倉 09-21 重複開倉：市價單送出後查不到就重送（修正 PR #65 已合併，未部署）。其他三支的下單函式只送一次，但呼叫端還沒查完，先列 pending。"
     },
     {
       "kind": "cap",
-      "id": "notify.telegram_repeat",
+      "id": "reconcile.unrecorded_fill_handling",
       "type": "added",
-      "note": "登記 Telegram 持續提醒（第 7 關 e）整條還沒做——之前只存在於計畫書，登記冊上看不到。"
+      "note": "同一事件暴露的缺口：帳本少記成交時只有對帳顯示不一致，沒有人被持續提醒，修復機器人也不處理這一類。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.recurrence_escalation",
+      "type": "added",
+      "note": "自動修補目前不通知、也不數重複次數；一個持續漏記的 bug 會被默默補掉而永遠不被發現。"
+    },
+    {
+      "kind": "cap",
+      "id": "notify.error_id",
+      "type": "added",
+      "note": "新需求：每種錯誤固定編號，通知一定附編號、標題跟風險登記冊一致；LINE 上的對帳狀態告警目前連目錄條目都沒有。"
     }
   ]
 }
