@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>49</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>50</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>9</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">49 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">50 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -2121,6 +2121,68 @@
    "title": "自動修補重複發生時升格通知"
   },
   {
+   "added_recent": true,
+   "anchor": "cap-notify.error_id",
+   "complete": false,
+   "dots": {
+    "btc-competition": "pending",
+    "momentum": "pending",
+    "mycrypto": "pending",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "notify.error_id",
+   "kind": "cap",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+       "state": "pending",
+       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+      }
+     ]
+    },
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+       "state": "pending",
+       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+      }
+     ]
+    },
+    {
+     "label": "加密策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+       "state": "pending",
+       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+      }
+     ]
+    },
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+       "state": "pending",
+       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+      }
+     ]
+    }
+   ],
+   "sub": "錯誤目錄每條有固定編號（ERR-001 起，全機隊一個流水號、永不重用，退役保留原號）；每則通知第一行是【編號】＋目錄標題，自動檢查擋住標題不一致。",
+   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+  },
+  {
    "added_recent": false,
    "anchor": "rule-SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
    "complete": false,
@@ -3560,6 +3622,7 @@
   "8-mycrypto": 18,
   "8-seykota": 20,
   "binance-funding-sync": 2,
+  "error-ids": 4,
   "hotfix-seykota-order-resend": 1,
   "naming-rollout": 0,
   "repair-recurrence": 4,
@@ -3583,7 +3646,8 @@
   "7e",
   "hotfix-seykota-order-resend",
   "unrecorded-fill",
-  "repair-recurrence"
+  "repair-recurrence",
+  "error-ids"
  ],
  "phases": {
   "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
@@ -3592,6 +3656,7 @@
   "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
   "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
   "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
+  "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
   "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
   "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
@@ -3631,28 +3696,34 @@
    "note": "自動修補目前不通知、也不數重複次數；一個持續漏記的 bug 會被默默補掉而永遠不被發現。",
    "project": null,
    "title": "自動修補重複發生時升格通知"
+  },
+  {
+   "anchor": "cap-notify.error_id",
+   "note": "新需求：每種錯誤固定編號，通知一定附編號、標題跟風險登記冊一致；LINE 上的對帳狀態告警目前連目錄條目都沒有。",
+   "project": null,
+   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
   }
  ],
  "totals": {
   "btc-competition": {
    "done": 12,
    "n/a": 8,
-   "pending": 12
+   "pending": 13
   },
   "momentum": {
    "done": 15,
    "n/a": 4,
-   "pending": 19
+   "pending": 20
   },
   "mycrypto": {
    "done": 12,
    "n/a": 5,
-   "pending": 21
+   "pending": 22
   },
   "seykota": {
    "done": 19,
    "n/a": 2,
-   "pending": 39
+   "pending": 40
   }
  }
 }

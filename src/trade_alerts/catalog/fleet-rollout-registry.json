@@ -23,7 +23,8 @@
     "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
     "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
     "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
-    "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug"
+    "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+    "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改"
   },
   "sources": {
     "momentum": {
@@ -543,6 +544,33 @@
           "state": "pending",
           "phase": "repair-recurrence",
           "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+        }
+      }
+    },
+    {
+      "id": "notify.error_id",
+      "title": "通知一定附錯誤編號，標題與風險登記冊一致",
+      "description": "錯誤目錄每條有固定編號（ERR-001 起，全機隊一個流水號、永不重用，退役保留原號）；每則通知第一行是【編號】＋目錄標題，自動檢查擋住標題不一致。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "error-ids",
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "error-ids",
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "error-ids",
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "error-ids",
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
         }
       }
     }
@@ -1238,6 +1266,12 @@
       "id": "repair_bot.recurrence_escalation",
       "type": "added",
       "note": "自動修補目前不通知、也不數重複次數；一個持續漏記的 bug 會被默默補掉而永遠不被發現。"
+    },
+    {
+      "kind": "cap",
+      "id": "notify.error_id",
+      "type": "added",
+      "note": "新需求：每種錯誤固定編號，通知一定附編號、標題跟風險登記冊一致；LINE 上的對帳狀態告警目前連目錄條目都沒有。"
     }
   ]
 }
