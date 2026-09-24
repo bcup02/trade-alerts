@@ -1185,7 +1185,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "seykota",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:376"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:420"
       ],
       "current": {
         "latch": null,
@@ -1194,7 +1194,7 @@
       },
       "verdict": "JUDGEMENT",
       "risk_tier": "R3",
-      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：以交易所成交重述整筆已平倉的交易（build_trade_correction，數量不平就拒絕），追加 trade_correction、排入 Google 表更正、更新 LINE 查詢。每輪最多寫一筆；寫完立刻通知，不開請求。",
+      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：以交易所成交重述整筆已平倉的交易（build_trade_correction，數量不平就拒絕；同一筆交易一併納入的其他未記單必須逐張證明是策略自己下的——重複送單或帶策略自己的編號特徵——有任何一張查不出來源就整筆不寫），追加 trade_correction、排入 Google 表更正、更新 LINE 查詢。每輪最多寫一筆；寫完立刻通知，不開請求。",
       "human_action": "帳本已經更正好，不用再動帳本；要做的是追出為什麼同一張單被送了兩次（重送 bug），並確認修正。",
       "resume": "n/a",
       "lands_in_phase": 8,
@@ -1214,7 +1214,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "seykota",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:450"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
       ],
       "current": {
         "latch": null,
@@ -1223,7 +1223,7 @@
       },
       "verdict": "JUDGEMENT",
       "risk_tier": "R3",
-      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
+      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、同一筆交易還有其他查不出來源的未記單、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
       "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
       "resume": "n/a",
       "lands_in_phase": 8,
@@ -1245,7 +1245,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:376"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:420"
       ],
       "current": {
         "latch": null,
@@ -1254,7 +1254,7 @@
       },
       "verdict": "JUDGEMENT",
       "risk_tier": "R3",
-      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：以交易所成交重述整筆已平倉的交易（build_trade_correction，數量不平就拒絕），追加 trade_correction、排入 Google 表更正、更新 LINE 查詢。每輪最多寫一筆；寫完立刻通知，不開請求。",
+      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：以交易所成交重述整筆已平倉的交易（build_trade_correction，數量不平就拒絕；同一筆交易一併納入的其他未記單必須逐張證明是策略自己下的——重複送單或帶策略自己的編號特徵——有任何一張查不出來源就整筆不寫），追加 trade_correction、排入 Google 表更正、更新 LINE 查詢。每輪最多寫一筆；寫完立刻通知，不開請求。",
       "human_action": "帳本已經更正好，不用再動帳本；要做的是追出為什麼同一張單被送了兩次（重送 bug），並確認修正。",
       "resume": "n/a",
       "lands_in_phase": 8,
@@ -1274,7 +1274,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:450"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
       ],
       "current": {
         "latch": null,
@@ -1283,7 +1283,7 @@
       },
       "verdict": "JUDGEMENT",
       "risk_tier": "R3",
-      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
+      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、同一筆交易還有其他查不出來源的未記單、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
       "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
       "resume": "n/a",
       "lands_in_phase": 8,
@@ -1305,7 +1305,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "btc-competition",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:420"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:464"
       ],
       "current": {
         "latch": null,
@@ -1334,7 +1334,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "btc-competition",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:450"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
       ],
       "current": {
         "latch": null,
@@ -1343,7 +1343,7 @@
       },
       "verdict": "JUDGEMENT",
       "risk_tier": "R3",
-      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
+      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、同一筆交易還有其他查不出來源的未記單、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
       "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
       "resume": "n/a",
       "lands_in_phase": 8,
@@ -1365,7 +1365,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "mycrypto",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:450"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
       ],
       "current": {
         "latch": null,

@@ -13,11 +13,14 @@ timer.  The operator's rule (2026-09-25):
 * the ledger is corrected automatically **only** when the extra order is
   certainly the strategy's own duplicate send -- the exchange reports the
   same clientOrderId as an order the ledger already recorded -- and the
-  exchange fills restate the trade completely.  The correction is appended
+  exchange fills restate the trade completely -- every other unrecorded
+  order folded into that restatement proven the strategy's own as well.  The
+  correction is appended
   (never an edit) and the operator is told at once (``UNRECORDED_FILL_CORRECTED``,
   R3): a duplicate send is a bug whose root cause must be found;
 * every other unrecorded fill -- unknown origin (e.g. an order placed by
-  hand in the exchange app), a duplicate whose position is still open, one
+  hand in the exchange app), a duplicate whose position is still open or
+  whose trade also holds an order of unknown origin, one
   the fills cannot restate, one whose order could not be looked up -- is
   never written: one request, one R3 notice with steps
   (``UNRECORDED_FILL_UNRESOLVED``).  The request is withdrawn automatically
@@ -72,6 +75,7 @@ POSITION_OPEN = "POSITION_OPEN"            # a duplicate, but its trade is still
 NOT_RESTATABLE = "NOT_RESTATABLE"          # the fills do not restate the trade
 LOOKUP_FAILED = "LOOKUP_FAILED"            # the order could not be looked up for too long
 WRITE_FAILED = "WRITE_FAILED"              # the correction write failed or could not be verified
+UNATTRIBUTED_ORDERS = "UNATTRIBUTED_ORDERS"  # another unrecorded order in the trade is of unknown origin
 
 #: Recorded orders within this distance of an unrecorded fill are the ones
 #: whose client ids are compared with it.  A duplicate send lands within
@@ -100,6 +104,14 @@ class UnrecordedFillAdapter:
     ``style="spot"``, ``append_spot_fills(symbol, order_id, fills)`` appends
     the order's fills as the strategy's own rows (projection included) and
     returns a dict with at least ``event_ids``.
+
+    ``owns_client_order_id(client_order_id)`` says whether a clientOrderId is
+    certainly one this strategy sends (its own id scheme, including the ids
+    its native-stop exits carry).  Restating a trade folds in the *other*
+    unrecorded orders of that trade (2026-09-21: the stop's exit was not
+    recorded either); each of them must be attributed on its own -- a
+    duplicate of a recorded order, or an id this predicate owns -- or nothing
+    is written.  ``None``: no other order can be attributed.
     """
 
     project: str
@@ -111,6 +123,7 @@ class UnrecordedFillAdapter:
     append_trade_correction: Callable[[dict[str, Any]], str] | None = None
     after_trade_correction: Callable[[dict[str, Any], str], dict[str, Any]] | None = None
     append_spot_fills: Callable[[str, str, list[dict[str, Any]]], dict[str, Any]] | None = None
+    owns_client_order_id: Callable[[str], bool] | None = None
     norm_symbol: Callable[[Any], str] = norm_symbol_plain
     is_paper: Callable[[dict[str, Any]], bool] = is_paper_event
     qty_multiplier: float = 1.0
@@ -278,6 +291,16 @@ class _Round:
             self._client_ids[order_id] = str(value).strip() if value not in (None, "") else None
         return self._client_ids[order_id]
 
+    def _attributed(self, symbol: str, order_id: str, duplicate_client_id: str) -> bool:
+        """True only when the order's clientOrderId proves this strategy sent it."""
+        cid = self._client_id(symbol, order_id)
+        if not cid:
+            return False
+        if cid == duplicate_client_id:
+            return True
+        owns = self.adapter.owns_client_order_id
+        return bool(owns is not None and owns(cid))
+
     def _duplicate_of(self, order: dict[str, Any], ledger_events: list[dict[str, Any]]) -> dict[str, Any] | None:
         """The recorded ledger event whose order has the same clientOrderId, or None."""
         mine = self._client_id(str(order["symbol"]), order["order_id"])
@@ -321,6 +344,27 @@ class _Round:
         group = [o for o in orders if o["norm_symbol"] == order["norm_symbol"]
                  and o["time_ms"] is not None and start <= o["time_ms"] <= end]
         group_ids = sorted({o["order_id"] for o in group} | {order["order_id"]})
+        # Every other order folded into the restatement needs its own proof
+        # of origin (PR #67 review): the flatness check only shows the fills
+        # balance, not that none of them was placed by hand in the app.
+        try:
+            unattributed = [
+                oid for oid in group_ids
+                if oid != order["order_id"] and not self._attributed(str(order["symbol"]), oid, match["client_order_id"])
+            ]
+        except Exception as exc:  # noqa: BLE001 -- fail closed, retried like any lookup failure
+            age = self.moment_ms - int(order["time_ms"] or 0)
+            if age < LOOKUP_GRACE_MS:
+                self.result["deferred"].append({"order_id": order["order_id"], "reason": f"{type(exc).__name__}: {exc}"})
+                return {"order_ids": group_ids}
+            self._unresolved(order, LOOKUP_FAILED, f"查不到同一筆交易其他未記訂單的自訂編號：{type(exc).__name__}: {exc}",
+                             match=match, order_ids=group_ids)
+            return {"order_ids": group_ids}
+        if unattributed:
+            self._unresolved(order, UNATTRIBUTED_ORDERS, (
+                f"這張單確定是策略重複送單，但交易 {trade_id} 同時段還有未記的訂單 {', '.join(unattributed)} "
+                "無法確認是策略下的（例如在 App 手動下的單），所以整筆不自動更正。"), match=match, order_ids=group_ids)
+            return {"order_ids": group_ids}
         recorded = sorted({str(e["order_id"]) for e in [*opens, *closes]
                            if e.get("order_id") is not None and str(e.get("order_id")).strip()})
         entry_side = "buy" if str(opens[0].get("side") or closes[0].get("side") or "long").lower() == "long" else "sell"

@@ -95,7 +95,8 @@ def _trade_adapter(paths: UnrecordedFillPaths, exchange: Exchange, *, append=Non
         project="seykota", style="trade", client_ids=True, evidence_source="fixture",
         client_order_id=exchange.client_order_id, fetch_fills=exchange.fetch_fills,
         append_trade_correction=append or append_trade_correction,
-        after_trade_correction=lambda fields, event_id: {"queued": event_id}, **kw,
+        after_trade_correction=lambda fields, event_id: {"queued": event_id},
+        owns_client_order_id=kw.pop("owns", lambda cid: cid.startswith("sk-")), **kw,
     )
 
 
@@ -143,6 +144,33 @@ def test_the_next_round_finds_nothing_left_to_do(tmp_path):
     again = _round(adapter, paths)  # ledger_status is still the stale DIVERGED one
     assert again["unrecorded_orders"] == [] and again["corrected"] == []
     assert _codes(paths) == [CODE_CORRECTED]
+
+
+def test_a_hand_placed_order_in_the_same_trade_blocks_the_whole_correction(tmp_path):
+    """PR #67 review: the duplicate is certain, but another unrecorded order in
+    the trade's window came from the app.  Even if every fill balances, the
+    ledger is not written."""
+    paths = _setup(tmp_path)
+    exchange = Exchange(_client_ids(**{EXIT: "web_Xk2pQ9manual"}))
+    result = _round(_trade_adapter(paths, exchange), paths)
+
+    assert result["corrected"] == []
+    [u] = result["unresolved"]
+    assert u["reason_code"] == "UNATTRIBUTED_ORDERS" and set(u["order_ids"]) == {DUPLICATE, EXIT}
+    assert not any(e.get("event_type") == TRADE_CORRECTION_EVENT for e in read_ledger(paths.ledger))
+    assert _codes(paths) == [CODE_UNRESOLVED]
+    [request] = outstanding_error_requests(paths.request_queue)
+    assert set(request["details"]["order_ids"]) == {DUPLICATE, EXIT}
+    again = _round(_trade_adapter(paths, exchange), paths)  # one incident, one notice
+    assert again["unresolved"] == [] and _codes(paths) == [CODE_UNRESOLVED]
+
+
+def test_without_an_ownership_rule_no_other_order_can_be_folded_in(tmp_path):
+    paths = _setup(tmp_path)
+    result = _round(_trade_adapter(paths, Exchange(_client_ids()), owns=None), paths)
+    assert result["corrected"] == []
+    assert [u["reason_code"] for u in result["unresolved"]] == ["UNATTRIBUTED_ORDERS"]
+    assert not any(e.get("event_type") == TRADE_CORRECTION_EVENT for e in read_ledger(paths.ledger))
 
 
 def test_a_fill_of_unknown_origin_is_never_written(tmp_path):
