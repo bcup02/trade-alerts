@@ -243,12 +243,13 @@
       "lands_in_phase": 4,
       "rationale": "策略對自己管的是哪一個部位失去把握，任何自動動作都可能作用在錯的部位上。",
       "operator_message": {
-        "what": "交易所回報的倉位資料，系統看不懂或認不出來是哪一筆。",
-        "direction": "系統停下來，等人確認交易所上的實際部位。交易所資料是標準答案。",
+        "what": "策略對自己的部位失去把握：可能是一張市價單送出後 60 秒都在交易所查不到（不知道成交了沒），也可能是交易所回報的倉位資料認不出是哪一筆。",
+        "direction": "系統停下來，不再送任何單，等人確認交易所上的實際部位、以及那張單到底有沒有成交。交易所資料是標準答案。",
         "steps": [
-          "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）。",
-          "如果有不該存在的倉位（例如手動開的），先處理掉。",
-          "確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+          "在正式機執行 `seykota-resume preview` 看暫停證據：有 client_order_id／submitted_at 就是某張市價單送出後查不到。",
+          "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）；有 client id 就用它在訂單紀錄找那張單，確認有沒有成交、成交幾張。",
+          "如果有不該存在的倉位（例如手動開的、或重複成交多出來的），先處理掉。",
+          "確認後解除暫停：執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。帳本若少記了成交，交易平倉後照「帳本更正」流程（scripts/append_trade_correction.py）補上。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼策略對自己的部位失去把握。先看暫停證據（seykota-resume preview）：若有 client_order_id／submitted_at，代表市價單送出後 60 秒在交易所查不到——讀 src/seykota_bot/bot.py 的 _resolve_market_order，用這個 client id 向交易所查單（GET /fapi/v1/order 帶 origClientOrderId）確認它到底有沒有成交、成交幾張，對照帳本與實際部位；否則是交易所回報的部位無法唯一辨識——讀 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了。兩種情況都要提出治本修正。"

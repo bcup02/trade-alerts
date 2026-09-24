@@ -320,7 +320,7 @@
    "bot": "seykota",
    "bot_label": "趨勢策略",
    "code": "SEY.POSITION_AMBIGUOUS",
-   "direction": "系統停下來，等人確認交易所上的實際部位。交易所資料是標準答案。",
+   "direction": "系統停下來，不再送任何單，等人確認交易所上的實際部位、以及那張單到底有沒有成交。交易所資料是標準答案。",
    "emits_event": {
     "phase": "8-seykota",
     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
@@ -331,14 +331,15 @@
    ],
    "open": true,
    "steps": [
-    "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）。",
-    "如果有不該存在的倉位（例如手動開的），先處理掉。",
-    "確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
+    "在正式機執行 `seykota-resume preview` 看暫停證據：有 client_order_id／submitted_at 就是某張市價單送出後查不到。",
+    "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）；有 client id 就用它在訂單紀錄找那張單，確認有沒有成交、成交幾張。",
+    "如果有不該存在的倉位（例如手動開的、或重複成交多出來的），先處理掉。",
+    "確認後解除暫停：執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。帳本若少記了成交，交易平倉後照「帳本更正」流程（scripts/append_trade_correction.py）補上。",
     "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
    ],
    "tier": "R3",
    "title": "交易所部位資料無法唯一辨識",
-   "what": "交易所回報的倉位資料，系統看不懂或認不出來是哪一筆。"
+   "what": "策略對自己的部位失去把握：可能是一張市價單送出後 60 秒都在交易所查不到（不知道成交了沒），也可能是交易所回報的倉位資料認不出是哪一筆。"
   },
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。",

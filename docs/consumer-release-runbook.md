@@ -691,3 +691,20 @@ trade-alerts：v0.21.1（資料修補版：錯誤目錄＋一致性登記冊，�
           尚未更正的既有狀態，與本次部署無關。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.22.0（帳本更正事件 trade_correction＋錯誤清單文字）
+變更摘要：1. 新增 trade_alerts.trade_correction（#58，h4）：只追加的帳本更正事件 trade-correction/v1，
+             build_trade_correction 只從交易所成交重述已平倉交易；recorded_order_ids／fold_ledger_trades 內建套用，
+             更正不改變部位。Google 路徑新增 correct_close_v2（投影佇列強制動作↔事件類型成對）；兩份 Apps Script
+             新增 correctClose，只能取代目前生效的版本。登記冊新能力 ledger.trade_correction。
+          2. 錯誤清單：BTC.ORDER_STATUS_UNKNOWN（#56，h7）；SEY.POSITION_AMBIGUOUS 的白話說明補上「市價單送出後 60 秒
+             查不到」這種情況（h6，追查指令已於 v0.21.1 補上）。
+          向後相容：沒有 trade_correction 事件的帳本，對帳與彙整結果與 v0.21.1 相同。
+受影響消費專案：趨勢策略（接上更正事件的讀寫與兩段式更正工具，必須改釘）；動能、維運通知改釘以維持全機隊同一版本
+          （動能的共用對帳自動認得更正事件；維運通知取得新錯誤清單文字）。
+部署入口：各專案既有部署腳本（開發機 → 正式機）。Apps Script 接收端（apps_script/google_ledger_receiver.gs）
+          須由使用者在 Google Apps Script 編輯器重新部署，correct_close_v2 才會生效。
+版本驗證／服務驗證／部署時間：待改釘與部署完成後補記。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```
