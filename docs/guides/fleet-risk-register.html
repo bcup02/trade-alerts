@@ -95,9 +95,9 @@
   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>36 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    四支策略目前所有已知的「出問題」情況，共 <b>37 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>27 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>28 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -739,6 +739,37 @@
    "tier": "R2",
    "title": "連續 3 天該再平衡卻零成交",
    "what": "連續 3 天該重新調整持倉比例，卻完全成交不了任何一筆。"
+  },
+  {
+   "ai_prompt": "請在 btc-bull-market-competition 追查一張結果不明的單：先看暫停證據（btc-competition-resume preview）裡的 symbol、side、base_qty、client_order_id、submitted_at，用這個 client id 向 Binance 現貨查單（GET /api/v3/order 帶 origClientOrderId，唯讀）確認有沒有成交、成交量與均價與手續費；對照本地帳本（audit/trading_ledger.jsonl）——若已成交而帳本沒有對應的 spot_fill，提出補記的做法（先給我確認再執行）。再讀 src/btc_competition/executor.py 的 _resolve 與當時的日誌，判斷 60 秒都查不到的原因（網路、交易所延遲、還是 client id 對不上），提出治本修正。",
+   "behaviour": {
+    "phase": "hotfix-btc-order-resend",
+    "reason": "PR #35 尚未上正式機。正式機現行版本遇到結果不明的單不會暫停，而是同一輪重新規劃再送（見 orders.single_send）。",
+    "state": "pending"
+   },
+   "bot": "btc-competition",
+   "bot_label": "競賽策略",
+   "code": "BTC.ORDER_STATUS_UNKNOWN",
+   "direction": "系統停下來，這一輪不再送任何單，免得同一筆調整被送兩次。交易所的紀錄是標準答案。",
+   "emits_event": {
+    "phase": "8-btc-competition",
+    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — PR #35 尚未上正式機。正式機現行版本遇到結果不明的單不會暫停，而是同一輪重新規劃再送（見 orders.single_send）。（預定：緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35））",
+    "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+   ],
+   "open": true,
+   "steps": [
+    "在正式機執行 `btc-competition-resume preview`，記下暫停證據裡的交易對、方向、數量、client id 與送出時間。",
+    "到交易所 App 的訂單紀錄，用那個 client id（或送出時間與交易對）找這張單，確認有沒有成交、成交多少。",
+    "確認後解除暫停：執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。下一輪會從實際餘額接著把持倉調整做完——那張單若已成交就不會再送。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，把那筆成交補進帳本並追查原因。"
+   ],
+   "tier": "R3",
+   "title": "送出的單 60 秒內確定不了有沒有成交",
+   "what": "有一張調整持倉的單送出去後，60 秒內都確定不了它到底有沒有成交。"
   },
   {
    "ai_prompt": null,

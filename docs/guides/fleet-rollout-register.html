@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>42</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>43</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>15</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">42 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">43 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -1632,9 +1632,9 @@
     "btc-competition": "pending",
     "momentum": "done",
     "mycrypto": "pending",
-    "seykota": "recent"
+    "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "notify.line_first_notice",
    "kind": "cap",
    "rows": [
@@ -1940,11 +1940,11 @@
    "complete": false,
    "dots": {
     "btc-competition": "pending",
-    "momentum": "pending",
-    "mycrypto": "pending",
+    "momentum": "recent",
+    "mycrypto": "recent",
     "seykota": "done"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "orders.single_send",
    "kind": "cap",
    "rows": [
@@ -1964,9 +1964,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "逐支查核市價單的所有呼叫端：送出結果不明（逾時、查不到）時，同一輪或下一輪會不會對同一個訊號再送一張",
-       "state": "pending",
-       "text": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：src/strategy.py:1561 進場用固定 client id open-{K線}-{幣種}，例外時存檔後往外拋（:1596）；註解說下一輪開頭會先向交易所同步部位——要確認這道保護在所有路徑都成立，以及這根 K 線是否已標記處理過。固定 client id 本身擋不住重複（Binance 不擋已成交市價單）。"
+       "phase": null,
+       "state": "done",
+       "text": "src/strategy.py:1473 進場迴圈前就寫 last_processed_candle，:1596 送單例外時先存檔再往外拋 → 主迴圈 polling_seconds 後重跑同一根 K 線走 :1189 重複 K 線分支、不再進場；src/strategy.py:1206 每輪開頭先向交易所同步部位、:1216 認回已成交但未追蹤的單；成交確認不了（entry_unconfirmed）同樣不追蹤、重跑仍是重複 K 線。平倉失敗不存檔：重跑先同步部位，已成交就釋放；沒成交則因原生停損已先取消而 PROTECTION_UNVERIFIED 暫停，不再送；平倉一律 reduce-only（src/binance_client.py:55）。src/binance_client.py:184 _mutate 只在 -1021（交易所拒絕）時重送。固定 client id 本身擋不住重複，保護全在上述呼叫端。2026-09-24 h7 查核＋模擬測試確認；回歸測試與自我檢查行為檢查 mexc-4h-momentum-trailing-stop #100。"
       }
      ]
     },
@@ -1975,9 +1975,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "逐支查核市價單的所有呼叫端：送出結果不明（逾時、查不到）時，同一輪或下一輪會不會對同一個訊號再送一張",
-       "state": "pending",
-       "text": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：mexc_futures_bot.py:398 _place_market_order_with_ledger 單次呼叫 create_market_order，失敗記帳後往外拋；呼叫端與主迴圈尚未查。"
+       "phase": null,
+       "state": "done",
+       "text": "mexc_futures_bot.py:410 只呼叫一次 create_market_order、失敗記帳後往外拋（不帶 client id，MEXC 端無從去重）；ccxt 4.5.71 預設不重試，:334 init_exchange 沒開 maxRetriesOnFailure；mexc_futures_bot.py:1569 run_forever 例外後睡 POLLING_SECONDS 才跑下一輪；:1147 每輪開頭先查部位、:1169 有部位就只管理不開新倉，查部位失敗則在送任何單之前就丟例外；平倉 :1438 帶 reduceOnly。2026-09-24 h7 查核＋模擬測試確認；回歸測試 my-crypto-bot #49。"
       }
      ]
     },
@@ -1986,9 +1986,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "逐支查核市價單的所有呼叫端：送出結果不明（逾時、查不到）時，同一輪或下一輪會不會對同一個訊號再送一張",
+       "phase": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
        "state": "pending",
-       "text": "下單函式本身只送一次，但呼叫端的查核還沒做完，所以不能標 done（trade-alerts #50 審閱 BLOCK 指出）。要確認：送出後丟例外或結果不明時，外層是否會在同一輪重試，或下一輪重新評估同一個訊號而再送一張（用同一個或新的 client id 都算）。已知線索：src/btc_competition/executor.py:154 只在 ccxt.InsufficientFunds 時換用新 client id {cid}-r{i} 縮量重試，其他例外往外拋；src/btc_competition/runner.py 的呼叫端與下一輪行為尚未查。"
+       "text": "2026-09-24 h7 查核發現並以模擬測試重現：src/btc_competition/runner.py:233 收斂迴圈把任何單腿例外都當成沒成交，下一輪用新鮮餘額重新規劃、換新 client id 再送；單其實已成交（逾時、網路錯誤、-1006/-1007）而緊接著的查餘額還沒反映時，同一腿會被送兩次。現貨、受餘額上限約束，損失是多付手續費／滑價並漏記一筆成交。修正 btc-bull-market-competition PR #35：明確拒絕才重新規劃；結果不明用 client id 查單最多 60 秒，查不到就停止本輪、以 ORDER_STATUS_UNKNOWN 暫停。上正式機後改 done。"
       }
      ]
     }
@@ -2953,6 +2953,41 @@
    "title": "R2｜連續 3 天該再平衡卻零成交"
   },
   {
+   "added_recent": true,
+   "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
+   "complete": false,
+   "dots": {
+    "btc-competition": "pending",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "BTC.ORDER_STATUS_UNKNOWN",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+       "state": "pending",
+       "text": "PR #35 尚未上正式機。正式機現行版本遇到結果不明的單不會暫停，而是同一輪重新規劃再送（見 orders.single_send）。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
+       "state": "pending",
+       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+      }
+     ]
+    }
+   ],
+   "sub": "BTC.ORDER_STATUS_UNKNOWN",
+   "title": "R3｜送出的單 60 秒內確定不了有沒有成交"
+  },
+  {
    "added_recent": false,
    "anchor": "rule-BTC.REBALANCE_PENDING",
    "complete": false,
@@ -3547,16 +3582,16 @@
  ],
  "phase_counts": {
   "7e": 4,
-  "8-btc-competition": 9,
+  "8-btc-competition": 10,
   "8-momentum": 3,
   "8-mycrypto": 18,
   "8-seykota": 20,
   "binance-funding-sync": 2,
   "error-ids": 4,
+  "hotfix-btc-order-resend": 2,
   "hotfix-seykota-order-resend": 0,
   "naming-rollout": 0,
   "repair-recurrence": 4,
-  "single-send-audit": 3,
   "unrecorded-fill": 4,
   "v2-W2": 0,
   "v2-W3": 0,
@@ -3579,7 +3614,7 @@
   "unrecorded-fill",
   "repair-recurrence",
   "error-ids",
-  "single-send-audit"
+  "hotfix-btc-order-resend"
  ],
  "phases": {
   "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
@@ -3589,10 +3624,10 @@
   "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
   "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
   "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+  "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
   "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
   "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
-  "single-send-audit": "逐支查核市價單的所有呼叫端：送出結果不明（逾時、查不到）時，同一輪或下一輪會不會對同一個訊號再送一張",
   "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
   "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
   "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
@@ -3613,27 +3648,39 @@
  },
  "recent_summary": [
   {
-   "anchor": "cap-notify.line_first_notice",
-   "note": "趨勢策略自己的 LINE 受控測試也送到你的手機、只送一次——分級 v2 最後一格完成。",
-   "project": "趨勢策略",
-   "title": "需要人處理的通知真的送到 LINE（只發第一則）"
+   "anchor": "cap-orders.single_send",
+   "note": "動能策略查核完成：送單結果不明時，同一輪不會重試、下一輪也不會對同一根 K 線再進場（回歸測試 #100）。",
+   "project": "動能策略",
+   "title": "市價單只送一次，不因查不到就重送"
+  },
+  {
+   "anchor": "cap-orders.single_send",
+   "note": "加密策略查核完成：下一輪先查部位，已成交就只管理不再開倉（回歸測試 #49）。",
+   "project": "加密策略",
+   "title": "市價單只送一次，不因查不到就重送"
+  },
+  {
+   "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
+   "note": "競賽策略查核發現會重送，新增這條暫停規則；修正 PR #35 上正式機前維持未做。",
+   "project": "競賽策略",
+   "title": "R3｜送出的單 60 秒內確定不了有沒有成交"
   }
  ],
  "totals": {
   "btc-competition": {
    "done": 11,
    "n/a": 8,
-   "pending": 14
+   "pending": 16
   },
   "momentum": {
-   "done": 24,
+   "done": 25,
    "n/a": 4,
-   "pending": 9
+   "pending": 8
   },
   "mycrypto": {
-   "done": 11,
+   "done": 12,
    "n/a": 5,
-   "pending": 23
+   "pending": 22
   },
   "seykota": {
    "done": 32,

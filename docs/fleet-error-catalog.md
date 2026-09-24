@@ -64,24 +64,24 @@ Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（P
 2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 修復機器人（只抓錯並提出修復建議） 從部署起就一直在發這個事件，卻從未登記進目錄，
 導致一致性登記冊上這支策略的修復機器人 完全看不到對應紀錄，見下方 §3.1，當時合計 **34 條**；2026-09-22 v2-W2 共用修復執行器
 補上它會發出的代碼：兩支策略各一條 `VERIFIED_CLOSE_REPAIR_FAILED`（R2，取代退役的 `*_PROPOSED`），seykota 另補
-`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，目前合計 **38 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，當時合計 **38 條**；2026-09-24 v0.21.1 把 `MOM／SEY.VERIFIED_CLOSE_PROPOSED` 移出 entries（留在 `retired_codes`）剩 36 條；同日 h7 查核補上 `BTC.ORDER_STATUS_UNKNOWN`——競賽策略送單結果不明時改為查單、查不到就暫停，不再重新規劃重送，見 §3.3，目前合計 **37 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
 Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
 
 | 判定 | 條數 | 佔比 |
 |---|---|---|
 | `MECHANICAL`（動作固定） | 12 | 32% |
-| `JUDGEMENT`（真的要人判斷） | 26 | 68% |
+| `JUDGEMENT`（真的要人判斷） | 25 | 68% |
 
 | 風險等級（v2） | 條數 |
 |---|---|
 | R0 只記錄 | 9 |
 | R1 自動、不通知 | 3 |
-| R2 自動嘗試、失敗才通知 | 14 |
-| R3 必須人工 | 12 |
+| R2 自動嘗試、失敗才通知 | 12 |
+| R3 必須人工 | 13 |
 
 下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
 
-### 3.1 ed-seykota（18 條）
+### 3.1 ed-seykota（17 條＋1 條已退役）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
@@ -99,7 +99,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `SEY.CLOSE_FILL_PENDING` | 誤標 critical | MECHANICAL | R0 | **P3** |
 | `SEY.TRADE_EXIT` | 誤標 critical | MECHANICAL | R0 | **P3** |
 | `SEY.ENTRY_SKIPPED_MIN_CAPITAL` | 誤標 critical | MECHANICAL | R0 | **P3** |
-| `SEY.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知（2026-09-18 補登，見下方說明） | JUDGEMENT | R2 | P8（v2） |
+| `SEY.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知（2026-09-18 補登，見下方說明；v0.21.1 已退役、移出 entries） | JUDGEMENT | R2 | P8（v2） |
 | `SEY.VERIFIED_CLOSE_AUTO_REPAIRED` | 未發出（共用修復執行器，v2-W4 接上） | MECHANICAL | R1 | P8（v2） |
 | `SEY.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R2 | P8（v2） |
 | `SEY.VERIFIED_CLOSE_REPAIR_BLOCKED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R3 | P8（v2） |
@@ -109,14 +109,14 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R1 自動清 latch）；平倉也失敗代表真倉
 有裸露部位而且程式的補救手段已經失敗過一次（→ R3，全機隊風險最高的一類）。
 
-### 3.2 momentum（7 條）
+### 3.2 momentum（6 條＋1 條已退役）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
 | `MOM.PROTECTION_UNVERIFIED` | latch dict，3 觸發點共用 | JUDGEMENT | R3 | P4 |
 | `MOM.STATE_REPAIRED_SAFE_HALT` | 人工工具寫入的 latch | JUDGEMENT | R3 | P4 |
 | `MOM.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重試 | MECHANICAL | R0 | — |
-| `MOM.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知 | JUDGEMENT | R2 | P8（v2） |
+| `MOM.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知（v0.21.1 已退役、移出 entries） | JUDGEMENT | R2 | P8（v2） |
 | `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R1 | **P6** |
 | `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R3 | **P6** |
 | `MOM.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W3 接上） | JUDGEMENT | R2 | P8（v2） |
@@ -132,17 +132,23 @@ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原�
 `SEY.VERIFIED_CLOSE_PROPOSED`）發出這個事件從未登記進 v1 目錄，2026-09-18 補登進 v2 目錄——跟 momentum 對等的處置、
 同一個理由、同樣列進 `retired_codes`，seykota 升到共用修復執行器（v2-W4）時一起取代退役。
 
-### 3.3 btc-competition（4 條）
+### 3.3 btc-competition（5 條）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
 | `BTC.BOOK_CORRUPT_NEGATIVE_BALANCE` | latch（4 個扁平欄位） | JUDGEMENT | R3 | P4 |
 | `BTC.EXECUTION_BLOCKED_ZERO_FILLS` | latch | JUDGEMENT | R2 | P8（v2） |
+| `BTC.ORDER_STATUS_UNKNOWN` | latch（h7 新增，PR #35） | JUDGEMENT | R3 | P4 |
 | `BTC.REBALANCE_PENDING` | 不 latch，自動續做 | MECHANICAL | R0 | — |
 | `BTC.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重新拋出 | MECHANICAL | R0 | — |
 
 btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障」分開的實作，這個區辨在 Phase 4
 要推廣到其他三支。
+
+`BTC.ORDER_STATUS_UNKNOWN`（2026-09-24，h7）：收斂迴圈原本把任何單腿例外都當成「沒成交」、下一輪用新鮮餘額重新規劃
+並換新 client id 再送；單其實已成交而餘額還沒反映時，同一腿會被送兩次（查核時以模擬測試重現）。修正後只有交易所明確
+拒絕才重新規劃；結果不明就用 client id 查單最多 60 秒，查不到就停止本輪、以此代碼暫停並保留目標比例，等人確認。
+跟 `SEY.POSITION_AMBIGUOUS` 的 60 秒查證同一條機隊規則（一致性登記冊 `orders.single_send`）。
 
 ### 3.4 my-crypto（7 條）
 

@@ -704,6 +704,38 @@
       }
     },
     {
+      "code": "BTC.ORDER_STATUS_UNKNOWN",
+      "title": "送出的單 60 秒內確定不了有沒有成交",
+      "project": "btc-competition",
+      "sources": [
+        "src/btc_competition/executor.py:302",
+        "src/btc_competition/runner.py:385"
+      ],
+      "current": {
+        "latch": "ORDER_STATUS_UNKNOWN",
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "維持 latch；本輪不再送任何單，保留目標比例（pending_target_weights）。",
+      "human_action": "到交易所用 client id 查那張單有沒有成交、成交多少，對照帳本後以 btc-competition-resume 解除；解除後下一輪從真實餘額接著做完再平衡。",
+      "resume": "two_stage_fingerprint",
+      "lands_in_phase": 4,
+      "rationale": "單可能已經成交、只是還查不到；這時用新鮮餘額重新規劃再送一次，就是把同一筆調整送兩次（2026-09-24 查核時重現）。Binance 只擋仍掛著的訂單的重複 client id，已成交的不擋，所以只能等人確認，不能自動重送。",
+      "operator_message": {
+        "what": "有一張調整持倉的單送出去後，60 秒內都確定不了它到底有沒有成交。",
+        "direction": "系統停下來，這一輪不再送任何單，免得同一筆調整被送兩次。交易所的紀錄是標準答案。",
+        "steps": [
+          "在正式機執行 `btc-competition-resume preview`，記下暫停證據裡的交易對、方向、數量、client id 與送出時間。",
+          "到交易所 App 的訂單紀錄，用那個 client id（或送出時間與交易對）找這張單，確認有沒有成交、成交多少。",
+          "確認後解除暫停：執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。下一輪會從實際餘額接著把持倉調整做完——那張單若已成交就不會再送。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，把那筆成交補進帳本並追查原因。"
+        ],
+        "ai_prompt": "請在 btc-bull-market-competition 追查一張結果不明的單：先看暫停證據（btc-competition-resume preview）裡的 symbol、side、base_qty、client_order_id、submitted_at，用這個 client id 向 Binance 現貨查單（GET /api/v3/order 帶 origClientOrderId，唯讀）確認有沒有成交、成交量與均價與手續費；對照本地帳本（audit/trading_ledger.jsonl）——若已成交而帳本沒有對應的 spot_fill，提出補記的做法（先給我確認再執行）。再讀 src/btc_competition/executor.py 的 _resolve 與當時的日誌，判斷 60 秒都查不到的原因（網路、交易所延遲、還是 client id 對不上），提出治本修正。"
+      }
+    },
+    {
       "code": "BTC.REBALANCE_PENDING",
       "title": "部分成交，目標權重尚未達成",
       "project": "btc-competition",
