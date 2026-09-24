@@ -1,0 +1,54 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 5093416..d76d5c1 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -713,6 +713,25 @@ trade-alerts：v0.22.0（帳本更正事件 trade_correction＋錯誤清單文
+           09:02 UTC 用兩段式工具在正式機帳本追加兩筆更正（預覽經使用者確認）；09:15 兩筆 correct_close_v2
+           CONFIRMED、帳本對交易所 RECONCILED（09-21 起的 DIVERGED 解除）、LINE 查詢真倉已實現損益 11.019→8.215；
+           09:30 帳本對 Google 表 RECONCILED。
+-          動能、維運通知：改釘 v0.22.0 尚未做，完成後補記。
++          維運通知：改釘 v0.22.0（bcup02/ops-notify#25）2026-09-24 開發機 10:23 UTC、正式機 11:34 UTC 部署，
++          首輪 17 項讀數、零錯誤。動能：改釘（mexc-4h-momentum-trailing-stop#102）2026-09-24 10:23 UTC 上開發機，
++          正式機待 9/25 與競賽策略修正同批推送後補記。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
++
++```text
++trade-alerts：v0.23.0（帳本少記交易所成交的共用處理程式，g1）
++變更摘要：1. 新增 trade_alerts.unrecorded_fill（#67，g1-1）：接手對帳列出的帳本未記成交。只有確定是策略自己重複送單
++             （交易所 clientOrderId 與帳本已記某張單相同）、交易已平倉、交易所成交能完整重述，且一併納入的其他未記單
++             也逐張證明是策略下的，才自動追加更正（期貨 trade_correction／現貨補記 spot_fill），並一律 R3 通知；
++             其他一律不寫帳本，開請求＋R3（附原因碼）。每輪最多寫一次，只做唯讀查詢。
++          2. 錯誤清單新增 7 條 R3：SEY/MOM/BTC.UNRECORDED_FILL_CORRECTED、SEY/MOM/BTC/MYC.UNRECORDED_FILL_UNRESOLVED；
++             登記冊新列皆 pending（phase unrecorded-fill）。
++          3. 錯誤清單 h11 資料（#65）：SEY.PROTECTION_MOVE_DEFERRED、SEY.PROTECTION_REPLACE_FAILED 文字更新、
++             SEY.PROTECTION_ORPHAN_CANCEL_FAILED 列入 retired_codes。
++          向後相容：新模組只有在策略接上 UnrecordedFillAdapter 後才會執行；既有 API 不變。
++受影響消費專案：趨勢、動能、競賽、加密四支策略（g1-3～g1-6 各自接上時改釘）；維運通知改釘以取得新錯誤清單文字。
++部署入口：各專案既有部署腳本（開發機 → 正式機）。
++版本驗證／服務驗證／部署時間：待改釘與部署完成後補記。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
+diff --git a/pyproject.toml b/pyproject.toml
+index 1dafb2a..a9a0f89 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.22.0"
++version = "0.23.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index bae9c98..a1b5cc6 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -333,4 +333,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.22.0"
++__version__ = "0.23.0"
