@@ -46,6 +46,8 @@ from typing import Any, Callable
 
 import requests
 
+from .trade_correction import apply_trade_corrections, correction_order_ids
+
 log = logging.getLogger("trade_alerts.ledger_reconcile")
 
 # --------------------------------------------------------------------------- #
@@ -238,12 +240,15 @@ def is_paper_event(event: dict[str, Any], *, live_close_estimate_is_real: bool =
 
 
 def recorded_order_ids(real_events: list[dict[str, Any]]) -> set[str]:
+    """Exchange order ids the ledger accounts for: every event's ``order_id``
+    plus the ``exchange_order_ids`` of appended ``trade_correction`` events (an
+    order the strategy sent but never recorded, restated from the exchange)."""
     ids: set[str] = set()
     for e in real_events:
         oid = e.get("order_id")
         if oid is not None and str(oid).strip():
             ids.add(str(oid))
-    return ids
+    return ids | correction_order_ids(real_events)
 
 
 def _paper_only_trade_ids(
@@ -547,9 +552,14 @@ def fold_ledger_trades(
     with its real open/close filtered out as paper -- is NOT a real position and
     is dropped (stops DRY_RUN ``order_attempt`` leak-through appearing as phantom
     ``SHEET_MISSING_ROW`` divergences).
+
+    Appended ``trade_correction`` events are applied first (see
+    :mod:`trade_alerts.trade_correction`): ``close_event`` is the effective,
+    corrected close.  A correction that no longer applies raises
+    ``TradeCorrectionError`` rather than being silently skipped.
     """
     trades: dict[str, dict[str, Any]] = {}
-    for event in real_events:
+    for event in apply_trade_corrections(real_events):
         tid = event.get("trade_id")
         if not isinstance(tid, str) or not tid:
             continue

@@ -126,6 +126,17 @@ from .repair_runner import (
     repair_paused,
     run_repair_round,
 )
+from .trade_correction import (
+    CORRECTED_FIELDS,
+    TRADE_CORRECTION_EVENT,
+    TRADE_CORRECTION_SCHEMA,
+    TradeCorrectionError,
+    apply_trade_corrections,
+    build_trade_correction,
+    correction_order_ids,
+    correction_projection_fields,
+    validate_trade_correction,
+)
 from .ledger_reconcile import (
     CLOSE_MARKERS,
     DRY_RUN_SOURCES,
@@ -156,6 +167,15 @@ from .ledger_reconcile import (
 )
 
 __all__ = [
+    "CORRECTED_FIELDS",
+    "TRADE_CORRECTION_EVENT",
+    "TRADE_CORRECTION_SCHEMA",
+    "TradeCorrectionError",
+    "apply_trade_corrections",
+    "build_trade_correction",
+    "correction_order_ids",
+    "correction_projection_fields",
+    "validate_trade_correction",
     "AlertChannel",
     "AlertDispatcher",
     "AlertEvent",

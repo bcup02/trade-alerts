@@ -198,6 +198,42 @@ assert.deepEqual(route(v2Close), {ok: true, row: 4, provenance_status: 'CONFIRME
 assert.deepEqual(route(v2Close), {ok: true, row: 4, idempotent: true});
 // exit_time (col F, index 5): 2026-08-26T01:00:00Z -> Taipei text.
 assert.equal(projectSheet.rows[3][5], '2026-08-26 9:00:00');
+// correct_close_v2 (h4): a ledger trade_correction may only supersede the
+// projection in force -- the confirmed close, then the latest confirmed
+// correction -- and it also rewrites the entry price / volume and notes.
+const digestOf = projection => crypto.createHash('sha256').update(canonicalJson(projection), 'utf8').digest('hex');
+const closeDigest = digestOf(v2CloseProjection);
+const correction1 = {...v2CloseProjection, entry_price: '1.05', entry_volume: '3', exit_volume: '3', entry_fee: '0.02', gross_pnl: '-0.45', net_pnl: '-0.48', return_on_margin: '-9', exit_order_id: '223456789012345678', reason_code: 'DUPLICATE_ENTRY_UNRECORDED', notes: 'trade_correction: duplicate entry restated from exchange fills', corrects_payload_digest: 'b'.repeat(64)};
+const badBase = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'v2-trade-1', projection: correction1, requestId: '00000000-0000-4000-8000-000000000020'});
+assert.deepEqual(route(badBase), {ok: false, error: 'correction_base_mismatch'});
+assert.equal(projectSheet.rows[3][13], -0.22);  // net_pnl (N) untouched
+const goodCorrection1 = {...correction1, corrects_payload_digest: closeDigest};
+const correct1 = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'v2-trade-1', projection: goodCorrection1, requestId: '00000000-0000-4000-8000-000000000021'});
+assert.deepEqual(route(correct1), {ok: true, row: 4, provenance_status: 'CONFIRMED'});
+assert.deepEqual(route(correct1), {ok: true, row: 4, idempotent: true});
+assert.equal(projectSheet.rows[3][13], -0.48);   // N net_pnl
+assert.equal(projectSheet.rows[3][6], 1.05);     // G entry_price (whole trade)
+assert.equal(projectSheet.rows[3][8], 3);        // I volume (whole trade)
+assert.equal(projectSheet.rows[3][17], '223456789012345678');  // R exit_order_id
+assert.equal(projectSheet.rows[3][20], 'trade_correction: duplicate entry restated from exchange fills');  // U notes
+// A second correction must name the first correction, not the original close.
+const correction2 = {...goodCorrection1, net_pnl: '-0.5', notes: 'fee restated'};
+const staleSecond = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'v2-trade-1', projection: correction2, requestId: '00000000-0000-4000-8000-000000000022'});
+assert.deepEqual(route(staleSecond), {ok: false, error: 'correction_base_mismatch'});
+const chainedSecond = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'v2-trade-1', projection: {...correction2, corrects_payload_digest: digestOf(goodCorrection1)}, requestId: '00000000-0000-4000-8000-000000000023'});
+assert.deepEqual(route(chainedSecond), {ok: true, row: 4, provenance_status: 'CONFIRMED'});
+assert.equal(projectSheet.rows[3][13], -0.5);
+// Wrong event type, or a correction without its reason notes, is refused.
+const asClose = v2Write({action: 'correct_close_v2', eventType: 'trade_close', tradeId: 'v2-trade-1', projection: {...correction2, net_pnl: '-0.6'}, requestId: '00000000-0000-4000-8000-000000000024'});
+assert.deepEqual(route(asClose), {ok: false, error: 'correction_projection_invalid'});
+const noNotes = {...correction2, net_pnl: '-0.6'};
+delete noNotes.notes;
+const withoutNotes = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'v2-trade-1', projection: noNotes, requestId: '00000000-0000-4000-8000-000000000025'});
+assert.deepEqual(route(withoutNotes), {ok: false, error: 'correction_projection_invalid'});
+// No confirmed close to correct.
+const orphanCorrection = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'legacy-trade-1', projection: {...goodCorrection1, trade_id: 'legacy-trade-1'}, requestId: '00000000-0000-4000-8000-000000000026'});
+assert.deepEqual(route(orphanCorrection), {ok: false, error: 'duplicate_trade_id'});
+assert.equal(projectSheet.rows[3][13], -0.5);
 // formatSheetTime passes an already-Taipei-text value through unchanged and
 // never throws on an unparseable one (unit-level guard for the rewrite tool).
 assert.equal(context.formatSheetTime('2026-08-27 0:30:05'), '2026-08-27 0:30:05');

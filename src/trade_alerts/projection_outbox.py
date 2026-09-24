@@ -19,9 +19,11 @@ from uuid import uuid4
 
 from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance
 
-ProjectionAction = Literal["append_open_v2", "update_close_v2"]
+ProjectionAction = Literal["append_open_v2", "update_close_v2", "correct_close_v2"]
 ProjectionOutcomeStatus = Literal["CONFIRMED", "REJECTED", "TRANSPORT_FAILED"]
-_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2"})
+_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_close_v2"})
+# Each write action projects exactly one kind of ledger event.
+_ACTION_EVENT_TYPE = {"append_open_v2": "trade_open", "update_close_v2": "trade_close", "correct_close_v2": "trade_correction"}
 _TERMINAL_STATUSES = frozenset({"CONFIRMED", "REJECTED"})
 
 
@@ -44,6 +46,8 @@ class ProjectionIntent:
     def from_provenance(cls, *, action: ProjectionAction, provenance: LedgerProvenance, intent_id: str | None = None) -> "ProjectionIntent":
         if action not in _ALLOWED_ACTIONS:
             raise ValueError("projection action is not allowed")
+        if provenance.event_type != _ACTION_EVENT_TYPE[action]:
+            raise ValueError("projection action does not match the ledger event type")
         return cls(
             intent_id=intent_id or uuid4().hex,
             created_at=_utc_now(),
