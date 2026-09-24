@@ -1,0 +1,175 @@
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index 3989203..ac3d311 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -64,31 +64,32 @@ Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（P
+ 2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 修復機器人（只抓錯並提出修復建議） 從部署起就一直在發這個事件，卻從未登記進目錄，
+ 導致一致性登記冊上這支策略的修復機器人 完全看不到對應紀錄，見下方 §3.1，當時合計 **34 條**；2026-09-22 v2-W2 共用修復執行器
+ 補上它會發出的代碼：兩支策略各一條 `VERIFIED_CLOSE_REPAIR_FAILED`（R2，取代退役的 `*_PROPOSED`），seykota 另補
+-`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，當時合計 **38 條**；2026-09-24 v0.21.1 把 `MOM／SEY.VERIFIED_CLOSE_PROPOSED` 移出 entries（留在 `retired_codes`）剩 36 條；同日 h7 查核補上 `BTC.ORDER_STATUS_UNKNOWN`——競賽策略送單結果不明時改為查單、查不到就暫停，不再重新規劃重送，見 §3.3，目前合計 **37 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
++`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，當時合計 **38 條**；2026-09-24 v0.21.1 把 `MOM／SEY.VERIFIED_CLOSE_PROPOSED` 移出 entries（留在 `retired_codes`）剩 36 條；同日 h7 查核補上 `BTC.ORDER_STATUS_UNKNOWN`——競賽策略送單結果不明時改為查單、查不到就暫停，不再重新規劃重送，見 §3.3，目前合計 **37 條**；同日 h11 補上 `SEY.PROTECTION_MOVE_DEFERRED`、並把走不到的 `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` 列進 `retired_codes`（ed-seykota PR #74 上正式機後移出 entries），合計 **38 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
+ 
+ | 判定 | 條數 | 佔比 |
+ |---|---|---|
+ | `MECHANICAL`（動作固定） | 12 | 32% |
+-| `JUDGEMENT`（真的要人判斷） | 25 | 68% |
++| `JUDGEMENT`（真的要人判斷） | 26 | 68% |
+ 
+ | 風險等級（v2） | 條數 |
+ |---|---|
+ | R0 只記錄 | 9 |
+ | R1 自動、不通知 | 3 |
+-| R2 自動嘗試、失敗才通知 | 12 |
++| R2 自動嘗試、失敗才通知 | 13 |
+ | R3 必須人工 | 13 |
+ 
+ 下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
+ 
+-### 3.1 ed-seykota（17 條＋1 條已退役）
++### 3.1 ed-seykota（18 條＋2 條已退役，其中 1 條待移出）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+ | `SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED` | latch `protective_stop_failed` | MECHANICAL | R1 | P4 |
+ | `SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED` | latch `protective_stop_failed` | JUDGEMENT | R3 | P4 |
+ | `SEY.PROTECTION_REPLACE_FAILED` | latch `protective_stop_replace_failed` | JUDGEMENT | R2 | P8（v2） |
+-| `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` | 通知 only | JUDGEMENT | R2 | P8（v2） |
++| `SEY.PROTECTION_MOVE_DEFERRED` | 通知 only（h11 新增：舊停損取消不掉時保留舊停損、下一根 K 棒再試） | JUDGEMENT | R2 | P8（v2） |
++| `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` | 通知 only（h11 退役：Binance 不允許同方向第二張全部平倉停損，這條路走不到；PR #74 上正式機後移出 entries） | JUDGEMENT | R2 | P8（v2） |
+ | `SEY.PROTECTION_CLOSE_CANCEL_FAILED` | 通知 only | JUDGEMENT | R2 | P8（v2） |
+ | `SEY.PROTECTION_UNVERIFIED` | latch | JUDGEMENT | R3 | P4 |
+ | `SEY.POSITION_AMBIGUOUS` | latch | JUDGEMENT | R3 | P4 |
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 44465f9..3763cdf 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -101,7 +101,7 @@
+     },
+     {
+       "code": "SEY.PROTECTION_REPLACE_FAILED",
+-      "title": "移動停損換單失敗，舊停損單已取消，部位目前無交易所端保護",
++      "title": "移動停損換單失敗，部位可能沒有交易所端保護",
+       "project": "seykota",
+       "sources": [
+         "src/seykota_bot/bot.py:574",
+@@ -120,7 +120,7 @@
+       "lands_in_phase": 8,
+       "rationale": "重掛保護單的動作內容是完全確定的（同一個部位、同一個停損價），my-crypto 對同一情境本來就是「下一輪自動重試而且不停機」。v2（2026-09-18）取消 v1 的逾時等待：動作內容完全確定，多等只是延長部位裸露的時間，所以立即重掛；連續 3 次都失敗代表不是暫時狀況，才交給人。",
+       "operator_message": {
+-        "what": "要把移動停損換到新價位，舊單已經取消，但新單沒掛上——這段時間倉位是沒有保護的。",
++        "what": "要把移動停損換到新價位，但沒換成：舊單已經取消、新單沒掛上，或已送出取消舊單卻在 60 秒內查不到交易所狀態——這段時間倉位可能沒有保護。",
+         "direction": "系統會立刻用原本的停損價重掛一張保護單，最多試 3 次；3 次都失敗才通知你。收到通知代表倉位此刻仍沒有交易所端的停損保護，要盡快處理。",
+         "steps": [
+           "到交易所 App 確認這筆倉位目前有沒有停損單。",
+@@ -131,6 +131,36 @@
+         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損換單失敗、且自動重掛也連續失敗的根本原因：讀 src/seykota_bot/bot.py 換單流程（取消舊單→掛新單）與重掛邏輯，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是價格／數量規則、API 錯誤還是網路問題，並提出治本修正。"
+       }
+     },
++    {
++      "code": "SEY.PROTECTION_MOVE_DEFERRED",
++      "title": "移動停損時舊停損單取消不掉，保留舊停損、這輪不移動",
++      "project": "seykota",
++      "sources": [
++        "src/seykota_bot/bot.py:848"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "PROTECTIVE_STOP_MOVE_DEFERRED (critical, log-only)",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "保留舊停損（部位仍有保護，只是停損價還是舊的），不掛新單；下一根 K 棒自動再試移動（ed-seykota PR #74 已實作）。目前每次發生都只在主機日誌記一筆緊急（ERROR）紀錄；第 8 關接上共用事件日誌時，改為連續 escalate_after 次都移不動才升格：開請求、通知。",
++      "human_action": "到交易所確認舊停損單還在；查明為什麼取消一直失敗（網路、交易所、API 權限），必要時手動把停損移到新價位。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-09-24 h11 在 Binance 測試網查證：掛單清單沒有延遲，所以取消卡住只會是撤單或查詢請求一直失敗。舊單最後一次查到時還在（或根本沒送出取消），部位仍受舊停損保護，不必停機；Binance 也不允許同方向再掛第二張全部平倉停損（-4130），所以不能先掛新單再清舊單，只能等下一輪再試。",
++      "operator_message": {
++        "what": "移動停損要先取消舊停損單，但 60 秒內取消不掉，舊單還掛在交易所上。",
++        "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，下一根 K 棒自動再試。目前每次發生都只在主機日誌記一筆緊急紀錄，還不會送到你的手機——趨勢策略的通知要到第 8 關接上共用事件日誌才會送出；屆時規劃改成連續 3 次都移不動才通知你。",
++        "steps": [
++          "到交易所 App 的委託清單確認訊息裡那張舊停損單還在。",
++          "如果擔心舊停損價太遠，可以手動把停損改到訊息裡的新停損價。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查取消一直失敗的原因。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損時取消舊停損單一直失敗的原因：讀 src/seykota_bot/bot.py 的 _resolve_stop_cancel 與 _replace_protective_stop，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是網路、交易所故障、限流還是 API 權限問題，並提出治本修正。"
++      }
++    },
+     {
+       "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
+       "title": "換單時舊停損單取消失敗，可能殘留在交易所",
+@@ -1161,6 +1191,11 @@
+       "code": "SEY.VERIFIED_CLOSE_PROPOSED",
+       "retired_in": "fleet-error-catalog/v2",
+       "reason": "Emitted by seykota's Phase 5c shadow repair bot but never catalogued in v1; backfilled 2026-09-18 so the rollout registry has something to point at. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED. Stays in the catalog until the shared repair runner (v2-W4) replaces the call site. Successor: SEY.VERIFIED_CLOSE_REPAIR_FAILED (R2), emitted by trade_alerts.repair_runner (v0.21.0). Entry removed 2026-09-24 after v2-W6 put the shared repair runner on the live host (momentum operations 3a91dd0, seykota operations f9946ba); the code stays here so it is never reused."
++    },
++    {
++      "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
++      "retired_in": "fleet-error-catalog/v2",
++      "reason": "The flow it describes -- place the new stop while the old one could not be cancelled, then clean the old one up as an orphan -- cannot happen on Binance: a second closePosition stop in the same direction is refused with -4130 (testnet 2026-09-24, h5), and the branch was only reachable on a resolver exception. ed-seykota PR #74 (h11) removes it: a trailing move now places a new stop only after the old one is confirmed gone, and an old stop that will not cancel is SEY.PROTECTION_MOVE_DEFERRED. The entry stays until #74 is on the live host; the code stays here so it is never reused."
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index daf5ae5..e35e52d 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -26,7 +26,8 @@
+     "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+-    "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）"
++    "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
++    "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）"
+   },
+   "sources": {
+     "momentum": {
+@@ -643,12 +644,29 @@
+       }
+     },
+     {
+-      "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
++      "code": "SEY.PROTECTION_MOVE_DEFERRED",
+       "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "hotfix-seykota-stop-resolution",
++          "reason": "PR #74（h11）：取消舊停損 60 秒內不成功且確定舊單仍在時，保留舊停損、這輪不移動、下一根 K 棒再試。上正式機後改 done；連續 3 次才通知屬第 8 關。"
++        }
++      },
++      "emits_event": {
+         "seykota": {
+           "state": "pending",
+           "phase": "8-seykota",
+-          "reason": "目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。"
++          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++        }
++      }
++    },
++    {
++      "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "hotfix-seykota-stop-resolution",
++          "reason": "已退役：Binance 不允許同方向第二張全部平倉停損（-4130），這條「先掛新單、再清孤兒舊單」的路走不到；PR #74 移除該分支、改由 SEY.PROTECTION_MOVE_DEFERRED 處理。#74 上正式機後從目錄移除。"
+         }
+       },
+       "emits_event": {
+@@ -1238,11 +1256,11 @@
+   ],
+   "recent_changes": [
+     {
+-      "kind": "cap",
+-      "id": "ledger.trade_correction",
+-      "type": "completed",
++      "kind": "rule",
++      "id": "SEY.PROTECTION_MOVE_DEFERRED",
++      "type": "added",
+       "project": "seykota",
+-      "note": "趨勢策略的帳本更正上正式機，並實際更正了 9/21 重複進場與 9/18 估算值兩筆：對帳、Google 表、LINE 查詢三邊都已一致。"
++      "note": "新增：移動停損時舊停損取消不掉，改成保留舊停損、下一根 K 棒再試，不再無限重試卡住（h11，PR #74 待上正式機）。"
+     }
+   ]
+ }
