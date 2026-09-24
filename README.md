@@ -113,6 +113,12 @@ development 或只在測試機上的算 `pending`。證據是否真的指到程�
 
 `apps_script/google_ledger_receiver.gs` 是綁在「AI自動程式交易紀錄」試算表上的**共用 Apps Script Web App 的權威源**（一個部署服所有專案分頁，靠 payload 的 `sheet_name` 選分頁）。它同時處理 legacy 協定（`SHARED_SECRET` + `append` / `update_by_trade_id` / `update_by_key` / `list_by_sheet` 唯讀）與 `google-ledger-projection-v2`（per-source HMAC + provenance）。欄位 schema、部署步驟、`list_by_sheet` 契約與呼叫端轉址告警都在該檔檔頭。`apps_script/google_ledger_receiver_v2.gs` 是 v2-only 的參考源，非部署對象。**部署（貼進 Apps Script 編輯器 → 管理部署作業 → 新版本）是手動、需另行核准的動作，不在版本標籤的自動範圍內。**
 
+**有兩個部署，兩個都要更新**（2026-09-24 補記）：同一份 `google_ledger_receiver.gs` 部署在兩個試算表上——
+正式機用的「AI自動程式交易紀錄」與開發機用的「AI自動程式交易紀錄(DEV)」。兩台主機的策略設定（`GOOGLE_LEDGER_V2_URL`）
+分別指向各自的 Web App。只更新其中一個，會讓開發機驗證不到新動作、兩邊程式分岔；每次改接收端都要兩個一起重新部署，
+並在發版紀錄寫明兩個的部署時間。Apps Script 在瀏覽器同時登入多個 Google 帳號時常開錯帳號（「無法開啟這個檔案」），
+用只登入擁有者帳號的無痕視窗打開試算表 → 擴充功能 → Apps Script。
+
 ## 驗證
 
 ```bash
