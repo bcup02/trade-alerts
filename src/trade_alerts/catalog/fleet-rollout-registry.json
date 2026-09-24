@@ -26,7 +26,8 @@
     "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
-    "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）"
+    "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
+    "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）"
   },
   "sources": {
     "momentum": {
@@ -643,12 +644,29 @@
       }
     },
     {
+      "code": "SEY.PROTECTION_MOVE_DEFERRED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "hotfix-seykota-stop-resolution",
+          "reason": "PR #74（h11）：取消舊停損 60 秒內不成功且確定舊單仍在時，保留舊停損、這輪不移動、下一根 K 棒再試。上正式機後改 done；連續 3 次才通知屬第 8 關。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+        }
+      }
+    },
+    {
       "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
       "behaviour": {
         "seykota": {
           "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前：只記錄、不處理。v2：在兩道安全條件下自動重試取消，失敗才通知。"
+          "phase": "hotfix-seykota-stop-resolution",
+          "reason": "已退役：Binance 不允許同方向第二張全部平倉停損（-4130），這條「先掛新單、再清孤兒舊單」的路走不到；PR #74 移除該分支、改由 SEY.PROTECTION_MOVE_DEFERRED 處理。#74 上正式機後從目錄移除。"
         }
       },
       "emits_event": {
@@ -1238,11 +1256,11 @@
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "ledger.trade_correction",
-      "type": "completed",
+      "kind": "rule",
+      "id": "SEY.PROTECTION_MOVE_DEFERRED",
+      "type": "added",
       "project": "seykota",
-      "note": "趨勢策略的帳本更正上正式機，並實際更正了 9/21 重複進場與 9/18 估算值兩筆：對帳、Google 表、LINE 查詢三邊都已一致。"
+      "note": "新增：移動停損時舊停損取消不掉，改成保留舊停損、下一根 K 棒再試，不再無限重試卡住（h11，PR #74 待上正式機）。"
     }
   ]
 }

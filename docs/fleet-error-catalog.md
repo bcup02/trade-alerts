@@ -64,31 +64,32 @@ Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（P
 2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 修復機器人（只抓錯並提出修復建議） 從部署起就一直在發這個事件，卻從未登記進目錄，
 導致一致性登記冊上這支策略的修復機器人 完全看不到對應紀錄，見下方 §3.1，當時合計 **34 條**；2026-09-22 v2-W2 共用修復執行器
 補上它會發出的代碼：兩支策略各一條 `VERIFIED_CLOSE_REPAIR_FAILED`（R2，取代退役的 `*_PROPOSED`），seykota 另補
-`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，當時合計 **38 條**；2026-09-24 v0.21.1 把 `MOM／SEY.VERIFIED_CLOSE_PROPOSED` 移出 entries（留在 `retired_codes`）剩 36 條；同日 h7 查核補上 `BTC.ORDER_STATUS_UNKNOWN`——競賽策略送單結果不明時改為查單、查不到就暫停，不再重新規劃重送，見 §3.3，目前合計 **37 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，當時合計 **38 條**；2026-09-24 v0.21.1 把 `MOM／SEY.VERIFIED_CLOSE_PROPOSED` 移出 entries（留在 `retired_codes`）剩 36 條；同日 h7 查核補上 `BTC.ORDER_STATUS_UNKNOWN`——競賽策略送單結果不明時改為查單、查不到就暫停，不再重新規劃重送，見 §3.3，目前合計 **37 條**；同日 h11 補上 `SEY.PROTECTION_MOVE_DEFERRED`、並把走不到的 `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` 列進 `retired_codes`（ed-seykota PR #74 上正式機後移出 entries），合計 **38 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
 Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
 
 | 判定 | 條數 | 佔比 |
 |---|---|---|
 | `MECHANICAL`（動作固定） | 12 | 32% |
-| `JUDGEMENT`（真的要人判斷） | 25 | 68% |
+| `JUDGEMENT`（真的要人判斷） | 26 | 68% |
 
 | 風險等級（v2） | 條數 |
 |---|---|
 | R0 只記錄 | 9 |
 | R1 自動、不通知 | 3 |
-| R2 自動嘗試、失敗才通知 | 12 |
+| R2 自動嘗試、失敗才通知 | 13 |
 | R3 必須人工 | 13 |
 
 下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
 
-### 3.1 ed-seykota（17 條＋1 條已退役）
+### 3.1 ed-seykota（18 條＋2 條已退役，其中 1 條待移出）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
 | `SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED` | latch `protective_stop_failed` | MECHANICAL | R1 | P4 |
 | `SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED` | latch `protective_stop_failed` | JUDGEMENT | R3 | P4 |
 | `SEY.PROTECTION_REPLACE_FAILED` | latch `protective_stop_replace_failed` | JUDGEMENT | R2 | P8（v2） |
-| `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` | 通知 only | JUDGEMENT | R2 | P8（v2） |
+| `SEY.PROTECTION_MOVE_DEFERRED` | 通知 only（h11 新增：舊停損取消不掉時保留舊停損、下一根 K 棒再試） | JUDGEMENT | R2 | P8（v2） |
+| `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` | 通知 only（h11 退役：Binance 不允許同方向第二張全部平倉停損，這條路走不到；PR #74 上正式機後移出 entries） | JUDGEMENT | R2 | P8（v2） |
 | `SEY.PROTECTION_CLOSE_CANCEL_FAILED` | 通知 only | JUDGEMENT | R2 | P8（v2） |
 | `SEY.PROTECTION_UNVERIFIED` | latch | JUDGEMENT | R3 | P4 |
 | `SEY.POSITION_AMBIGUOUS` | latch | JUDGEMENT | R3 | P4 |
