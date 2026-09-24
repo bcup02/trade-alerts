@@ -1,0 +1,172 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index ab49bfb..5093416 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -706,8 +706,13 @@ trade-alerts：v0.22.0（帳本更正事件 trade_correction＋錯誤清單文
+           （動能的共用對帳自動認得更正事件；維運通知取得新錯誤清單文字）。
+ 部署入口：各專案既有部署腳本（開發機 → 正式機）。Apps Script 接收端（apps_script/google_ledger_receiver.gs）
+           須由使用者在 Google Apps Script 編輯器重新部署，correct_close_v2 才會生效——兩個試算表都要：
+-          正式機「AI自動程式交易紀錄」已於 2026-09-24 重新部署；開發機「AI自動程式交易紀錄(DEV)」待部署
+-          （當初發版紀錄漏列 DEV，見上方標準流程第 6 步）。
+-版本驗證／服務驗證／部署時間：待改釘與部署完成後補記。
++          正式機「AI自動程式交易紀錄」與開發機「AI自動程式交易紀錄(DEV)」都已於 2026-09-24 重新部署，
++          在趨勢策略推正式機之前完成（當初發版紀錄漏列 DEV，見上方標準流程第 6 步）。
++版本驗證／服務驗證／部署時間：
++          趨勢策略（ed-seykota #69，改釘 v0.22.0）：開發機先上；正式機 operations 6d1edc2，2026-09-24 08:56 UTC 部署。
++          09:02 UTC 用兩段式工具在正式機帳本追加兩筆更正（預覽經使用者確認）；09:15 兩筆 correct_close_v2
++          CONFIRMED、帳本對交易所 RECONCILED（09-21 起的 DIVERGED 解除）、LINE 查詢真倉已實現損益 11.019→8.215；
++          09:30 帳本對 Google 表 RECONCILED。
++          動能、維運通知：改釘 v0.22.0 尚未做，完成後補記。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index ecc44ff..092b7fa 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -210,7 +210,7 @@
+   <div id="glossaryHost"></div>
+   <div class="foot">
+     資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-24 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+-    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations f9946ba</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 3a91dd0</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations b8eda43</code>。
++    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 6d1edc2</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 3a91dd0</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations b8eda43</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+   </div>
+ </div>
+@@ -1997,16 +1997,16 @@
+    "title": "市價單只送一次，不因查不到就重送"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-ledger.trade_correction",
+    "complete": false,
+    "dots": {
+     "btc-competition": "na",
+     "momentum": "pending",
+     "mycrypto": "pending",
+-    "seykota": "pending"
++    "seykota": "recent"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "ledger.trade_correction",
+    "kind": "cap",
+    "rows": [
+@@ -2015,9 +2015,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
+-       "state": "pending",
+-       "text": "要接上：src/seykota_bot/reconcile/compare.py 的已記錄單號、src/seykota_bot/google_ledger_provenance.py 的 correct_close_v2 投影、src/seykota_bot/external_trade_events.py 的 LINE 查詢平倉投影，並提供兩段式更正工具；接好後在正式機追加 09-21 重複進場與 09-19 估算值兩筆更正。"
++       "phase": null,
++       "state": "done",
++       "text": "src/seykota_bot/reconcile/compare.py:111 _recorded_order_ids 併入更正涵蓋的單號（部位不變）；src/seykota_bot/google_ledger_provenance.py:100 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正；src/seykota_bot/external_trade_events.py:192 LINE 查詢套用最新一次 SETTLED_TRADE_CORRECTION；scripts/append_trade_correction.py:163 兩段式更正工具。PR #69，2026-09-24 08:56 UTC 上正式機（operations 6d1edc2）。同日 09:02 UTC 以此工具在正式機追加 9/18（淨損益 21.406→21.448）、9/21（0.008→0.011，−10.387→−13.233）兩筆更正；09:15 UTC 兩筆 correct_close_v2 皆 CONFIRMED、帳本對交易所 DIVERGED→RECONCILED、LINE 查詢已實現損益更正（真倉總額 11.019→8.215）；09:30 UTC 帳本對 Google 表亦 RECONCILED。"
+       }
+      ]
+     },
+@@ -2079,7 +2079,7 @@
+        "aspect": null,
+        "phase": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+        "state": "pending",
+-       "text": "實例：2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162，已向 Binance 查單確認）；帳本以為部位 0.008、實際 0.011，這筆交易帳本淨損益 −10.387、以交易所為準 −13.233。DIVERGED 從 09-21 16:10 UTC 起持續，只在變化當下發過一次狀態告警。對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
++       "text": "實例：2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162）；DIVERGED 從 09-21 16:10 UTC 持續到 09-24 09:15 UTC，期間只在變化當下發過一次狀態告警，沒有任何錯誤代碼接手。這一筆已於 2026-09-24 以人工帳本更正（ledger.trade_correction）改成與交易所一致；但自動偵測、升格通知與修復機器人自動更正仍未做（g1）：對帳把多出來的成交列進 unmatched_exchange_fills 後沒有錯誤代碼接手，修復機器人只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
+       }
+      ]
+     },
+@@ -3385,7 +3385,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/reconcile/compare.py:250 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
++       "text": "src/seykota_bot/reconcile/compare.py:255 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -3650,7 +3650,7 @@
+   "8-seykota": 20,
+   "binance-funding-sync": 2,
+   "error-ids": 4,
+-  "h4-trade-correction": 1,
++  "h4-trade-correction": 0,
+   "hotfix-btc-order-resend": 2,
+   "hotfix-seykota-order-resend": 0,
+   "naming-rollout": 0,
+@@ -3714,8 +3714,8 @@
+  "recent_summary": [
+   {
+    "anchor": "cap-ledger.trade_correction",
+-   "note": "新增帳本更正事件的共用格式與套用規則（h4）：先用來更正趨勢策略 9/21 重複進場那筆，之後修復機器人（g1）也用同一套。",
+-   "project": null,
++   "note": "趨勢策略的帳本更正上正式機，並實際更正了 9/21 重複進場與 9/18 估算值兩筆：對帳、Google 表、LINE 查詢三邊都已一致。",
++   "project": "趨勢策略",
+    "title": "帳本更正事件：以交易所成交為準、只追加，讀帳本的地方都認得"
+   }
+  ],
+@@ -3736,9 +3736,9 @@
+    "pending": 23
+   },
+   "seykota": {
+-   "done": 32,
++   "done": 33,
+    "n/a": 2,
+-   "pending": 26
++   "pending": 25
+   }
+  }
+ }
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 1d8eea3..daf5ae5 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -37,7 +37,7 @@
+     "seykota": {
+       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
+       "branch": "operations",
+-      "commit": "f9946ba222e9080bb4a7573bac1408c988733b4e"
++      "commit": "6d1edc2867dd508e72e267d03fc81373ff8b1442"
+     },
+     "mycrypto": {
+       "repo": "AI-for-column/my-crypto-bot",
+@@ -491,9 +491,8 @@
+       "description": "帳本記錯（漏記成交、數量不對、價格或手續費是估算值）時，不改舊紀錄，而是追加一筆 trade_correction（trade-correction/v1），由共用的 trade_alerts.trade_correction 從交易所成交算出更正後的整筆交易數字、附上被取代的舊值。每個讀帳本的地方都要套用：對帳把更正列出的單號算作已記錄、部位不受影響；交易彙整與 LINE 查詢用更正後的數字；Google 表用受稽核的 correct_close_v2 覆寫（只能取代目前有效的那一版）。人工工具與修復機器人共用同一個產生函式。",
+       "status": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "h4-trade-correction",
+-          "reason": "要接上：src/seykota_bot/reconcile/compare.py 的已記錄單號、src/seykota_bot/google_ledger_provenance.py 的 correct_close_v2 投影、src/seykota_bot/external_trade_events.py 的 LINE 查詢平倉投影，並提供兩段式更正工具；接好後在正式機追加 09-21 重複進場與 09-19 估算值兩筆更正。"
++          "state": "done",
++          "evidence": "src/seykota_bot/reconcile/compare.py:111 _recorded_order_ids 併入更正涵蓋的單號（部位不變）；src/seykota_bot/google_ledger_provenance.py:100 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正；src/seykota_bot/external_trade_events.py:192 LINE 查詢套用最新一次 SETTLED_TRADE_CORRECTION；scripts/append_trade_correction.py:163 兩段式更正工具。PR #69，2026-09-24 08:56 UTC 上正式機（operations 6d1edc2）。同日 09:02 UTC 以此工具在正式機追加 9/18（淨損益 21.406→21.448）、9/21（0.008→0.011，−10.387→−13.233）兩筆更正；09:15 UTC 兩筆 correct_close_v2 皆 CONFIRMED、帳本對交易所 DIVERGED→RECONCILED、LINE 查詢已實現損益更正（真倉總額 11.019→8.215）；09:30 UTC 帳本對 Google 表亦 RECONCILED。"
+         },
+         "momentum": {
+           "state": "pending",
+@@ -519,7 +518,7 @@
+         "seykota": {
+           "state": "pending",
+           "phase": "unrecorded-fill",
+-          "reason": "實例：2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162，已向 Binance 查單確認）；帳本以為部位 0.008、實際 0.011，這筆交易帳本淨損益 −10.387、以交易所為準 −13.233。DIVERGED 從 09-21 16:10 UTC 起持續，只在變化當下發過一次狀態告警。對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
++          "reason": "實例：2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162）；DIVERGED 從 09-21 16:10 UTC 持續到 09-24 09:15 UTC，期間只在變化當下發過一次狀態告警，沒有任何錯誤代碼接手。這一筆已於 2026-09-24 以人工帳本更正（ledger.trade_correction）改成與交易所一致；但自動偵測、升格通知與修復機器人自動更正仍未做（g1）：對帳把多出來的成交列進 unmatched_exchange_fills 後沒有錯誤代碼接手，修復機器人只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
+         },
+         "momentum": {
+           "state": "pending",
+@@ -1122,7 +1121,7 @@
+         },
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/reconcile/compare.py:250 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
++          "evidence": "src/seykota_bot/reconcile/compare.py:255 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
+         },
+         "mycrypto": {
+           "state": "done",
+@@ -1241,8 +1240,9 @@
+     {
+       "kind": "cap",
+       "id": "ledger.trade_correction",
+-      "type": "added",
+-      "note": "新增帳本更正事件的共用格式與套用規則（h4）：先用來更正趨勢策略 9/21 重複進場那筆，之後修復機器人（g1）也用同一套。"
++      "type": "completed",
++      "project": "seykota",
++      "note": "趨勢策略的帳本更正上正式機，並實際更正了 9/21 重複進場與 9/18 估算值兩筆：對帳、Google 表、LINE 查詢三邊都已一致。"
+     }
+   ]
+ }
