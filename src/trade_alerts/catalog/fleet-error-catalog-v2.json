@@ -101,7 +101,7 @@
     },
     {
       "code": "SEY.PROTECTION_REPLACE_FAILED",
-      "title": "移動停損換單失敗，舊停損單已取消，部位目前無交易所端保護",
+      "title": "移動停損換單失敗，部位可能沒有交易所端保護",
       "project": "seykota",
       "sources": [
         "src/seykota_bot/bot.py:574",
@@ -120,7 +120,7 @@
       "lands_in_phase": 8,
       "rationale": "重掛保護單的動作內容是完全確定的（同一個部位、同一個停損價），my-crypto 對同一情境本來就是「下一輪自動重試而且不停機」。v2（2026-09-18）取消 v1 的逾時等待：動作內容完全確定，多等只是延長部位裸露的時間，所以立即重掛；連續 3 次都失敗代表不是暫時狀況，才交給人。",
       "operator_message": {
-        "what": "要把移動停損換到新價位，舊單已經取消，但新單沒掛上——這段時間倉位是沒有保護的。",
+        "what": "要把移動停損換到新價位，但沒換成：舊單已經取消、新單沒掛上，或已送出取消舊單卻在 60 秒內查不到交易所狀態——這段時間倉位可能沒有保護。",
         "direction": "系統會立刻用原本的停損價重掛一張保護單，最多試 3 次；3 次都失敗才通知你。收到通知代表倉位此刻仍沒有交易所端的停損保護，要盡快處理。",
         "steps": [
           "到交易所 App 確認這筆倉位目前有沒有停損單。",
@@ -129,6 +129,36 @@
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損換單失敗、且自動重掛也連續失敗的根本原因：讀 src/seykota_bot/bot.py 換單流程（取消舊單→掛新單）與重掛邏輯，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是價格／數量規則、API 錯誤還是網路問題，並提出治本修正。"
+      }
+    },
+    {
+      "code": "SEY.PROTECTION_MOVE_DEFERRED",
+      "title": "移動停損時舊停損單取消不掉，保留舊停損、這輪不移動",
+      "project": "seykota",
+      "sources": [
+        "src/seykota_bot/bot.py:848"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "PROTECTIVE_STOP_MOVE_DEFERRED (critical, log-only)",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "保留舊停損（部位仍有保護，只是停損價還是舊的），不掛新單；下一根 K 棒自動再試移動，連續 escalate_after 次都移不動才升格：開請求、通知。",
+      "human_action": "到交易所確認舊停損單還在；查明為什麼取消一直失敗（網路、交易所、API 權限），必要時手動把停損移到新價位。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-09-24 h11 在 Binance 測試網查證：掛單清單沒有延遲，所以取消卡住只會是撤單或查詢請求一直失敗。舊單最後一次查到時還在（或根本沒送出取消），部位仍受舊停損保護，不必停機；Binance 也不允許同方向再掛第二張全部平倉停損（-4130），所以不能先掛新單再清舊單，只能等下一輪再試。",
+      "operator_message": {
+        "what": "移動停損要先取消舊停損單，但 60 秒內取消不掉，舊單還掛在交易所上。",
+        "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，下一根 K 棒自動再試；連續 3 次都移不動才通知你。",
+        "steps": [
+          "到交易所 App 的委託清單確認訊息裡那張舊停損單還在。",
+          "如果擔心舊停損價太遠，可以手動把停損改到訊息裡的新停損價。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查取消一直失敗的原因。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損時取消舊停損單一直失敗的原因：讀 src/seykota_bot/bot.py 的 _resolve_stop_cancel 與 _replace_protective_stop，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是網路、交易所故障、限流還是 API 權限問題，並提出治本修正。"
       }
     },
     {
@@ -1161,6 +1191,11 @@
       "code": "SEY.VERIFIED_CLOSE_PROPOSED",
       "retired_in": "fleet-error-catalog/v2",
       "reason": "Emitted by seykota's Phase 5c shadow repair bot but never catalogued in v1; backfilled 2026-09-18 so the rollout registry has something to point at. Same retirement as MOM.VERIFIED_CLOSE_PROPOSED. Stays in the catalog until the shared repair runner (v2-W4) replaces the call site. Successor: SEY.VERIFIED_CLOSE_REPAIR_FAILED (R2), emitted by trade_alerts.repair_runner (v0.21.0). Entry removed 2026-09-24 after v2-W6 put the shared repair runner on the live host (momentum operations 3a91dd0, seykota operations f9946ba); the code stays here so it is never reused."
+    },
+    {
+      "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "The flow it describes -- place the new stop while the old one could not be cancelled, then clean the old one up as an orphan -- cannot happen on Binance: a second closePosition stop in the same direction is refused with -4130 (testnet 2026-09-24, h5), and the branch was only reachable on a resolver exception. ed-seykota PR #74 (h11) removes it: a trailing move now places a new stop only after the old one is confirmed gone, and an old stop that will not cancel is SEY.PROTECTION_MOVE_DEFERRED. The entry stays until #74 is on the live host; the code stays here so it is never reused."
     }
   ]
 }
