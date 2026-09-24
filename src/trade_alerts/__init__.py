@@ -117,6 +117,11 @@ from .verified_close_backfill import (
     load_evidence,
     validate_evidence,
 )
+from .unrecorded_fill import (
+    UnrecordedFillAdapter,
+    UnrecordedFillPaths,
+    run_unrecorded_fill_round,
+)
 from .repair_runner import (
     RUNNER_CODES,
     PositionStillOpen,
@@ -221,6 +226,9 @@ __all__ = [
     "RUNNER_CODES",
     "PositionStillOpen",
     "RepairAdapter",
+    "UnrecordedFillAdapter",
+    "UnrecordedFillPaths",
+    "run_unrecorded_fill_round",
     "RepairPaths",
     "pause_env_name",
     "repair_paused",

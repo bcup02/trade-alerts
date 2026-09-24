@@ -95,9 +95,9 @@
   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>38 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    四支策略目前所有已知的「出問題」情況，共 <b>45 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>29 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>36 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -1154,6 +1154,217 @@
    "tier": "R3",
    "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
    "what": "趨勢策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。",
+   "behaviour": {
+    "phase": "unrecorded-fill",
+    "reason": "趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.UNRECORDED_FILL_CORRECTED",
+   "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
+   "emits_event": {
+    "phase": "unrecorded-fill",
+    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
+    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+   "what": "策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的那筆交易整筆重述、追加一筆帳本更正（不改舊紀錄），帳本、Google 表、LINE 查詢的數字已跟交易所一致。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。",
+   "behaviour": {
+    "phase": "unrecorded-fill",
+    "reason": "趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.UNRECORDED_FILL_UNRESOLVED",
+   "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
+   "emits_event": {
+    "phase": "unrecorded-fill",
+    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
+    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
+    "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
+    "如果是策略下的單：到電腦前用手動更正工具（scripts/append_trade_correction.py，先預覽再帶確認碼套用）把這筆交易改成跟交易所一致；完成後下一輪會自動撤回這個請求。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
+   ],
+   "tier": "R3",
+   "title": "交易所有成交、帳本沒記，無法自動更正",
+   "what": "趨勢策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。"
+  },
+  {
+   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。",
+   "behaviour": {
+    "phase": "unrecorded-fill",
+    "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。",
+    "state": "pending"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.UNRECORDED_FILL_CORRECTED",
+   "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
+   "emits_event": {
+    "phase": "unrecorded-fill",
+    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
+    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+   "what": "策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的那筆交易整筆重述、追加一筆帳本更正（不改舊紀錄），帳本、Google 表、LINE 查詢的數字已跟交易所一致。"
+  },
+  {
+   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。",
+   "behaviour": {
+    "phase": "unrecorded-fill",
+    "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。",
+    "state": "pending"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.UNRECORDED_FILL_UNRESOLVED",
+   "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
+   "emits_event": {
+    "phase": "unrecorded-fill",
+    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
+    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
+    "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
+    "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
+   ],
+   "tier": "R3",
+   "title": "交易所有成交、帳本沒記，無法自動更正",
+   "what": "動能策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。"
+  },
+  {
+   "ai_prompt": "請在 btc-bull-market-competition 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。",
+   "behaviour": {
+    "phase": "unrecorded-fill",
+    "reason": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。",
+    "state": "pending"
+   },
+   "bot": "btc-competition",
+   "bot_label": "競賽策略",
+   "code": "BTC.UNRECORDED_FILL_CORRECTED",
+   "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
+   "emits_event": {
+    "phase": "unrecorded-fill",
+    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
+    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+   "what": "策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的現貨成交補記進帳本（只追加、不改舊紀錄），持倉數字已跟交易所一致。"
+  },
+  {
+   "ai_prompt": "請在 btc-bull-market-competition 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。",
+   "behaviour": {
+    "phase": "unrecorded-fill",
+    "reason": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。",
+    "state": "pending"
+   },
+   "bot": "btc-competition",
+   "bot_label": "競賽策略",
+   "code": "BTC.UNRECORDED_FILL_UNRESOLVED",
+   "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
+   "emits_event": {
+    "phase": "unrecorded-fill",
+    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
+    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
+    "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
+    "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
+   ],
+   "tier": "R3",
+   "title": "交易所有成交、帳本沒記，無法自動更正",
+   "what": "競賽策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。",
+   "behaviour": {
+    "phase": "unrecorded-fill",
+    "reason": "加密策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-6），上正式機後改 done。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.UNRECORDED_FILL_UNRESOLVED",
+   "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
+   "emits_event": {
+    "phase": "unrecorded-fill",
+    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
+    "state": "pending"
+   },
+   "notes": [
+    "行為未做 — 加密策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-6），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
+    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
+    "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
+    "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
+   ],
+   "tier": "R3",
+   "title": "交易所有成交、帳本沒記，無法自動更正",
+   "what": "加密策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。"
   }
  ],
  "tiers": [

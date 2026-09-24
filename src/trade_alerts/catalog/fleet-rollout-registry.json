@@ -22,7 +22,7 @@
     "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
     "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
     "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
-    "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+    "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
     "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
@@ -1252,15 +1252,176 @@
           "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
         }
       }
+    },
+    {
+      "code": "SEY.UNRECORDED_FILL_CORRECTED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+        }
+      }
+    },
+    {
+      "code": "SEY.UNRECORDED_FILL_UNRESOLVED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+        }
+      }
+    },
+    {
+      "code": "MOM.UNRECORDED_FILL_CORRECTED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+        }
+      }
+    },
+    {
+      "code": "MOM.UNRECORDED_FILL_UNRESOLVED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+        }
+      }
+    },
+    {
+      "code": "BTC.UNRECORDED_FILL_CORRECTED",
+      "behaviour": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+        }
+      }
+    },
+    {
+      "code": "BTC.UNRECORDED_FILL_UNRESOLVED",
+      "behaviour": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+        }
+      }
+    },
+    {
+      "code": "MYC.UNRECORDED_FILL_UNRESOLVED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "加密策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-6），上正式機後改 done。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
       "kind": "rule",
-      "id": "SEY.PROTECTION_MOVE_DEFERRED",
+      "id": "SEY.UNRECORDED_FILL_CORRECTED",
       "type": "added",
       "project": "seykota",
-      "note": "新增：移動停損時舊停損取消不掉，改成保留舊停損、下一根 K 棒再試，不再無限重試卡住（h11，PR #74 待上正式機）。"
+      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.UNRECORDED_FILL_UNRESOLVED",
+      "type": "added",
+      "project": "seykota",
+      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.UNRECORDED_FILL_CORRECTED",
+      "type": "added",
+      "project": "momentum",
+      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
+      "type": "added",
+      "project": "momentum",
+      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
+    },
+    {
+      "kind": "rule",
+      "id": "BTC.UNRECORDED_FILL_CORRECTED",
+      "type": "added",
+      "project": "btc-competition",
+      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
+    },
+    {
+      "kind": "rule",
+      "id": "BTC.UNRECORDED_FILL_UNRESOLVED",
+      "type": "added",
+      "project": "btc-competition",
+      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.UNRECORDED_FILL_UNRESOLVED",
+      "type": "added",
+      "project": "mycrypto",
+      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
     }
   ]
 }

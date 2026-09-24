@@ -1179,6 +1179,217 @@
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
       }
+    },
+    {
+      "code": "SEY.UNRECORDED_FILL_CORRECTED",
+      "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+      "project": "seykota",
+      "sources": [
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:376"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：以交易所成交重述整筆已平倉的交易（build_trade_correction，數量不平就拒絕），追加 trade_correction、排入 Google 表更正、更新 LINE 查詢。每輪最多寫一筆；寫完立刻通知，不開請求。",
+      "human_action": "帳本已經更正好，不用再動帳本；要做的是追出為什麼同一張單被送了兩次（重送 bug），並確認修正。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-09-21 趨勢策略重複送單、帳本漏記，DIVERGED 三天沒人處理（h4 人工更正）。使用者 2026-09-25 定案（g1）：只有確定是自己重複送單才自動更正，因為這時更正的內容完全由交易所成交決定、沒有猜的空間；但重複送單本身是 bug，一律立刻通知人追根因，所以是 R3 而不是 R1。",
+      "operator_message": {
+        "what": "策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的那筆交易整筆重述、追加一筆帳本更正（不改舊紀錄），帳本、Google 表、LINE 查詢的數字已跟交易所一致。",
+        "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
+        "steps": [
+          "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。"
+      }
+    },
+    {
+      "code": "SEY.UNRECORDED_FILL_UNRESOLVED",
+      "title": "交易所有成交、帳本沒記，無法自動更正",
+      "project": "seykota",
+      "sources": [
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:450"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
+      "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "使用者 2026-09-25 定案（g1）：不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。",
+      "operator_message": {
+        "what": "趨勢策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。",
+        "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
+        "steps": [
+          "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
+          "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
+          "如果是策略下的單：到電腦前用手動更正工具（scripts/append_trade_correction.py，先預覽再帶確認碼套用）把這筆交易改成跟交易所一致；完成後下一輪會自動撤回這個請求。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
+      }
+    },
+    {
+      "code": "MOM.UNRECORDED_FILL_CORRECTED",
+      "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+      "project": "momentum",
+      "sources": [
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:376"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：以交易所成交重述整筆已平倉的交易（build_trade_correction，數量不平就拒絕），追加 trade_correction、排入 Google 表更正、更新 LINE 查詢。每輪最多寫一筆；寫完立刻通知，不開請求。",
+      "human_action": "帳本已經更正好，不用再動帳本；要做的是追出為什麼同一張單被送了兩次（重送 bug），並確認修正。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-09-21 趨勢策略重複送單、帳本漏記，DIVERGED 三天沒人處理（h4 人工更正）。使用者 2026-09-25 定案（g1）：只有確定是自己重複送單才自動更正，因為這時更正的內容完全由交易所成交決定、沒有猜的空間；但重複送單本身是 bug，一律立刻通知人追根因，所以是 R3 而不是 R1。",
+      "operator_message": {
+        "what": "策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的那筆交易整筆重述、追加一筆帳本更正（不改舊紀錄），帳本、Google 表、LINE 查詢的數字已跟交易所一致。",
+        "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
+        "steps": [
+          "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
+        ],
+        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。"
+      }
+    },
+    {
+      "code": "MOM.UNRECORDED_FILL_UNRESOLVED",
+      "title": "交易所有成交、帳本沒記，無法自動更正",
+      "project": "momentum",
+      "sources": [
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:450"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
+      "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "使用者 2026-09-25 定案（g1）：不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。",
+      "operator_message": {
+        "what": "動能策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。",
+        "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
+        "steps": [
+          "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
+          "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
+          "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
+        ],
+        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
+      }
+    },
+    {
+      "code": "BTC.UNRECORDED_FILL_CORRECTED",
+      "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+      "project": "btc-competition",
+      "sources": [
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:420"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：把那張單的成交補記成帳本的現貨成交，排入 Google 表。每輪最多寫一筆；寫完立刻通知，不開請求。",
+      "human_action": "帳本已經更正好，不用再動帳本；要做的是追出為什麼同一張單被送了兩次（重送 bug），並確認修正。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-09-21 趨勢策略重複送單、帳本漏記，DIVERGED 三天沒人處理（h4 人工更正）。使用者 2026-09-25 定案（g1）：只有確定是自己重複送單才自動更正，因為這時更正的內容完全由交易所成交決定、沒有猜的空間；但重複送單本身是 bug，一律立刻通知人追根因，所以是 R3 而不是 R1。",
+      "operator_message": {
+        "what": "策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的現貨成交補記進帳本（只追加、不改舊紀錄），持倉數字已跟交易所一致。",
+        "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
+        "steps": [
+          "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
+        ],
+        "ai_prompt": "請在 btc-bull-market-competition 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。"
+      }
+    },
+    {
+      "code": "BTC.UNRECORDED_FILL_UNRESOLVED",
+      "title": "交易所有成交、帳本沒記，無法自動更正",
+      "project": "btc-competition",
+      "sources": [
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:450"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
+      "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "使用者 2026-09-25 定案（g1）：不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。",
+      "operator_message": {
+        "what": "競賽策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。",
+        "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
+        "steps": [
+          "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
+          "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
+          "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
+        ],
+        "ai_prompt": "請在 btc-bull-market-competition 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
+      }
+    },
+    {
+      "code": "MYC.UNRECORDED_FILL_UNRESOLVED",
+      "title": "交易所有成交、帳本沒記，無法自動更正",
+      "project": "mycrypto",
+      "sources": [
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:450"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。這支策略下單不帶自訂編號，無法判斷是不是自己重複送單，所以一律走這條。",
+      "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "使用者 2026-09-25 定案（g1）：不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。",
+      "operator_message": {
+        "what": "加密策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。",
+        "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
+        "steps": [
+          "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
+          "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
+          "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
+        ],
+        "ai_prompt": "請在 my-crypto-bot 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
+      }
     }
   ],
   "retired_codes": [

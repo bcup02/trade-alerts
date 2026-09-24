@@ -29,7 +29,7 @@ from trade_alerts import (
     repair_paused,
     run_repair_round,
 )
-from trade_alerts import repair_runner
+from trade_alerts import repair_runner, unrecorded_fill
 from trade_alerts.fleet_event_log import FleetEventLogError
 
 OPENED_MS = 1788408032535
@@ -530,9 +530,11 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
             lines = (root / path).read_text(encoding="utf-8").splitlines()
             call = " ".join(lines[int(line) - 1:int(line) + 2])
             assert "append_fleet_event(" in call, source
-            constant = next(name for name, value in vars(repair_runner).items()
+            constant = next(name for module in (repair_runner, unrecorded_fill)
+                            for name, value in vars(module).items()
                             if name.startswith("CODE_") and value == bare)
             assert f"code={constant}" in call, source
             cited += 1
     # 3 runner codes x 2 strategies; FAILED is emitted from two call sites.
-    assert cited == 8
+    # g1: UNRECORDED_FILL_CORRECTED for 3 strategies, UNRESOLVED for all 4.
+    assert cited == 8 + 7
