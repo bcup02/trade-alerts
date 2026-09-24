@@ -53,6 +53,7 @@ CORRECTED_FIELDS = (
 )
 
 _NUMERIC_FIELDS = tuple(name for name in CORRECTED_FIELDS if name != "exit_order_id")
+_PROJECTED_FIELDS = tuple(name for name in _NUMERIC_FIELDS if name != "total_fees")
 _REQUIRED_FIELDS = (
     "schema_version", "trade_id", "symbol", "side", "reason_code", "reason",
     "corrects_event_ids", "exchange_order_ids", "added_fills", "previous",
@@ -205,7 +206,9 @@ def correction_projection_fields(event: Mapping[str, Any]) -> dict[str, Any]:
     validate_trade_correction(event)
     corrected = event["corrected"]
     previous = event["previous"]
-    fields = {name: corrected[name] for name in _NUMERIC_FIELDS}
+    # Only the close-projection columns the receiver's correct_close_v2
+    # accepts (CORRECTION_FIELDS) -- total_fees is ledger-only.
+    fields = {name: corrected[name] for name in _PROJECTED_FIELDS}
     fields["exit_order_id"] = corrected["exit_order_id"]
     fields["reason_code"] = event["reason_code"]
     fields["notes"] = (

@@ -259,6 +259,13 @@ def test_projection_fields_carry_the_corrected_close_and_a_readable_note():
     assert fields["exit_order_id"] == "1144042776223"
     assert fields["reason_code"] == "DUPLICATE_ENTRY_UNRECORDED"
     assert "帳本更正" in fields["notes"] and "-13.2331294" in fields["notes"]
+    # exactly what the receiver's correct_close_v2 accepts on top of the close fields
+    receiver = Path(__file__).resolve().parents[1] / "apps_script" / "google_ledger_receiver.gs"
+    source = receiver.read_text("utf-8")
+    close_fields = source.split("const CLOSE_FIELDS = [", 1)[1].split("]", 1)[0]
+    allowed = {name.strip().strip("'") for name in close_fields.split(",")} | {
+        "corrects_payload_digest", "reason_code", "notes"}
+    assert set(fields) <= allowed, set(fields) - allowed
 
 
 def test_a_trade_correction_provenance_is_signable_as_correct_close_v2():
