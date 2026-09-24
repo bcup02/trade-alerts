@@ -708,7 +708,7 @@
       "title": "送出的單 60 秒內確定不了有沒有成交",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/executor.py:302",
+        "src/btc_competition/executor.py:307",
         "src/btc_competition/runner.py:385"
       ],
       "current": {
