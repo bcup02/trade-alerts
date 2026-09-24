@@ -64,6 +64,14 @@ const CLOSE_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'ent
 const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source'];
 const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
 const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
+// correct_close_v2: an appended ledger trade_correction restates a closed
+// trade from the exchange's fills (e.g. ed-seykota's 2026-09-21 duplicate
+// entry).  It may only supersede the projection currently in force (the
+// confirmed close, or the latest confirmed correction), named by digest, and
+// it also rewrites the entry price / volume columns with the whole trade.
+const CORRECTION_FIELDS = CLOSE_FIELDS.concat(['corrects_payload_digest', 'reason_code', 'notes']);
+const CORRECTION_REQUIRED_FIELDS = CLOSE_REQUIRED_FIELDS.concat(['corrects_payload_digest', 'reason_code', 'notes']);
+const CORRECTION_COLUMN_MAP = Object.assign({entry_price: 'G', entry_volume: 'I', notes: 'U'}, CLOSE_COLUMN_MAP);
 const NUMERIC_PROJECTION_FIELDS = new Set(['entry_price', 'exit_price', 'volume', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin']);
 // Time cells (E entry_time / F exit_time) are Taipei-local *text*, e.g.
 // "2026-08-26 0:00:49", matching the rows the strategies wrote before v2. The
@@ -224,7 +232,7 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
 // ---- V2 handler: ledger-backed, source-scoped, and fail-closed. ----
 
 function handleV2(data) {
-  if (!['append_open_v2', 'update_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
+  if (!['append_open_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
   const source = sourceRegistration(data.source_id);
   if (!source || data.project_id !== source.project_id || data.sheet_name !== source.sheet_name) return {ok: false, error: 'source_not_allowed'};
   if (!verifySignature(data, source.hmac_secret)) return {ok: false, error: 'signature_invalid'};
@@ -236,6 +244,7 @@ function handleV2(data) {
   const projection = data.projection || {};
   if (data.action === 'append_open_v2') return appendOpen(sheet, data, projection);
   if (data.action === 'update_close_v2') return updateClose(sheet, data, projection);
+  if (data.action === 'correct_close_v2') return correctClose(sheet, data, projection);
   if (data.action === 'read_audit_v2') return readAudit(data);
   return quarantineOnlyWithExplicitDeploymentFlag(data);
 }
@@ -283,7 +292,7 @@ function validProvenance(provenance, data) {
   const required = ['project_id', 'trade_id', 'event_type', 'ledger_event_digest', 'payload_digest', 'request_id', 'issued_at', 'source_id', 'schema_version'];
   if (required.some(key => typeof provenance[key] !== 'string' || provenance[key] === '')) return false;
   if (provenance.project_id !== data.project_id || provenance.source_id !== data.source_id || provenance.request_id !== data.request_id || provenance.issued_at !== data.issued_at || provenance.schema_version !== V2_SCHEMA) return false;
-  if (!['trade_open', 'trade_close'].includes(provenance.event_type)) return false;
+  if (!['trade_open', 'trade_close', 'trade_correction'].includes(provenance.event_type)) return false;
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(provenance.trade_id)) return false;
   if (!/^[0-9a-f]{64}$/.test(provenance.ledger_event_digest) || !/^[0-9a-f]{64}$/.test(provenance.payload_digest)) return false;
   if (sha256Hex(canonicalJson(data.projection || {})) !== provenance.payload_digest) return false;
@@ -334,6 +343,22 @@ function updateClose(sheet, data, projection) {
   if (prior.length === 1 && prior[0].payload_digest === data.provenance.payload_digest) return {ok: true, row: existing[0], idempotent: true};
   if (prior.length > 0) return rejectAndAudit(data, 'trade_close_conflict');
   writeProjection(sheet, existing[0], projection, CLOSE_COLUMN_MAP);
+  writeAudit(data, existing[0], 'CONFIRMED');
+  return {ok: true, row: existing[0], provenance_status: 'CONFIRMED'};
+}
+
+function correctClose(sheet, data, projection) {
+  if (data.provenance.event_type !== 'trade_correction' || !validateProjection(projection, CORRECTION_FIELDS, CORRECTION_REQUIRED_FIELDS, data.provenance.trade_id)) return rejectAndAudit(data, 'correction_projection_invalid');
+  if (typeof projection.corrects_payload_digest !== 'string' || !/^[0-9a-f]{64}$/.test(projection.corrects_payload_digest)) return rejectAndAudit(data, 'correction_projection_invalid');
+  const existing = findTradeRows(sheet, data.provenance.trade_id);
+  if (existing.length !== 1) return rejectAndAudit(data, existing.length === 0 ? 'trade_id_not_found' : 'duplicate_trade_id');
+  const corrections = auditByTradeId(data.project_id, data.provenance.trade_id, 'trade_correction').filter(row => row.status === 'CONFIRMED');
+  if (corrections.some(row => row.payload_digest === data.provenance.payload_digest)) return {ok: true, row: existing[0], idempotent: true};
+  const closes = auditByTradeId(data.project_id, data.provenance.trade_id, 'trade_close').filter(row => row.status === 'CONFIRMED');
+  if (closes.length !== 1) return rejectAndAudit(data, 'close_not_confirmed');
+  const inForce = corrections.length ? corrections[corrections.length - 1].payload_digest : closes[0].payload_digest;
+  if (projection.corrects_payload_digest !== inForce) return rejectAndAudit(data, 'correction_base_mismatch');
+  writeProjection(sheet, existing[0], projection, CORRECTION_COLUMN_MAP);
   writeAudit(data, existing[0], 'CONFIRMED');
   return {ok: true, row: existing[0], provenance_status: 'CONFIRMED'};
 }

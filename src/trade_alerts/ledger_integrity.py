@@ -19,8 +19,8 @@ from typing import Any, Mapping
 from uuid import UUID
 
 LEDGER_PROJECTION_SCHEMA_VERSION = "google-ledger-projection-v2"
-_ALLOWED_EVENT_TYPES = frozenset({"trade_open", "trade_close"})
-_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "read_audit_v2", "read_reconciliation_v2", "quarantine_v2"})
+_ALLOWED_EVENT_TYPES = frozenset({"trade_open", "trade_close", "trade_correction"})
+_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_close_v2", "read_audit_v2", "read_reconciliation_v2", "quarantine_v2"})
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 

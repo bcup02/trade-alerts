@@ -18,7 +18,7 @@ from .ledger_integrity import LedgerProvenance
 from .provenance_outbox import append_outbox_record
 
 
-_PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "update_close_v2"})
+_PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_close_v2"})
 
 # Receiver ``ok: false`` errors that mean the payload itself is structurally
 # wrong -- the SAME intent can never succeed, so its dispatch is terminal.
@@ -31,6 +31,8 @@ _TERMINAL_RECEIVER_ERRORS = frozenset({
     "provenance_invalid",
     "open_projection_invalid",
     "close_projection_invalid",
+    "correction_projection_invalid",
+    "correction_base_mismatch",
 })
 
 

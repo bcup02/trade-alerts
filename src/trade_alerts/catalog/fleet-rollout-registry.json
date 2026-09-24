@@ -25,7 +25,8 @@
     "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
     "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
-    "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）"
+    "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+    "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）"
   },
   "sources": {
     "momentum": {
@@ -481,6 +482,32 @@
           "state": "pending",
           "phase": "hotfix-btc-order-resend",
           "reason": "2026-09-24 h7 查核發現並以模擬測試重現：src/btc_competition/runner.py:233 收斂迴圈把任何單腿例外都當成沒成交，下一輪用新鮮餘額重新規劃、換新 client id 再送；單其實已成交（逾時、網路錯誤、-1006/-1007）而緊接著的查餘額還沒反映時，同一腿會被送兩次。現貨、受餘額上限約束，損失是多付手續費／滑價並漏記一筆成交。修正 btc-bull-market-competition PR #35：明確拒絕才重新規劃；結果不明用 client id 查單最多 60 秒，查不到就停止本輪、以 ORDER_STATUS_UNKNOWN 暫停。上正式機後改 done。"
+        }
+      }
+    },
+    {
+      "id": "ledger.trade_correction",
+      "title": "帳本更正事件：以交易所成交為準、只追加，讀帳本的地方都認得",
+      "description": "帳本記錯（漏記成交、數量不對、價格或手續費是估算值）時，不改舊紀錄，而是追加一筆 trade_correction（trade-correction/v1），由共用的 trade_alerts.trade_correction 從交易所成交算出更正後的整筆交易數字、附上被取代的舊值。每個讀帳本的地方都要套用：對帳把更正列出的單號算作已記錄、部位不受影響；交易彙整與 LINE 查詢用更正後的數字；Google 表用受稽核的 correct_close_v2 覆寫（只能取代目前有效的那一版）。人工工具與修復機器人共用同一個產生函式。",
+      "status": {
+        "seykota": {
+          "state": "pending",
+          "phase": "h4-trade-correction",
+          "reason": "要接上：src/seykota_bot/reconcile/compare.py 的已記錄單號、src/seykota_bot/google_ledger_provenance.py 的 correct_close_v2 投影、src/seykota_bot/external_trade_events.py 的 LINE 查詢平倉投影，並提供兩段式更正工具；接好後在正式機追加 09-21 重複進場與 09-19 估算值兩筆更正。"
+        },
+        "momentum": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "帳本對交易所、帳本對 Google 表兩層對帳走共用 ledger_reconcile，改釘到含本功能的版本後就會套用更正；Google 表投影與投資人快照的讀取端還要各自接上 correct_close_v2 與更正後數字，跟修復機器人自動更正（g1）一起做。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "unrecorded-fill",
+          "reason": "同動能策略：共用對帳改釘後即套用；Google 表同步與投資人快照的讀取端要一起接上，跟修復機器人（需先有 MEXC 成交查詢）一起做。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "現貨再平衡策略的帳本是逐筆成交（spot_fill），沒有開倉／平倉配對，沒有「整筆交易」可以重述；漏記的現貨成交直接補那筆 spot_fill，歸在「帳本少記交易所成交時，升格通知並以交易所為準更正」那一列處理。"
         }
       }
     },
@@ -1213,24 +1240,9 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "orders.single_send",
-      "type": "completed",
-      "project": "momentum",
-      "note": "動能策略查核完成：送單結果不明時，同一輪不會重試、下一輪也不會對同一根 K 線再進場（回歸測試 #100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "orders.single_send",
-      "type": "completed",
-      "project": "mycrypto",
-      "note": "加密策略查核完成：下一輪先查部位，已成交就只管理不再開倉（回歸測試 #49）。"
-    },
-    {
-      "kind": "rule",
-      "id": "BTC.ORDER_STATUS_UNKNOWN",
+      "id": "ledger.trade_correction",
       "type": "added",
-      "project": "btc-competition",
-      "note": "競賽策略查核發現會重送，新增這條暫停規則；修正 PR #35 上正式機前維持未做。"
+      "note": "新增帳本更正事件的共用格式與套用規則（h4）：先用來更正趨勢策略 9/21 重複進場那筆，之後修復機器人（g1）也用同一套。"
     }
   ]
 }
