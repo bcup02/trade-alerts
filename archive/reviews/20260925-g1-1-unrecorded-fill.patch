@@ -1,0 +1,1476 @@
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index ac3d311..b951f06 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -64,24 +64,24 @@ Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（P
+ 2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 修復機器人（只抓錯並提出修復建議） 從部署起就一直在發這個事件，卻從未登記進目錄，
+ 導致一致性登記冊上這支策略的修復機器人 完全看不到對應紀錄，見下方 §3.1，當時合計 **34 條**；2026-09-22 v2-W2 共用修復執行器
+ 補上它會發出的代碼：兩支策略各一條 `VERIFIED_CLOSE_REPAIR_FAILED`（R2，取代退役的 `*_PROPOSED`），seykota 另補
+-`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，當時合計 **38 條**；2026-09-24 v0.21.1 把 `MOM／SEY.VERIFIED_CLOSE_PROPOSED` 移出 entries（留在 `retired_codes`）剩 36 條；同日 h7 查核補上 `BTC.ORDER_STATUS_UNKNOWN`——競賽策略送單結果不明時改為查單、查不到就暫停，不再重新規劃重送，見 §3.3，目前合計 **37 條**；同日 h11 補上 `SEY.PROTECTION_MOVE_DEFERRED`、並把走不到的 `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` 列進 `retired_codes`（ed-seykota PR #74 上正式機後移出 entries），合計 **38 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
++`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，當時合計 **38 條**；2026-09-24 v0.21.1 把 `MOM／SEY.VERIFIED_CLOSE_PROPOSED` 移出 entries（留在 `retired_codes`）剩 36 條；同日 h7 查核補上 `BTC.ORDER_STATUS_UNKNOWN`——競賽策略送單結果不明時改為查單、查不到就暫停，不再重新規劃重送，見 §3.3，目前合計 **37 條**；同日 h11 補上 `SEY.PROTECTION_MOVE_DEFERRED`、並把走不到的 `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` 列進 `retired_codes`（ed-seykota PR #74 上正式機後移出 entries），合計 **38 條**；2026-09-25 g1 補上「帳本少記交易所成交」兩條（`UNRECORDED_FILL_CORRECTED` 趨勢／動能／競賽、`UNRECORDED_FILL_UNRESOLVED` 四支），見 §4.10，合計 **45 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
+ 
+ | 判定 | 條數 | 佔比 |
+ |---|---|---|
+-| `MECHANICAL`（動作固定） | 12 | 32% |
+-| `JUDGEMENT`（真的要人判斷） | 26 | 68% |
++| `MECHANICAL`（動作固定） | 12 | 27% |
++| `JUDGEMENT`（真的要人判斷） | 33 | 73% |
+ 
+ | 風險等級（v2） | 條數 |
+ |---|---|
+ | R0 只記錄 | 9 |
+ | R1 自動、不通知 | 3 |
+ | R2 自動嘗試、失敗才通知 | 13 |
+-| R3 必須人工 | 13 |
++| R3 必須人工 | 20 |
+ 
+ 下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
+ 
+-### 3.1 ed-seykota（18 條＋2 條已退役，其中 1 條待移出）
++### 3.1 ed-seykota（20 條＋2 條已退役，其中 1 條待移出）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+@@ -104,13 +104,15 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `SEY.VERIFIED_CLOSE_AUTO_REPAIRED` | 未發出（共用修復執行器，v2-W4 接上） | MECHANICAL | R1 | P8（v2） |
+ | `SEY.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R2 | P8（v2） |
+ | `SEY.VERIFIED_CLOSE_REPAIR_BLOCKED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R3 | P8（v2） |
++| `SEY.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
++| `SEY.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+ 
+ **`protective_stop_failed` 拆成兩碼**是本節最重要的改動。現行程式在「停損掛單失敗」之後會立刻
+ 嘗試緊急市價平倉，但不論平倉成功或失敗，都收斂成同一個 latch 原因碼。這兩種結果的真倉風險相差
+ 極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R1 自動清 latch）；平倉也失敗代表真倉
+ 有裸露部位而且程式的補救手段已經失敗過一次（→ R3，全機隊風險最高的一類）。
+ 
+-### 3.2 momentum（6 條＋1 條已退役）
++### 3.2 momentum（8 條＋1 條已退役）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+@@ -121,6 +123,8 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R1 | **P6** |
+ | `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R3 | **P6** |
+ | `MOM.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W3 接上） | JUDGEMENT | R2 | P8（v2） |
++| `MOM.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
++| `MOM.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+ 
+ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
+ 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
+@@ -133,13 +137,15 @@ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原
+ `SEY.VERIFIED_CLOSE_PROPOSED`）發出這個事件從未登記進 v1 目錄，2026-09-18 補登進 v2 目錄——跟 momentum 對等的處置、
+ 同一個理由、同樣列進 `retired_codes`，seykota 升到共用修復執行器（v2-W4）時一起取代退役。
+ 
+-### 3.3 btc-competition（5 條）
++### 3.3 btc-competition（7 條）
+ 
+ | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+ | `BTC.BOOK_CORRUPT_NEGATIVE_BALANCE` | latch（4 個扁平欄位） | JUDGEMENT | R3 | P4 |
+ | `BTC.EXECUTION_BLOCKED_ZERO_FILLS` | latch | JUDGEMENT | R2 | P8（v2） |
+ | `BTC.ORDER_STATUS_UNKNOWN` | latch（h7 新增，PR #35） | JUDGEMENT | R3 | P4 |
++| `BTC.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
++| `BTC.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+ | `BTC.REBALANCE_PENDING` | 不 latch，自動續做 | MECHANICAL | R0 | — |
+ | `BTC.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重新拋出 | MECHANICAL | R0 | — |
+ 
+@@ -151,7 +157,7 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障
+ 拒絕才重新規劃；結果不明就用 client id 查單最多 60 秒，查不到就停止本輪、以此代碼暫停並保留目標比例，等人確認。
+ 跟 `SEY.POSITION_AMBIGUOUS` 的 60 秒查證同一條機隊規則（一致性登記冊 `orders.single_send`）。
+ 
+-### 3.4 my-crypto（7 條）
++### 3.4 my-crypto（8 條）
+ 
+ | 錯誤碼 | 現行事件名 | 判定 | 等級 | 落在 |
+ |---|---|---|---|---|
+@@ -162,6 +168,7 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障
+ | `MYC.PROTECTION_PLACEMENT_ERROR` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P5 |
+ | `MYC.PROTECTION_REPLACE_FAILED` | `PROTECTIVE_STOP_FAILED` ×2 | JUDGEMENT | R2 | P8（v2） |
+ | `MYC.PROTECTION_ORPHAN_CANCEL_FAILED` | `PROTECTIVE_STOP_CANCEL_FAILED` | JUDGEMENT | R2 | P8（v2） |
++| `MYC.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上；下單不帶自訂編號，只通知） | JUDGEMENT | R3 | P8（v2） |
+ 
+ **my-crypto 不加 latch**（使用者 2026-09-12 定案）。兩個叫 `SAFE_HALT` 的事件名宣稱一個這支程式
+ 根本沒有的安全暫停行為——bot 發完通知照常繼續交易。替一支目前沒有這個概念的 LIVE bot 新增安全暫停行為，
+@@ -394,6 +401,21 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停
+   轉接器拿不到某筆成交的已實現損益時，證據標 `exchange_profit_reported: false`，此時不以交易所為準。
+ - 執行器的三個代碼必須在目錄裡有該策略的條目，否則開跑前就拒絕（事件等級查不到＝沒辦法通知任何人）。
+ 
++### 4.10 帳本少記交易所成交（g1，`trade_alerts.unrecorded_fill`）
++
++對帳（`exchange_ledger_compare`）把帳本沒記到的交易所成交列在 `evidence.unmatched_exchange_fills` 並判 `DIVERGED`；
++2026-09-21 趨勢策略重複送單就這樣在頁面上掛了三天沒人接手。`unrecorded_fill.run_unrecorded_fill_round` 是全機隊唯一的接手者，
++跟著各策略的計時器每輪跑一次。使用者 2026-09-25 定案的規則：
++
++- **只有確定是策略自己重複送單才自動更正**：向交易所唯讀查這張單的自訂編號（clientOrderId），跟帳本已記、前後 30 分鐘內同幣種的某張單相同，
++  而且那筆交易已平倉、用交易所成交能完整重述（`build_trade_correction`，數量不平就拒絕）——才追加 `trade_correction`（期貨），
++  或把那張單的成交補記成 `spot_fill`（競賽策略現貨）。寫完立刻發 `UNRECORDED_FILL_CORRECTED`（R3，不開請求：帳本已正確，要人追重送的根因）。
++  同一筆交易在時段內的其他未記訂單（例如 9/21 那筆原生停損的出場單）一起納入重述，但**每一張都要各自證明是策略下的**（跟已記單同一個自訂編號，或帶策略自己的編號特徵），有任何一張查不出來源（例如 App 手動單剛好落在同時段）就整筆不寫（`UNATTRIBUTED_ORDERS`）。每輪最多寫一筆，寫前重讀帳本、寫後確認已涵蓋。
++- **其他一律不寫帳本**，開一個請求（同一張單一次）＋發 `UNRECORDED_FILL_UNRESOLVED`（R3，附步驟）：來源不明（`ORIGIN_UNKNOWN`，例如 App 手動下單）、
++  重複送單但部位還開著（`POSITION_OPEN`，減倉與否由人決定）、同一筆交易還有來源不明的未記單（`UNATTRIBUTED_ORDERS`）、重述不了（`NOT_RESTATABLE`）、查單持續失敗超過 2 小時（`LOOKUP_FAILED`，之前靜默重試）、
++  更正寫入失敗（`WRITE_FAILED`，不重試）、這支策略下單不帶自訂編號（`NO_CLIENT_IDS`，加密策略）。帳本之後記到這張單時請求自動撤回（`WITHDRAWN`）。
++- 不下單、不撤單；轉接器對交易所只做唯讀查詢。
++
+ ## 5. Phase 3 實際落地的程式改動
+ 
+ 本 Phase 以設計為主，程式改動限縮在「零風險的標記與命名修正」——不動任何 latch、resume 或交易
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index afff6ee..bae9c98 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -117,6 +117,11 @@ from .verified_close_backfill import (
+     load_evidence,
+     validate_evidence,
+ )
++from .unrecorded_fill import (
++    UnrecordedFillAdapter,
++    UnrecordedFillPaths,
++    run_unrecorded_fill_round,
++)
+ from .repair_runner import (
+     RUNNER_CODES,
+     PositionStillOpen,
+@@ -221,6 +226,9 @@ __all__ = [
+     "RUNNER_CODES",
+     "PositionStillOpen",
+     "RepairAdapter",
++    "UnrecordedFillAdapter",
++    "UnrecordedFillPaths",
++    "run_unrecorded_fill_round",
+     "RepairPaths",
+     "pause_env_name",
+     "repair_paused",
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 3763cdf..1ecec06 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -1179,6 +1179,217 @@
+         ],
+         "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
+       }
++    },
++    {
++      "code": "SEY.UNRECORDED_FILL_CORRECTED",
++      "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
++      "project": "seykota",
++      "sources": [
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:420"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：以交易所成交重述整筆已平倉的交易（build_trade_correction，數量不平就拒絕；同一筆交易一併納入的其他未記單必須逐張證明是策略自己下的——重複送單或帶策略自己的編號特徵——有任何一張查不出來源就整筆不寫），追加 trade_correction、排入 Google 表更正、更新 LINE 查詢。每輪最多寫一筆；寫完立刻通知，不開請求。",
++      "human_action": "帳本已經更正好，不用再動帳本；要做的是追出為什麼同一張單被送了兩次（重送 bug），並確認修正。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-09-21 趨勢策略重複送單、帳本漏記，DIVERGED 三天沒人處理（h4 人工更正）。使用者 2026-09-25 定案（g1）：只有確定是自己重複送單才自動更正，因為這時更正的內容完全由交易所成交決定、沒有猜的空間；但重複送單本身是 bug，一律立刻通知人追根因，所以是 R3 而不是 R1。",
++      "operator_message": {
++        "what": "策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的那筆交易整筆重述、追加一筆帳本更正（不改舊紀錄），帳本、Google 表、LINE 查詢的數字已跟交易所一致。",
++        "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
++        "steps": [
++          "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。"
++      }
++    },
++    {
++      "code": "SEY.UNRECORDED_FILL_UNRESOLVED",
++      "title": "交易所有成交、帳本沒記，無法自動更正",
++      "project": "seykota",
++      "sources": [
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、同一筆交易還有其他查不出來源的未記單、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
++      "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "使用者 2026-09-25 定案（g1）：不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。",
++      "operator_message": {
++        "what": "趨勢策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。",
++        "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
++        "steps": [
++          "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
++          "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
++          "如果是策略下的單：到電腦前用手動更正工具（scripts/append_trade_correction.py，先預覽再帶確認碼套用）把這筆交易改成跟交易所一致；完成後下一輪會自動撤回這個請求。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
++      }
++    },
++    {
++      "code": "MOM.UNRECORDED_FILL_CORRECTED",
++      "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
++      "project": "momentum",
++      "sources": [
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:420"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：以交易所成交重述整筆已平倉的交易（build_trade_correction，數量不平就拒絕；同一筆交易一併納入的其他未記單必須逐張證明是策略自己下的——重複送單或帶策略自己的編號特徵——有任何一張查不出來源就整筆不寫），追加 trade_correction、排入 Google 表更正、更新 LINE 查詢。每輪最多寫一筆；寫完立刻通知，不開請求。",
++      "human_action": "帳本已經更正好，不用再動帳本；要做的是追出為什麼同一張單被送了兩次（重送 bug），並確認修正。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-09-21 趨勢策略重複送單、帳本漏記，DIVERGED 三天沒人處理（h4 人工更正）。使用者 2026-09-25 定案（g1）：只有確定是自己重複送單才自動更正，因為這時更正的內容完全由交易所成交決定、沒有猜的空間；但重複送單本身是 bug，一律立刻通知人追根因，所以是 R3 而不是 R1。",
++      "operator_message": {
++        "what": "策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的那筆交易整筆重述、追加一筆帳本更正（不改舊紀錄），帳本、Google 表、LINE 查詢的數字已跟交易所一致。",
++        "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
++        "steps": [
++          "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
++        ],
++        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。"
++      }
++    },
++    {
++      "code": "MOM.UNRECORDED_FILL_UNRESOLVED",
++      "title": "交易所有成交、帳本沒記，無法自動更正",
++      "project": "momentum",
++      "sources": [
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、同一筆交易還有其他查不出來源的未記單、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
++      "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "使用者 2026-09-25 定案（g1）：不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。",
++      "operator_message": {
++        "what": "動能策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。",
++        "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
++        "steps": [
++          "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
++          "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
++          "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
++        ],
++        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
++      }
++    },
++    {
++      "code": "BTC.UNRECORDED_FILL_CORRECTED",
++      "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
++      "project": "btc-competition",
++      "sources": [
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:464"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：把那張單的成交補記成帳本的現貨成交，排入 Google 表。每輪最多寫一筆；寫完立刻通知，不開請求。",
++      "human_action": "帳本已經更正好，不用再動帳本；要做的是追出為什麼同一張單被送了兩次（重送 bug），並確認修正。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-09-21 趨勢策略重複送單、帳本漏記，DIVERGED 三天沒人處理（h4 人工更正）。使用者 2026-09-25 定案（g1）：只有確定是自己重複送單才自動更正，因為這時更正的內容完全由交易所成交決定、沒有猜的空間；但重複送單本身是 bug，一律立刻通知人追根因，所以是 R3 而不是 R1。",
++      "operator_message": {
++        "what": "策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的現貨成交補記進帳本（只追加、不改舊紀錄），持倉數字已跟交易所一致。",
++        "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
++        "steps": [
++          "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
++        ],
++        "ai_prompt": "請在 btc-bull-market-competition 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。"
++      }
++    },
++    {
++      "code": "BTC.UNRECORDED_FILL_UNRESOLVED",
++      "title": "交易所有成交、帳本沒記，無法自動更正",
++      "project": "btc-competition",
++      "sources": [
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、同一筆交易還有其他查不出來源的未記單、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
++      "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "使用者 2026-09-25 定案（g1）：不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。",
++      "operator_message": {
++        "what": "競賽策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。",
++        "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
++        "steps": [
++          "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
++          "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
++          "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
++        ],
++        "ai_prompt": "請在 btc-bull-market-competition 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
++      }
++    },
++    {
++      "code": "MYC.UNRECORDED_FILL_UNRESOLVED",
++      "title": "交易所有成交、帳本沒記，無法自動更正",
++      "project": "mycrypto",
++      "sources": [
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。這支策略下單不帶自訂編號，無法判斷是不是自己重複送單，所以一律走這條。",
++      "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "使用者 2026-09-25 定案（g1）：不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。",
++      "operator_message": {
++        "what": "加密策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。",
++        "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
++        "steps": [
++          "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
++          "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
++          "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
++        ],
++        "ai_prompt": "請在 my-crypto-bot 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
++      }
+     }
+   ],
+   "retired_codes": [
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index e35e52d..40c2e27 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -22,7 +22,7 @@
+     "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
+     "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+     "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
+-    "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
++    "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+     "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+@@ -1252,15 +1252,176 @@
+           "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+         }
+       }
++    },
++    {
++      "code": "SEY.UNRECORDED_FILL_CORRECTED",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++        }
++      }
++    },
++    {
++      "code": "SEY.UNRECORDED_FILL_UNRESOLVED",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++        }
++      }
++    },
++    {
++      "code": "MOM.UNRECORDED_FILL_CORRECTED",
++      "behaviour": {
++        "momentum": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++        }
++      }
++    },
++    {
++      "code": "MOM.UNRECORDED_FILL_UNRESOLVED",
++      "behaviour": {
++        "momentum": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++        }
++      }
++    },
++    {
++      "code": "BTC.UNRECORDED_FILL_CORRECTED",
++      "behaviour": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。"
++        }
++      },
++      "emits_event": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++        }
++      }
++    },
++    {
++      "code": "BTC.UNRECORDED_FILL_UNRESOLVED",
++      "behaviour": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。"
++        }
++      },
++      "emits_event": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++        }
++      }
++    },
++    {
++      "code": "MYC.UNRECORDED_FILL_UNRESOLVED",
++      "behaviour": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "加密策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-6），上正式機後改 done。"
++        }
++      },
++      "emits_event": {
++        "mycrypto": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
+     {
+       "kind": "rule",
+-      "id": "SEY.PROTECTION_MOVE_DEFERRED",
++      "id": "SEY.UNRECORDED_FILL_CORRECTED",
+       "type": "added",
+       "project": "seykota",
+-      "note": "新增：移動停損時舊停損取消不掉，改成保留舊停損、下一根 K 棒再試，不再無限重試卡住（h11，PR #74 待上正式機）。"
++      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
++    },
++    {
++      "kind": "rule",
++      "id": "SEY.UNRECORDED_FILL_UNRESOLVED",
++      "type": "added",
++      "project": "seykota",
++      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
++    },
++    {
++      "kind": "rule",
++      "id": "MOM.UNRECORDED_FILL_CORRECTED",
++      "type": "added",
++      "project": "momentum",
++      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
++    },
++    {
++      "kind": "rule",
++      "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
++      "type": "added",
++      "project": "momentum",
++      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
++    },
++    {
++      "kind": "rule",
++      "id": "BTC.UNRECORDED_FILL_CORRECTED",
++      "type": "added",
++      "project": "btc-competition",
++      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
++    },
++    {
++      "kind": "rule",
++      "id": "BTC.UNRECORDED_FILL_UNRESOLVED",
++      "type": "added",
++      "project": "btc-competition",
++      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.UNRECORDED_FILL_UNRESOLVED",
++      "type": "added",
++      "project": "mycrypto",
++      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/unrecorded_fill.py b/src/trade_alerts/unrecorded_fill.py
+new file mode 100644
+index 0000000..487d74c
+--- /dev/null
++++ b/src/trade_alerts/unrecorded_fill.py
+@@ -0,0 +1,540 @@
++"""Unrecorded exchange fills: detect, attribute, and correct only the certain case (g1).
++
++The ledger-vs-exchange check (``ledger_reconcile.exchange_ledger_compare``)
++lists every exchange fill the ledger does not account for in
++``evidence.unmatched_exchange_fills`` and turns the verdict ``DIVERGED`` --
++and until now nothing took it from there.  2026-09-21 ed-seykota sent one
++entry twice under the same clientOrderId, both filled, the ledger recorded
++one, and the divergence sat unattended for three days.
++
++This module is the fleet's one handler for that list, run on each strategy's
++timer.  The operator's rule (2026-09-25):
++
++* the ledger is corrected automatically **only** when the extra order is
++  certainly the strategy's own duplicate send -- the exchange reports the
++  same clientOrderId as an order the ledger already recorded -- and the
++  exchange fills restate the trade completely -- every other unrecorded
++  order folded into that restatement proven the strategy's own as well.  The
++  correction is appended
++  (never an edit) and the operator is told at once (``UNRECORDED_FILL_CORRECTED``,
++  R3): a duplicate send is a bug whose root cause must be found;
++* every other unrecorded fill -- unknown origin (e.g. an order placed by
++  hand in the exchange app), a duplicate whose position is still open or
++  whose trade also holds an order of unknown origin, one
++  the fills cannot restate, one whose order could not be looked up -- is
++  never written: one request, one R3 notice with steps
++  (``UNRECORDED_FILL_UNRESOLVED``).  The request is withdrawn automatically
++  once the ledger accounts for the order (a human corrected it).
++
++Two ledger shapes:
++
++* ``style="trade"`` (futures: ``trade_open`` / ``trade_close``): the whole
++  closed trade is restated from the exchange with
++  ``trade_correction.build_trade_correction``;
++* ``style="spot"`` (btc-competition: one ``spot_fill`` per fill): the
++  duplicate order's own fills are appended as the strategy's ``spot_fill``
++  rows by the adapter.
++
++A strategy that cannot tell a duplicate apart (no client order ids,
++``client_ids=False``) only ever reports ``UNRESOLVED``.
++
++At most one ledger write per round.  The module never places or cancels an
++order: the adapter's exchange calls are read-only lookups.
++"""
++from __future__ import annotations
++
++import logging
++from dataclasses import dataclass
++from datetime import datetime, timezone
++from pathlib import Path
++from typing import Any, Callable, Iterable, Mapping
++
++from .error_request_queue import open_error_request, outstanding_error_requests, record_request_outcome
++from .fleet_event_log import append_fleet_event, load_error_catalog, risk_tier_for
++from .ledger_reconcile import (
++    atomic_write,
++    is_paper_event,
++    norm_symbol_plain,
++    parse_iso,
++    read_json,
++    read_ledger,
++    recorded_order_ids,
++)
++from .ops_export import build_ops_export, write_ops_export
++from .trade_correction import TRADE_CORRECTION_EVENT, build_trade_correction
++
++LOGGER = logging.getLogger("trade_alerts.unrecorded_fill")
++
++CODE_CORRECTED = "UNRECORDED_FILL_CORRECTED"
++CODE_UNRESOLVED = "UNRECORDED_FILL_UNRESOLVED"
++
++#: Why an unrecorded fill was left for a human.
++ORIGIN_UNKNOWN = "ORIGIN_UNKNOWN"          # not a duplicate of any recorded order
++NO_CLIENT_IDS = "NO_CLIENT_IDS"            # this strategy cannot tell (no client ids)
++POSITION_OPEN = "POSITION_OPEN"            # a duplicate, but its trade is still open
++NOT_RESTATABLE = "NOT_RESTATABLE"          # the fills do not restate the trade
++LOOKUP_FAILED = "LOOKUP_FAILED"            # the order could not be looked up for too long
++WRITE_FAILED = "WRITE_FAILED"              # the correction write failed or could not be verified
++UNATTRIBUTED_ORDERS = "UNATTRIBUTED_ORDERS"  # another unrecorded order in the trade is of unknown origin
++
++#: Recorded orders within this distance of an unrecorded fill are the ones
++#: whose client ids are compared with it.  A duplicate send lands within
++#: seconds of the original; a generous window costs only a few lookups.
++DUPLICATE_WINDOW_MS = 30 * 60 * 1000
++#: Unrecorded orders this close to a duplicate's trade (before its first open,
++#: after its close) are taken as part of that trade when restating it.
++TRADE_SLACK_MS = 10 * 60 * 1000
++#: An order that cannot be looked up is retried silently for this long, then
++#: reported: a network blip must not page anyone, a lasting one must.
++LOOKUP_GRACE_MS = 2 * 60 * 60 * 1000
++
++
++@dataclass(frozen=True)
++class UnrecordedFillAdapter:
++    """What one strategy tells the handler.
++
++    ``client_order_id(symbol, order_id)`` returns the exchange's clientOrderId
++    for an order (a read-only lookup; ``None`` when it has none).
++    ``fetch_fills(symbol, order_ids)`` returns ``reconcile-source/v1`` fill
++    rows for exactly those orders.  For ``style="trade"``,
++    ``append_trade_correction(fields)`` appends one ``trade_correction`` with
++    the strategy's own ledger writer and returns its event id, and
++    ``after_trade_correction(fields, event_id)`` queues the Google projection /
++    LINE query (best-effort; the ledger already stands).  For
++    ``style="spot"``, ``append_spot_fills(symbol, order_id, fills)`` appends
++    the order's fills as the strategy's own rows (projection included) and
++    returns a dict with at least ``event_ids``.
++
++    ``owns_client_order_id(client_order_id)`` says whether a clientOrderId is
++    certainly one this strategy sends (its own id scheme, including the ids
++    its native-stop exits carry).  Restating a trade folds in the *other*
++    unrecorded orders of that trade (2026-09-21: the stop's exit was not
++    recorded either); each of them must be attributed on its own -- a
++    duplicate of a recorded order, or an id this predicate owns -- or nothing
++    is written.  ``None``: no other order can be attributed.
++    """
++
++    project: str
++    style: str
++    client_ids: bool
++    evidence_source: str
++    client_order_id: Callable[[str, str], str | None] | None = None
++    fetch_fills: Callable[[str, list[str]], list[dict[str, Any]]] | None = None
++    append_trade_correction: Callable[[dict[str, Any]], str] | None = None
++    after_trade_correction: Callable[[dict[str, Any], str], dict[str, Any]] | None = None
++    append_spot_fills: Callable[[str, str, list[dict[str, Any]]], dict[str, Any]] | None = None
++    owns_client_order_id: Callable[[str], bool] | None = None
++    norm_symbol: Callable[[Any], str] = norm_symbol_plain
++    is_paper: Callable[[dict[str, Any]], bool] = is_paper_event
++    qty_multiplier: float = 1.0
++
++    def __post_init__(self) -> None:
++        if self.style not in ("trade", "spot"):
++            raise ValueError("style must be 'trade' or 'spot'")
++        if not self.client_ids:
++            return
++        needed = ["client_order_id", "fetch_fills"]
++        needed.append("append_trade_correction" if self.style == "trade" else "append_spot_fills")
++        missing = [name for name in needed if getattr(self, name) is None]
++        if missing:
++            raise ValueError(f"a {self.style} adapter that corrects needs {missing}")
++
++    @property
++    def codes(self) -> tuple[str, ...]:
++        return (CODE_CORRECTED, CODE_UNRESOLVED) if self.client_ids else (CODE_UNRESOLVED,)
++
++
++@dataclass(frozen=True)
++class UnrecordedFillPaths:
++    ledger: str = "audit/trading_ledger.jsonl"
++    ledger_status: str = "audit/ledger_status.json"
++    fleet_event_log: str = "audit/fleet_event_log.jsonl"
++    request_queue: str = "audit/error_requests.jsonl"
++    evidence_dir: str = "audit/unrecorded-fill-evidence"
++    ops_export: str = "audit/ops_export.json"
++
++
++def run_unrecorded_fill_round(
++    adapter: UnrecordedFillAdapter,
++    paths: UnrecordedFillPaths = UnrecordedFillPaths(),
++    *,
++    catalog: Mapping[str, Any] | None = None,
++    now: datetime | None = None,
++    refresh_ops_export: bool = True,
++) -> dict[str, Any]:
++    """One round; returns what it did, for the caller to print.
++
++    Raises before touching anything when the catalog lacks a code this
++    adapter can emit.  ``refresh_ops_export=False`` for a caller that
++    refreshes the export itself afterwards (the repair timer does).
++    """
++    catalog = catalog if catalog is not None else load_error_catalog()
++    tiers = {code: risk_tier_for(catalog, adapter.project, code) for code in adapter.codes}
++    moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
++    result: dict[str, Any] = {
++        "project": adapter.project, "unrecorded_orders": [], "corrected": [], "unresolved": [],
++        "awaiting_human": [], "deferred": [], "withdrawn": [], "ops_export_written": None,
++    }
++    try:
++        _Round(adapter, paths, tiers, moment, result).run()
++    finally:
++        if refresh_ops_export:
++            result["ops_export_written"] = _refresh_ops_export(adapter.project, paths, catalog)
++    return result
++
++
++def _refresh_ops_export(project: str, paths: UnrecordedFillPaths, catalog: Mapping[str, Any]) -> bool:
++    try:
++        write_ops_export(paths.ops_export, build_ops_export(
++            paths.fleet_event_log, paths.request_queue, project=project, catalog=catalog,
++        ))
++    except Exception as exc:  # noqa: BLE001 -- best-effort, same as the repair runner
++        LOGGER.warning("ops_export_refresh_failed path=%s error=%s: %s", paths.ops_export, type(exc).__name__, exc)
++        return False
++    return True
++
++
++def _event_ms(event: Mapping[str, Any]) -> int | None:
++    value = event.get("event_epoch_ms")
++    if isinstance(value, (int, float)) and not isinstance(value, bool):
++        return int(value)
++    parsed = parse_iso(event.get("event_time") or event.get("ts"))
++    return int(parsed.timestamp() * 1000) if parsed else None
++
++
++def unrecorded_orders(ledger_status: Mapping[str, Any], ledger_events: list[dict[str, Any]],
++                      *, norm_symbol: Callable[[Any], str] = norm_symbol_plain) -> list[dict[str, Any]]:
++    """The exchange orders behind ``unmatched_exchange_fills`` that the ledger
++    still does not account for, oldest first, one entry per order."""
++    if (ledger_status or {}).get("value") != "DIVERGED":
++        return []
++    evidence = ledger_status.get("evidence") or {}
++    accounted = recorded_order_ids(ledger_events)
++    orders: dict[str, dict[str, Any]] = {}
++    for fill in evidence.get("unmatched_exchange_fills") or []:
++        oid = str(fill.get("order_id") or "").strip()
++        if not oid or oid in accounted:
++            continue
++        order = orders.setdefault(oid, {
++            "order_id": oid, "symbol": fill.get("symbol"), "norm_symbol": norm_symbol(fill.get("symbol")),
++            "side": str(fill.get("side") or "").lower() or None, "time_ms": fill.get("time_ms"), "fills": [],
++        })
++        order["fills"].append(dict(fill))
++        if isinstance(fill.get("time_ms"), (int, float)) and (
++            order["time_ms"] is None or fill["time_ms"] < order["time_ms"]
++        ):
++            order["time_ms"] = fill["time_ms"]
++    return sorted(orders.values(), key=lambda o: (o["time_ms"] or 0, o["order_id"]))
++
++
++class _Round:
++    def __init__(self, adapter: UnrecordedFillAdapter, paths: UnrecordedFillPaths, tiers: dict[str, str],
++                 moment: datetime, result: dict[str, Any]) -> None:
++        self.adapter = adapter
++        self.project = adapter.project
++        self.paths = paths
++        self.tiers = tiers
++        self.moment_ms = int(moment.timestamp() * 1000)
++        self.result = result
++        self._client_ids: dict[str, str | None] = {}
++
++    def run(self) -> None:
++        ledger_events = read_ledger(self.paths.ledger)
++        accounted = recorded_order_ids(ledger_events)
++        open_requests = self._withdraw_accounted_requests(accounted)
++        orders = unrecorded_orders(read_json(self.paths.ledger_status) or {}, ledger_events,
++                                   norm_symbol=self.adapter.norm_symbol)
++        self.result["unrecorded_orders"] = [o["order_id"] for o in orders]
++
++        write_attempted = False
++        handled: set[str] = set()
++        for order in orders:
++            oid = order["order_id"]
++            if oid in handled:
++                continue
++            if oid in open_requests:
++                self.result["awaiting_human"].append({"order_id": oid, "request_id": open_requests[oid]["request_id"]})
++                continue
++            outcome = self._handle(order, orders, ledger_events, allow_write=not write_attempted)
++            handled.update(outcome.get("order_ids", [oid]))
++            write_attempted = write_attempted or outcome.get("wrote", False)
++
++    # -- one unrecorded order ------------------------------------------------ #
++    def _handle(self, order: dict[str, Any], orders: list[dict[str, Any]], ledger_events: list[dict[str, Any]],
++                *, allow_write: bool) -> dict[str, Any]:
++        oid = order["order_id"]
++        if not self.adapter.client_ids:
++            self._unresolved(order, NO_CLIENT_IDS, "這支策略下單不帶自訂編號，無法判斷是不是自己重複送單，不自動更正。")
++            return {}
++        try:
++            match = self._duplicate_of(order, ledger_events)
++        except Exception as exc:  # noqa: BLE001 -- a lookup failure is retried, then reported
++            age = self.moment_ms - int(order["time_ms"] or 0)
++            if age < LOOKUP_GRACE_MS:
++                self.result["deferred"].append({"order_id": oid, "reason": f"{type(exc).__name__}: {exc}"})
++                return {}
++            self._unresolved(order, LOOKUP_FAILED, f"查不到這張單的自訂編號（已持續 {age // 60000} 分鐘）：{type(exc).__name__}: {exc}")
++            return {}
++        if match is None:
++            self._unresolved(order, ORIGIN_UNKNOWN, "這張單的自訂編號跟帳本已記的任何一張單都不同，來源不明（例如在交易所 App 手動下的單）。")
++            return {}
++        if not allow_write:
++            self.result["deferred"].append({"order_id": oid, "reason": "one ledger write per round"})
++            return {}
++        if self.adapter.style == "spot":
++            return self._correct_spot(order, match)
++        return self._correct_trade(order, match, orders, ledger_events)
++
++    def _client_id(self, symbol: str, order_id: str) -> str | None:
++        if order_id not in self._client_ids:
++            value = self.adapter.client_order_id(symbol, order_id)
++            self._client_ids[order_id] = str(value).strip() if value not in (None, "") else None
++        return self._client_ids[order_id]
++
++    def _attributed(self, symbol: str, order_id: str, duplicate_client_id: str) -> bool:
++        """True only when the order's clientOrderId proves this strategy sent it."""
++        cid = self._client_id(symbol, order_id)
++        if not cid:
++            return False
++        if cid == duplicate_client_id:
++            return True
++        owns = self.adapter.owns_client_order_id
++        return bool(owns is not None and owns(cid))
++
++    def _duplicate_of(self, order: dict[str, Any], ledger_events: list[dict[str, Any]]) -> dict[str, Any] | None:
++        """The recorded ledger event whose order has the same clientOrderId, or None."""
++        mine = self._client_id(str(order["symbol"]), order["order_id"])
++        if not mine:
++            return None
++        when = int(order["time_ms"] or 0)
++        for event in ledger_events:
++            oid = str(event.get("order_id") or "").strip()
++            if not oid or oid == order["order_id"] or self.adapter.is_paper(event):
++                continue
++            if self.adapter.norm_symbol(event.get("symbol")) != order["norm_symbol"]:
++                continue
++            at = _event_ms(event)
++            if at is None or abs(at - when) > DUPLICATE_WINDOW_MS:
++                continue
++            if self._client_id(str(order["symbol"]), oid) == mine:
++                return {"event": event, "order_id": oid, "client_order_id": mine}
++        return None
++
++    # -- corrections --------------------------------------------------------- #
++    def _correct_trade(self, order: dict[str, Any], match: dict[str, Any], orders: list[dict[str, Any]],
++                       ledger_events: list[dict[str, Any]]) -> dict[str, Any]:
++        trade_id = str(match["event"].get("trade_id") or "")
++        # Not paper-filtered: the match already came from a real order, and a
++        # native-stop close legitimately has no order_id (2026-09-23), which
++        # the generic paper test would drop -- making the trade look open.
++        trade = [e for e in ledger_events if str(e.get("trade_id") or "") == trade_id]
++        opens = [e for e in trade if e.get("event_type") == "trade_open"]
++        closes = [e for e in trade if e.get("event_type") == "trade_close"]
++        if not trade_id or not opens:
++            self._unresolved(order, NOT_RESTATABLE, f"重複送單對應的帳本紀錄沒有 trade_open（trade_id={trade_id!r}）。", match=match)
++            return {}
++        if not closes:
++            self._unresolved(order, POSITION_OPEN, (
++                f"這是策略自己重複送單（跟帳本已記的訂單 {match['order_id']} 同一個自訂編號），"
++                f"但交易 {trade_id} 還沒平倉：交易所部位比帳本多，要不要減倉由你決定。"), match=match)
++            return {}
++
++        start = min(_event_ms(e) or 0 for e in opens) - TRADE_SLACK_MS
++        end = max(_event_ms(e) or 0 for e in closes) + TRADE_SLACK_MS
++        group = [o for o in orders if o["norm_symbol"] == order["norm_symbol"]
++                 and o["time_ms"] is not None and start <= o["time_ms"] <= end]
++        group_ids = sorted({o["order_id"] for o in group} | {order["order_id"]})
++        # Every other order folded into the restatement needs its own proof
++        # of origin (PR #67 review): the flatness check only shows the fills
++        # balance, not that none of them was placed by hand in the app.
++        try:
++            unattributed = [
++                oid for oid in group_ids
++                if oid != order["order_id"] and not self._attributed(str(order["symbol"]), oid, match["client_order_id"])
++            ]
++        except Exception as exc:  # noqa: BLE001 -- fail closed, retried like any lookup failure
++            age = self.moment_ms - int(order["time_ms"] or 0)
++            if age < LOOKUP_GRACE_MS:
++                self.result["deferred"].append({"order_id": order["order_id"], "reason": f"{type(exc).__name__}: {exc}"})
++                return {"order_ids": group_ids}
++            self._unresolved(order, LOOKUP_FAILED, f"查不到同一筆交易其他未記訂單的自訂編號：{type(exc).__name__}: {exc}",
++                             match=match, order_ids=group_ids)
++            return {"order_ids": group_ids}
++        if unattributed:
++            self._unresolved(order, UNATTRIBUTED_ORDERS, (
++                f"這張單確定是策略重複送單，但交易 {trade_id} 同時段還有未記的訂單 {', '.join(unattributed)} "
++                "無法確認是策略下的（例如在 App 手動下的單），所以整筆不自動更正。"), match=match, order_ids=group_ids)
++            return {"order_ids": group_ids}
++        recorded = sorted({str(e["order_id"]) for e in [*opens, *closes]
++                           if e.get("order_id") is not None and str(e.get("order_id")).strip()})
++        entry_side = "buy" if str(opens[0].get("side") or closes[0].get("side") or "long").lower() == "long" else "sell"
++        reason_code = "DUPLICATE_ENTRY_UNRECORDED" if order["side"] == entry_side else "UNRECORDED_FILL"
++        reason = (f"策略重複送單：訂單 {order['order_id']} 與帳本已記的訂單 {match['order_id']} 用同一個自訂編號 "
++                  f"{match['client_order_id']}，帳本漏記；以交易所成交重述整筆交易（一併納入同時段未記的訂單 "
++                  f"{', '.join(o for o in group_ids if o != order['order_id']) or '無'}）。")
++        try:
++            fills = self.adapter.fetch_fills(str(order["symbol"]), sorted(set(recorded) | set(group_ids)))
++            fields = build_trade_correction(
++                ledger_events, trade_id=trade_id, fills=fills, reason_code=reason_code, reason=reason,
++                evidence_source=self.adapter.evidence_source, qty_multiplier=self.adapter.qty_multiplier,
++            )
++        except Exception as exc:  # noqa: BLE001 -- TradeCorrectionError or a fetch failure: cannot restate
++            self._unresolved(order, NOT_RESTATABLE, f"交易所成交無法完整重述交易 {trade_id}：{type(exc).__name__}: {exc}",
++                             match=match, order_ids=group_ids)
++            return {"order_ids": group_ids}
++
++        evidence = {"order_ids": group_ids, "duplicate_of": match["order_id"], "client_order_id": match["client_order_id"],
++                    "trade_id": trade_id, "fills": fills, "correction": fields}
++        evidence_path = self._persist_evidence(order["order_id"], evidence)
++        if evidence_path is None:
++            self.result["deferred"].append({"order_id": order["order_id"], "reason": "could not persist the evidence file"})
++            return {"order_ids": group_ids}
++        # Re-read immediately before writing: another writer (a human with the
++        # manual tool) may have corrected it since this round started.
++        if set(group_ids) & recorded_order_ids(read_ledger(self.paths.ledger)):
++            self.result["deferred"].append({"order_id": order["order_id"], "reason": "accounted for since the round started"})
++            return {"order_ids": group_ids}
++        try:
++            event_id = self.adapter.append_trade_correction(fields)
++            if set(group_ids) - recorded_order_ids(read_ledger(self.paths.ledger)):
++                raise RuntimeError("the appended correction does not account for every order")
++        except Exception as exc:  # noqa: BLE001 -- a failed or unverifiable write is never retried
++            self._unresolved(order, WRITE_FAILED, f"帳本更正寫入失敗或無法確認：{type(exc).__name__}: {exc}",
++                             match=match, order_ids=group_ids, extra={"evidence_path": evidence_path})
++            return {"order_ids": group_ids, "wrote": True}
++        post: dict[str, Any] = {}
++        if self.adapter.after_trade_correction is not None:
++            try:
++                post = dict(self.adapter.after_trade_correction(fields, event_id) or {})
++            except Exception as exc:  # noqa: BLE001 -- the ledger stands; the sheet check reports a gap
++                post = {"error": f"{type(exc).__name__}: {exc}"}
++        previous, corrected = fields["previous"], fields["corrected"]
++        notice = "\n".join([
++            "策略自己重複送單，帳本漏記的成交已照交易所自動更正（只追加、不改舊紀錄）。",
++            f"trade_id: {trade_id}  symbol: {order['symbol']}",
++            f"重複的訂單: {order['order_id']}（與帳本已記的 {match['order_id']} 同一個自訂編號 {match['client_order_id']}）",
++            f"一併重述的訂單: {', '.join(group_ids)}",
++            f"數量 {previous['exit_volume']} → {corrected['exit_volume']}；淨損益 {previous['net_pnl']} → {corrected['net_pnl']}",
++            f"帳本更正事件: {event_id}",
++        ])
++        event = append_fleet_event(
++            self.paths.fleet_event_log, project=self.project, code=CODE_CORRECTED, risk_tier=self.tiers[CODE_CORRECTED],
++            summary=f"duplicate send {order['order_id']} of {match['order_id']} corrected in trade_id={trade_id}",
++            evidence={"order_ids": group_ids, "trade_id": trade_id, "symbol": order["symbol"]},
++            details={"correction_event_id": event_id, "duplicate_of": match["order_id"],
++                     "client_order_id": match["client_order_id"], "reason_code": reason_code,
++                     "evidence_path": evidence_path, "post": post, "notice_text": notice},
++            measurements={"previous_net_pnl": previous["net_pnl"], "corrected_net_pnl": corrected["net_pnl"],
++                          "previous_exit_volume": previous["exit_volume"], "corrected_exit_volume": corrected["exit_volume"]},
++        )
++        self.result["corrected"].append({"order_ids": group_ids, "trade_id": trade_id, "event_id": event_id,
++                                         "fleet_event_id": event["event_id"], "post": post})
++        return {"order_ids": group_ids, "wrote": True}
++
++    def _correct_spot(self, order: dict[str, Any], match: dict[str, Any]) -> dict[str, Any]:
++        oid = order["order_id"]
++        try:
++            fills = self.adapter.fetch_fills(str(order["symbol"]), [oid])
++            if not fills:
++                raise RuntimeError("the exchange returned no fills for the order")
++        except Exception as exc:  # noqa: BLE001
++            self._unresolved(order, NOT_RESTATABLE, f"查不到這張單的成交明細：{type(exc).__name__}: {exc}", match=match)
++            return {}
++        evidence_path = self._persist_evidence(oid, {"order_ids": [oid], "duplicate_of": match["order_id"],
++                                                     "client_order_id": match["client_order_id"], "fills": fills})
++        if evidence_path is None:
++            self.result["deferred"].append({"order_id": oid, "reason": "could not persist the evidence file"})
++            return {}
++        if oid in recorded_order_ids(read_ledger(self.paths.ledger)):
++            self.result["deferred"].append({"order_id": oid, "reason": "accounted for since the round started"})
++            return {}
++        try:
++            written = dict(self.adapter.append_spot_fills(str(order["symbol"]), oid, fills) or {})
++            if oid not in recorded_order_ids(read_ledger(self.paths.ledger)):
++                raise RuntimeError("the appended rows do not account for the order")
++        except Exception as exc:  # noqa: BLE001
++            self._unresolved(order, WRITE_FAILED, f"補記成交寫入失敗或無法確認：{type(exc).__name__}: {exc}",
++                             match=match, extra={"evidence_path": evidence_path})
++            return {"wrote": True}
++        notice = "\n".join([
++            "策略自己重複送單，帳本漏記的現貨成交已照交易所自動補記（只追加）。",
++            f"symbol: {order['symbol']}  重複的訂單: {oid}（與帳本已記的 {match['order_id']} 同一個自訂編號 {match['client_order_id']}）",
++            f"補記事件: {', '.join(map(str, written.get('event_ids') or []))}",
++        ])
++        event = append_fleet_event(
++            self.paths.fleet_event_log, project=self.project, code=CODE_CORRECTED, risk_tier=self.tiers[CODE_CORRECTED],
++            summary=f"duplicate send {oid} of {match['order_id']} recorded from exchange fills",
++            evidence={"order_ids": [oid], "symbol": order["symbol"]},
++            details={"duplicate_of": match["order_id"], "client_order_id": match["client_order_id"],
++                     "evidence_path": evidence_path, "written": written, "notice_text": notice},
++        )
++        self.result["corrected"].append({"order_ids": [oid], "written": written, "fleet_event_id": event["event_id"]})
++        return {"wrote": True}
++
++    # -- outcomes ------------------------------------------------------------ #
++    def _unresolved(self, order: dict[str, Any], reason_code: str, reason: str, *, match: dict[str, Any] | None = None,
++                    order_ids: Iterable[str] | None = None, extra: Mapping[str, Any] | None = None) -> None:
++        oid = order["order_id"]
++        ids = sorted(set(order_ids or []) | {oid})
++        tier = self.tiers[CODE_UNRESOLVED]
++        fills = [{k: f.get(k) for k in ("order_id", "side", "quantity", "price", "time_ms")} for f in order["fills"]]
++        request = open_error_request(
++            self.paths.request_queue, project=self.project, code=CODE_UNRESOLVED, risk_tier=tier,
++            summary=reason, evidence={"order_id": oid},
++            details={"reason_code": reason_code, "order_ids": ids, "symbol": order["symbol"], "fills": fills,
++                     **({"duplicate_of": match["order_id"], "client_order_id": match["client_order_id"]} if match else {}),
++                     **dict(extra or {})},
++        )
++        notice = "\n".join([
++            f"帳本漏記交易所成交，沒有自動更正（{reason_code}）。",
++            f"symbol: {order['symbol']}  訂單: {', '.join(ids)}",
++            *[f"- {f['side']} {f['quantity']} @ {f['price']}（time_ms {f['time_ms']}）" for f in fills],
++            f"原因：{reason}",
++        ])
++        append_fleet_event(
++            self.paths.fleet_event_log, project=self.project, code=CODE_UNRESOLVED, risk_tier=tier,
++            summary=reason, evidence={"order_id": oid, "symbol": order["symbol"]},
++            details={"reason_code": reason_code, "order_ids": ids, "request_id": request["request_id"],
++                     **({"duplicate_of": match["order_id"]} if match else {}), **dict(extra or {}),
++                     "notice_text": notice},
++        )
++        self.result["unresolved"].append({"order_id": oid, "order_ids": ids, "reason_code": reason_code,
++                                          "request_id": request["request_id"]})
++
++    def _withdraw_accounted_requests(self, accounted: set[str]) -> dict[str, dict[str, Any]]:
++        still_open: dict[str, dict[str, Any]] = {}
++        for request in outstanding_error_requests(self.paths.request_queue):
++            if request.get("project") != self.project or request.get("code") != CODE_UNRESOLVED:
++                continue
++            oid = str((request.get("evidence") or {}).get("order_id") or "")
++            if oid and oid in accounted:
++                record_request_outcome(self.paths.request_queue, request_id=request["request_id"], status="WITHDRAWN",
++                                       note="the ledger now accounts for this order", details={})
++                self.result["withdrawn"].append({"order_id": oid, "request_id": request["request_id"]})
++            elif oid:
++                # Every order the request covers waits for the human, not just
++                # the one it was opened for: one incident, one notice.
++                for covered in {oid, *map(str, (request.get("details") or {}).get("order_ids") or [])}:
++                    still_open[covered] = request
++        return still_open
++
++    def _persist_evidence(self, order_id: str, evidence: dict[str, Any]) -> str | None:
++        stamp = datetime.fromtimestamp(self.moment_ms / 1000, timezone.utc).strftime("%Y%m%d-%H%M%S")
++        path = Path(self.paths.evidence_dir) / f"{order_id}-{stamp}.json"
++        try:
++            atomic_write(path, evidence)
++        except Exception as exc:  # noqa: BLE001 -- nothing written to the ledger yet
++            LOGGER.warning("unrecorded_fill_evidence_write_failed path=%s: %s", path, exc)
++            return None
++        return str(path)
++
++
++__all__ = [
++    "CODE_CORRECTED",
++    "CODE_UNRESOLVED",
++    "TRADE_CORRECTION_EVENT",
++    "UnrecordedFillAdapter",
++    "UnrecordedFillPaths",
++    "run_unrecorded_fill_round",
++    "unrecorded_orders",
++]
+diff --git a/tests/test_repair_runner.py b/tests/test_repair_runner.py
+index 3039e0a..108cd9d 100644
+--- a/tests/test_repair_runner.py
++++ b/tests/test_repair_runner.py
+@@ -29,7 +29,7 @@ from trade_alerts import (
+     repair_paused,
+     run_repair_round,
+ )
+-from trade_alerts import repair_runner
++from trade_alerts import repair_runner, unrecorded_fill
+ from trade_alerts.fleet_event_log import FleetEventLogError
+ 
+ OPENED_MS = 1788408032535
+@@ -530,9 +530,11 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
+             lines = (root / path).read_text(encoding="utf-8").splitlines()
+             call = " ".join(lines[int(line) - 1:int(line) + 2])
+             assert "append_fleet_event(" in call, source
+-            constant = next(name for name, value in vars(repair_runner).items()
++            constant = next(name for module in (repair_runner, unrecorded_fill)
++                            for name, value in vars(module).items()
+                             if name.startswith("CODE_") and value == bare)
+             assert f"code={constant}" in call, source
+             cited += 1
+     # 3 runner codes x 2 strategies; FAILED is emitted from two call sites.
+-    assert cited == 8
++    # g1: UNRECORDED_FILL_CORRECTED for 3 strategies, UNRESOLVED for all 4.
++    assert cited == 8 + 7
+diff --git a/tests/test_unrecorded_fill.py b/tests/test_unrecorded_fill.py
+new file mode 100644
+index 0000000..1e784fe
+--- /dev/null
++++ b/tests/test_unrecorded_fill.py
+@@ -0,0 +1,341 @@
++"""g1: unrecorded exchange fills -- correct only a certain duplicate send.
++
++The main scenario is the real 2026-09-21 incident (the h4 fixture): order
++1142206692162 was a second send of 1142206675339 under the same clientOrderId,
++and the native stop's exit 1144042776223 was never recorded either.  h4 fixed
++it by hand; here the handler must reach the same correction on its own.
++"""
++from __future__ import annotations
++
++import json
++from datetime import datetime, timezone
++from pathlib import Path
++
++import pytest
++
++from trade_alerts import (
++    TRADE_CORRECTION_EVENT,
++    build_trade_correction,
++    UnrecordedFillAdapter,
++    UnrecordedFillPaths,
++    exchange_ledger_compare,
++    load_error_catalog,
++    read_ledger,
++    run_unrecorded_fill_round,
++)
++from trade_alerts.error_request_queue import outstanding_error_requests
++from trade_alerts.fleet_event_log import read_fleet_events
++from trade_alerts.ledger_reconcile import is_paper_event, norm_symbol_plain
++from trade_alerts.unrecorded_fill import (
++    CODE_CORRECTED,
++    CODE_UNRESOLVED,
++    LOOKUP_GRACE_MS,
++    unrecorded_orders,
++)
++
++FIXTURE = json.loads(
++    (Path(__file__).parent / "fixtures" / "seykota_duplicate_entry_20260921.json").read_text("utf-8")
++)
++LEDGER = FIXTURE["ledger"]
++STATE = FIXTURE["exchange_state"]
++NOW = datetime(2026, 9, 24, 5, 30, 30, tzinfo=timezone.utc)
++TRADE_B = "BTCUSDT-1142206675339"
++DUPLICATE, ORIGINAL, EXIT = "1142206692162", "1142206675339", "1144042776223"
++ORDERS_B = {ORIGINAL, DUPLICATE, "1143212109561", EXIT}
++CATALOG = load_error_catalog()
++
++
++def _client_ids(**overrides: str | None) -> dict[str, str | None]:
++    ids = {str(f["order_id"]): f"sk-{f['order_id']}" for f in STATE["fills"]}
++    ids[DUPLICATE] = ids[ORIGINAL]  # the 09-21 duplicate send
++    ids.update(overrides)
++    return ids
++
++
++class Exchange:
++    def __init__(self, client_ids: dict[str, str | None], *, fail_lookup: bool = False) -> None:
++        self.client_ids = client_ids
++        self.fail_lookup = fail_lookup
++        self.lookups: list[str] = []
++
++    def client_order_id(self, _symbol: str, order_id: str) -> str | None:
++        self.lookups.append(order_id)
++        if self.fail_lookup:
++            raise ConnectionError("read timed out")
++        return self.client_ids.get(order_id)
++
++    def fetch_fills(self, _symbol: str, order_ids: list[str]) -> list[dict]:
++        return [dict(f) for f in STATE["fills"] if str(f["order_id"]) in set(order_ids)]
++
++
++def _setup(tmp_path: Path, ledger=LEDGER) -> UnrecordedFillPaths:
++    paths = UnrecordedFillPaths(
++        ledger=str(tmp_path / "ledger.jsonl"), ledger_status=str(tmp_path / "ledger_status.json"),
++        fleet_event_log=str(tmp_path / "fleet.jsonl"), request_queue=str(tmp_path / "requests.jsonl"),
++        evidence_dir=str(tmp_path / "evidence"), ops_export=str(tmp_path / "ops_export.json"),
++    )
++    Path(paths.ledger).write_text("".join(json.dumps(e) + "\n" for e in ledger), encoding="utf-8")
++    status = exchange_ledger_compare(STATE, ledger, is_paper=is_paper_event, norm_symbol=norm_symbol_plain, now=NOW)
++    Path(paths.ledger_status).write_text(json.dumps(status), encoding="utf-8")
++    return paths
++
++
++def _trade_adapter(paths: UnrecordedFillPaths, exchange: Exchange, *, append=None, **kw) -> UnrecordedFillAdapter:
++    written: list[str] = []
++
++    def append_trade_correction(fields: dict) -> str:
++        event_id = f"corr-{len(written) + 1}"
++        with open(paths.ledger, "a", encoding="utf-8") as fh:
++            fh.write(json.dumps({"event_type": TRADE_CORRECTION_EVENT, "event_id": event_id,
++                                 "event_epoch_ms": 1790200000000, **fields}) + "\n")
++        written.append(event_id)
++        return event_id
++
++    return UnrecordedFillAdapter(
++        project="seykota", style="trade", client_ids=True, evidence_source="fixture",
++        client_order_id=exchange.client_order_id, fetch_fills=exchange.fetch_fills,
++        append_trade_correction=append or append_trade_correction,
++        after_trade_correction=lambda fields, event_id: {"queued": event_id},
++        owns_client_order_id=kw.pop("owns", lambda cid: cid.startswith("sk-")), **kw,
++    )
++
++
++def _round(adapter, paths, now=NOW):
++    return run_unrecorded_fill_round(adapter, paths, catalog=CATALOG, now=now)
++
++
++def _codes(paths):
++    return [e["code"] for e in read_fleet_events(paths.fleet_event_log)]
++
++
++# --------------------------------------------------------------------------- #
++def test_the_fixture_shows_both_unrecorded_orders():
++    status = exchange_ledger_compare(STATE, LEDGER, is_paper=is_paper_event, norm_symbol=norm_symbol_plain, now=NOW)
++    assert [o["order_id"] for o in unrecorded_orders(status, LEDGER)] == [DUPLICATE, EXIT]
++
++
++def test_a_certain_duplicate_send_is_corrected_like_the_manual_h4_fix(tmp_path):
++    paths = _setup(tmp_path)
++    result = _round(_trade_adapter(paths, Exchange(_client_ids())), paths)
++
++    assert result["unresolved"] == []
++    [done] = result["corrected"]
++    assert done["trade_id"] == TRADE_B and set(done["order_ids"]) == {DUPLICATE, EXIT}
++    correction = [e for e in read_ledger(paths.ledger) if e.get("event_type") == TRADE_CORRECTION_EVENT]
++    assert len(correction) == 1
++    c = correction[0]
++    assert set(c["exchange_order_ids"]) == ORDERS_B
++    assert c["reason_code"] == "DUPLICATE_ENTRY_UNRECORDED"
++    assert c["corrected"]["exit_volume"] == pytest.approx(0.011)
++    assert c["corrected"]["net_pnl"] == pytest.approx(-13.233, abs=5e-4)  # h4: -10.387 -> -13.233
++    # R3 notice, no request: the ledger is right; the human chases the bug.
++    [event] = read_fleet_events(paths.fleet_event_log)
++    assert event["code"] == CODE_CORRECTED and event["risk_tier"] == "R3"
++    assert "重複送單" in event["details"]["notice_text"]
++    assert event["details"]["post"] == {"queued": "corr-1"}
++    assert outstanding_error_requests(paths.request_queue) == []
++    assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "SEY." + CODE_CORRECTED
++
++
++def test_the_next_round_finds_nothing_left_to_do(tmp_path):
++    paths = _setup(tmp_path)
++    adapter = _trade_adapter(paths, Exchange(_client_ids()))
++    _round(adapter, paths)
++    again = _round(adapter, paths)  # ledger_status is still the stale DIVERGED one
++    assert again["unrecorded_orders"] == [] and again["corrected"] == []
++    assert _codes(paths) == [CODE_CORRECTED]
++
++
++def test_a_hand_placed_order_in_the_same_trade_blocks_the_whole_correction(tmp_path):
++    """PR #67 review: the duplicate is certain, but another unrecorded order in
++    the trade's window came from the app.  Even if every fill balances, the
++    ledger is not written."""
++    paths = _setup(tmp_path)
++    exchange = Exchange(_client_ids(**{EXIT: "web_Xk2pQ9manual"}))
++    result = _round(_trade_adapter(paths, exchange), paths)
++
++    assert result["corrected"] == []
++    [u] = result["unresolved"]
++    assert u["reason_code"] == "UNATTRIBUTED_ORDERS" and set(u["order_ids"]) == {DUPLICATE, EXIT}
++    assert not any(e.get("event_type") == TRADE_CORRECTION_EVENT for e in read_ledger(paths.ledger))
++    assert _codes(paths) == [CODE_UNRESOLVED]
++    [request] = outstanding_error_requests(paths.request_queue)
++    assert set(request["details"]["order_ids"]) == {DUPLICATE, EXIT}
++    again = _round(_trade_adapter(paths, exchange), paths)  # one incident, one notice
++    assert again["unresolved"] == [] and _codes(paths) == [CODE_UNRESOLVED]
++
++
++def test_without_an_ownership_rule_no_other_order_can_be_folded_in(tmp_path):
++    paths = _setup(tmp_path)
++    result = _round(_trade_adapter(paths, Exchange(_client_ids()), owns=None), paths)
++    assert result["corrected"] == []
++    assert [u["reason_code"] for u in result["unresolved"]] == ["UNATTRIBUTED_ORDERS"]
++    assert not any(e.get("event_type") == TRADE_CORRECTION_EVENT for e in read_ledger(paths.ledger))
++
++
++def test_a_fill_of_unknown_origin_is_never_written(tmp_path):
++    paths = _setup(tmp_path)
++    exchange = Exchange(_client_ids(**{DUPLICATE: "web_manual_123"}))  # e.g. placed by hand in the app
++    result = _round(_trade_adapter(paths, exchange), paths)
++
++    assert result["corrected"] == []
++    assert [(u["order_id"], u["reason_code"]) for u in result["unresolved"]] == [
++        (DUPLICATE, "ORIGIN_UNKNOWN"), (EXIT, "ORIGIN_UNKNOWN")]
++    assert not any(e.get("event_type") == TRADE_CORRECTION_EVENT for e in read_ledger(paths.ledger))
++    assert _codes(paths) == [CODE_UNRESOLVED, CODE_UNRESOLVED]
++    assert len(outstanding_error_requests(paths.request_queue)) == 2
++
++
++def test_an_open_request_is_not_notified_again(tmp_path):
++    paths = _setup(tmp_path)
++    adapter = _trade_adapter(paths, Exchange(_client_ids(**{DUPLICATE: "web_manual_123"})))
++    _round(adapter, paths)
++    again = _round(adapter, paths)
++    assert again["unresolved"] == [] and {a["order_id"] for a in again["awaiting_human"]} == {DUPLICATE, EXIT}
++    assert len(_codes(paths)) == 2
++
++
++def test_a_request_is_withdrawn_once_the_ledger_accounts_for_the_order(tmp_path):
++    paths = _setup(tmp_path)
++    exchange = Exchange(_client_ids(**{DUPLICATE: "web_manual_123"}))
++    _round(_trade_adapter(paths, exchange), paths)
++    assert len(outstanding_error_requests(paths.request_queue)) == 2
++    # A human corrects it with the manual tool (same builder the handler uses).
++    fields = build_trade_correction(read_ledger(paths.ledger), trade_id=TRADE_B, fills=exchange.fetch_fills("", sorted(ORDERS_B)),
++                                    reason_code="UNRECORDED_FILL", reason="manual", evidence_source="fixture")
++    with open(paths.ledger, "a", encoding="utf-8") as fh:
++        fh.write(json.dumps({"event_type": TRADE_CORRECTION_EVENT, "event_id": "manual", **fields}) + "\n")
++
++    result = _round(_trade_adapter(paths, exchange), paths)
++    assert {w["order_id"] for w in result["withdrawn"]} == {DUPLICATE, EXIT}
++    assert outstanding_error_requests(paths.request_queue) == []
++
++
++def test_a_duplicate_whose_trade_is_still_open_is_left_to_the_human(tmp_path):
++    ledger = [e for e in LEDGER if not (e.get("trade_id") == TRADE_B and e["event_type"] != "trade_open")]
++    paths = _setup(tmp_path, ledger)
++    result = _round(_trade_adapter(paths, Exchange(_client_ids())), paths)
++
++    assert result["corrected"] == []
++    assert result["unresolved"][0]["reason_code"] == "POSITION_OPEN"
++    assert "減倉由你決定" in read_fleet_events(paths.fleet_event_log)[0]["details"]["notice_text"]
++    assert not any(e.get("event_type") == TRADE_CORRECTION_EVENT for e in read_ledger(paths.ledger))
++
++
++def test_fills_that_cannot_restate_the_trade_are_left_to_the_human(tmp_path):
++    paths = _setup(tmp_path)
++    exchange = Exchange(_client_ids())
++    exchange.fetch_fills = lambda _s, ids: [dict(f) for f in STATE["fills"] if str(f["order_id"]) in set(ids) and str(f["order_id"]) != EXIT]
++    result = _round(_trade_adapter(paths, exchange), paths)
++
++    assert result["corrected"] == []
++    [u] = result["unresolved"]
++    assert u["reason_code"] == "NOT_RESTATABLE" and set(u["order_ids"]) == {DUPLICATE, EXIT}
++    assert len(outstanding_error_requests(paths.request_queue)) == 1  # one incident, one request
++
++
++def test_a_strategy_without_client_ids_only_reports(tmp_path):
++    paths = _setup(tmp_path)
++    exchange = Exchange(_client_ids())
++    adapter = UnrecordedFillAdapter(project="mycrypto", style="trade", client_ids=False, evidence_source="fixture")
++    result = _round(adapter, paths)
++    assert [u["reason_code"] for u in result["unresolved"]] == ["NO_CLIENT_IDS", "NO_CLIENT_IDS"]
++    assert exchange.lookups == []
++    assert {e["code"] for e in read_fleet_events(paths.fleet_event_log)} == {CODE_UNRESOLVED}
++
++
++def test_a_failed_lookup_is_retried_silently_then_reported(tmp_path):
++    paths = _setup(tmp_path)
++    adapter = _trade_adapter(paths, Exchange(_client_ids(), fail_lookup=True))
++    duplicate_fill_ms = next(f["time_ms"] for f in STATE["fills"] if str(f["order_id"]) == DUPLICATE)
++
++    young = datetime.fromtimestamp((duplicate_fill_ms + LOOKUP_GRACE_MS - 60_000) / 1000, timezone.utc)
++    first = _round(adapter, paths, now=young)
++    assert first["unresolved"] == [] and len(first["deferred"]) == 2
++    assert _codes(paths) == []
++
++    later = _round(adapter, paths, now=NOW)
++    assert [u["reason_code"] for u in later["unresolved"]] == ["LOOKUP_FAILED", "LOOKUP_FAILED"]
++
++
++def test_a_failed_write_is_reported_and_never_retried(tmp_path):
++    paths = _setup(tmp_path)
++
++    def broken(_fields):
++        raise OSError("disk full")
++
++    adapter = _trade_adapter(paths, Exchange(_client_ids()), append=broken)
++    result = _round(adapter, paths)
++    assert [u["reason_code"] for u in result["unresolved"]] == ["WRITE_FAILED"]
++    again = _round(adapter, paths)
++    assert again["corrected"] == [] and again["unresolved"] == []
++    assert _codes(paths) == [CODE_UNRESOLVED]
++
++
++def test_nothing_happens_unless_the_verdict_is_diverged(tmp_path):
++    paths = _setup(tmp_path)
++    Path(paths.ledger_status).write_text(json.dumps({"value": "RECONCILED", "evidence": {}}), encoding="utf-8")
++    exchange = Exchange(_client_ids())
++    result = _round(_trade_adapter(paths, exchange), paths)
++    assert result["unrecorded_orders"] == [] and exchange.lookups == []
++
++
++def test_the_catalog_carries_every_code_an_adapter_can_emit():
++    tiers = {e["code"]: e["risk_tier"] for e in CATALOG["entries"]}
++    for prefix in ("SEY", "MOM", "BTC"):
++        for code in (CODE_CORRECTED, CODE_UNRESOLVED):
++            assert tiers[f"{prefix}.{code}"] == "R3"
++    assert any(e["code"] == "MYC." + CODE_UNRESOLVED for e in CATALOG["entries"])
++    assert not any(e["code"] == "MYC." + CODE_CORRECTED for e in CATALOG["entries"])
++
++
++def test_an_adapter_that_corrects_must_say_how():
++    with pytest.raises(ValueError, match="append_trade_correction"):
++        UnrecordedFillAdapter(project="seykota", style="trade", client_ids=True, evidence_source="x",
++                              client_order_id=lambda s, o: None, fetch_fills=lambda s, o: [])
++
++
++# --- spot (btc-competition) -------------------------------------------------- #
++def _spot_setup(tmp_path: Path):
++    t0 = 1790200000000
++    ledger = [{"event_type": "spot_fill", "event_id": "f1", "order_id": "501", "symbol": "ETHUSDT",
++               "execution_mode": "LIVE", "event_epoch_ms": t0, "side": "buy", "quantity": 0.1}]
++    state = {"schema_version": "reconcile-source/v1", "fetched_at": "2026-09-24T12:00:00Z",
++             "fetch_status": {"complete": True, "errors": []}, "positions": [],
++             "fills": [{"order_id": 501, "side": "buy", "quantity": 0.1, "price": 2600, "time_ms": t0,
++                        "symbol": "ETHUSDT", "commission": 0.1, "commission_asset": "USDT"},
++                       {"order_id": 502, "side": "buy", "quantity": 0.1, "price": 2601, "time_ms": t0 + 800,
++                        "symbol": "ETHUSDT", "commission": 0.1, "commission_asset": "USDT"}]}
++    paths = UnrecordedFillPaths(
++        ledger=str(tmp_path / "ledger.jsonl"), ledger_status=str(tmp_path / "ledger_status.json"),
++        fleet_event_log=str(tmp_path / "fleet.jsonl"), request_queue=str(tmp_path / "requests.jsonl"),
++        evidence_dir=str(tmp_path / "evidence"), ops_export=str(tmp_path / "ops_export.json"),
++    )
++    Path(paths.ledger).write_text("".join(json.dumps(e) + "\n" for e in ledger), encoding="utf-8")
++    status = {"value": "DIVERGED", "evidence": {"unmatched_exchange_fills": [
++        {k: state["fills"][1][k] for k in ("order_id", "symbol", "time_ms", "quantity", "price", "side")}]}}
++    Path(paths.ledger_status).write_text(json.dumps(status), encoding="utf-8")
++    return paths, state
++
++
++def test_a_spot_duplicate_send_is_recorded_from_its_fills(tmp_path):
++    paths, state = _spot_setup(tmp_path)
++    client = {"501": "btc-a", "502": "btc-a"}
++
++    def append_spot_fills(symbol, order_id, fills):
++        with open(paths.ledger, "a", encoding="utf-8") as fh:
++            for f in fills:
++                fh.write(json.dumps({"event_type": "spot_fill", "event_id": f"x{order_id}", "order_id": order_id,
++                                     "symbol": symbol, "quantity": f["quantity"]}) + "\n")
++        return {"event_ids": [f"x{order_id}"]}
++
++    adapter = UnrecordedFillAdapter(
++        project="btc-competition", style="spot", client_ids=True, evidence_source="fixture",
++        client_order_id=lambda _s, oid: client.get(oid),
++        fetch_fills=lambda _s, ids: [f for f in state["fills"] if str(f["order_id"]) in ids],
++        append_spot_fills=append_spot_fills,
++    )
++    result = run_unrecorded_fill_round(adapter, paths, catalog=CATALOG, now=NOW)
++    assert [c["order_ids"] for c in result["corrected"]] == [["502"]]
++    assert [e["order_id"] for e in read_ledger(paths.ledger) if e["event_type"] == "spot_fill"] == ["501", "502"]
++    assert _codes(paths) == [CODE_CORRECTED]
