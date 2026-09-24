@@ -1,0 +1,104 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index c6ac2ab..5b29b76 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -691,3 +691,20 @@ trade-alerts：v0.21.1（資料修補版：錯誤目錄＋一致性登記冊，
+           尚未更正的既有狀態，與本次部署無關。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.22.0（帳本更正事件 trade_correction＋錯誤清單文字）
++變更摘要：1. 新增 trade_alerts.trade_correction（#58，h4）：只追加的帳本更正事件 trade-correction/v1，
++             build_trade_correction 只從交易所成交重述已平倉交易；recorded_order_ids／fold_ledger_trades 內建套用，
++             更正不改變部位。Google 路徑新增 correct_close_v2（投影佇列強制動作↔事件類型成對）；兩份 Apps Script
++             新增 correctClose，只能取代目前生效的版本。登記冊新能力 ledger.trade_correction。
++          2. 錯誤清單：BTC.ORDER_STATUS_UNKNOWN（#56，h7）；SEY.POSITION_AMBIGUOUS 的白話說明補上「市價單送出後 60 秒
++             查不到」這種情況（h6，追查指令已於 v0.21.1 補上）。
++          向後相容：沒有 trade_correction 事件的帳本，對帳與彙整結果與 v0.21.1 相同。
++受影響消費專案：趨勢策略（接上更正事件的讀寫與兩段式更正工具，必須改釘）；動能、維運通知改釘以維持全機隊同一版本
++          （動能的共用對帳自動認得更正事件；維運通知取得新錯誤清單文字）。
++部署入口：各專案既有部署腳本（開發機 → 正式機）。Apps Script 接收端（apps_script/google_ledger_receiver.gs）
++          須由使用者在 Google Apps Script 編輯器重新部署，correct_close_v2 才會生效。
++版本驗證／服務驗證／部署時間：待改釘與部署完成後補記。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 009533f..ecdb4d5 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -320,7 +320,7 @@
+    "bot": "seykota",
+    "bot_label": "趨勢策略",
+    "code": "SEY.POSITION_AMBIGUOUS",
+-   "direction": "系統停下來，等人確認交易所上的實際部位。交易所資料是標準答案。",
++   "direction": "系統停下來，不再送任何單，等人確認交易所上的實際部位、以及那張單到底有沒有成交。交易所資料是標準答案。",
+    "emits_event": {
+     "phase": "8-seykota",
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+@@ -331,14 +331,15 @@
+    ],
+    "open": true,
+    "steps": [
+-    "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）。",
+-    "如果有不該存在的倉位（例如手動開的），先處理掉。",
+-    "確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++    "在正式機執行 `seykota-resume preview` 看暫停證據：有 client_order_id／submitted_at 就是某張市價單送出後查不到。",
++    "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）；有 client id 就用它在訂單紀錄找那張單，確認有沒有成交、成交幾張。",
++    "如果有不該存在的倉位（例如手動開的、或重複成交多出來的），先處理掉。",
++    "確認後解除暫停：執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。帳本若少記了成交，交易平倉後照「帳本更正」流程（scripts/append_trade_correction.py）補上。",
+     "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+    ],
+    "tier": "R3",
+    "title": "交易所部位資料無法唯一辨識",
+-   "what": "交易所回報的倉位資料，系統看不懂或認不出來是哪一筆。"
++   "what": "策略對自己的部位失去把握：可能是一張市價單送出後 60 秒都在交易所查不到（不知道成交了沒），也可能是交易所回報的倉位資料認不出是哪一筆。"
+   },
+   {
+    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。",
+diff --git a/pyproject.toml b/pyproject.toml
+index 1e388fc..1dafb2a 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.21.1"
++version = "0.22.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 1bafec3..afff6ee 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -325,4 +325,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.21.1"
++__version__ = "0.22.0"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index e33649b..44465f9 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -243,12 +243,13 @@
+       "lands_in_phase": 4,
+       "rationale": "策略對自己管的是哪一個部位失去把握，任何自動動作都可能作用在錯的部位上。",
+       "operator_message": {
+-        "what": "交易所回報的倉位資料，系統看不懂或認不出來是哪一筆。",
+-        "direction": "系統停下來，等人確認交易所上的實際部位。交易所資料是標準答案。",
++        "what": "策略對自己的部位失去把握：可能是一張市價單送出後 60 秒都在交易所查不到（不知道成交了沒），也可能是交易所回報的倉位資料認不出是哪一筆。",
++        "direction": "系統停下來，不再送任何單，等人確認交易所上的實際部位、以及那張單到底有沒有成交。交易所資料是標準答案。",
+         "steps": [
+-          "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）。",
+-          "如果有不該存在的倉位（例如手動開的），先處理掉。",
+-          "確認後解除暫停：在正式機執行 `seykota-resume preview` 取得確認碼，再執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。",
++          "在正式機執行 `seykota-resume preview` 看暫停證據：有 client_order_id／submitted_at 就是某張市價單送出後查不到。",
++          "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）；有 client id 就用它在訂單紀錄找那張單，確認有沒有成交、成交幾張。",
++          "如果有不該存在的倉位（例如手動開的、或重複成交多出來的），先處理掉。",
++          "確認後解除暫停：執行 `seykota-resume resume --confirm <確認碼> --exchange-verified`。帳本若少記了成交，交易平倉後照「帳本更正」流程（scripts/append_trade_correction.py）補上。",
+           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+         ],
+         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼策略對自己的部位失去把握。先看暫停證據（seykota-resume preview）：若有 client_order_id／submitted_at，代表市價單送出後 60 秒在交易所查不到——讀 src/seykota_bot/bot.py 的 _resolve_market_order，用這個 client id 向交易所查單（GET /fapi/v1/order 帶 origClientOrderId）確認它到底有沒有成交、成交幾張，對照帳本與實際部位；否則是交易所回報的部位無法唯一辨識——讀 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了。兩種情況都要提出治本修正。"
