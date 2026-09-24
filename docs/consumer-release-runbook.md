@@ -673,8 +673,21 @@ trade-alerts：v0.21.1（資料修補版：錯誤目錄＋一致性登記冊，�
 受影響消費專案：momentum、seykota、ops-notify 改釘 v0.21.1（全機隊同一版本）；seykota 同時
           刪除 tests/test_rollout_registry_self_check.py 的 RENAMED_AHEAD_OF_DEPLOY 豁免。
           行為不變：ops_export 渲染、修復執行器、事件日誌與 v0.21.0 相同。
-部署入口：各專案既有部署腳本（開發機 → 正式機）；部署結果於改釘完成後補記於下。
-版本驗證：pyproject.toml version == 0.21.1；trade_alerts.__version__ == "0.21.1"。
-服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
+部署入口：各專案既有部署腳本（開發機 → 正式機）。
+          改釘（Perplexity 同批 PASS）：momentum #98 → development 70ca592；seykota #67 → b1df34f
+          （同時清空 RENAMED_AHEAD_OF_DEPLOY）；ops-notify #23 → a547537。三支 testing／operations 以
+          origin/<branch> 完整限定 ref 快轉並核對 SHA。
+          開發機 trading-dev 2026-09-24 03:31–03:34 UTC：ops-notify install.sh（testing）→ momentum
+          install_systemd.sh → seykota install_systemd.sh，皆 exit 0。
+          正式機 trading-main 2026-09-24 03:43–03:44 UTC（兩支策略皆空手、避開 04:00 收盤）：
+          ops-notify install.sh → momentum → seykota，皆 exit 0，既有 14 個 unit 照原狀恢復。
+版本驗證：pyproject.toml version == 0.21.1；trade_alerts.__version__ == "0.21.1"；兩台主機的
+          /opt/ops-notify、/opt/mexc-4h-momentum-trailing-stop、/opt/ed-seykota-systematic-trend-following
+          venv 實際安裝版本皆為 0.21.1。
+服務/工作流程驗證：trade-alerts pytest 全綠（#54）；消費專案 CI：momentum 700、seykota 475、
+          ops-notify 143 passed。兩台部署後第一輪：兩支修復機器人零候選、ops-notify 零錯誤、
+          匯出軸與服務單元軸皆 OK、兩支 bot 零重啟；正式機兩筆 LINE 受控測試事件未被重送
+          （attempted=0，送達狀態跨重裝保留）。seykota 帳本軸 DIVERGED 為 2026-09-21 重複下單事故
+          尚未更正的既有狀態，與本次部署無關。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```

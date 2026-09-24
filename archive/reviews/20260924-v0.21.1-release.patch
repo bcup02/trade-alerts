@@ -1,0 +1,252 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 992d9b0..095cb77 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -659,3 +659,22 @@ trade-alerts：v0.21.0（風險分級 v2，W2：共用修復執行器）
+ 服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.21.1（資料修補版：錯誤目錄＋一致性登記冊，無程式變更）
++變更摘要：v0.21.0 之後 src/ 只有兩份打包資料有變，本版把它們發出去，讓策略的登記冊
++          自我檢查（讀已安裝套件裡的登記冊）對得上正式機現況：
++          1. 錯誤目錄：MOM／SEY.VERIFIED_CLOSE_PROPOSED 從 entries 移除（retired_codes 保留，
++             36 條）；6 條修復執行器代碼的 sources 改指策略呼叫點；SEY.POSITION_AMBIGUOUS
++             補上市價單送出後查不到的呼叫點與追查指令（#52）。
++          2. 一致性登記冊：分級 v2-W6 上正式機後的已做格子、sources 換到 momentum
++             operations 3a91dd0／seykota operations f9946ba（#52）；趨勢策略重複下單事故與
++             新缺口四列（#50）；通知渠道缺口兩列（#49）；趨勢策略 LINE 受控測試送達（本版）。
++受影響消費專案：momentum、seykota、ops-notify 改釘 v0.21.1（全機隊同一版本）；seykota 同時
++          刪除 tests/test_rollout_registry_self_check.py 的 RENAMED_AHEAD_OF_DEPLOY 豁免。
++          行為不變：ops_export 渲染、修復執行器、事件日誌與 v0.21.0 相同。
++部署入口：各專案既有部署腳本（開發機 → 正式機）；部署結果於改釘完成後補記於下。
++版本驗證：pyproject.toml version == 0.21.1；trade_alerts.__version__ == "0.21.1"。
++服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index e3ae30f..180ce74 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -1382,11 +1382,11 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "na",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "pending",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "repair_bot.verified_close",
+    "kind": "cap",
+    "rows": [
+@@ -1630,9 +1630,9 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "pending",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "pending",
+-    "seykota": "pending"
++    "seykota": "recent"
+    },
+    "has_recent": true,
+    "id": "notify.line_first_notice",
+@@ -1643,9 +1643,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "分級 v2：部署到開發機與正式機",
+-       "state": "pending",
+-       "text": "2026-09-24：正式機轉送開關（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）與匯出軸首輪 OK 已確認，且與動能策略共用同一個 ops-notify 與 LINE 憑證（動能策略受控測試已送達、只送一次）；但趨勢策略自己還沒有任何一則通知真的經匯出檔→維運通知→LINE 送達過。要做一次趨勢策略專屬的受控測試（sent=1、手機收到、下一輪不重送）才算完成（trade-alerts #52 審閱指出）。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:100 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 趨勢策略專屬受控測試事件 f9c595f9b545449a91794e7ab01c27d6（標明測試、只寫事件未開請求）02:50 UTC 匯出（1134 字）並 sent=1、使用者手機確認收到、03:00 UTC attempted=0 未重送；同輪修復機器人仍零候選。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
+       }
+      ]
+     },
+@@ -1754,11 +1754,11 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "pending",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "pending",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "ops_notify.units_axis",
+    "kind": "cap",
+    "rows": [
+@@ -1942,9 +1942,9 @@
+     "btc-competition": "pending",
+     "momentum": "pending",
+     "mycrypto": "pending",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "orders.single_send",
+    "kind": "cap",
+    "rows": [
+@@ -3561,7 +3561,7 @@
+   "v2-W2": 0,
+   "v2-W3": 0,
+   "v2-W4": 0,
+-  "v2-W6": 1
++  "v2-W6": 0
+  },
+  "phase_order": [
+   "v2-W2",
+@@ -3612,41 +3612,11 @@
+   "seykota": "趨勢策略"
+  },
+  "recent_summary": [
+-  {
+-   "anchor": "cap-repair_bot.verified_close",
+-   "note": "分級 v2 上正式機（2026-09-24）：動能、趨勢兩支的修復機器人都改用共用修復執行器，能對應的漏記平倉直接以交易所為準補寫。",
+-   "project": "動能策略",
+-   "title": "修復機器人：自動補寫漏記平倉"
+-  },
+-  {
+-   "anchor": "cap-repair_bot.verified_close",
+-   "note": "分級 v2 上正式機（2026-09-24）：動能、趨勢兩支的修復機器人都改用共用修復執行器，能對應的漏記平倉直接以交易所為準補寫。",
+-   "project": "趨勢策略",
+-   "title": "修復機器人：自動補寫漏記平倉"
+-  },
+   {
+    "anchor": "cap-notify.line_first_notice",
+-   "note": "正式機轉送開關打開，LINE 受控測試真的送到你的手機、而且只送一次。",
+-   "project": "動能策略",
+-   "title": "需要人處理的通知真的送到 LINE（只發第一則）"
+-  },
+-  {
+-   "anchor": "cap-orders.single_send",
+-   "note": "趨勢策略的「查不到就重送」修正（PR #65）已上正式機。",
++   "note": "趨勢策略自己的 LINE 受控測試也送到你的手機、只送一次——分級 v2 最後一格完成。",
+    "project": "趨勢策略",
+-   "title": "市價單只送一次，不因查不到就重送"
+-  },
+-  {
+-   "anchor": "cap-ops_notify.units_axis",
+-   "note": "正式機開始監控兩支修復機器人的背景服務有沒有掛掉。",
+-   "project": "動能策略",
+-   "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
+-  },
+-  {
+-   "anchor": "cap-ops_notify.units_axis",
+-   "note": "正式機開始監控兩支修復機器人的背景服務有沒有掛掉。",
+-   "project": "趨勢策略",
+-   "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
++   "title": "需要人處理的通知真的送到 LINE（只發第一則）"
+   }
+  ],
+  "totals": {
+@@ -3666,9 +3636,9 @@
+    "pending": 23
+   },
+   "seykota": {
+-   "done": 31,
++   "done": 32,
+    "n/a": 2,
+-   "pending": 26
++   "pending": 25
+   }
+  }
+ }
+diff --git a/pyproject.toml b/pyproject.toml
+index 640a4ff..1e388fc 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.21.0"
++version = "0.21.1"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 47d5348..0966a65 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -305,4 +305,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.21.0"
++__version__ = "0.21.1"
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 95c7aaa..77349c9 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -341,9 +341,8 @@
+       "description": "維運通知讀策略的匯出檔後，把需要人處理的事送一則到 LINE。LINE 有每月額度，所以刻意只發第一則、不重複提醒；重複提醒是 Telegram 的工作（見下一列）。兩台主機都要有這條路。",
+       "status": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "v2-W6",
+-          "reason": "2026-09-24：正式機轉送開關（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）與匯出軸首輪 OK 已確認，且與動能策略共用同一個 ops-notify 與 LINE 憑證（動能策略受控測試已送達、只送一次）；但趨勢策略自己還沒有任何一則通知真的經匯出檔→維運通知→LINE 送達過。要做一次趨勢策略專屬的受控測試（sent=1、手機收到、下一輪不重送）才算完成（trade-alerts #52 審閱指出）。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:100 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 趨勢策略專屬受控測試事件 f9c595f9b545449a91794e7ab01c27d6（標明測試、只寫事件未開請求）02:50 UTC 匯出（1134 字）並 sent=1、使用者手機確認收到、03:00 UTC attempted=0 未重送；同輪修復機器人仍零候選。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
+         },
+         "momentum": {
+           "state": "done",
+@@ -1197,47 +1196,12 @@
+     }
+   ],
+   "recent_changes": [
+-    {
+-      "kind": "cap",
+-      "id": "repair_bot.verified_close",
+-      "type": "completed",
+-      "note": "分級 v2 上正式機（2026-09-24）：動能、趨勢兩支的修復機器人都改用共用修復執行器，能對應的漏記平倉直接以交易所為準補寫。",
+-      "project": "momentum"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "repair_bot.verified_close",
+-      "type": "completed",
+-      "note": "分級 v2 上正式機（2026-09-24）：動能、趨勢兩支的修復機器人都改用共用修復執行器，能對應的漏記平倉直接以交易所為準補寫。",
+-      "project": "seykota"
+-    },
+     {
+       "kind": "cap",
+       "id": "notify.line_first_notice",
+       "type": "completed",
+-      "note": "正式機轉送開關打開，LINE 受控測試真的送到你的手機、而且只送一次。",
+-      "project": "momentum"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "orders.single_send",
+-      "type": "completed",
+-      "note": "趨勢策略的「查不到就重送」修正（PR #65）已上正式機。",
+-      "project": "seykota"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "ops_notify.units_axis",
+-      "type": "completed",
+-      "note": "正式機開始監控兩支修復機器人的背景服務有沒有掛掉。",
+-      "project": "momentum"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "ops_notify.units_axis",
+-      "type": "completed",
+-      "note": "正式機開始監控兩支修復機器人的背景服務有沒有掛掉。",
+-      "project": "seykota"
++      "project": "seykota",
++      "note": "趨勢策略自己的 LINE 受控測試也送到你的手機、只送一次——分級 v2 最後一格完成。"
+     }
+   ]
+ }
