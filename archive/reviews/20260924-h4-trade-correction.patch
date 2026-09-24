@@ -1,0 +1,1652 @@
+diff --git a/apps_script/google_ledger_receiver.gs b/apps_script/google_ledger_receiver.gs
+index ff93ccc..2fbe136 100644
+--- a/apps_script/google_ledger_receiver.gs
++++ b/apps_script/google_ledger_receiver.gs
+@@ -64,6 +64,14 @@ const CLOSE_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'ent
+ const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source'];
+ const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
+ const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
++// correct_close_v2: an appended ledger trade_correction restates a closed
++// trade from the exchange's fills (e.g. ed-seykota's 2026-09-21 duplicate
++// entry).  It may only supersede the projection currently in force (the
++// confirmed close, or the latest confirmed correction), named by digest, and
++// it also rewrites the entry price / volume columns with the whole trade.
++const CORRECTION_FIELDS = CLOSE_FIELDS.concat(['corrects_payload_digest', 'reason_code', 'notes']);
++const CORRECTION_REQUIRED_FIELDS = CLOSE_REQUIRED_FIELDS.concat(['corrects_payload_digest', 'reason_code', 'notes']);
++const CORRECTION_COLUMN_MAP = Object.assign({entry_price: 'G', entry_volume: 'I', notes: 'U'}, CLOSE_COLUMN_MAP);
+ const NUMERIC_PROJECTION_FIELDS = new Set(['entry_price', 'exit_price', 'volume', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin']);
+ // Time cells (E entry_time / F exit_time) are Taipei-local *text*, e.g.
+ // "2026-08-26 0:00:49", matching the rows the strategies wrote before v2. The
+@@ -224,7 +232,7 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
+ // ---- V2 handler: ledger-backed, source-scoped, and fail-closed. ----
+ 
+ function handleV2(data) {
+-  if (!['append_open_v2', 'update_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
++  if (!['append_open_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
+   const source = sourceRegistration(data.source_id);
+   if (!source || data.project_id !== source.project_id || data.sheet_name !== source.sheet_name) return {ok: false, error: 'source_not_allowed'};
+   if (!verifySignature(data, source.hmac_secret)) return {ok: false, error: 'signature_invalid'};
+@@ -236,6 +244,7 @@ function handleV2(data) {
+   const projection = data.projection || {};
+   if (data.action === 'append_open_v2') return appendOpen(sheet, data, projection);
+   if (data.action === 'update_close_v2') return updateClose(sheet, data, projection);
++  if (data.action === 'correct_close_v2') return correctClose(sheet, data, projection);
+   if (data.action === 'read_audit_v2') return readAudit(data);
+   return quarantineOnlyWithExplicitDeploymentFlag(data);
+ }
+@@ -283,7 +292,7 @@ function validProvenance(provenance, data) {
+   const required = ['project_id', 'trade_id', 'event_type', 'ledger_event_digest', 'payload_digest', 'request_id', 'issued_at', 'source_id', 'schema_version'];
+   if (required.some(key => typeof provenance[key] !== 'string' || provenance[key] === '')) return false;
+   if (provenance.project_id !== data.project_id || provenance.source_id !== data.source_id || provenance.request_id !== data.request_id || provenance.issued_at !== data.issued_at || provenance.schema_version !== V2_SCHEMA) return false;
+-  if (!['trade_open', 'trade_close'].includes(provenance.event_type)) return false;
++  if (!['trade_open', 'trade_close', 'trade_correction'].includes(provenance.event_type)) return false;
+   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(provenance.trade_id)) return false;
+   if (!/^[0-9a-f]{64}$/.test(provenance.ledger_event_digest) || !/^[0-9a-f]{64}$/.test(provenance.payload_digest)) return false;
+   if (sha256Hex(canonicalJson(data.projection || {})) !== provenance.payload_digest) return false;
+@@ -338,6 +347,22 @@ function updateClose(sheet, data, projection) {
+   return {ok: true, row: existing[0], provenance_status: 'CONFIRMED'};
+ }
+ 
++function correctClose(sheet, data, projection) {
++  if (data.provenance.event_type !== 'trade_correction' || !validateProjection(projection, CORRECTION_FIELDS, CORRECTION_REQUIRED_FIELDS, data.provenance.trade_id)) return rejectAndAudit(data, 'correction_projection_invalid');
++  if (typeof projection.corrects_payload_digest !== 'string' || !/^[0-9a-f]{64}$/.test(projection.corrects_payload_digest)) return rejectAndAudit(data, 'correction_projection_invalid');
++  const existing = findTradeRows(sheet, data.provenance.trade_id);
++  if (existing.length !== 1) return rejectAndAudit(data, existing.length === 0 ? 'trade_id_not_found' : 'duplicate_trade_id');
++  const corrections = auditByTradeId(data.project_id, data.provenance.trade_id, 'trade_correction').filter(row => row.status === 'CONFIRMED');
++  if (corrections.some(row => row.payload_digest === data.provenance.payload_digest)) return {ok: true, row: existing[0], idempotent: true};
++  const closes = auditByTradeId(data.project_id, data.provenance.trade_id, 'trade_close').filter(row => row.status === 'CONFIRMED');
++  if (closes.length !== 1) return rejectAndAudit(data, 'close_not_confirmed');
++  const inForce = corrections.length ? corrections[corrections.length - 1].payload_digest : closes[0].payload_digest;
++  if (projection.corrects_payload_digest !== inForce) return rejectAndAudit(data, 'correction_base_mismatch');
++  writeProjection(sheet, existing[0], projection, CORRECTION_COLUMN_MAP);
++  writeAudit(data, existing[0], 'CONFIRMED');
++  return {ok: true, row: existing[0], provenance_status: 'CONFIRMED'};
++}
++
+ function findTradeRows(sheet, tradeId) {
+   const last = sheet.getLastRow();
+   if (last < 2) return [];
+diff --git a/apps_script/google_ledger_receiver_v2.gs b/apps_script/google_ledger_receiver_v2.gs
+index 6f222bd..d3b689e 100644
+--- a/apps_script/google_ledger_receiver_v2.gs
++++ b/apps_script/google_ledger_receiver_v2.gs
+@@ -20,6 +20,14 @@ const CLOSE_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'ent
+ const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source'];
+ const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
+ const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
++// correct_close_v2: an appended ledger trade_correction restates a closed
++// trade from the exchange's fills (e.g. ed-seykota's 2026-09-21 duplicate
++// entry).  It may only supersede the projection currently in force (the
++// confirmed close, or the latest confirmed correction), named by digest, and
++// it also rewrites the entry price / volume columns with the whole trade.
++const CORRECTION_FIELDS = CLOSE_FIELDS.concat(['corrects_payload_digest', 'reason_code', 'notes']);
++const CORRECTION_REQUIRED_FIELDS = CLOSE_REQUIRED_FIELDS.concat(['corrects_payload_digest', 'reason_code', 'notes']);
++const CORRECTION_COLUMN_MAP = Object.assign({entry_price: 'G', entry_volume: 'I', notes: 'U'}, CLOSE_COLUMN_MAP);
+ const NUMERIC_PROJECTION_FIELDS = new Set(['entry_price', 'exit_price', 'volume', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin']);
+ // entry_time / exit_time cells are Taipei-local text ("2026-08-26 0:00:49"),
+ // matching the pre-v2 rows; the projection carries them as UTC ISO-8601 from
+@@ -40,7 +48,7 @@ function doPost(e) {
+ 
+ function handleV2(data) {
+   if (!data || data.schema_version !== V2_SCHEMA) return {ok: false, error: 'unsupported_schema'};
+-  if (!['append_open_v2', 'update_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
++  if (!['append_open_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
+   const source = sourceRegistration(data.source_id);
+   if (!source || data.project_id !== source.project_id || data.sheet_name !== source.sheet_name) return {ok: false, error: 'source_not_allowed'};
+   if (!verifySignature(data, source.hmac_secret)) return {ok: false, error: 'signature_invalid'};
+@@ -53,6 +61,7 @@ function handleV2(data) {
+   const projection = data.projection || {};
+   if (data.action === 'append_open_v2') return appendOpen(sheet, data, projection);
+   if (data.action === 'update_close_v2') return updateClose(sheet, data, projection);
++  if (data.action === 'correct_close_v2') return correctClose(sheet, data, projection);
+   if (data.action === 'read_audit_v2') return readAudit(data);
+   return quarantineOnlyWithExplicitDeploymentFlag(data);
+ }
+@@ -100,7 +109,7 @@ function validProvenance(provenance, data) {
+   const required = ['project_id', 'trade_id', 'event_type', 'ledger_event_digest', 'payload_digest', 'request_id', 'issued_at', 'source_id', 'schema_version'];
+   if (required.some(key => typeof provenance[key] !== 'string' || provenance[key] === '')) return false;
+   if (provenance.project_id !== data.project_id || provenance.source_id !== data.source_id || provenance.request_id !== data.request_id || provenance.issued_at !== data.issued_at || provenance.schema_version !== V2_SCHEMA) return false;
+-  if (!['trade_open', 'trade_close'].includes(provenance.event_type)) return false;
++  if (!['trade_open', 'trade_close', 'trade_correction'].includes(provenance.event_type)) return false;
+   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(provenance.trade_id)) return false;
+   if (!/^[0-9a-f]{64}$/.test(provenance.ledger_event_digest) || !/^[0-9a-f]{64}$/.test(provenance.payload_digest)) return false;
+   if (sha256Hex(canonicalJson(data.projection || {})) !== provenance.payload_digest) return false;
+@@ -155,6 +164,22 @@ function updateClose(sheet, data, projection) {
+   return {ok: true, row: existing[0], provenance_status: 'CONFIRMED'};
+ }
+ 
++function correctClose(sheet, data, projection) {
++  if (data.provenance.event_type !== 'trade_correction' || !validateProjection(projection, CORRECTION_FIELDS, CORRECTION_REQUIRED_FIELDS, data.provenance.trade_id)) return rejectAndAudit(data, 'correction_projection_invalid');
++  if (typeof projection.corrects_payload_digest !== 'string' || !/^[0-9a-f]{64}$/.test(projection.corrects_payload_digest)) return rejectAndAudit(data, 'correction_projection_invalid');
++  const existing = findTradeRows(sheet, data.provenance.trade_id);
++  if (existing.length !== 1) return rejectAndAudit(data, existing.length === 0 ? 'trade_id_not_found' : 'duplicate_trade_id');
++  const corrections = auditByTradeId(data.project_id, data.provenance.trade_id, 'trade_correction').filter(row => row.status === 'CONFIRMED');
++  if (corrections.some(row => row.payload_digest === data.provenance.payload_digest)) return {ok: true, row: existing[0], idempotent: true};
++  const closes = auditByTradeId(data.project_id, data.provenance.trade_id, 'trade_close').filter(row => row.status === 'CONFIRMED');
++  if (closes.length !== 1) return rejectAndAudit(data, 'close_not_confirmed');
++  const inForce = corrections.length ? corrections[corrections.length - 1].payload_digest : closes[0].payload_digest;
++  if (projection.corrects_payload_digest !== inForce) return rejectAndAudit(data, 'correction_base_mismatch');
++  writeProjection(sheet, existing[0], projection, CORRECTION_COLUMN_MAP);
++  writeAudit(data, existing[0], 'CONFIRMED');
++  return {ok: true, row: existing[0], provenance_status: 'CONFIRMED'};
++}
++
+ function findTradeRows(sheet, tradeId) {
+   const last = sheet.getLastRow();
+   if (last < 2) return [];
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 8bb85c0..ecc44ff 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,7 +177,7 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>43</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-pending" href="#group-pending"><b>44</b><span>項未完成——還有策略沒做到</span></a>
+     <a class="c-done" href="#group-done"><b>15</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+@@ -193,7 +193,7 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">43 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">44 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+@@ -1940,11 +1940,11 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "pending",
+-    "momentum": "recent",
+-    "mycrypto": "recent",
++    "momentum": "done",
++    "mycrypto": "done",
+     "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "orders.single_send",
+    "kind": "cap",
+    "rows": [
+@@ -1996,6 +1996,68 @@
+    "sub": "送出市價單之後，如果交易所一時查不到這張單，只能繼續查、不能再送一次——Binance 對已成交的市價單不會擋重複的 client id，重送就是重複開倉。只有交易所明確拒絕（根本沒受理）時才可以重送。",
+    "title": "市價單只送一次，不因查不到就重送"
+   },
++  {
++   "added_recent": true,
++   "anchor": "cap-ledger.trade_correction",
++   "complete": false,
++   "dots": {
++    "btc-competition": "na",
++    "momentum": "pending",
++    "mycrypto": "pending",
++    "seykota": "pending"
++   },
++   "has_recent": false,
++   "id": "ledger.trade_correction",
++   "kind": "cap",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
++       "state": "pending",
++       "text": "要接上：src/seykota_bot/reconcile/compare.py 的已記錄單號、src/seykota_bot/google_ledger_provenance.py 的 correct_close_v2 投影、src/seykota_bot/external_trade_events.py 的 LINE 查詢平倉投影，並提供兩段式更正工具；接好後在正式機追加 09-21 重複進場與 09-19 估算值兩筆更正。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
++       "state": "pending",
++       "text": "帳本對交易所、帳本對 Google 表兩層對帳走共用 ledger_reconcile，改釘到含本功能的版本後就會套用更正；Google 表投影與投資人快照的讀取端還要各自接上 correct_close_v2 與更正後數字，跟修復機器人自動更正（g1）一起做。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
++       "state": "pending",
++       "text": "同動能策略：共用對帳改釘後即套用；Google 表同步與投資人快照的讀取端要一起接上，跟修復機器人（需先有 MEXC 成交查詢）一起做。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": null,
++       "state": "n/a",
++       "text": "現貨再平衡策略的帳本是逐筆成交（spot_fill），沒有開倉／平倉配對，沒有「整筆交易」可以重述；漏記的現貨成交直接補那筆 spot_fill，歸在「帳本少記交易所成交時，升格通知並以交易所為準更正」那一列處理。"
++      }
++     ]
++    }
++   ],
++   "sub": "帳本記錯（漏記成交、數量不對、價格或手續費是估算值）時，不改舊紀錄，而是追加一筆 trade_correction（trade-correction/v1），由共用的 trade_alerts.trade_correction 從交易所成交算出更正後的整筆交易數字、附上被取代的舊值。每個讀帳本的地方都要套用：對帳把更正列出的單號算作已記錄、部位不受影響；交易彙整與 LINE 查詢用更正後的數字；Google 表用受稽核的 correct_close_v2 覆寫（只能取代目前有效的那一版）。人工工具與修復機器人共用同一個產生函式。",
++   "title": "帳本更正事件：以交易所成交為準、只追加，讀帳本的地方都認得"
++  },
+   {
+    "added_recent": false,
+    "anchor": "cap-reconcile.unrecorded_fill_handling",
+@@ -2953,7 +3015,7 @@
+    "title": "R2｜連續 3 天該再平衡卻零成交"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
+    "complete": false,
+    "dots": {
+@@ -3588,11 +3650,12 @@
+   "8-seykota": 20,
+   "binance-funding-sync": 2,
+   "error-ids": 4,
++  "h4-trade-correction": 1,
+   "hotfix-btc-order-resend": 2,
+   "hotfix-seykota-order-resend": 0,
+   "naming-rollout": 0,
+   "repair-recurrence": 4,
+-  "unrecorded-fill": 4,
++  "unrecorded-fill": 6,
+   "v2-W2": 0,
+   "v2-W3": 0,
+   "v2-W4": 0,
+@@ -3614,7 +3677,8 @@
+   "unrecorded-fill",
+   "repair-recurrence",
+   "error-ids",
+-  "hotfix-btc-order-resend"
++  "hotfix-btc-order-resend",
++  "h4-trade-correction"
+  ],
+  "phases": {
+   "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+@@ -3624,6 +3688,7 @@
+   "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
+   "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
+   "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
++  "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
+   "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
+   "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
+@@ -3648,44 +3713,32 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "cap-orders.single_send",
+-   "note": "動能策略查核完成：送單結果不明時，同一輪不會重試、下一輪也不會對同一根 K 線再進場（回歸測試 #100）。",
+-   "project": "動能策略",
+-   "title": "市價單只送一次，不因查不到就重送"
+-  },
+-  {
+-   "anchor": "cap-orders.single_send",
+-   "note": "加密策略查核完成：下一輪先查部位，已成交就只管理不再開倉（回歸測試 #49）。",
+-   "project": "加密策略",
+-   "title": "市價單只送一次，不因查不到就重送"
+-  },
+-  {
+-   "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
+-   "note": "競賽策略查核發現會重送，新增這條暫停規則；修正 PR #35 上正式機前維持未做。",
+-   "project": "競賽策略",
+-   "title": "R3｜送出的單 60 秒內確定不了有沒有成交"
++   "anchor": "cap-ledger.trade_correction",
++   "note": "新增帳本更正事件的共用格式與套用規則（h4）：先用來更正趨勢策略 9/21 重複進場那筆，之後修復機器人（g1）也用同一套。",
++   "project": null,
++   "title": "帳本更正事件：以交易所成交為準、只追加，讀帳本的地方都認得"
+   }
+  ],
+  "totals": {
+   "btc-competition": {
+    "done": 11,
+-   "n/a": 8,
++   "n/a": 9,
+    "pending": 16
+   },
+   "momentum": {
+    "done": 25,
+    "n/a": 4,
+-   "pending": 8
++   "pending": 9
+   },
+   "mycrypto": {
+    "done": 12,
+    "n/a": 5,
+-   "pending": 22
++   "pending": 23
+   },
+   "seykota": {
+    "done": 32,
+    "n/a": 2,
+-   "pending": 25
++   "pending": 26
+   }
+  }
+ }
+diff --git a/docs/trade-correction.md b/docs/trade-correction.md
+new file mode 100644
+index 0000000..1769840
+--- /dev/null
++++ b/docs/trade-correction.md
+@@ -0,0 +1,67 @@
++# 帳本更正事件（`trade_correction`，trade-correction/v1）
++
++> 2026-09-24 建立（機隊工程進度 h4）。起因：趨勢策略 2026-09-21 同一個 clientOrderId 成交兩張、帳本只記一張，
++> 平倉又只記了 0.008（實際 0.011）；另外 09-19 加碼與 09-21 進場的價格、手續費是估算值。
++
++## 為什麼要一種新事件
++
++帳本只能往後加。要把一筆記錯的交易改成跟交易所一致，不能改舊紀錄，也不能單純再補一筆開倉或平倉——
++現有的讀帳本程式各有規則會擋掉或誤判：
++
++| 讀帳本的地方 | 規則 | 補一筆開倉／平倉的後果 |
++|---|---|---|
++| 帳本對交易所（`exchange_ledger_compare`、各策略 compare） | 事件的 `order_id` 算「已記錄」；部位＝開倉量−平倉量 | 補在結案後的開倉讓帳本以為還有部位 |
++| 交易彙整（`fold_ledger_trades`） | 同一筆交易以第一筆 `trade_close` 為準 | 補的平倉被忽略 |
++| Google 表投影（策略轉接器） | 同一筆交易只能有一筆平倉事件 | 判定歧義、停止投影 |
++| Google 表接收端 | 平倉確認後內容不同一律 `trade_close_conflict` | 被拒 |
++
++所以更正是獨立的一種事件，由共用模組 `trade_alerts.trade_correction` 定義、產生與套用。
++
++## 格式
++
++```json
++{
++  "event_type": "trade_correction",
++  "schema_version": "trade-correction/v1",
++  "trade_id": "BTCUSDT-1142206675339", "symbol": "BTCUSDT", "side": "long", "execution_mode": "LIVE",
++  "reason_code": "DUPLICATE_ENTRY_UNRECORDED | UNRECORDED_FILL | ESTIMATED_FILL_SUPERSEDED",
++  "reason": "給人看的原因",
++  "corrects_event_ids": ["被重述的開倉與平倉 event_id"],
++  "exchange_order_ids": ["這筆交易在交易所的所有單號"],
++  "added_fills": [{"order_id": "…", "side": "buy", "quantity": 0.003, "price": 85877.5, "fee": 0.12881625, "time_ms": 0}],
++  "previous":  {"entry_volume": …, "exit_volume": …, "entry_price": …, "exit_price": …, "entry_fee": …, "exit_fee": …,
++                "total_fees": …, "gross_pnl": …, "net_pnl": …, "return_on_margin": …, "exit_order_id": …},
++  "corrected": {同上欄位，交易所數字},
++  "evidence": {"source": "…", "fills": [交易所成交原始列]}
++}
++```
++
++`event_id` / `event_time` / `event_epoch_ms` 由各策略的帳本寫入器加上。
++
++## 規則
++
++- **只從交易所成交算**：`build_trade_correction` 用 reconcile-source/v1 的成交列重算整筆交易（加權均價、手續費、毛／淨損益、保證金報酬），
++  不接受手打數字。帳本已記錄的每張單都必須在成交列裡；進出量必須相等；有交易所 `realized_pnl` 時毛損益要與它一致（誤差 0.01）；
++  手續費必須是 USDT。
++- **只能更正已平倉的交易**，且更正後進出量相等——所以**永遠不改變帳本推得的部位**。
++- **`previous` 必須等於目前生效的數字**：套用時對不上（例如同一筆更正追加兩次、或針對別本帳本產生）就拋 `TradeCorrectionError`，
++  讀帳本的程式把它當成對帳失敗顯示出來，不會默默套一半。第二次更正會自動以第一次更正後的數字為 `previous`（鏈狀）。
++- **套用方式**：`apply_trade_corrections(events)` 把該交易第一筆 `trade_close` 換成更正後的副本（`corrected_by` 記更正的 event_id），
++  `order_id` 換成 `corrected.exit_order_id`；`correction_order_ids(events)` 給出更正涵蓋的單號，算作已記錄。
++  共用的 `recorded_order_ids` 與 `fold_ledger_trades` 已內建。
++
++## Google 表：`correct_close_v2`
++
++- 來源驗證的事件類型是 `trade_correction`；投影＝策略原本的平倉投影欄位，數字換成 `correction_projection_fields(event)`，
++  再加 `corrects_payload_digest`（目前在 Google 表生效的那一版投影的摘要：原本的平倉，或上一次更正）。
++- 接收端只在「那筆交易的平倉已確認、而且 `corrects_payload_digest` 等於目前生效版本」時覆寫；同內容重送回 idempotent；
++  否則 `correction_base_mismatch` / `close_not_confirmed` / `correction_projection_invalid`。稽核表記 `trade_correction CONFIRMED`。
++- 更正會覆寫平倉欄位，外加 G（整筆交易加權進場價）、I（整筆數量）、U（備註：更正原因與前後數字）。
++  既有狀況（另列待辦）：一般的 `update_close_v2` 不寫 G／I，有加碼的交易在 Google 表上 G／I 仍是第一次進場的價量。
++- **部署**：接收端是機隊共用的 Apps Script，改版後要由使用者在 Google Apps Script 編輯器重新部署，程式庫發版不會自動生效。
++
++## 人工工具與修復機器人
++
++同一個 `build_trade_correction` 給兩種呼叫端用：各策略的兩段式人工更正工具（預覽→帶確認碼寫入），
++以及修復機器人自動更正（g1：帳本少記交易所成交時，能完整由交易所成交重述的已平倉交易自動更正；
++判斷是策略自己重複送單時仍立即通知人追根因；無法重述時通知人工並附步驟）。
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 0966a65..1bafec3 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -126,6 +126,17 @@ from .repair_runner import (
+     repair_paused,
+     run_repair_round,
+ )
++from .trade_correction import (
++    CORRECTED_FIELDS,
++    TRADE_CORRECTION_EVENT,
++    TRADE_CORRECTION_SCHEMA,
++    TradeCorrectionError,
++    apply_trade_corrections,
++    build_trade_correction,
++    correction_order_ids,
++    correction_projection_fields,
++    validate_trade_correction,
++)
+ from .ledger_reconcile import (
+     CLOSE_MARKERS,
+     DRY_RUN_SOURCES,
+@@ -156,6 +167,15 @@ from .ledger_reconcile import (
+ )
+ 
+ __all__ = [
++    "CORRECTED_FIELDS",
++    "TRADE_CORRECTION_EVENT",
++    "TRADE_CORRECTION_SCHEMA",
++    "TradeCorrectionError",
++    "apply_trade_corrections",
++    "build_trade_correction",
++    "correction_order_ids",
++    "correction_projection_fields",
++    "validate_trade_correction",
+     "AlertChannel",
+     "AlertDispatcher",
+     "AlertEvent",
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index facf2ee..1d8eea3 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -25,7 +25,8 @@
+     "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+     "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+-    "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）"
++    "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
++    "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）"
+   },
+   "sources": {
+     "momentum": {
+@@ -484,6 +485,32 @@
+         }
+       }
+     },
++    {
++      "id": "ledger.trade_correction",
++      "title": "帳本更正事件：以交易所成交為準、只追加，讀帳本的地方都認得",
++      "description": "帳本記錯（漏記成交、數量不對、價格或手續費是估算值）時，不改舊紀錄，而是追加一筆 trade_correction（trade-correction/v1），由共用的 trade_alerts.trade_correction 從交易所成交算出更正後的整筆交易數字、附上被取代的舊值。每個讀帳本的地方都要套用：對帳把更正列出的單號算作已記錄、部位不受影響；交易彙整與 LINE 查詢用更正後的數字；Google 表用受稽核的 correct_close_v2 覆寫（只能取代目前有效的那一版）。人工工具與修復機器人共用同一個產生函式。",
++      "status": {
++        "seykota": {
++          "state": "pending",
++          "phase": "h4-trade-correction",
++          "reason": "要接上：src/seykota_bot/reconcile/compare.py 的已記錄單號、src/seykota_bot/google_ledger_provenance.py 的 correct_close_v2 投影、src/seykota_bot/external_trade_events.py 的 LINE 查詢平倉投影，並提供兩段式更正工具；接好後在正式機追加 09-21 重複進場與 09-19 估算值兩筆更正。"
++        },
++        "momentum": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "帳本對交易所、帳本對 Google 表兩層對帳走共用 ledger_reconcile，改釘到含本功能的版本後就會套用更正；Google 表投影與投資人快照的讀取端還要各自接上 correct_close_v2 與更正後數字，跟修復機器人自動更正（g1）一起做。"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "unrecorded-fill",
++          "reason": "同動能策略：共用對帳改釘後即套用；Google 表同步與投資人快照的讀取端要一起接上，跟修復機器人（需先有 MEXC 成交查詢）一起做。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "現貨再平衡策略的帳本是逐筆成交（spot_fill），沒有開倉／平倉配對，沒有「整筆交易」可以重述；漏記的現貨成交直接補那筆 spot_fill，歸在「帳本少記交易所成交時，升格通知並以交易所為準更正」那一列處理。"
++        }
++      }
++    },
+     {
+       "id": "reconcile.unrecorded_fill_handling",
+       "title": "帳本少記交易所成交時，升格通知並以交易所為準更正",
+@@ -1213,24 +1240,9 @@
+   "recent_changes": [
+     {
+       "kind": "cap",
+-      "id": "orders.single_send",
+-      "type": "completed",
+-      "project": "momentum",
+-      "note": "動能策略查核完成：送單結果不明時，同一輪不會重試、下一輪也不會對同一根 K 線再進場（回歸測試 #100）。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "orders.single_send",
+-      "type": "completed",
+-      "project": "mycrypto",
+-      "note": "加密策略查核完成：下一輪先查部位，已成交就只管理不再開倉（回歸測試 #49）。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "BTC.ORDER_STATUS_UNKNOWN",
++      "id": "ledger.trade_correction",
+       "type": "added",
+-      "project": "btc-competition",
+-      "note": "競賽策略查核發現會重送，新增這條暫停規則；修正 PR #35 上正式機前維持未做。"
++      "note": "新增帳本更正事件的共用格式與套用規則（h4）：先用來更正趨勢策略 9/21 重複進場那筆，之後修復機器人（g1）也用同一套。"
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/google_ledger_client.py b/src/trade_alerts/google_ledger_client.py
+index 3c9c105..b5db6c4 100644
+--- a/src/trade_alerts/google_ledger_client.py
++++ b/src/trade_alerts/google_ledger_client.py
+@@ -18,7 +18,7 @@ from .ledger_integrity import LedgerProvenance
+ from .provenance_outbox import append_outbox_record
+ 
+ 
+-_PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "update_close_v2"})
++_PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_close_v2"})
+ 
+ # Receiver ``ok: false`` errors that mean the payload itself is structurally
+ # wrong -- the SAME intent can never succeed, so its dispatch is terminal.
+@@ -31,6 +31,8 @@ _TERMINAL_RECEIVER_ERRORS = frozenset({
+     "provenance_invalid",
+     "open_projection_invalid",
+     "close_projection_invalid",
++    "correction_projection_invalid",
++    "correction_base_mismatch",
+ })
+ 
+ 
+diff --git a/src/trade_alerts/ledger_integrity.py b/src/trade_alerts/ledger_integrity.py
+index 55f08f6..5cd050b 100644
+--- a/src/trade_alerts/ledger_integrity.py
++++ b/src/trade_alerts/ledger_integrity.py
+@@ -19,8 +19,8 @@ from typing import Any, Mapping
+ from uuid import UUID
+ 
+ LEDGER_PROJECTION_SCHEMA_VERSION = "google-ledger-projection-v2"
+-_ALLOWED_EVENT_TYPES = frozenset({"trade_open", "trade_close"})
+-_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "read_audit_v2", "read_reconciliation_v2", "quarantine_v2"})
++_ALLOWED_EVENT_TYPES = frozenset({"trade_open", "trade_close", "trade_correction"})
++_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_close_v2", "read_audit_v2", "read_reconciliation_v2", "quarantine_v2"})
+ _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
+ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+ 
+diff --git a/src/trade_alerts/ledger_reconcile.py b/src/trade_alerts/ledger_reconcile.py
+index ce26626..c9fc278 100644
+--- a/src/trade_alerts/ledger_reconcile.py
++++ b/src/trade_alerts/ledger_reconcile.py
+@@ -46,6 +46,8 @@ from typing import Any, Callable
+ 
+ import requests
+ 
++from .trade_correction import apply_trade_corrections, correction_order_ids
++
+ log = logging.getLogger("trade_alerts.ledger_reconcile")
+ 
+ # --------------------------------------------------------------------------- #
+@@ -238,12 +240,15 @@ def is_paper_event(event: dict[str, Any], *, live_close_estimate_is_real: bool =
+ 
+ 
+ def recorded_order_ids(real_events: list[dict[str, Any]]) -> set[str]:
++    """Exchange order ids the ledger accounts for: every event's ``order_id``
++    plus the ``exchange_order_ids`` of appended ``trade_correction`` events (an
++    order the strategy sent but never recorded, restated from the exchange)."""
+     ids: set[str] = set()
+     for e in real_events:
+         oid = e.get("order_id")
+         if oid is not None and str(oid).strip():
+             ids.add(str(oid))
+-    return ids
++    return ids | correction_order_ids(real_events)
+ 
+ 
+ def _paper_only_trade_ids(
+@@ -547,9 +552,14 @@ def fold_ledger_trades(
+     with its real open/close filtered out as paper -- is NOT a real position and
+     is dropped (stops DRY_RUN ``order_attempt`` leak-through appearing as phantom
+     ``SHEET_MISSING_ROW`` divergences).
++
++    Appended ``trade_correction`` events are applied first (see
++    :mod:`trade_alerts.trade_correction`): ``close_event`` is the effective,
++    corrected close.  A correction that no longer applies raises
++    ``TradeCorrectionError`` rather than being silently skipped.
+     """
+     trades: dict[str, dict[str, Any]] = {}
+-    for event in real_events:
++    for event in apply_trade_corrections(real_events):
+         tid = event.get("trade_id")
+         if not isinstance(tid, str) or not tid:
+             continue
+diff --git a/src/trade_alerts/projection_outbox.py b/src/trade_alerts/projection_outbox.py
+index 8aebc36..b97e86f 100644
+--- a/src/trade_alerts/projection_outbox.py
++++ b/src/trade_alerts/projection_outbox.py
+@@ -19,9 +19,11 @@ from uuid import uuid4
+ 
+ from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance
+ 
+-ProjectionAction = Literal["append_open_v2", "update_close_v2"]
++ProjectionAction = Literal["append_open_v2", "update_close_v2", "correct_close_v2"]
+ ProjectionOutcomeStatus = Literal["CONFIRMED", "REJECTED", "TRANSPORT_FAILED"]
+-_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2"})
++_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_close_v2"})
++# Each write action projects exactly one kind of ledger event.
++_ACTION_EVENT_TYPE = {"append_open_v2": "trade_open", "update_close_v2": "trade_close", "correct_close_v2": "trade_correction"}
+ _TERMINAL_STATUSES = frozenset({"CONFIRMED", "REJECTED"})
+ 
+ 
+@@ -44,6 +46,8 @@ class ProjectionIntent:
+     def from_provenance(cls, *, action: ProjectionAction, provenance: LedgerProvenance, intent_id: str | None = None) -> "ProjectionIntent":
+         if action not in _ALLOWED_ACTIONS:
+             raise ValueError("projection action is not allowed")
++        if provenance.event_type != _ACTION_EVENT_TYPE[action]:
++            raise ValueError("projection action does not match the ledger event type")
+         return cls(
+             intent_id=intent_id or uuid4().hex,
+             created_at=_utc_now(),
+diff --git a/src/trade_alerts/trade_correction.py b/src/trade_alerts/trade_correction.py
+new file mode 100644
+index 0000000..1cecf6d
+--- /dev/null
++++ b/src/trade_alerts/trade_correction.py
+@@ -0,0 +1,370 @@
++"""Append-only corrections of a closed trade, derived from exchange fills.
++
++A strategy ledger is append-only: a ``trade_close`` that recorded the wrong
++volume, an estimated price or fee, or that missed a fill entirely (2026-09-21:
++ed-seykota sent one entry twice and recorded only the first) is never edited.
++Instead a ``trade_correction`` event is appended that restates the trade's
++close summary as the exchange recorded it, together with the values it
++supersedes.
++
++Every consumer that reads a ledger applies the corrections the same way, via
++this module:
++
++* :func:`apply_trade_corrections` returns the event list with each corrected
++  ``trade_close`` replaced by an effective copy (the fold, the sheet compare,
++  investor figures);
++* :func:`correction_order_ids` lists the exchange orders a correction accounts
++  for (the ledger-vs-exchange fill check);
++* a correction never changes the position a ledger implies: it is not an open
++  or a close, and it is only valid for a closed trade whose corrected entry and
++  exit volumes are equal.
++
++:func:`build_trade_correction` computes a correction from the exchange's own
++fills -- never from typed-in numbers -- and is shared by the operator tool and
++the repair bot, so both produce the same event for the same evidence.
++
++Pure: no I/O, no network, no ledger writes.  The caller appends the returned
++fields with its own ledger writer (which adds ``event_id`` / ``event_time``).
++"""
++from __future__ import annotations
++
++import math
++from typing import Any, Iterable, Mapping
++
++TRADE_CORRECTION_EVENT = "trade_correction"
++TRADE_CORRECTION_SCHEMA = "trade-correction/v1"
++
++#: Why the recorded trade disagreed with the exchange.
++REASON_CODES = frozenset({
++    # the strategy sent an order the ledger never recorded (duplicate send)
++    "DUPLICATE_ENTRY_UNRECORDED",
++    # a fill the ledger did not record, cause not (yet) attributed
++    "UNRECORDED_FILL",
++    # recorded price / fee were estimates; the exchange fill supersedes them
++    "ESTIMATED_FILL_SUPERSEDED",
++})
++
++#: The close-summary fields a correction restates.  ``exit_order_id`` maps to
++#: the ``order_id`` of the ``trade_close`` it corrects.
++CORRECTED_FIELDS = (
++    "entry_volume", "exit_volume", "entry_price", "exit_price",
++    "entry_fee", "exit_fee", "total_fees", "gross_pnl", "net_pnl",
++    "return_on_margin", "exit_order_id",
++)
++
++_NUMERIC_FIELDS = tuple(name for name in CORRECTED_FIELDS if name != "exit_order_id")
++_PROJECTED_FIELDS = tuple(name for name in _NUMERIC_FIELDS if name != "total_fees")
++_REQUIRED_FIELDS = (
++    "schema_version", "trade_id", "symbol", "side", "reason_code", "reason",
++    "corrects_event_ids", "exchange_order_ids", "added_fills", "previous",
++    "corrected", "evidence",
++)
++_ABS_TOL = 1e-9
++_REALIZED_PNL_TOL = 0.01
++
++
++class TradeCorrectionError(ValueError):
++    """A correction cannot be built, or an appended one no longer applies."""
++
++
++# --------------------------------------------------------------------------- #
++# helpers
++# --------------------------------------------------------------------------- #
++def _num(value: Any) -> float | None:
++    if isinstance(value, bool) or value is None or value == "":
++        return None
++    try:
++        number = float(value)
++    except (TypeError, ValueError):
++        return None
++    return number if math.isfinite(number) else None
++
++
++def _oid(value: Any) -> str | None:
++    if value is None:
++        return None
++    text = str(value).strip()
++    return text or None
++
++
++def _close_view(close: Mapping[str, Any]) -> dict[str, Any]:
++    view = {name: close.get(name) for name in _NUMERIC_FIELDS}
++    view["exit_order_id"] = _oid(close.get("order_id"))
++    return view
++
++
++def _same(a: Any, b: Any) -> bool:
++    if isinstance(a, str) or isinstance(b, str) or a is None or b is None:
++        return _oid(a) == _oid(b)
++    na, nb = _num(a), _num(b)
++    if na is None or nb is None:
++        return na is nb
++    return abs(na - nb) <= _ABS_TOL * max(1.0, abs(na), abs(nb))
++
++
++def _is_correction(event: Mapping[str, Any]) -> bool:
++    return event.get("event_type") == TRADE_CORRECTION_EVENT
++
++
++# --------------------------------------------------------------------------- #
++# structural validation
++# --------------------------------------------------------------------------- #
++def validate_trade_correction(event: Mapping[str, Any]) -> None:
++    """Raise :class:`TradeCorrectionError` unless ``event`` is a well-formed
++    ``trade-correction/v1`` record.  Does not look at the rest of the ledger."""
++    missing = [name for name in _REQUIRED_FIELDS if name not in event]
++    if missing:
++        raise TradeCorrectionError(f"trade_correction lacks {missing}")
++    if event.get("schema_version") != TRADE_CORRECTION_SCHEMA:
++        raise TradeCorrectionError("unsupported trade_correction schema_version")
++    if event.get("reason_code") not in REASON_CODES:
++        raise TradeCorrectionError("unknown trade_correction reason_code")
++    if not isinstance(event.get("trade_id"), str) or not event["trade_id"]:
++        raise TradeCorrectionError("trade_correction has no trade_id")
++    for name in ("previous", "corrected"):
++        block = event.get(name)
++        if not isinstance(block, Mapping) or set(block) != set(CORRECTED_FIELDS):
++            raise TradeCorrectionError(f"trade_correction {name} must carry exactly {CORRECTED_FIELDS}")
++    corrected = event["corrected"]
++    for name in _NUMERIC_FIELDS:
++        if _num(corrected.get(name)) is None and not (name == "return_on_margin" and corrected.get(name) is None):
++            raise TradeCorrectionError(f"trade_correction corrected.{name} is not a finite number")
++    if not _same(corrected["entry_volume"], corrected["exit_volume"]):
++        # A closed trade is flat: anything else would change the position the
++        # ledger implies, which a correction must never do.
++        raise TradeCorrectionError("corrected entry_volume and exit_volume differ")
++    order_ids = event.get("exchange_order_ids")
++    if not isinstance(order_ids, list) or not order_ids or not all(_oid(o) for o in order_ids):
++        raise TradeCorrectionError("trade_correction exchange_order_ids must list the orders it accounts for")
++    if not isinstance(event.get("added_fills"), list) or not isinstance(event.get("corrects_event_ids"), list):
++        raise TradeCorrectionError("trade_correction added_fills / corrects_event_ids must be lists")
++
++
++# --------------------------------------------------------------------------- #
++# consumers
++# --------------------------------------------------------------------------- #
++def correction_order_ids(events: Iterable[Mapping[str, Any]]) -> set[str]:
++    """Exchange order ids that appended corrections account for."""
++    ids: set[str] = set()
++    for event in events:
++        if _is_correction(event):
++            for order_id in event.get("exchange_order_ids") or []:
++                oid = _oid(order_id)
++                if oid:
++                    ids.add(oid)
++    return ids
++
++
++def apply_trade_corrections(events: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
++    """Return ``events`` with every corrected ``trade_close`` replaced by its
++    effective copy (``corrected`` values applied, ``corrected_by`` listing the
++    correction event ids).  Other events -- corrections included -- pass
++    through unchanged.
++
++    Corrections apply in file order to the *first* ``trade_close`` of their
++    trade (the one every fold already treats as authoritative).  Each must
++    name, in ``previous``, exactly the values it supersedes; a correction for a
++    trade with no close, or whose ``previous`` no longer matches (an earlier
++    correction changed them, or it was written against another ledger), raises
++    :class:`TradeCorrectionError` -- never a silent partial application.
++    """
++    out = [dict(event) for event in events]
++    first_close: dict[str, int] = {}
++    for index, event in enumerate(out):
++        tid = event.get("trade_id")
++        if event.get("event_type") == "trade_close" and isinstance(tid, str) and tid not in first_close:
++            first_close[tid] = index
++    for event in out:
++        if not _is_correction(event):
++            continue
++        validate_trade_correction(event)
++        tid = event["trade_id"]
++        if tid not in first_close:
++            raise TradeCorrectionError(f"trade_correction for {tid} has no trade_close to correct")
++        close = out[first_close[tid]]
++        current = _close_view(close)
++        stale = [name for name in CORRECTED_FIELDS if not _same(current.get(name), event["previous"].get(name))]
++        if stale:
++            raise TradeCorrectionError(f"trade_correction for {tid} no longer applies: {stale} changed")
++        effective = dict(close)
++        for name in _NUMERIC_FIELDS:
++            effective[name] = event["corrected"][name]
++        effective["order_id"] = event["corrected"]["exit_order_id"]
++        effective["corrected_by"] = [*close.get("corrected_by", []), event.get("event_id")]
++        out[first_close[tid]] = effective
++    return out
++
++
++def correction_projection_fields(event: Mapping[str, Any]) -> dict[str, Any]:
++    """The correction-specific part of a ``correct_close_v2`` projection.
++
++    A strategy adapter merges these over the non-corrected close fields it
++    already projects (``trade_id``, ``exit_time``, ``leverage``, ``source``,
++    ...) and adds ``corrects_payload_digest`` -- the digest of the projection
++    currently in force for the trade, which only the adapter can rebuild.
++    """
++    validate_trade_correction(event)
++    corrected = event["corrected"]
++    previous = event["previous"]
++    # Only the close-projection columns the receiver's correct_close_v2
++    # accepts (CORRECTION_FIELDS) -- total_fees is ledger-only.
++    fields = {name: corrected[name] for name in _PROJECTED_FIELDS}
++    fields["exit_order_id"] = corrected["exit_order_id"]
++    fields["reason_code"] = event["reason_code"]
++    fields["notes"] = (
++        f"帳本更正 {event['reason_code']}：{event['reason']}"
++        f"（淨損益 {_num(previous.get('net_pnl'))} → {_num(corrected['net_pnl'])}，"
++        f"數量 {_num(previous.get('exit_volume'))} → {_num(corrected['exit_volume'])}）"
++    )
++    return fields
++
++
++# --------------------------------------------------------------------------- #
++# builder (operator tool + repair bot)
++# --------------------------------------------------------------------------- #
++def build_trade_correction(
++    events: list[Mapping[str, Any]],
++    *,
++    trade_id: str,
++    fills: Iterable[Mapping[str, Any]],
++    reason_code: str,
++    reason: str,
++    evidence_source: str,
++    qty_multiplier: float = 1.0,
++) -> dict[str, Any]:
++    """Compute the ``trade_correction`` fields for a closed trade from the
++    exchange fills that make it up.
++
++    ``fills`` are ``reconcile-source/v1`` fill rows (``order_id``, ``side``
++    buy/sell, ``quantity``, ``price``, ``commission``, ``commission_asset``,
++    optional ``realized_pnl`` / ``time_ms``) -- every fill of every order of the
++    trade, entries and exits.  Every order the ledger already records for the
++    trade must be among them: the correction restates the whole trade from the
++    exchange, it does not patch a part of it.  ``qty_multiplier`` converts a
++    fill quantity into the ledger's volume unit times price (1.0 when the
++    ledger records base-asset quantity).
++    """
++    if reason_code not in REASON_CODES:
++        raise TradeCorrectionError("unknown reason_code")
++    if not isinstance(reason, str) or not reason.strip():
++        raise TradeCorrectionError("a correction needs a human-readable reason")
++    effective = apply_trade_corrections(list(events))
++    opens = [e for e in effective if e.get("event_type") == "trade_open" and e.get("trade_id") == trade_id]
++    closes = [e for e in effective if e.get("event_type") == "trade_close" and e.get("trade_id") == trade_id]
++    if not opens:
++        raise TradeCorrectionError(f"{trade_id} has no trade_open")
++    if not closes:
++        raise TradeCorrectionError(f"{trade_id} is not closed; only a closed trade can be corrected")
++    close = closes[0]
++    side = str(close.get("side") or opens[0].get("side") or "").lower()
++    if side not in ("long", "short"):
++        raise TradeCorrectionError(f"{trade_id} has no long/short side")
++    entry_side, exit_side = ("buy", "sell") if side == "long" else ("sell", "buy")
++
++    rows = [dict(f) for f in fills]
++    if not rows:
++        raise TradeCorrectionError("no exchange fills given")
++    fill_order_ids = {_oid(f.get("order_id")) for f in rows}
++    ledger_order_ids = {_oid(e.get("order_id")) for e in [*opens, close]} - {None}
++    unseen = sorted(ledger_order_ids - fill_order_ids)
++    if unseen:
++        raise TradeCorrectionError(f"orders {unseen} recorded for {trade_id} are missing from the exchange fills")
++    for fill in rows:
++        if str(fill.get("side") or "").lower() not in (entry_side, exit_side):
++            raise TradeCorrectionError(f"fill of order {fill.get('order_id')} has side {fill.get('side')!r}")
++        if str(fill.get("commission_asset") or "").upper() != "USDT":
++            raise TradeCorrectionError(f"fill of order {fill.get('order_id')} is not charged in USDT")
++        for name in ("quantity", "price", "commission"):
++            if _num(fill.get(name)) is None:
++                raise TradeCorrectionError(f"fill of order {fill.get('order_id')} lacks {name}")
++
++    def _leg(wanted: str) -> tuple[float, float, float]:
++        leg = [f for f in rows if str(f.get("side")).lower() == wanted]
++        qty = sum(_num(f["quantity"]) for f in leg)
++        if qty <= 0:
++            raise TradeCorrectionError(f"no {wanted} fills for {trade_id}")
++        vwap = sum(_num(f["quantity"]) * _num(f["price"]) for f in leg) / qty
++        return qty, vwap, sum(_num(f["commission"]) for f in leg)
++
++    entry_qty, entry_price, entry_fee = _leg(entry_side)
++    exit_qty, exit_price, exit_fee = _leg(exit_side)
++    if abs(entry_qty - exit_qty) > _ABS_TOL * max(1.0, entry_qty):
++        raise TradeCorrectionError(
++            f"{trade_id} is not flat on the exchange fills (entered {entry_qty}, exited {exit_qty})"
++        )
++    direction = 1.0 if side == "long" else -1.0
++    gross = (exit_price - entry_price) * entry_qty * qty_multiplier * direction
++    exit_fills = [f for f in rows if str(f.get("side")).lower() == exit_side]
++    realized = [_num(f.get("realized_pnl")) for f in exit_fills]
++    if realized and all(value is not None for value in realized):
++        if abs(gross - sum(realized)) > _REALIZED_PNL_TOL:
++            raise TradeCorrectionError(
++                f"computed gross {gross} disagrees with the exchange realized PnL {sum(realized)}"
++            )
++    net = gross - entry_fee - exit_fee
++    leverage = _num(close.get("leverage"))
++    margin = entry_price * entry_qty * qty_multiplier / leverage if leverage else None
++    exit_order_ids = [_oid(f.get("order_id")) for f in sorted(exit_fills, key=lambda f: f.get("time_ms") or 0)]
++    corrected = {
++        "entry_volume": entry_qty,
++        "exit_volume": exit_qty,
++        "entry_price": entry_price,
++        "exit_price": exit_price,
++        "entry_fee": entry_fee,
++        "exit_fee": exit_fee,
++        "total_fees": entry_fee + exit_fee,
++        "gross_pnl": gross,
++        "net_pnl": net,
++        "return_on_margin": (net / margin) if margin else None,
++        "exit_order_id": exit_order_ids[-1],
++    }
++    previous = _close_view(close)
++    if all(_same(previous[name], corrected[name]) for name in CORRECTED_FIELDS):
++        raise TradeCorrectionError(f"{trade_id} already agrees with the exchange; nothing to correct")
++
++    recorded = ledger_order_ids | correction_order_ids(
++        e for e in effective if e.get("trade_id") == trade_id
++    )
++    added = [
++        {"order_id": _oid(f.get("order_id")), "side": str(f.get("side")).lower(),
++         "quantity": _num(f.get("quantity")), "price": _num(f.get("price")),
++         "fee": _num(f.get("commission")), "time_ms": f.get("time_ms")}
++        for f in rows if _oid(f.get("order_id")) not in recorded
++    ]
++    fields = {
++        "schema_version": TRADE_CORRECTION_SCHEMA,
++        "trade_id": trade_id,
++        "symbol": close.get("symbol") or opens[0].get("symbol"),
++        "side": side,
++        "execution_mode": close.get("execution_mode") or opens[0].get("execution_mode"),
++        "reason_code": reason_code,
++        "reason": reason.strip(),
++        "corrects_event_ids": [e.get("event_id") for e in [*opens, close] if e.get("event_id")],
++        "exchange_order_ids": sorted(fill_order_ids - {None}),
++        "added_fills": added,
++        "previous": previous,
++        "corrected": corrected,
++        "evidence": {"source": evidence_source, "fills": sorted(
++            ({"order_id": _oid(f.get("order_id")), "side": str(f.get("side")).lower(),
++              "quantity": _num(f.get("quantity")), "price": _num(f.get("price")),
++              "commission": _num(f.get("commission")), "realized_pnl": _num(f.get("realized_pnl")),
++              "time_ms": f.get("time_ms")} for f in rows),
++            key=lambda f: (f["time_ms"] or 0, f["order_id"] or ""),
++        )},
++    }
++    validate_trade_correction(fields)
++    return fields
++
++
++__all__ = [
++    "CORRECTED_FIELDS",
++    "REASON_CODES",
++    "TRADE_CORRECTION_EVENT",
++    "TRADE_CORRECTION_SCHEMA",
++    "TradeCorrectionError",
++    "apply_trade_corrections",
++    "build_trade_correction",
++    "correction_order_ids",
++    "correction_projection_fields",
++    "validate_trade_correction",
++]
+diff --git a/tests/apps_script_unified_receiver_node_test.js b/tests/apps_script_unified_receiver_node_test.js
+index 8c9256b..4371b0e 100644
+--- a/tests/apps_script_unified_receiver_node_test.js
++++ b/tests/apps_script_unified_receiver_node_test.js
+@@ -198,6 +198,42 @@ assert.deepEqual(route(v2Close), {ok: true, row: 4, provenance_status: 'CONFIRME
+ assert.deepEqual(route(v2Close), {ok: true, row: 4, idempotent: true});
+ // exit_time (col F, index 5): 2026-08-26T01:00:00Z -> Taipei text.
+ assert.equal(projectSheet.rows[3][5], '2026-08-26 9:00:00');
++// correct_close_v2 (h4): a ledger trade_correction may only supersede the
++// projection in force -- the confirmed close, then the latest confirmed
++// correction -- and it also rewrites the entry price / volume and notes.
++const digestOf = projection => crypto.createHash('sha256').update(canonicalJson(projection), 'utf8').digest('hex');
++const closeDigest = digestOf(v2CloseProjection);
++const correction1 = {...v2CloseProjection, entry_price: '1.05', entry_volume: '3', exit_volume: '3', entry_fee: '0.02', gross_pnl: '-0.45', net_pnl: '-0.48', return_on_margin: '-9', exit_order_id: '223456789012345678', reason_code: 'DUPLICATE_ENTRY_UNRECORDED', notes: 'trade_correction: duplicate entry restated from exchange fills', corrects_payload_digest: 'b'.repeat(64)};
++const badBase = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'v2-trade-1', projection: correction1, requestId: '00000000-0000-4000-8000-000000000020'});
++assert.deepEqual(route(badBase), {ok: false, error: 'correction_base_mismatch'});
++assert.equal(projectSheet.rows[3][13], -0.22);  // net_pnl (N) untouched
++const goodCorrection1 = {...correction1, corrects_payload_digest: closeDigest};
++const correct1 = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'v2-trade-1', projection: goodCorrection1, requestId: '00000000-0000-4000-8000-000000000021'});
++assert.deepEqual(route(correct1), {ok: true, row: 4, provenance_status: 'CONFIRMED'});
++assert.deepEqual(route(correct1), {ok: true, row: 4, idempotent: true});
++assert.equal(projectSheet.rows[3][13], -0.48);   // N net_pnl
++assert.equal(projectSheet.rows[3][6], 1.05);     // G entry_price (whole trade)
++assert.equal(projectSheet.rows[3][8], 3);        // I volume (whole trade)
++assert.equal(projectSheet.rows[3][17], '223456789012345678');  // R exit_order_id
++assert.equal(projectSheet.rows[3][20], 'trade_correction: duplicate entry restated from exchange fills');  // U notes
++// A second correction must name the first correction, not the original close.
++const correction2 = {...goodCorrection1, net_pnl: '-0.5', notes: 'fee restated'};
++const staleSecond = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'v2-trade-1', projection: correction2, requestId: '00000000-0000-4000-8000-000000000022'});
++assert.deepEqual(route(staleSecond), {ok: false, error: 'correction_base_mismatch'});
++const chainedSecond = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'v2-trade-1', projection: {...correction2, corrects_payload_digest: digestOf(goodCorrection1)}, requestId: '00000000-0000-4000-8000-000000000023'});
++assert.deepEqual(route(chainedSecond), {ok: true, row: 4, provenance_status: 'CONFIRMED'});
++assert.equal(projectSheet.rows[3][13], -0.5);
++// Wrong event type, or a correction without its reason notes, is refused.
++const asClose = v2Write({action: 'correct_close_v2', eventType: 'trade_close', tradeId: 'v2-trade-1', projection: {...correction2, net_pnl: '-0.6'}, requestId: '00000000-0000-4000-8000-000000000024'});
++assert.deepEqual(route(asClose), {ok: false, error: 'correction_projection_invalid'});
++const noNotes = {...correction2, net_pnl: '-0.6'};
++delete noNotes.notes;
++const withoutNotes = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'v2-trade-1', projection: noNotes, requestId: '00000000-0000-4000-8000-000000000025'});
++assert.deepEqual(route(withoutNotes), {ok: false, error: 'correction_projection_invalid'});
++// No confirmed close to correct.
++const orphanCorrection = v2Write({action: 'correct_close_v2', eventType: 'trade_correction', tradeId: 'legacy-trade-1', projection: {...goodCorrection1, trade_id: 'legacy-trade-1'}, requestId: '00000000-0000-4000-8000-000000000026'});
++assert.deepEqual(route(orphanCorrection), {ok: false, error: 'duplicate_trade_id'});
++assert.equal(projectSheet.rows[3][13], -0.5);
+ // formatSheetTime passes an already-Taipei-text value through unchanged and
+ // never throws on an unparseable one (unit-level guard for the rewrite tool).
+ assert.equal(context.formatSheetTime('2026-08-27 0:30:05'), '2026-08-27 0:30:05');
+diff --git a/tests/fixtures/seykota_duplicate_entry_20260921.json b/tests/fixtures/seykota_duplicate_entry_20260921.json
+new file mode 100644
+index 0000000..97e6e4a
+--- /dev/null
++++ b/tests/fixtures/seykota_duplicate_entry_20260921.json
+@@ -0,0 +1,292 @@
++{
++ "_note": "ed-seykota production ledger and Binance fills around the 2026-09-21 duplicate entry (h4). Ledger read 2026-09-24 from trading-main; fills from its reconcile-source/v1 snapshot fetched 2026-09-24T05:30:05Z. Non-secret.",
++ "ledger": [
++  {
++   "contract_size": 0.0001,
++   "event_epoch_ms": 1788456715185,
++   "event_id": "229cedd1aceb4fa29442eec2aa9c0497",
++   "event_time": "2026-09-03T17:31:55.185484+00:00",
++   "event_type": "trade_open",
++   "execution_mode": "DEMO",
++   "fee": 0.33144532,
++   "leverage": 5.0,
++   "opened_at": "2026-09-03T16:00:29.689954+00:00",
++   "order_id": "28569152485",
++   "price": 81236.6,
++   "side": "long",
++   "source": "exchange_fill",
++   "symbol": "BTCUSDT",
++   "trade_id": "BTCUSDT-2026-09-03T12:00:00Z-entry",
++   "volume": 0.0102
++  },
++  {
++   "closed_at": "2026-09-04T02:41:23.805891+00:00",
++   "entry_fee": 0.33144532,
++   "entry_price": 81236.6,
++   "entry_volume": 0.0102,
++   "event_epoch_ms": 1788489683811,
++   "event_id": "2228bd06d174434baa8ca4cee3b03aff",
++   "event_time": "2026-09-04T02:41:23.810993+00:00",
++   "event_type": "trade_close",
++   "execution_mode": "DEMO",
++   "exit_fee": 0.32920931999999997,
++   "exit_price": 80688.55882352941,
++   "exit_volume": 0.0102,
++   "gross_pnl": -5.590020000000051,
++   "leverage": 5.0,
++   "net_pnl": -6.250674640000051,
++   "opened_at": "2026-09-03T16:00:29.689954+00:00",
++   "order_id": null,
++   "return_on_margin": -0.03771768139088115,
++   "side": "long",
++   "source": "native_stop_reconciled",
++   "stop_order_id": 1000000191650446,
++   "symbol": "BTCUSDT",
++   "total_fees": 0.66065464,
++   "trade_id": "BTCUSDT-2026-09-03T12:00:00Z-entry"
++  },
++  {
++   "event_epoch_ms": 1788489683811,
++   "event_id": "2ca3f89e5865471bb91df04d51b33502",
++   "event_time": "2026-09-04T02:41:23.811121+00:00",
++   "event_type": "position_reconciled_closed",
++   "order_id": null,
++   "source": "native_stop_reconciled",
++   "symbol": "BTCUSDT",
++   "trade_id": "BTCUSDT-2026-09-03T12:00:00Z-entry"
++  },
++  {
++   "contract_size": 0.001,
++   "event_epoch_ms": 1789747223207,
++   "event_id": "26cb0808c97742c7bde30b9cc39ab92b",
++   "event_time": "2026-09-18T16:00:23.207693+00:00",
++   "event_type": "trade_open",
++   "execution_mode": "LIVE",
++   "fee": 0.1210758,
++   "leverage": 5.0,
++   "opened_at": "2026-09-18T16:00:23.182242+00:00",
++   "order_id": "1139592365588",
++   "price": 80717.2,
++   "side": "long",
++   "source": "exchange_fill",
++   "symbol": "BTCUSDT",
++   "trade_id": "BTCUSDT-1139592365588",
++   "volume": 0.003
++  },
++  {
++   "contract_size": 0.001,
++   "event_epoch_ms": 1789833654169,
++   "event_id": "47945b8754d045b782b4b157cdeda36c",
++   "event_time": "2026-09-19T16:00:54.169914+00:00",
++   "event_type": "trade_open",
++   "execution_mode": "LIVE",
++   "fee": 0.04897525309200001,
++   "leverage": 5.0,
++   "opened_at": "2026-09-18T16:00:23.182242+00:00",
++   "order_id": "1140379790881",
++   "price": 81625.42182,
++   "side": "long",
++   "source": "add",
++   "symbol": "BTCUSDT",
++   "trade_id": "BTCUSDT-1139592365588",
++   "volume": 0.003
++  },
++  {
++   "closed_at": "2026-09-21T12:00:12.305916+00:00",
++   "entry_fee": 0.170051053092,
++   "entry_price": 81171.31091,
++   "entry_volume": 0.006,
++   "event_epoch_ms": 1789992012335,
++   "event_id": "e1fe225703a14c118c140abc68f93dbe",
++   "event_time": "2026-09-21T12:00:12.335401+00:00",
++   "event_type": "trade_close",
++   "execution_mode": "LIVE",
++   "exit_fee": 0.25442939,
++   "exit_price": 84809.8,
++   "exit_volume": 0.006,
++   "gross_pnl": 21.830934540000015,
++   "leverage": 5.0,
++   "net_pnl": 21.406454096908018,
++   "opened_at": "2026-09-18T16:00:23.182242+00:00",
++   "order_id": "1141997710722",
++   "return_on_margin": 0.21976621478002625,
++   "side": "long",
++   "source": "atr_trailing_stop",
++   "stop_order_id": 1000002576458878,
++   "symbol": "BTCUSDT",
++   "total_fees": 0.42448044309199995,
++   "trade_id": "BTCUSDT-1139592365588"
++  },
++  {
++   "contract_size": 0.001,
++   "event_epoch_ms": 1790006408273,
++   "event_id": "c49e20c0d338483d9769dbede40629f7",
++   "event_time": "2026-09-21T16:00:08.273069+00:00",
++   "event_type": "trade_open",
++   "execution_mode": "LIVE",
++   "fee": 0.05153680530000001,
++   "leverage": 5.0,
++   "opened_at": "2026-09-21T16:00:08.235422+00:00",
++   "order_id": "1142206675339",
++   "price": 85894.6755,
++   "side": "long",
++   "source": "exchange_fill",
++   "symbol": "BTCUSDT",
++   "trade_id": "BTCUSDT-1142206675339",
++   "volume": 0.003
++  },
++  {
++   "contract_size": 0.001,
++   "event_epoch_ms": 1790092858084,
++   "event_id": "4683f7ab59a24b5f8eedbf5685ba6e7e",
++   "event_time": "2026-09-22T16:00:58.084582+00:00",
++   "event_type": "trade_open",
++   "execution_mode": "LIVE",
++   "fee": 0.21590525,
++   "leverage": 5.0,
++   "opened_at": "2026-09-21T16:00:08.235422+00:00",
++   "order_id": "1143212109561",
++   "price": 86362.1,
++   "side": "long",
++   "source": "add",
++   "symbol": "BTCUSDT",
++   "trade_id": "BTCUSDT-1142206675339",
++   "volume": 0.005
++  },
++  {
++   "closed_at": "2026-09-23T14:11:35.562723+00:00",
++   "entry_fee": 0.2674420553,
++   "entry_price": 86186.81581250002,
++   "entry_volume": 0.008,
++   "event_epoch_ms": 1790172695572,
++   "event_id": "f956b6405e324964a5a517404eb7f033",
++   "event_time": "2026-09-23T14:11:35.572482+00:00",
++   "event_type": "trade_close",
++   "execution_mode": "LIVE",
++   "exit_fee": 0.46739165000000005,
++   "exit_price": 84980.3,
++   "exit_volume": 0.008,
++   "gross_pnl": -9.652126499999998,
++   "leverage": 5.0,
++   "net_pnl": -10.386960205299998,
++   "opened_at": "2026-09-21T16:00:08.235422+00:00",
++   "order_id": null,
++   "return_on_margin": -0.07532300697168766,
++   "side": "long",
++   "source": "native_stop_reconciled",
++   "stop_order_id": 1000002577754251,
++   "symbol": "BTCUSDT",
++   "total_fees": 0.7348337053,
++   "trade_id": "BTCUSDT-1142206675339"
++  },
++  {
++   "event_epoch_ms": 1790172695573,
++   "event_id": "3ce93a27f3c44e94937f39eb16f94aaf",
++   "event_time": "2026-09-23T14:11:35.573272+00:00",
++   "event_type": "position_reconciled_closed",
++   "order_id": null,
++   "source": "native_stop_reconciled",
++   "symbol": "BTCUSDT",
++   "trade_id": "BTCUSDT-1142206675339"
++  }
++ ],
++ "exchange_state": {
++  "schema_version": "reconcile-source/v1",
++  "fetched_at": "2026-09-24T05:30:05Z",
++  "fetch_status": {
++   "complete": true,
++   "errors": []
++  },
++  "positions": [],
++  "lookback": {
++   "hours": 168,
++   "since_ms": 1789623005735
++  },
++  "fills": [
++   {
++    "order_id": 1139592365588,
++    "trade_id": 8093555901,
++    "side": "buy",
++    "quantity": 0.003,
++    "price": 80717.2,
++    "commission": 0.1210758,
++    "commission_asset": "USDT",
++    "realized_pnl": 0.0,
++    "time_ms": 1789747221106,
++    "symbol": "BTCUSDT"
++   },
++   {
++    "order_id": 1140379790881,
++    "trade_id": 8095938146,
++    "side": "buy",
++    "quantity": 0.003,
++    "price": 81587.1,
++    "commission": 0.12238065,
++    "commission_asset": "USDT",
++    "realized_pnl": 0.0,
++    "time_ms": 1789833654144,
++    "symbol": "BTCUSDT"
++   },
++   {
++    "order_id": 1141997710722,
++    "trade_id": 8101768665,
++    "side": "sell",
++    "quantity": 0.006,
++    "price": 84809.8,
++    "commission": 0.25442939,
++    "commission_asset": "USDT",
++    "realized_pnl": 21.9459,
++    "time_ms": 1789992012265,
++    "symbol": "BTCUSDT"
++   },
++   {
++    "order_id": 1142206675339,
++    "trade_id": 8103493005,
++    "side": "buy",
++    "quantity": 0.003,
++    "price": 85877.5,
++    "commission": 0.12881625,
++    "commission_asset": "USDT",
++    "realized_pnl": 0.0,
++    "time_ms": 1790006405349,
++    "symbol": "BTCUSDT"
++   },
++   {
++    "order_id": 1142206692162,
++    "trade_id": 8103493024,
++    "side": "buy",
++    "quantity": 0.003,
++    "price": 85877.5,
++    "commission": 0.12881625,
++    "commission_asset": "USDT",
++    "realized_pnl": 0.0,
++    "time_ms": 1790006406194,
++    "symbol": "BTCUSDT"
++   },
++   {
++    "order_id": 1143212109561,
++    "trade_id": 8108250736,
++    "side": "buy",
++    "quantity": 0.005,
++    "price": 86362.1,
++    "commission": 0.21590525,
++    "commission_asset": "USDT",
++    "realized_pnl": 0.0,
++    "time_ms": 1790092858049,
++    "symbol": "BTCUSDT"
++   },
++   {
++    "order_id": 1144042776223,
++    "trade_id": 8111577487,
++    "side": "sell",
++    "quantity": 0.011,
++    "price": 84980.3,
++    "commission": 0.46739165,
++    "commission_asset": "USDT",
++    "realized_pnl": -12.2922,
++    "time_ms": 1790172650042,
++    "symbol": "BTCUSDT"
++   }
++  ]
++ }
++}
+\ No newline at end of file
+diff --git a/tests/test_trade_correction.py b/tests/test_trade_correction.py
+new file mode 100644
+index 0000000..b16dc50
+--- /dev/null
++++ b/tests/test_trade_correction.py
+@@ -0,0 +1,293 @@
++"""``trade_alerts.trade_correction`` against the real 2026-09-21 incident.
++
++ed-seykota sent one entry twice (same clientOrderId, both filled) and recorded
++only the first; the native-stop close then recorded 0.008 of the 0.011 that
++really left.  The fixture is the production ledger and the exchange's own
++fills (reconcile-source/v1), so the expected figures are the exchange's.
++"""
++from __future__ import annotations
++
++import copy
++import json
++from datetime import datetime, timezone
++from pathlib import Path
++
++import pytest
++
++from trade_alerts import (
++    CORRECTED_FIELDS,
++    TRADE_CORRECTION_EVENT,
++    TradeCorrectionError,
++    apply_trade_corrections,
++    build_trade_correction,
++    correction_order_ids,
++    exchange_ledger_compare,
++    fold_ledger_trades,
++    norm_symbol_plain,
++    recorded_order_ids,
++    validate_trade_correction,
++)
++
++FIXTURE = json.loads(
++    (Path(__file__).parent / "fixtures" / "seykota_duplicate_entry_20260921.json").read_text("utf-8")
++)
++LEDGER = FIXTURE["ledger"]
++STATE = FIXTURE["exchange_state"]
++TRADE_A = "BTCUSDT-1139592365588"  # 09-18 entry + 09-19 add recorded with estimates
++TRADE_B = "BTCUSDT-1142206675339"  # 09-21 duplicate entry
++ORDERS_A = {"1139592365588", "1140379790881", "1141997710722"}
++ORDERS_B = {"1142206675339", "1142206692162", "1143212109561", "1144042776223"}
++NOW = datetime(2026, 9, 24, 5, 30, 30, tzinfo=timezone.utc)
++
++
++def _fills(order_ids):
++    return [f for f in STATE["fills"] if str(f["order_id"]) in order_ids]
++
++
++def _append(ledger, fields, event_id):
++    return [*ledger, {"event_type": TRADE_CORRECTION_EVENT, "event_id": event_id,
++                      "event_epoch_ms": 1790200000000, **fields}]
++
++
++def _build_b(ledger=LEDGER):
++    return build_trade_correction(
++        ledger, trade_id=TRADE_B, fills=_fills(ORDERS_B), reason_code="DUPLICATE_ENTRY_UNRECORDED",
++        reason="2026-09-21 同一 clientOrderId 成交兩張，第二張未入帳", evidence_source="fixture",
++    )
++
++
++def _build_a(ledger=LEDGER):
++    return build_trade_correction(
++        ledger, trade_id=TRADE_A, fills=_fills(ORDERS_A), reason_code="ESTIMATED_FILL_SUPERSEDED",
++        reason="09-19 加碼的價格與手續費是估算值", evidence_source="fixture",
++    )
++
++
++# --------------------------------------------------------------------------- #
++# builder
++# --------------------------------------------------------------------------- #
++def test_duplicate_entry_is_restated_from_the_exchange():
++    fields = _build_b()
++    c = fields["corrected"]
++    assert c["entry_volume"] == pytest.approx(0.011) and c["exit_volume"] == pytest.approx(0.011)
++    assert c["entry_price"] == pytest.approx(86097.7727272727)
++    assert c["exit_price"] == pytest.approx(84980.3)
++    assert c["entry_fee"] == pytest.approx(0.47353775)
++    assert c["exit_fee"] == pytest.approx(0.46739165)
++    assert c["gross_pnl"] == pytest.approx(-12.2922)  # == the exchange's realizedPnl
++    assert c["net_pnl"] == pytest.approx(-13.2331294)
++    assert c["exit_order_id"] == "1144042776223"
++    assert fields["previous"]["net_pnl"] == pytest.approx(-10.386960205299998)
++    assert fields["previous"]["exit_volume"] == pytest.approx(0.008)
++    assert fields["previous"]["exit_order_id"] is None
++    assert [f["order_id"] for f in fields["added_fills"]] == ["1142206692162", "1144042776223"]
++    assert set(fields["exchange_order_ids"]) == ORDERS_B
++    assert set(fields["corrected"]) == set(CORRECTED_FIELDS)
++
++
++def test_estimated_add_is_restated_without_added_fills():
++    fields = _build_a()
++    c = fields["corrected"]
++    assert c["entry_price"] == pytest.approx(81152.15)
++    assert c["entry_fee"] == pytest.approx(0.24345645)
++    assert c["gross_pnl"] == pytest.approx(21.9459)
++    assert c["net_pnl"] == pytest.approx(21.44801416)
++    assert c["exit_order_id"] == "1141997710722"
++    assert fields["added_fills"] == []
++
++
++def test_every_recorded_order_must_be_among_the_fills():
++    with pytest.raises(TradeCorrectionError, match="missing from the exchange fills"):
++        build_trade_correction(
++            LEDGER, trade_id=TRADE_B, fills=_fills(ORDERS_B - {"1143212109561"}),
++            reason_code="UNRECORDED_FILL", reason="x", evidence_source="fixture",
++        )
++
++
++def test_fills_that_do_not_net_flat_are_refused():
++    with pytest.raises(TradeCorrectionError, match="not flat"):
++        build_trade_correction(
++            LEDGER, trade_id=TRADE_B, fills=_fills(ORDERS_B - {"1142206692162"}),
++            reason_code="UNRECORDED_FILL", reason="x", evidence_source="fixture",
++        )
++
++
++def test_a_gross_that_disagrees_with_the_exchange_realized_pnl_is_refused():
++    fills = copy.deepcopy(_fills(ORDERS_B))
++    next(f for f in fills if str(f["order_id"]) == "1144042776223")["realized_pnl"] = -5.0
++    with pytest.raises(TradeCorrectionError, match="realized PnL"):
++        build_trade_correction(LEDGER, trade_id=TRADE_B, fills=fills, reason_code="UNRECORDED_FILL",
++                               reason="x", evidence_source="fixture")
++
++
++def test_non_usdt_commission_is_refused():
++    fills = copy.deepcopy(_fills(ORDERS_B))
++    fills[0]["commission_asset"] = "BNB"
++    with pytest.raises(TradeCorrectionError, match="USDT"):
++        build_trade_correction(LEDGER, trade_id=TRADE_B, fills=fills, reason_code="UNRECORDED_FILL",
++                               reason="x", evidence_source="fixture")
++
++
++def test_an_open_trade_cannot_be_corrected():
++    ledger = [e for e in LEDGER if not (e["trade_id"] == TRADE_B and e["event_type"] != "trade_open")]
++    with pytest.raises(TradeCorrectionError, match="not closed"):
++        build_trade_correction(ledger, trade_id=TRADE_B, fills=_fills(ORDERS_B),
++                               reason_code="UNRECORDED_FILL", reason="x", evidence_source="fixture")
++
++
++def test_rebuilding_after_the_correction_finds_nothing_to_correct():
++    ledger = _append(LEDGER, _build_b(), "corr-b")
++    with pytest.raises(TradeCorrectionError, match="nothing to correct"):
++        _build_b(ledger)
++
++
++def test_a_reason_is_required():
++    with pytest.raises(TradeCorrectionError, match="reason"):
++        build_trade_correction(LEDGER, trade_id=TRADE_B, fills=_fills(ORDERS_B),
++                               reason_code="UNRECORDED_FILL", reason=" ", evidence_source="fixture")
++
++
++# --------------------------------------------------------------------------- #
++# consumers
++# --------------------------------------------------------------------------- #
++def test_apply_replaces_the_close_with_the_corrected_view():
++    ledger = _append(LEDGER, _build_b(), "corr-b")
++    effective = apply_trade_corrections(ledger)
++    close = next(e for e in effective if e["event_type"] == "trade_close" and e["trade_id"] == TRADE_B)
++    assert close["net_pnl"] == pytest.approx(-13.2331294)
++    assert close["exit_volume"] == pytest.approx(0.011)
++    assert close["order_id"] == "1144042776223"
++    assert close["corrected_by"] == ["corr-b"]
++    # the original event list is untouched (append-only; nothing is edited)
++    assert next(e for e in ledger if e["event_type"] == "trade_close" and e["trade_id"] == TRADE_B)["net_pnl"] \
++        == pytest.approx(-10.386960205299998)
++
++
++def test_a_stale_correction_raises_instead_of_applying_partially():
++    fields = _build_b()
++    ledger = _append(_append(LEDGER, fields, "corr-b"), fields, "corr-b-again")
++    with pytest.raises(TradeCorrectionError, match="no longer applies"):
++        apply_trade_corrections(ledger)
++
++
++def test_corrections_chain_on_the_previous_correction():
++    first = _build_b()
++    ledger = _append(LEDGER, first, "corr-b")
++    fills = copy.deepcopy(_fills(ORDERS_B))
++    for fill in fills:
++        fill["commission"] = fill["commission"] * 2  # a later, genuinely different restatement
++        fill["realized_pnl"] = fill.get("realized_pnl")
++    second = build_trade_correction(ledger, trade_id=TRADE_B, fills=fills, reason_code="UNRECORDED_FILL",
++                                    reason="fee restated", evidence_source="fixture")
++    assert second["previous"]["net_pnl"] == pytest.approx(first["corrected"]["net_pnl"])
++    close = next(e for e in apply_trade_corrections(_append(ledger, second, "corr-b2"))
++                 if e["event_type"] == "trade_close" and e["trade_id"] == TRADE_B)
++    assert close["corrected_by"] == ["corr-b", "corr-b2"]
++
++
++def test_a_correction_without_a_close_raises():
++    ledger = [e for e in LEDGER if not (e["trade_id"] == TRADE_B and e["event_type"] == "trade_close")]
++    with pytest.raises(TradeCorrectionError, match="no trade_close"):
++        apply_trade_corrections(_append(ledger, _build_b(), "corr-b"))
++
++
++def test_validate_refuses_a_correction_that_would_move_the_position():
++    fields = _build_b()
++    fields["corrected"]["exit_volume"] = 0.008
++    with pytest.raises(TradeCorrectionError, match="differ"):
++        validate_trade_correction(fields)
++
++
++def test_correction_orders_count_as_recorded():
++    ledger = _append(LEDGER, _build_b(), "corr-b")
++    assert correction_order_ids(ledger) == ORDERS_B
++    assert ORDERS_B <= recorded_order_ids(ledger)
++
++
++def test_the_incident_reconciles_once_both_corrections_are_appended():
++    def compare(ledger):
++        return exchange_ledger_compare(STATE, ledger, is_paper=lambda e: False,
++                                       norm_symbol=norm_symbol_plain, now=NOW)
++
++    before = compare(LEDGER)
++    assert before["value"] == "DIVERGED"
++    assert {str(f["order_id"]) for f in before["evidence"]["unmatched_exchange_fills"]} \
++        == {"1142206692162", "1144042776223"}
++
++    ledger = _append(_append(LEDGER, _build_a(), "corr-a"), _build_b(), "corr-b")
++    after = compare(ledger)
++    assert after["value"] == "RECONCILED", after
++    assert after["evidence"]["position_diffs"] == []
++
++
++def test_the_fold_carries_the_corrected_close():
++    ledger = _append(LEDGER, _build_b(), "corr-b")
++    trades = fold_ledger_trades(ledger, norm_symbol=norm_symbol_plain)
++    assert trades[TRADE_B]["close_event"]["net_pnl"] == pytest.approx(-13.2331294)
++    assert trades[TRADE_B]["closed"] is True
++
++
++# --------------------------------------------------------------------------- #
++# Google projection path (correct_close_v2)
++# --------------------------------------------------------------------------- #
++from trade_alerts import correction_projection_fields  # noqa: E402
++from trade_alerts.ledger_integrity import (  # noqa: E402
++    LedgerIntegrityError,
++    build_provenance,
++    signed_request,
++)
++from trade_alerts.projection_outbox import ProjectionIntent  # noqa: E402
++
++_REQUEST_ID = "00000000-0000-4000-8000-000000000001"
++
++
++def _correction_event():
++    return {"event_type": TRADE_CORRECTION_EVENT, "event_id": "corr-b", **_build_b()}
++
++
++def _provenance(event_type, projection):
++    return build_provenance(
++        project_id="seykota-btcusdt-4h", trade_id=TRADE_B, event_type=event_type,
++        ledger_event=_correction_event(), projection=projection, request_id=_REQUEST_ID,
++        issued_at="2026-09-24T06:00:00Z", source_id="seykota-prod",
++    )
++
++
++def test_projection_fields_carry_the_corrected_close_and_a_readable_note():
++    fields = correction_projection_fields(_correction_event())
++    assert fields["net_pnl"] == pytest.approx(-13.2331294)
++    assert fields["exit_order_id"] == "1144042776223"
++    assert fields["reason_code"] == "DUPLICATE_ENTRY_UNRECORDED"
++    assert "帳本更正" in fields["notes"] and "-13.2331294" in fields["notes"]
++    # exactly what the receiver's correct_close_v2 accepts on top of the close fields
++    receiver = Path(__file__).resolve().parents[1] / "apps_script" / "google_ledger_receiver.gs"
++    source = receiver.read_text("utf-8")
++    close_fields = source.split("const CLOSE_FIELDS = [", 1)[1].split("]", 1)[0]
++    allowed = {name.strip().strip("'") for name in close_fields.split(",")} | {
++        "corrects_payload_digest", "reason_code", "notes"}
++    assert set(fields) <= allowed, set(fields) - allowed
++
++
++def test_a_trade_correction_provenance_is_signable_as_correct_close_v2():
++    projection = {"trade_id": TRADE_B, **correction_projection_fields(_correction_event()),
++                  "corrects_payload_digest": "c" * 64}
++    provenance = _provenance("trade_correction", projection)
++    payload = signed_request(action="correct_close_v2", sheet_name="ed-seykota", provenance=provenance,
++                             projection=projection, source_hmac_secret="test-only")
++    assert payload["action"] == "correct_close_v2"
++    intent = ProjectionIntent.from_provenance(action="correct_close_v2", provenance=provenance)
++    assert intent.event_type == "trade_correction"
++
++
++def test_an_action_must_match_its_ledger_event_type():
++    provenance = _provenance("trade_correction", {"trade_id": TRADE_B})
++    with pytest.raises(ValueError, match="does not match"):
++        ProjectionIntent.from_provenance(action="update_close_v2", provenance=provenance)
++    close_provenance = _provenance("trade_close", {"trade_id": TRADE_B})
++    with pytest.raises(ValueError, match="does not match"):
++        ProjectionIntent.from_provenance(action="correct_close_v2", provenance=close_provenance)
++
++
++def test_unknown_event_types_are_still_refused():
++    with pytest.raises(LedgerIntegrityError, match="event_type"):
++        _provenance("trade_adjustment", {"trade_id": TRADE_B})
