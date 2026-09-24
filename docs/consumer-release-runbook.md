@@ -659,3 +659,22 @@ trade-alerts：v0.21.0（風險分級 v2，W2：共用修復執行器）
 服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.21.1（資料修補版：錯誤目錄＋一致性登記冊，無程式變更）
+變更摘要：v0.21.0 之後 src/ 只有兩份打包資料有變，本版把它們發出去，讓策略的登記冊
+          自我檢查（讀已安裝套件裡的登記冊）對得上正式機現況：
+          1. 錯誤目錄：MOM／SEY.VERIFIED_CLOSE_PROPOSED 從 entries 移除（retired_codes 保留，
+             36 條）；6 條修復執行器代碼的 sources 改指策略呼叫點；SEY.POSITION_AMBIGUOUS
+             補上市價單送出後查不到的呼叫點與追查指令（#52）。
+          2. 一致性登記冊：分級 v2-W6 上正式機後的已做格子、sources 換到 momentum
+             operations 3a91dd0／seykota operations f9946ba（#52）；趨勢策略重複下單事故與
+             新缺口四列（#50）；通知渠道缺口兩列（#49）；趨勢策略 LINE 受控測試送達（本版）。
+受影響消費專案：momentum、seykota、ops-notify 改釘 v0.21.1（全機隊同一版本）；seykota 同時
+          刪除 tests/test_rollout_registry_self_check.py 的 RENAMED_AHEAD_OF_DEPLOY 豁免。
+          行為不變：ops_export 渲染、修復執行器、事件日誌與 v0.21.0 相同。
+部署入口：各專案既有部署腳本（開發機 → 正式機）；部署結果於改釘完成後補記於下。
+版本驗證：pyproject.toml version == 0.21.1；trade_alerts.__version__ == "0.21.1"。
+服務/工作流程驗證：trade-alerts pytest 全綠（見 PR）。
+交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+```

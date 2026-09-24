@@ -341,9 +341,8 @@
       "description": "維運通知讀策略的匯出檔後，把需要人處理的事送一則到 LINE。LINE 有每月額度，所以刻意只發第一則、不重複提醒；重複提醒是 Telegram 的工作（見下一列）。兩台主機都要有這條路。",
       "status": {
         "seykota": {
-          "state": "pending",
-          "phase": "v2-W6",
-          "reason": "2026-09-24：正式機轉送開關（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）與匯出軸首輪 OK 已確認，且與動能策略共用同一個 ops-notify 與 LINE 憑證（動能策略受控測試已送達、只送一次）；但趨勢策略自己還沒有任何一則通知真的經匯出檔→維運通知→LINE 送達過。要做一次趨勢策略專屬的受控測試（sent=1、手機收到、下一輪不重送）才算完成（trade-alerts #52 審閱指出）。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:100 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 趨勢策略專屬受控測試事件 f9c595f9b545449a91794e7ab01c27d6（標明測試、只寫事件未開請求）02:50 UTC 匯出（1134 字）並 sent=1、使用者手機確認收到、03:00 UTC attempted=0 未重送；同輪修復機器人仍零候選。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
         },
         "momentum": {
           "state": "done",
@@ -1199,45 +1198,10 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "repair_bot.verified_close",
-      "type": "completed",
-      "note": "分級 v2 上正式機（2026-09-24）：動能、趨勢兩支的修復機器人都改用共用修復執行器，能對應的漏記平倉直接以交易所為準補寫。",
-      "project": "momentum"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.verified_close",
-      "type": "completed",
-      "note": "分級 v2 上正式機（2026-09-24）：動能、趨勢兩支的修復機器人都改用共用修復執行器，能對應的漏記平倉直接以交易所為準補寫。",
-      "project": "seykota"
-    },
-    {
-      "kind": "cap",
       "id": "notify.line_first_notice",
       "type": "completed",
-      "note": "正式機轉送開關打開，LINE 受控測試真的送到你的手機、而且只送一次。",
-      "project": "momentum"
-    },
-    {
-      "kind": "cap",
-      "id": "orders.single_send",
-      "type": "completed",
-      "note": "趨勢策略的「查不到就重送」修正（PR #65）已上正式機。",
-      "project": "seykota"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.units_axis",
-      "type": "completed",
-      "note": "正式機開始監控兩支修復機器人的背景服務有沒有掛掉。",
-      "project": "momentum"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.units_axis",
-      "type": "completed",
-      "note": "正式機開始監控兩支修復機器人的背景服務有沒有掛掉。",
-      "project": "seykota"
+      "project": "seykota",
+      "note": "趨勢策略自己的 LINE 受控測試也送到你的手機、只送一次——分級 v2 最後一格完成。"
     }
   ]
 }
