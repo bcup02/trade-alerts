@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>45</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>52</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>15</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">45 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">52 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -2026,7 +2026,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
        "state": "pending",
        "text": "帳本對交易所、帳本對 Google 表兩層對帳走共用 ledger_reconcile，改釘到含本功能的版本後就會套用更正；Google 表投影與投資人快照的讀取端還要各自接上 correct_close_v2 與更正後數字，跟修復機器人自動更正（g1）一起做。"
       }
@@ -2037,7 +2037,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
        "state": "pending",
        "text": "同動能策略：共用對帳改釘後即套用；Google 表同步與投資人快照的讀取端要一起接上，跟修復機器人（需先有 MEXC 成交查詢）一起做。"
       }
@@ -2077,7 +2077,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
        "state": "pending",
        "text": "實例：2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162）；DIVERGED 從 09-21 16:10 UTC 持續到 09-24 09:15 UTC，期間只在變化當下發過一次狀態告警，沒有任何錯誤代碼接手。這一筆已於 2026-09-24 以人工帳本更正（ledger.trade_correction）改成與交易所一致；但自動偵測、升格通知與修復機器人自動更正仍未做（g1）：對帳把多出來的成交列進 unmatched_exchange_fills 後沒有錯誤代碼接手，修復機器人只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
       }
@@ -2088,7 +2088,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
        "state": "pending",
        "text": "對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
       }
@@ -2099,7 +2099,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
        "state": "pending",
        "text": "對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
       }
@@ -2110,7 +2110,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
        "state": "pending",
        "text": "對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
       }
@@ -2350,7 +2350,7 @@
    "title": "R2｜移動停損換單失敗，部位可能沒有交易所端保護"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-SEY.PROTECTION_MOVE_DEFERRED",
    "complete": false,
    "dots": {
@@ -3675,6 +3675,251 @@
    ],
    "sub": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
    "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-SEY.UNRECORDED_FILL_CORRECTED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "SEY.UNRECORDED_FILL_CORRECTED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+      }
+     ]
+    }
+   ],
+   "sub": "SEY.UNRECORDED_FILL_CORRECTED",
+   "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-SEY.UNRECORDED_FILL_UNRESOLVED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "SEY.UNRECORDED_FILL_UNRESOLVED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+      }
+     ]
+    }
+   ],
+   "sub": "SEY.UNRECORDED_FILL_UNRESOLVED",
+   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-MOM.UNRECORDED_FILL_CORRECTED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "pending",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "MOM.UNRECORDED_FILL_CORRECTED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+      }
+     ]
+    }
+   ],
+   "sub": "MOM.UNRECORDED_FILL_CORRECTED",
+   "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-MOM.UNRECORDED_FILL_UNRESOLVED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "pending",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+      }
+     ]
+    }
+   ],
+   "sub": "MOM.UNRECORDED_FILL_UNRESOLVED",
+   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-BTC.UNRECORDED_FILL_CORRECTED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "pending",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "BTC.UNRECORDED_FILL_CORRECTED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+      }
+     ]
+    }
+   ],
+   "sub": "BTC.UNRECORDED_FILL_CORRECTED",
+   "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-BTC.UNRECORDED_FILL_UNRESOLVED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "pending",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "BTC.UNRECORDED_FILL_UNRESOLVED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+      }
+     ]
+    }
+   ],
+   "sub": "BTC.UNRECORDED_FILL_UNRESOLVED",
+   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-MYC.UNRECORDED_FILL_UNRESOLVED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "pending",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "MYC.UNRECORDED_FILL_UNRESOLVED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "加密策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "加密策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-6），上正式機後改 done。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+       "state": "pending",
+       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+      }
+     ]
+    }
+   ],
+   "sub": "MYC.UNRECORDED_FILL_UNRESOLVED",
+   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
   }
  ],
  "phase_counts": {
@@ -3691,7 +3936,7 @@
   "hotfix-seykota-stop-resolution": 2,
   "naming-rollout": 0,
   "repair-recurrence": 4,
-  "unrecorded-fill": 6,
+  "unrecorded-fill": 20,
   "v2-W2": 0,
   "v2-W3": 0,
   "v2-W4": 0,
@@ -3731,7 +3976,7 @@
   "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
   "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
   "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
-  "unrecorded-fill": "尚未排定：帳本少記交易所成交（多出來的成交、數量不符）要升格通知並以交易所為準更正；目前只有對帳顯示 DIVERGED",
+  "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
   "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
   "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
   "v2-W4": "分級 v2：趨勢策略的修復機器人升到完整版",
@@ -3751,32 +3996,68 @@
  },
  "recent_summary": [
   {
-   "anchor": "rule-SEY.PROTECTION_MOVE_DEFERRED",
-   "note": "新增：移動停損時舊停損取消不掉，改成保留舊停損、下一根 K 棒再試，不再無限重試卡住（h11，PR #74 待上正式機）。",
+   "anchor": "rule-SEY.UNRECORDED_FILL_CORRECTED",
+   "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。",
    "project": "趨勢策略",
-   "title": "R2｜移動停損時舊停損單取消不掉，保留舊停損、這輪不移動"
+   "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
+  },
+  {
+   "anchor": "rule-SEY.UNRECORDED_FILL_UNRESOLVED",
+   "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。",
+   "project": "趨勢策略",
+   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+  },
+  {
+   "anchor": "rule-MOM.UNRECORDED_FILL_CORRECTED",
+   "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。",
+   "project": "動能策略",
+   "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
+  },
+  {
+   "anchor": "rule-MOM.UNRECORDED_FILL_UNRESOLVED",
+   "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。",
+   "project": "動能策略",
+   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+  },
+  {
+   "anchor": "rule-BTC.UNRECORDED_FILL_CORRECTED",
+   "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。",
+   "project": "競賽策略",
+   "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
+  },
+  {
+   "anchor": "rule-BTC.UNRECORDED_FILL_UNRESOLVED",
+   "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。",
+   "project": "競賽策略",
+   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+  },
+  {
+   "anchor": "rule-MYC.UNRECORDED_FILL_UNRESOLVED",
+   "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。",
+   "project": "加密策略",
+   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
   }
  ],
  "totals": {
   "btc-competition": {
    "done": 11,
    "n/a": 9,
-   "pending": 16
+   "pending": 20
   },
   "momentum": {
    "done": 25,
    "n/a": 4,
-   "pending": 9
+   "pending": 13
   },
   "mycrypto": {
    "done": 12,
    "n/a": 5,
-   "pending": 23
+   "pending": 25
   },
   "seykota": {
    "done": 33,
    "n/a": 2,
-   "pending": 27
+   "pending": 31
   }
  }
 }

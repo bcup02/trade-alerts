@@ -64,24 +64,24 @@ Phase 2 之後存活、且會產生維運可見訊號的條件共 **30 條**（P
 2026-09-18 補登 `SEY.VERIFIED_CLOSE_PROPOSED`——seykota 的 Phase 5c 修復機器人（只抓錯並提出修復建議） 從部署起就一直在發這個事件，卻從未登記進目錄，
 導致一致性登記冊上這支策略的修復機器人 完全看不到對應紀錄，見下方 §3.1，當時合計 **34 條**；2026-09-22 v2-W2 共用修復執行器
 補上它會發出的代碼：兩支策略各一條 `VERIFIED_CLOSE_REPAIR_FAILED`（R2，取代退役的 `*_PROPOSED`），seykota 另補
-`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，當時合計 **38 條**；2026-09-24 v0.21.1 把 `MOM／SEY.VERIFIED_CLOSE_PROPOSED` 移出 entries（留在 `retired_codes`）剩 36 條；同日 h7 查核補上 `BTC.ORDER_STATUS_UNKNOWN`——競賽策略送單結果不明時改為查單、查不到就暫停，不再重新規劃重送，見 §3.3，目前合計 **37 條**；同日 h11 補上 `SEY.PROTECTION_MOVE_DEFERRED`、並把走不到的 `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` 列進 `retired_codes`（ed-seykota PR #74 上正式機後移出 entries），合計 **38 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
+`VERIFIED_CLOSE_AUTO_REPAIRED`／`VERIFIED_CLOSE_REPAIR_BLOCKED` 與 momentum 對等，見 §4.9，當時合計 **38 條**；2026-09-24 v0.21.1 把 `MOM／SEY.VERIFIED_CLOSE_PROPOSED` 移出 entries（留在 `retired_codes`）剩 36 條；同日 h7 查核補上 `BTC.ORDER_STATUS_UNKNOWN`——競賽策略送單結果不明時改為查單、查不到就暫停，不再重新規劃重送，見 §3.3，目前合計 **37 條**；同日 h11 補上 `SEY.PROTECTION_MOVE_DEFERRED`、並把走不到的 `SEY.PROTECTION_ORPHAN_CANCEL_FAILED` 列進 `retired_codes`（ed-seykota PR #74 上正式機後移出 entries），合計 **38 條**；2026-09-25 g1 補上「帳本少記交易所成交」兩條（`UNRECORDED_FILL_CORRECTED` 趨勢／動能／競賽、`UNRECORDED_FILL_UNRESOLVED` 四支），見 §4.10，合計 **45 條**）（盤查原始的 57 條路徑裡，6 條是死碼已在
 Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄以「條件」而非「呼叫點」為單位）。
 
 | 判定 | 條數 | 佔比 |
 |---|---|---|
-| `MECHANICAL`（動作固定） | 12 | 32% |
-| `JUDGEMENT`（真的要人判斷） | 26 | 68% |
+| `MECHANICAL`（動作固定） | 12 | 27% |
+| `JUDGEMENT`（真的要人判斷） | 33 | 73% |
 
 | 風險等級（v2） | 條數 |
 |---|---|
 | R0 只記錄 | 9 |
 | R1 自動、不通知 | 3 |
 | R2 自動嘗試、失敗才通知 | 13 |
-| R3 必須人工 | 13 |
+| R3 必須人工 | 20 |
 
 下列各表的「等級」「落在」兩欄以 JSON 為準重新產生（v2）；「現況」欄描述 Phase 3 盤查時的程式行為。
 
-### 3.1 ed-seykota（18 條＋2 條已退役，其中 1 條待移出）
+### 3.1 ed-seykota（20 條＋2 條已退役，其中 1 條待移出）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
@@ -104,13 +104,15 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `SEY.VERIFIED_CLOSE_AUTO_REPAIRED` | 未發出（共用修復執行器，v2-W4 接上） | MECHANICAL | R1 | P8（v2） |
 | `SEY.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R2 | P8（v2） |
 | `SEY.VERIFIED_CLOSE_REPAIR_BLOCKED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R3 | P8（v2） |
+| `SEY.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+| `SEY.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
 
 **`protective_stop_failed` 拆成兩碼**是本節最重要的改動。現行程式在「停損掛單失敗」之後會立刻
 嘗試緊急市價平倉，但不論平倉成功或失敗，都收斂成同一個 latch 原因碼。這兩種結果的真倉風險相差
 極大：平倉成功代表交易所上沒有任何未保護部位（動作固定 → R1 自動清 latch）；平倉也失敗代表真倉
 有裸露部位而且程式的補救手段已經失敗過一次（→ R3，全機隊風險最高的一類）。
 
-### 3.2 momentum（6 條＋1 條已退役）
+### 3.2 momentum（8 條＋1 條已退役）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
@@ -121,6 +123,8 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R1 | **P6** |
 | `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R3 | **P6** |
 | `MOM.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W3 接上） | JUDGEMENT | R2 | P8（v2） |
+| `MOM.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+| `MOM.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
 
 momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
@@ -133,13 +137,15 @@ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原�
 `SEY.VERIFIED_CLOSE_PROPOSED`）發出這個事件從未登記進 v1 目錄，2026-09-18 補登進 v2 目錄——跟 momentum 對等的處置、
 同一個理由、同樣列進 `retired_codes`，seykota 升到共用修復執行器（v2-W4）時一起取代退役。
 
-### 3.3 btc-competition（5 條）
+### 3.3 btc-competition（7 條）
 
 | 錯誤碼 | 現況 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
 | `BTC.BOOK_CORRUPT_NEGATIVE_BALANCE` | latch（4 個扁平欄位） | JUDGEMENT | R3 | P4 |
 | `BTC.EXECUTION_BLOCKED_ZERO_FILLS` | latch | JUDGEMENT | R2 | P8（v2） |
 | `BTC.ORDER_STATUS_UNKNOWN` | latch（h7 新增，PR #35） | JUDGEMENT | R3 | P4 |
+| `BTC.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+| `BTC.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
 | `BTC.REBALANCE_PENDING` | 不 latch，自動續做 | MECHANICAL | R0 | — |
 | `BTC.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重新拋出 | MECHANICAL | R0 | — |
 
@@ -151,7 +157,7 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障�
 拒絕才重新規劃；結果不明就用 client id 查單最多 60 秒，查不到就停止本輪、以此代碼暫停並保留目標比例，等人確認。
 跟 `SEY.POSITION_AMBIGUOUS` 的 60 秒查證同一條機隊規則（一致性登記冊 `orders.single_send`）。
 
-### 3.4 my-crypto（7 條）
+### 3.4 my-crypto（8 條）
 
 | 錯誤碼 | 現行事件名 | 判定 | 等級 | 落在 |
 |---|---|---|---|---|
@@ -162,6 +168,7 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障�
 | `MYC.PROTECTION_PLACEMENT_ERROR` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P5 |
 | `MYC.PROTECTION_REPLACE_FAILED` | `PROTECTIVE_STOP_FAILED` ×2 | JUDGEMENT | R2 | P8（v2） |
 | `MYC.PROTECTION_ORPHAN_CANCEL_FAILED` | `PROTECTIVE_STOP_CANCEL_FAILED` | JUDGEMENT | R2 | P8（v2） |
+| `MYC.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上；下單不帶自訂編號，只通知） | JUDGEMENT | R3 | P8（v2） |
 
 **my-crypto 不加 latch**（使用者 2026-09-12 定案）。兩個叫 `SAFE_HALT` 的事件名宣稱一個這支程式
 根本沒有的安全暫停行為——bot 發完通知照常繼續交易。替一支目前沒有這個概念的 LIVE bot 新增安全暫停行為，
@@ -393,6 +400,21 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
 - 「以交易所為準」的判斷寫在 `build_repair_events` 裡，手動流程（`append_repair`）與執行器寫出的帳本列逐欄相同。
   轉接器拿不到某筆成交的已實現損益時，證據標 `exchange_profit_reported: false`，此時不以交易所為準。
 - 執行器的三個代碼必須在目錄裡有該策略的條目，否則開跑前就拒絕（事件等級查不到＝沒辦法通知任何人）。
+
+### 4.10 帳本少記交易所成交（g1，`trade_alerts.unrecorded_fill`）
+
+對帳（`exchange_ledger_compare`）把帳本沒記到的交易所成交列在 `evidence.unmatched_exchange_fills` 並判 `DIVERGED`；
+2026-09-21 趨勢策略重複送單就這樣在頁面上掛了三天沒人接手。`unrecorded_fill.run_unrecorded_fill_round` 是全機隊唯一的接手者，
+跟著各策略的計時器每輪跑一次。使用者 2026-09-25 定案的規則：
+
+- **只有確定是策略自己重複送單才自動更正**：向交易所唯讀查這張單的自訂編號（clientOrderId），跟帳本已記、前後 30 分鐘內同幣種的某張單相同，
+  而且那筆交易已平倉、用交易所成交能完整重述（`build_trade_correction`，數量不平就拒絕）——才追加 `trade_correction`（期貨），
+  或把那張單的成交補記成 `spot_fill`（競賽策略現貨）。寫完立刻發 `UNRECORDED_FILL_CORRECTED`（R3，不開請求：帳本已正確，要人追重送的根因）。
+  同一筆交易在時段內的其他未記訂單（例如 9/21 那筆原生停損的出場單）一起納入重述，但**每一張都要各自證明是策略下的**（跟已記單同一個自訂編號，或帶策略自己的編號特徵），有任何一張查不出來源（例如 App 手動單剛好落在同時段）就整筆不寫（`UNATTRIBUTED_ORDERS`）。每輪最多寫一筆，寫前重讀帳本、寫後確認已涵蓋。
+- **其他一律不寫帳本**，開一個請求（同一張單一次）＋發 `UNRECORDED_FILL_UNRESOLVED`（R3，附步驟）：來源不明（`ORIGIN_UNKNOWN`，例如 App 手動下單）、
+  重複送單但部位還開著（`POSITION_OPEN`，減倉與否由人決定）、同一筆交易還有來源不明的未記單（`UNATTRIBUTED_ORDERS`）、重述不了（`NOT_RESTATABLE`）、查單持續失敗超過 2 小時（`LOOKUP_FAILED`，之前靜默重試）、
+  更正寫入失敗（`WRITE_FAILED`，不重試）、這支策略下單不帶自訂編號（`NO_CLIENT_IDS`，加密策略）。帳本之後記到這張單時請求自動撤回（`WITHDRAWN`）。
+- 不下單、不撤單；轉接器對交易所只做唯讀查詢。
 
 ## 5. Phase 3 實際落地的程式改動
 
