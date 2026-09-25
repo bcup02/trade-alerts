@@ -209,7 +209,19 @@ filters.appendChild(tierHost); filters.appendChild(botHost); filters.appendChild
 chipGroup(tierHost,[{id:"all",label:"全部等級",n:DATA.entries.length}].concat(DATA.tiers.map(function(t){return {id:t.id,label:t.id+" "+t.title,n:count(function(e){return e.tier===t.id;})};})),function(v){pick.tier=v;apply();});
 chipGroup(botHost,[{id:"all",label:"全部策略",n:DATA.entries.length}].concat(DATA.bots.map(function(b){return {id:b.id,label:b.label,n:count(function(e){return e.bot===b.id;})};})),function(v){pick.bot=v;apply();});
 chipGroup(openHost,[{id:"all",label:"全部",n:DATA.entries.length},{id:"open",label:"只看還沒做完的",n:count(function(e){return e.open;})}],function(v){pick.open=v;apply();});
+var toTop=document.getElementById("totop");
+toTop.addEventListener("click",function(){ window.scrollTo(0,0); var h=document.querySelector("h1"); if(h){ h.setAttribute("tabindex","-1"); h.focus({preventScroll:true}); } });
+function syncTop(){ toTop.classList.toggle("show", filters.getBoundingClientRect().bottom<0); }
+window.addEventListener("scroll",syncTop,{passive:true}); syncTop();
 """
+
+_RISK_CSS = """
+  #totop{position:fixed;right:20px;bottom:20px;width:46px;height:46px;border-radius:50%;border:1px solid var(--accent-line);background:var(--accent-bg);color:var(--accent);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:0;pointer-events:none;transform:translateY(8px);transition:opacity .2s,transform .2s;}
+  #totop.show{opacity:1;pointer-events:auto;transform:none;}
+  #totop:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  @media (max-width:560px){ #totop{right:16px;bottom:16px;} }
+"""
+
 
 _ROLLOUT_CSS = """
   html{scroll-behavior:smooth;}
@@ -479,8 +491,9 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
     資料來源：trade-alerts <code>{catalog['catalog_version']}</code>（錯誤分類）與 <code>{registry['registry_version']}</code>（各策略實際進度，{registry['updated_at']} 盤點）。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
   </div>
-</div>"""
-    return _page("機隊風險登記冊", body, data, _RISK_JS)
+</div>
+<button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>"""
+    return _page("機隊風險登記冊", body, data, _RISK_JS, _RISK_CSS)
 
 
 def _line(status: dict[str, Any], aspect: str | None, phases: dict[str, str]) -> dict[str, Any]:
