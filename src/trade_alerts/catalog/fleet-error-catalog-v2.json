@@ -42,9 +42,8 @@
       "title": "開倉後停損掛單失敗，緊急市價平倉成功",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:513",
-        "src/seykota_bot/bot.py:521",
-        "src/seykota_bot/bot.py:525"
+        "src/seykota_bot/bot.py:737",
+        "src/seykota_bot/bot.py:759"
       ],
       "current": {
         "latch": "protective_stop_failed",
@@ -72,8 +71,8 @@
       "title": "停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:524",
-        "src/seykota_bot/bot.py:525"
+        "src/seykota_bot/bot.py:752",
+        "src/seykota_bot/bot.py:767"
       ],
       "current": {
         "latch": "protective_stop_failed",
@@ -104,8 +103,8 @@
       "title": "移動停損換單失敗，部位可能沒有交易所端保護",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:574",
-        "src/seykota_bot/bot.py:575"
+        "src/seykota_bot/bot.py:853",
+        "src/seykota_bot/bot.py:868"
       ],
       "current": {
         "latch": "protective_stop_replace_failed",
@@ -162,41 +161,11 @@
       }
     },
     {
-      "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
-      "title": "換單時舊停損單取消失敗，可能殘留在交易所",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:593"
-      ],
-      "current": {
-        "latch": null,
-        "notify": "PROTECTIVE_STOP_ORPHAN (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R2",
-      "auto_action": "只取消系統自己在換單時記錄的那張舊單編號（不做推測比對），而且取消前先確認新的保護單已在交易所上；兩者都成立才自動重試取消，最多連續 escalate_after 次。任一條件不成立或全部失敗即升格：開請求、通知。",
-      "human_action": "到交易所手動取消那張殘留停損單。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "自動取消一張「以為是孤兒」的委託，若判斷錯誤就是把正在保護部位的停損單拿掉——這個風險是真的。v2（2026-09-18）的自動重試因此加兩道條件：只取消系統自己記錄的那張舊單編號，且取消前先確認新保護單已在交易所上；任一不成立就不取消、直接升格給人。在這兩道條件下取消的對象是確定的，才屬於「系統自動嘗試」而不是「猜」。",
-      "operator_message": {
-        "what": "換停損單時，舊單本該被取消卻取消失敗，可能還留在交易所上。",
-        "direction": "系統只會取消它自己記錄的那張舊停損單，而且會先確認新的保護單已經掛上才動手，最多試 3 次；條件不成立或都失敗才通知你。殘留的停損單如果被觸發，可能提早平掉目前的倉位。",
-        "steps": [
-          "到交易所 App 的委託清單找訊息裡那張停損單編號。",
-          "確認它不是目前倉位正在用的保護單後，手動取消。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查換單時舊停損單取消失敗、且自動重試也失敗的原因：讀 src/seykota_bot/bot.py 取消舊單的流程與錯誤處理，對照 journal 與交易所錯誤碼，判斷是單已不存在、權限還是 API 問題，並提出治本修正。"
-      }
-    },
-    {
       "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
       "title": "平倉後停損單取消失敗，可能還掛在交易所",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:607"
+        "src/seykota_bot/bot.py:891"
       ],
       "current": {
         "latch": null,
@@ -209,7 +178,7 @@
       "human_action": "到交易所手動取消殘留停損單，或確認它已自行失效。",
       "resume": "n/a",
       "lands_in_phase": 8,
-      "rationale": "跟 SEY.PROTECTION_ORPHAN_CANCEL_FAILED 同一個風險形狀，只是發生在平倉之後。部位已平時風險較低，但誤取消仍可能影響下一個部位的保護。 v2（2026-09-18）：自動重試只在確認交易所上已無部位時進行，且只取消系統自己記錄的那張保護單編號；條件不成立就直接升格。",
+      "rationale": "風險形狀是「自動取消一張以為沒用的停損單，判斷錯就是拿掉正在保護部位的單」，只是發生在平倉之後。部位已平時風險較低，但誤取消仍可能影響下一個部位的保護。 v2（2026-09-18）：自動重試只在確認交易所上已無部位時進行，且只取消系統自己記錄的那張保護單編號；條件不成立就直接升格。",
       "operator_message": {
         "what": "平倉後要收掉停損單卻收不掉，可能還掛著。",
         "direction": "系統會先確認倉位真的已經平掉，再取消它自己記錄的那張停損單，最多試 3 次；條件不成立或都失敗才通知你。殘留的單通常不會成交，但留著可能在之後開新倉時造成誤判。",
@@ -226,7 +195,7 @@
       "title": "交易所存在部位，但沒有可唯一確認的原生保護單",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:726"
+        "src/seykota_bot/bot.py:1011"
       ],
       "current": {
         "latch": "exchange_position_protection_unverified",
@@ -257,8 +226,8 @@
       "title": "交易所部位資料無法唯一辨識",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:1080",
-        "src/seykota_bot/bot.py:644"
+        "src/seykota_bot/bot.py:1163",
+        "src/seykota_bot/bot.py:695"
       ],
       "current": {
         "latch": "exchange_position_ambiguous",
@@ -290,7 +259,7 @@
       "title": "非暫時性的對帳失敗",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:844"
+        "src/seykota_bot/bot.py:1102"
       ],
       "current": {
         "latch": "reconcile_error",
@@ -321,7 +290,7 @@
       "title": "執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:1313"
+        "src/seykota_bot/bot.py:1663"
       ],
       "current": {
         "latch": "exchange_target_unsafe",
@@ -351,7 +320,7 @@
       "title": "真倉固定訂單識別能力不足",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:1320"
+        "src/seykota_bot/bot.py:1674"
       ],
       "current": {
         "latch": "fixed_identifier_contract_unavailable",
@@ -381,7 +350,7 @@
       "title": "未分類的執行期例外（run_forever catch-all）",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:1376"
+        "src/seykota_bot/bot.py:1751"
       ],
       "current": {
         "latch": "runtime_error",
@@ -411,7 +380,7 @@
       "title": "交易所部位已消失，等待平倉成交資料回填",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:1020"
+        "src/seykota_bot/bot.py:1355"
       ],
       "current": {
         "latch": null,
@@ -438,7 +407,8 @@
       "title": "原生停損觸發的正常平倉",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:1054"
+        "src/seykota_bot/bot.py:1392",
+        "src/seykota_bot/bot.py:1579"
       ],
       "current": {
         "latch": null,
@@ -465,7 +435,7 @@
       "title": "權益低於最低下單資金，跳過本次進場",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/bot.py:1131"
+        "src/seykota_bot/bot.py:1471"
       ],
       "current": {
         "latch": null,
@@ -675,8 +645,8 @@
       "title": "出現負／不可能的餘額，本地帳本本身不可信",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/runner.py:282",
-        "src/btc_competition/runner.py:332"
+        "src/btc_competition/runner.py:321",
+        "src/btc_competition/runner.py:395"
       ],
       "current": {
         "latch": "HOLDINGS_UNVERIFIED:negative",
@@ -707,8 +677,8 @@
       "title": "連續 3 天該再平衡卻零成交",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/runner.py:301",
-        "src/btc_competition/runner.py:332"
+        "src/btc_competition/runner.py:345",
+        "src/btc_competition/runner.py:397"
       ],
       "current": {
         "latch": "EXECUTION_BLOCKED:3 consecutive days with zero fills",
@@ -771,7 +741,8 @@
       "title": "部分成交，目標權重尚未達成",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/runner.py:297"
+        "src/btc_competition/runner.py:339",
+        "src/btc_competition/runner.py:347"
       ],
       "current": {
         "latch": null,
@@ -798,7 +769,7 @@
       "title": "runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/runner.py:358"
+        "src/btc_competition/runner.py:426"
       ],
       "current": {
         "latch": null,
@@ -1094,7 +1065,7 @@
       "title": "無歧義的漏記平倉已自動補寫進帳本",
       "project": "seykota",
       "sources": [
-        "scripts/repair_bot.py:100",
+        "scripts/repair_bot.py:186",
         "trade-alerts/src/trade_alerts/repair_runner.py:299"
       ],
       "current": {
@@ -1123,7 +1094,7 @@
       "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
       "project": "seykota",
       "sources": [
-        "scripts/repair_bot.py:100",
+        "scripts/repair_bot.py:186",
         "trade-alerts/src/trade_alerts/repair_runner.py:332",
         "trade-alerts/src/trade_alerts/repair_runner.py:346"
       ],
@@ -1154,7 +1125,7 @@
       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
       "project": "seykota",
       "sources": [
-        "scripts/repair_bot.py:100",
+        "scripts/repair_bot.py:186",
         "trade-alerts/src/trade_alerts/repair_runner.py:364"
       ],
       "current": {
@@ -1406,7 +1377,7 @@
     {
       "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
       "retired_in": "fleet-error-catalog/v2",
-      "reason": "The flow it describes -- place the new stop while the old one could not be cancelled, then clean the old one up as an orphan -- cannot happen on Binance: a second closePosition stop in the same direction is refused with -4130 (testnet 2026-09-24, h5), and the branch was only reachable on a resolver exception. ed-seykota PR #74 (h11) removes it: a trailing move now places a new stop only after the old one is confirmed gone, and an old stop that will not cancel is SEY.PROTECTION_MOVE_DEFERRED. The entry stays until #74 is on the live host; the code stays here so it is never reused."
+      "reason": "The flow it describes -- place the new stop while the old one could not be cancelled, then clean the old one up as an orphan -- cannot happen on Binance: a second closePosition stop in the same direction is refused with -4130 (testnet 2026-09-24, h5), and the branch was only reachable on a resolver exception. ed-seykota PR #74 (h11) removes it: a trailing move now places a new stop only after the old one is confirmed gone, and an old stop that will not cancel is SEY.PROTECTION_MOVE_DEFERRED. Entry removed 2026-09-25 after #74 reached the live host (seykota operations 3e3b6f7); the code stays here so it is never reused."
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-09-24",
+  "updated_at": "2026-09-25",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -33,12 +33,12 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "3a91dd065894f42bd24cf964fd54c7dae13c3e64"
+      "commit": "61ff1e5c4fe4e6e543d0a51f8aa2ded1d80ae826"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "6d1edc2867dd508e72e267d03fc81373ff8b1442"
+      "commit": "3e3b6f78e9db33d3a3a80d25c43811f30d432bad"
     },
     "mycrypto": {
       "repo": "AI-for-column/my-crypto-bot",
@@ -48,7 +48,7 @@
     "btc-competition": {
       "repo": "AI-for-column/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "b8eda43089a21cd71200e9fcf090a5a0de229c4a"
+      "commit": "2d167aad4ac72e8629c05654f7cd4a5af1efb08e"
     }
   },
   "capabilities": [
@@ -63,7 +63,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:392 build_safe_halt（Phase 4c）"
+          "evidence": "src/seykota_bot/bot.py:423 build_safe_halt（Phase 4c）"
         },
         "mycrypto": {
           "state": "n/a",
@@ -71,7 +71,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:347 build_safe_halt（Phase 4c）"
+          "evidence": "src/btc_competition/runner.py:398 build_safe_halt（Phase 4c）"
         }
       }
     },
@@ -133,7 +133,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:52 _CONSECUTIVE_FAILURE_LATCH_THRESHOLD Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）"
+          "evidence": "src/seykota_bot/bot.py:53 _CONSECUTIVE_FAILURE_LATCH_THRESHOLD Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）"
         },
         "mycrypto": {
           "state": "pending",
@@ -226,7 +226,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:186 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         },
         "mycrypto": {
           "state": "pending",
@@ -250,7 +250,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 run_repair_round＋:83 staging_ledger（本策略帳本寫入器整批原子寫入），含加碼與做空（v2-W4）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:186 run_repair_round＋:113 staging_ledger（本策略帳本寫入器整批原子寫入），含加碼與做空（v2-W4）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         },
         "mycrypto": {
           "state": "pending",
@@ -274,7 +274,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 run_repair_round 由共用修復執行器讀 SEYKOTA_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔；正式機每輪輸出都帶 paused 欄位。"
+          "evidence": "scripts/repair_bot.py:186 run_repair_round 由共用修復執行器讀 SEYKOTA_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔；正式機每輪輸出都帶 paused 欄位。"
         },
         "mycrypto": {
           "state": "pending",
@@ -298,7 +298,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
+          "evidence": "scripts/repair_bot.py:186 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
         },
         "mycrypto": {
           "state": "pending",
@@ -323,7 +323,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機尚未開（開發機的通知路徑會在「通知分兩則」那包重整）。"
+          "evidence": "scripts/repair_bot.py:186 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機尚未開（開發機的通知路徑會在「通知分兩則」那包重整）。"
         },
         "mycrypto": {
           "state": "pending",
@@ -344,7 +344,7 @@
       "status": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 趨勢策略專屬受控測試事件 f9c595f9b545449a91794e7ab01c27d6（標明測試、只寫事件未開請求）02:50 UTC 匯出（1134 字）並 sent=1、使用者手機確認收到、03:00 UTC attempted=0 未重送；同輪修復機器人仍零候選。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
+          "evidence": "scripts/repair_bot.py:186 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 趨勢策略專屬受控測試事件 f9c595f9b545449a91794e7ab01c27d6（標明測試、只寫事件未開請求）02:50 UTC 匯出（1134 字）並 sent=1、使用者手機確認收到、03:00 UTC attempted=0 未重送；同輪修復機器人仍零候選。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
         },
         "momentum": {
           "state": "done",
@@ -473,16 +473,15 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:586 _resolve_market_order：送出前先記下已送出（:621 mark_pending_submitted），之後查不到只繼續查、絕不重送；:58 _MARKET_ORDER_VISIBILITY_SECONDS 60 秒仍查不到就以 POSITION_AMBIGUOUS 安全暫停（:644）。PR #65，2026-09-24 18:40 UTC 上正式機。"
+          "evidence": "src/seykota_bot/bot.py:633 _resolve_market_order：送出前先記下已送出（:668 mark_pending_submitted），之後查不到只繼續查、絕不重送；:59 _MARKET_ORDER_VISIBILITY_SECONDS 60 秒仍查不到就以 POSITION_AMBIGUOUS 安全暫停（:695）。PR #65，2026-09-24 18:40 UTC 上正式機。"
         },
         "mycrypto": {
           "state": "done",
           "evidence": "mexc_futures_bot.py:410 只呼叫一次 create_market_order、失敗記帳後往外拋（不帶 client id，MEXC 端無從去重）；ccxt 4.5.71 預設不重試，:334 init_exchange 沒開 maxRetriesOnFailure；mexc_futures_bot.py:1569 run_forever 例外後睡 POLLING_SECONDS 才跑下一輪；:1147 每輪開頭先查部位、:1169 有部位就只管理不開新倉，查部位失敗則在送任何單之前就丟例外；平倉 :1438 帶 reduceOnly。2026-09-24 h7 查核＋模擬測試確認；回歸測試 my-crypto-bot #49。"
         },
         "btc-competition": {
-          "state": "pending",
-          "phase": "hotfix-btc-order-resend",
-          "reason": "2026-09-24 h7 查核發現並以模擬測試重現：src/btc_competition/runner.py:233 收斂迴圈把任何單腿例外都當成沒成交，下一輪用新鮮餘額重新規劃、換新 client id 再送；單其實已成交（逾時、網路錯誤、-1006/-1007）而緊接著的查餘額還沒反映時，同一腿會被送兩次。現貨、受餘額上限約束，損失是多付手續費／滑價並漏記一筆成交。修正 btc-bull-market-competition PR #35：明確拒絕才重新規劃；結果不明用 client id 查單最多 60 秒，查不到就停止本輪、以 ORDER_STATUS_UNKNOWN 暫停。上正式機後改 done。"
+          "state": "done",
+          "evidence": "src/btc_competition/executor.py:226 market_order：只有交易所明確拒絕（:108 _is_definite_rejection）才丟 OrderRejected 讓收斂迴圈重新規劃；結果不明（逾時、網路錯誤、OrderNotFound）改用同一個 client id 查單，:38 _ORDER_VISIBILITY_SECONDS 60 秒仍查不到就丟 :87 OrderOutcomeUnknown。src/btc_competition/runner.py:237 收到後本輪立刻停止送單，:330 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
         }
       }
     },
@@ -599,7 +598,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:405 _clear_automatic_safe_halt 確認已平倉後自動解除"
+          "evidence": "src/seykota_bot/bot.py:436 _clear_automatic_safe_halt 確認已平倉後自動解除"
         }
       },
       "emits_event": {
@@ -615,7 +614,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:716 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+          "evidence": "src/seykota_bot/bot.py:767 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
         }
       },
       "emits_event": {
@@ -647,26 +646,8 @@
       "code": "SEY.PROTECTION_MOVE_DEFERRED",
       "behaviour": {
         "seykota": {
-          "state": "pending",
-          "phase": "hotfix-seykota-stop-resolution",
-          "reason": "PR #74（h11）：取消舊停損 60 秒內不成功且確定舊單仍在時，保留舊停損、這輪不移動、下一根 K 棒再試。上正式機後改 done；連續 3 次才通知屬第 8 關。"
-        }
-      },
-      "emits_event": {
-        "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
-        }
-      }
-    },
-    {
-      "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
-      "behaviour": {
-        "seykota": {
-          "state": "pending",
-          "phase": "hotfix-seykota-stop-resolution",
-          "reason": "已退役：Binance 不允許同方向第二張全部平倉停損（-4130），這條「先掛新單、再清孤兒舊單」的路走不到；PR #74 移除該分支、改由 SEY.PROTECTION_MOVE_DEFERRED 處理。#74 上正式機後從目錄移除。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:844 移動停損先以 :779 _resolve_stop_cancel（60 秒上限）取消舊停損；確定舊單仍在（open）時 :848 保留舊停損、記 PROTECTIVE_STOP_MOVE_DEFERRED、這輪不移動，下一根 K 棒再試；結果不明才 :853 PROTECTION_REPLACE_FAILED。PR #74（h11），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。通知目前只寫主機日誌；連續 3 次才通知屬第 8 關。"
         }
       },
       "emits_event": {
@@ -699,7 +680,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:928 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+          "evidence": "src/seykota_bot/bot.py:1011 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
         }
       },
       "emits_event": {
@@ -715,7 +696,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1080 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :644 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）"
+          "evidence": "src/seykota_bot/bot.py:1163 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :695 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）"
         }
       },
       "emits_event": {
@@ -731,7 +712,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:52 連續 3 次失敗才暫停（Phase 4d）"
+          "evidence": "src/seykota_bot/bot.py:53 連續 3 次失敗才暫停（Phase 4d）"
         }
       },
       "emits_event": {
@@ -781,7 +762,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:52 連續 3 次失敗才暫停（Phase 4d）"
+          "evidence": "src/seykota_bot/bot.py:53 連續 3 次失敗才暫停（Phase 4d）"
         }
       },
       "emits_event": {
@@ -797,7 +778,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1226 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）"
+          "evidence": "src/seykota_bot/bot.py:1309 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）"
         }
       },
       "emits_event": {
@@ -813,7 +794,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1307 只記錄出場（Phase 3）"
+          "evidence": "src/seykota_bot/bot.py:1390 只記錄出場（Phase 3）"
         }
       },
       "emits_event": {
@@ -829,7 +810,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1387 資金不足跳過進場、只記錄（Phase 3）"
+          "evidence": "src/seykota_bot/bot.py:1470 資金不足跳過進場、只記錄（Phase 3）"
         }
       },
       "emits_event": {
@@ -938,7 +919,7 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:347 暫停並等人以 btc-competition-resume 解除"
+          "evidence": "src/btc_competition/runner.py:398 暫停並等人以 btc-competition-resume 解除"
         }
       },
       "emits_event": {
@@ -970,9 +951,8 @@
       "code": "BTC.ORDER_STATUS_UNKNOWN",
       "behaviour": {
         "btc-competition": {
-          "state": "pending",
-          "phase": "hotfix-btc-order-resend",
-          "reason": "PR #35 尚未上正式機。正式機現行版本遇到結果不明的單不會暫停，而是同一輪重新規劃再送（見 orders.single_send）。"
+          "state": "done",
+          "evidence": "src/btc_competition/runner.py:237 單腿結果不明（executor.OrderOutcomeUnknown，src/btc_competition/executor.py:307）時本輪停止送單，:330 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，:385 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
         }
       },
       "emits_event": {
@@ -1213,13 +1193,13 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:186 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+          "evidence": "scripts/repair_bot.py:186 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
         }
       }
     },
@@ -1228,13 +1208,13 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:186 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+          "evidence": "scripts/repair_bot.py:186 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
         }
       }
     },
@@ -1243,13 +1223,13 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:186 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:100 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+          "evidence": "scripts/repair_bot.py:186 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
         }
       }
     },
@@ -1257,16 +1237,14 @@
       "code": "SEY.UNRECORDED_FILL_CORRECTED",
       "behaviour": {
         "seykota": {
-          "state": "pending",
-          "phase": "unrecorded-fill",
-          "reason": "趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:186 修復機器人每輪先跑修復輪，:189 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；:89 只認得 sk-＋32 位十六進位的自有編號（owns_client_order_id），確定是自己重複送單且已平倉才自動追加帳本更正。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
         }
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "unrecorded-fill",
-          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:189 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
         }
       }
     },
@@ -1274,16 +1252,14 @@
       "code": "SEY.UNRECORDED_FILL_UNRESOLVED",
       "behaviour": {
         "seykota": {
-          "state": "pending",
-          "phase": "unrecorded-fill",
-          "reason": "趨勢策略的修復機器人計時器每輪跑一次（g1-3 接上），上正式機後改 done。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:186 修復機器人每輪先跑修復輪，:189 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；:89 只認得 sk-＋32 位十六進位的自有編號（owns_client_order_id），確定是自己重複送單且已平倉才自動追加帳本更正。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
         }
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "unrecorded-fill",
-          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:189 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
         }
       }
     },
@@ -1375,53 +1351,43 @@
   ],
   "recent_changes": [
     {
+      "kind": "cap",
+      "id": "orders.single_send",
+      "project": "btc-competition",
+      "type": "completed",
+      "note": "競賽策略送單結果不明時改為查單、查不到就暫停，不再換新編號重送（h9，PR #35）已上正式機。"
+    },
+    {
+      "kind": "rule",
+      "id": "BTC.ORDER_STATUS_UNKNOWN",
+      "project": "btc-competition",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "同上：結果不明的單查不到就以 ORDER_STATUS_UNKNOWN 暫停，已上正式機。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.PROTECTION_MOVE_DEFERRED",
+      "project": "seykota",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "趨勢策略移動停損時舊停損取消不掉，改為保留舊停損、下一根 K 棒再試，不再無限等（h11，PR #74）已上正式機。"
+    },
+    {
       "kind": "rule",
       "id": "SEY.UNRECORDED_FILL_CORRECTED",
-      "type": "added",
       "project": "seykota",
-      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "趨勢策略修復機器人每輪檢查帳本少記的交易所成交（g1-3，PR #76）已上正式機。"
     },
     {
       "kind": "rule",
       "id": "SEY.UNRECORDED_FILL_UNRESOLVED",
-      "type": "added",
       "project": "seykota",
-      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.UNRECORDED_FILL_CORRECTED",
-      "type": "added",
-      "project": "momentum",
-      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
-      "type": "added",
-      "project": "momentum",
-      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
-    },
-    {
-      "kind": "rule",
-      "id": "BTC.UNRECORDED_FILL_CORRECTED",
-      "type": "added",
-      "project": "btc-competition",
-      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
-    },
-    {
-      "kind": "rule",
-      "id": "BTC.UNRECORDED_FILL_UNRESOLVED",
-      "type": "added",
-      "project": "btc-competition",
-      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.UNRECORDED_FILL_UNRESOLVED",
-      "type": "added",
-      "project": "mycrypto",
-      "note": "新增：帳本少記交易所成交時的處理規則（g1），各策略接上後生效。"
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "同上：無法確定來源的少記成交一律不寫帳本、開請求並通知。"
     }
   ]
 }
