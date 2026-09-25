@@ -462,10 +462,10 @@
       "title": "原生移動停損無法驗證",
       "project": "momentum",
       "sources": [
-        "src/strategy.py:1295",
-        "src/strategy.py:1331",
-        "src/strategy.py:1718",
-        "src/strategy.py:1053"
+        "src/strategy.py:1320",
+        "src/strategy.py:1351",
+        "src/strategy.py:1743",
+        "src/strategy.py:1077"
       ],
       "current": {
         "latch": "PROTECTION_UNVERIFIED",
@@ -496,7 +496,7 @@
       "title": "工具修復本地 state 後主動 latch，等人明確解除",
       "project": "momentum",
       "sources": [
-        "src/safe_halt_state_repair.py:144"
+        "src/safe_halt_state_repair.py:148"
       ],
       "current": {
         "latch": "state_repaired_safe_halt",
@@ -554,7 +554,7 @@
       "title": "無歧義的漏記平倉已自動補寫進帳本",
       "project": "momentum",
       "sources": [
-        "scripts/repair_bot.py:87",
+        "scripts/repair_bot.py:163",
         "trade-alerts/src/trade_alerts/repair_runner.py:299"
       ],
       "current": {
@@ -583,7 +583,7 @@
       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
       "project": "momentum",
       "sources": [
-        "scripts/repair_bot.py:87",
+        "scripts/repair_bot.py:163",
         "trade-alerts/src/trade_alerts/repair_runner.py:364"
       ],
       "current": {
@@ -614,7 +614,7 @@
       "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
       "project": "momentum",
       "sources": [
-        "scripts/repair_bot.py:87",
+        "scripts/repair_bot.py:163",
         "trade-alerts/src/trade_alerts/repair_runner.py:332",
         "trade-alerts/src/trade_alerts/repair_runner.py:346"
       ],
