@@ -1,0 +1,926 @@
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index ece7cdc..e3e408e 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -97,7 +97,7 @@
+   <p class="lede">
+     四支策略目前所有已知的「出問題」情況，共 <b>44 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>33 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>31 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -531,7 +531,7 @@
+   {
+    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼移動停損單無法驗證：讀 src/strategy.py 的 _ensure_native_trailing_stop 與相關核對函式，對照交易所目前的委託清單與 state/state.json，判斷是單不存在、有多張、還是單號與 state 不一致，並提出治本修正。",
+    "behaviour": {
+-    "evidence": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除",
++    "evidence": "src/strategy.py:1076 暫停並等人以 safe_halt_resume 解除",
+     "state": "done"
+    },
+    "bot": "momentum",
+@@ -612,7 +612,7 @@
+   {
+    "ai_prompt": null,
+    "behaviour": {
+-    "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
++    "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+     "state": "done"
+    },
+    "bot": "momentum",
+@@ -620,7 +620,7 @@
+    "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+    "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
+    "emits_event": {
+-    "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
++    "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+     "state": "done"
+    },
+    "notes": [],
+@@ -633,7 +633,7 @@
+   {
+    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
+    "behaviour": {
+-    "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
++    "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+     "state": "done"
+    },
+    "bot": "momentum",
+@@ -641,7 +641,7 @@
+    "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+    "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
+    "emits_event": {
+-    "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
++    "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+     "state": "done"
+    },
+    "notes": [],
+@@ -658,7 +658,7 @@
+   {
+    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
+    "behaviour": {
+-    "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
++    "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+     "state": "done"
+    },
+    "bot": "momentum",
+@@ -666,7 +666,7 @@
+    "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+    "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+    "emits_event": {
+-    "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
++    "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+     "state": "done"
+    },
+    "notes": [],
+@@ -1174,24 +1174,19 @@
+   {
+    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。",
+    "behaviour": {
+-    "phase": "unrecorded-fill",
+-    "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
++    "state": "done"
+    },
+    "bot": "momentum",
+    "bot_label": "動能策略",
+    "code": "MOM.UNRECORDED_FILL_CORRECTED",
+    "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
+    "emits_event": {
+-    "phase": "unrecorded-fill",
+-    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
++    "state": "done"
+    },
+-   "notes": [
+-    "行為未做 — 動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
+-    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
+-   ],
+-   "open": true,
++   "notes": [],
++   "open": false,
+    "steps": [
+     "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
+     "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
+@@ -1203,24 +1198,19 @@
+   {
+    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。",
+    "behaviour": {
+-    "phase": "unrecorded-fill",
+-    "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
++    "state": "done"
+    },
+    "bot": "momentum",
+    "bot_label": "動能策略",
+    "code": "MOM.UNRECORDED_FILL_UNRESOLVED",
+    "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
+    "emits_event": {
+-    "phase": "unrecorded-fill",
+-    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
+-    "state": "pending"
++    "evidence": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
++    "state": "done"
+    },
+-   "notes": [
+-    "行為未做 — 動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
+-    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
+-   ],
+-   "open": true,
++   "notes": [],
++   "open": false,
+    "steps": [
+     "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
+     "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 9ddebbf..908f902 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,8 +177,8 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>48</b><span>項未完成——還有策略沒做到</span></a>
+-    <a class="c-done" href="#group-done"><b>18</b><span>項已完成——四支都到位，不用再動</span></a>
++    <a class="c-pending" href="#group-pending"><b>46</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-done" href="#group-done"><b>20</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+   <p class="dot-legend">
+@@ -193,11 +193,11 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">48 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">46 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+-  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">18 項</span></div>
++  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">20 項</span></div>
+   <p class="group-sub">每支相關的策略都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
+   <div id="done"></div>
+ 
+@@ -210,7 +210,7 @@
+   <div id="glossaryHost"></div>
+   <div class="foot">
+     資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-25 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+-    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 3e3b6f7</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 61ff1e5</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 2d167aa</code>。
++    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 3e3b6f7</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 43be152</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 2d167aa</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+   </div>
+ </div>
+@@ -912,7 +912,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "src/strategy.py:1067 build_safe_halt（Phase 4c）"
++       "text": "src/strategy.py:1076 build_safe_halt（Phase 4c）"
+       }
+      ]
+     },
+@@ -1346,7 +1346,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
++       "text": "scripts/repair_bot.py:163 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       }
+      ]
+     },
+@@ -1408,7 +1408,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 run_repair_round＋:70 staging_ledger（本策略帳本寫入器整批原子寫入）；自動補寫開關已拿掉（v2-W3）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
++       "text": "scripts/repair_bot.py:163 run_repair_round＋scripts/repair_bot.py:95 staging_ledger（本策略帳本寫入器整批原子寫入）；自動補寫開關已拿掉（v2-W3）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       }
+      ]
+     },
+@@ -1470,7 +1470,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 run_repair_round 由共用修復執行器讀 MOMENTUM_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔、不查交易所不寫帳本；正式機每輪輸出都帶 paused 欄位。"
++       "text": "scripts/repair_bot.py:163 run_repair_round 由共用修復執行器讀 MOMENTUM_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔、不查交易所不寫帳本；正式機每輪輸出都帶 paused 欄位。"
+       }
+      ]
+     },
+@@ -1532,7 +1532,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
++       "text": "scripts/repair_bot.py:163 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
+       }
+      ]
+     },
+@@ -1594,7 +1594,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機另計（2026-09-17 已開）。"
++       "text": "scripts/repair_bot.py:163 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機另計（2026-09-17 已開）。"
+       }
+      ]
+     },
+@@ -1656,7 +1656,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 受控測試事件 3ee1c8c932f14b0e8ba7ca0ba4bf31b8（標明測試、只寫事件未開請求）19:20 UTC sent=1、使用者手機確認收到、19:30 attempted=0 未重送。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
++       "text": "scripts/repair_bot.py:163 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 受控測試事件 3ee1c8c932f14b0e8ba7ca0ba4bf31b8（標明測試、只寫事件未開請求）19:20 UTC sent=1、使用者手機確認收到、19:30 attempted=0 未重送。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
+       }
+      ]
+     },
+@@ -1939,12 +1939,12 @@
+    "anchor": "cap-orders.single_send",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "done",
+     "momentum": "done",
+     "mycrypto": "done",
+     "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "orders.single_send",
+    "kind": "cap",
+    "rows": [
+@@ -1966,7 +1966,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "src/strategy.py:1473 進場迴圈前就寫 last_processed_candle，:1596 送單例外時先存檔再往外拋 → 主迴圈 polling_seconds 後重跑同一根 K 線走 :1189 重複 K 線分支、不再進場；src/strategy.py:1206 每輪開頭先向交易所同步部位、:1216 認回已成交但未追蹤的單；成交確認不了（entry_unconfirmed）同樣不追蹤、重跑仍是重複 K 線。平倉失敗不存檔：重跑先同步部位，已成交就釋放；沒成交則因原生停損已先取消而 PROTECTION_UNVERIFIED 暫停，不再送；平倉一律 reduce-only（src/binance_client.py:55）。src/binance_client.py:184 _mutate 只在 -1021（交易所拒絕）時重送。固定 client id 本身擋不住重複，保護全在上述呼叫端。2026-09-24 h7 查核＋模擬測試確認；回歸測試與自我檢查行為檢查 mexc-4h-momentum-trailing-stop #100。"
++       "text": "src/strategy.py:1482 進場迴圈前就寫 last_processed_candle，src/strategy.py:1605 送單例外時先存檔再往外拋 → 主迴圈 polling_seconds 後重跑同一根 K 線走 src/strategy.py:1198 重複 K 線分支、不再進場；src/strategy.py:1215 每輪開頭先向交易所同步部位、src/strategy.py:1225 認回已成交但未追蹤的單；成交確認不了（entry_unconfirmed）同樣不追蹤、重跑仍是重複 K 線。平倉失敗不存檔：重跑先同步部位，已成交就釋放；沒成交則因原生停損已先取消而 PROTECTION_UNVERIFIED 暫停，不再送；平倉一律 reduce-only（src/binance_client.py:55）。src/binance_client.py:184 _mutate 只在 -1021（交易所拒絕）時重送。固定 client id 本身擋不住重複，保護全在上述呼叫端。2026-09-24 h7 查核＋模擬測試確認；回歸測試與自我檢查行為檢查 mexc-4h-momentum-trailing-stop #100。"
+       }
+      ]
+     },
+@@ -2002,11 +2002,11 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "na",
+-    "momentum": "pending",
++    "momentum": "recent",
+     "mycrypto": "pending",
+     "seykota": "done"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "ledger.trade_correction",
+    "kind": "cap",
+    "rows": [
+@@ -2026,9 +2026,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+-       "state": "pending",
+-       "text": "帳本對交易所、帳本對 Google 表兩層對帳走共用 ledger_reconcile，改釘到含本功能的版本後就會套用更正；Google 表投影與投資人快照的讀取端還要各自接上 correct_close_v2 與更正後數字，跟修復機器人自動更正（g1）一起做。"
++       "phase": null,
++       "state": "done",
++       "text": "src/reconcile_compare.py:62 帳本對交易所走共用 exchange_ledger_compare，更正涵蓋的單號算已記、部位不變；src/google_ledger_provenance.py:77 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正，src/google_ledger_provenance.py:179 依佇列的 ledger digest 選擇；src/google_projection_worker.py:71 送出時帶入該 digest；src/portfolio_snapshot_adapter.py:184 LINE 查詢快照套用 apply_trade_corrections；scripts/append_trade_correction.py:151 兩段式人工更正工具（預覽→確認碼→寫入）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+       }
+      ]
+     },
+@@ -2064,11 +2064,11 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "pending",
+-    "momentum": "pending",
++    "momentum": "recent",
+     "mycrypto": "pending",
+-    "seykota": "pending"
++    "seykota": "recent"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "reconcile.unrecorded_fill_handling",
+    "kind": "cap",
+    "rows": [
+@@ -2077,9 +2077,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+-       "state": "pending",
+-       "text": "實例：2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162）；DIVERGED 從 09-21 16:10 UTC 持續到 09-24 09:15 UTC，期間只在變化當下發過一次狀態告警，沒有任何錯誤代碼接手。這一筆已於 2026-09-24 以人工帳本更正（ledger.trade_correction）改成與交易所一致；但自動偵測、升格通知與修復機器人自動更正仍未做（g1）：對帳把多出來的成交列進 unmatched_exchange_fills 後沒有錯誤代碼接手，修復機器人只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:189 修復機器人每輪接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:89 只認 sk-＋32 位十六進位的自有編號。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7），01:35 UTC 第一輪 0 筆、無錯誤。9/21 那一筆已於 9/24 以人工帳本更正處理。"
+       }
+      ]
+     },
+@@ -2088,9 +2088,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+-       "state": "pending",
+-       "text": "對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+       }
+      ]
+     },
+@@ -2359,7 +2359,7 @@
+     "mycrypto": "none",
+     "seykota": "pending"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "SEY.PROTECTION_MOVE_DEFERRED",
+    "kind": "rule",
+    "rows": [
+@@ -2755,7 +2755,7 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除"
++       "text": "src/strategy.py:1076 暫停並等人以 safe_halt_resume 解除"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -2860,13 +2860,13 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
++       "text": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       },
+       {
+        "aspect": "寫進事件日誌",
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
++       "text": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+       }
+      ]
+     }
+@@ -2895,13 +2895,13 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
++       "text": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       },
+       {
+        "aspect": "寫進事件日誌",
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
++       "text": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+       }
+      ]
+     }
+@@ -2930,13 +2930,13 @@
+        "aspect": "行為",
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
++       "text": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+       },
+       {
+        "aspect": "寫進事件日誌",
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
++       "text": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+       }
+      ]
+     }
+@@ -3024,7 +3024,7 @@
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "BTC.ORDER_STATUS_UNKNOWN",
+    "kind": "rule",
+    "rows": [
+@@ -3649,9 +3649,9 @@
+     "btc-competition": "none",
+     "momentum": "none",
+     "mycrypto": "none",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "SEY.UNRECORDED_FILL_CORRECTED",
+    "kind": "rule",
+    "rows": [
+@@ -3684,9 +3684,9 @@
+     "btc-competition": "none",
+     "momentum": "none",
+     "mycrypto": "none",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "SEY.UNRECORDED_FILL_UNRESOLVED",
+    "kind": "rule",
+    "rows": [
+@@ -3714,14 +3714,14 @@
+   {
+    "added_recent": false,
+    "anchor": "rule-MOM.UNRECORDED_FILL_CORRECTED",
+-   "complete": false,
++   "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "pending",
++    "momentum": "recent",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "MOM.UNRECORDED_FILL_CORRECTED",
+    "kind": "rule",
+    "rows": [
+@@ -3730,15 +3730,15 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+-       "state": "pending",
+-       "text": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+-       "state": "pending",
+-       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+       }
+      ]
+     }
+@@ -3749,14 +3749,14 @@
+   {
+    "added_recent": false,
+    "anchor": "rule-MOM.UNRECORDED_FILL_UNRESOLVED",
+-   "complete": false,
++   "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "pending",
++    "momentum": "recent",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
+    "kind": "rule",
+    "rows": [
+@@ -3765,15 +3765,15 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+-       "state": "pending",
+-       "text": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+-       "state": "pending",
+-       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+       }
+      ]
+     }
+@@ -3901,7 +3901,7 @@
+   "hotfix-seykota-stop-resolution": 0,
+   "naming-rollout": 0,
+   "repair-recurrence": 4,
+-  "unrecorded-fill": 16,
++  "unrecorded-fill": 9,
+   "v2-W2": 0,
+   "v2-W3": 0,
+   "v2-W4": 0,
+@@ -3961,34 +3961,34 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "cap-orders.single_send",
+-   "note": "競賽策略送單結果不明時改為查單、查不到就暫停，不再換新編號重送（h9，PR #35）已上正式機。",
+-   "project": "競賽策略",
+-   "title": "市價單只送一次，不因查不到就重送"
++   "anchor": "cap-reconcile.unrecorded_fill_handling",
++   "note": "動能策略修復機器人每輪檢查帳本少記的交易所成交（g1-4，PR #104）已上正式機；動能送出的每張單（含移動停損）都帶自己的 mo- 編號，停損出場單也能證明是自己下的。",
++   "project": "動能策略",
++   "title": "帳本少記交易所成交時，升格通知並以交易所為準更正"
+   },
+   {
+-   "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
+-   "note": "同上：結果不明的單查不到就以 ORDER_STATUS_UNKNOWN 暫停，已上正式機。",
+-   "project": "競賽策略",
+-   "title": "R3｜送出的單 60 秒內確定不了有沒有成交"
++   "anchor": "cap-ledger.trade_correction",
++   "note": "動能策略的 Google 表與 LINE 查詢認得帳本更正，另有兩段式人工更正工具（g1-4）。",
++   "project": "動能策略",
++   "title": "帳本更正事件：以交易所成交為準、只追加，讀帳本的地方都認得"
+   },
+   {
+-   "anchor": "rule-SEY.PROTECTION_MOVE_DEFERRED",
+-   "note": "趨勢策略移動停損時舊停損取消不掉，改為保留舊停損、下一根 K 棒再試，不再無限等（h11，PR #74）已上正式機。",
+-   "project": "趨勢策略",
+-   "title": "R2｜移動停損時舊停損單取消不掉，保留舊停損、這輪不移動"
++   "anchor": "rule-MOM.UNRECORDED_FILL_CORRECTED",
++   "note": "確定是自己重複送單才自動更正帳本並立刻通知。",
++   "project": "動能策略",
++   "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
+   },
+   {
+-   "anchor": "rule-SEY.UNRECORDED_FILL_CORRECTED",
+-   "note": "趨勢策略修復機器人每輪檢查帳本少記的交易所成交（g1-3，PR #76）已上正式機。",
+-   "project": "趨勢策略",
+-   "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
++   "anchor": "rule-MOM.UNRECORDED_FILL_UNRESOLVED",
++   "note": "來源無法確定的少記成交一律不寫帳本、開請求並通知。",
++   "project": "動能策略",
++   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+   },
+   {
+-   "anchor": "rule-SEY.UNRECORDED_FILL_UNRESOLVED",
+-   "note": "同上：無法確定來源的少記成交一律不寫帳本、開請求並通知。",
++   "anchor": "cap-reconcile.unrecorded_fill_handling",
++   "note": "補登：趨勢策略這一格在 g1-3 上正式機（9/25）時漏改，其實已經在跑。",
+    "project": "趨勢策略",
+-   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
++   "title": "帳本少記交易所成交時，升格通知並以交易所為準更正"
+   }
+  ],
+  "totals": {
+@@ -3998,9 +3998,9 @@
+    "pending": 18
+   },
+   "momentum": {
+-   "done": 25,
++   "done": 31,
+    "n/a": 4,
+-   "pending": 13
++   "pending": 7
+   },
+   "mycrypto": {
+    "done": 12,
+@@ -4008,9 +4008,9 @@
+    "pending": 25
+   },
+   "seykota": {
+-   "done": 38,
++   "done": 39,
+    "n/a": 2,
+-   "pending": 24
++   "pending": 23
+   }
+  }
+ }
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 2494a72..5e66184 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -462,10 +462,10 @@
+       "title": "原生移動停損無法驗證",
+       "project": "momentum",
+       "sources": [
+-        "src/strategy.py:1295",
+-        "src/strategy.py:1331",
+-        "src/strategy.py:1718",
+-        "src/strategy.py:1053"
++        "src/strategy.py:1320",
++        "src/strategy.py:1351",
++        "src/strategy.py:1743",
++        "src/strategy.py:1077"
+       ],
+       "current": {
+         "latch": "PROTECTION_UNVERIFIED",
+@@ -496,7 +496,7 @@
+       "title": "工具修復本地 state 後主動 latch，等人明確解除",
+       "project": "momentum",
+       "sources": [
+-        "src/safe_halt_state_repair.py:144"
++        "src/safe_halt_state_repair.py:148"
+       ],
+       "current": {
+         "latch": "state_repaired_safe_halt",
+@@ -554,7 +554,7 @@
+       "title": "無歧義的漏記平倉已自動補寫進帳本",
+       "project": "momentum",
+       "sources": [
+-        "scripts/repair_bot.py:87",
++        "scripts/repair_bot.py:163",
+         "trade-alerts/src/trade_alerts/repair_runner.py:299"
+       ],
+       "current": {
+@@ -583,7 +583,7 @@
+       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+       "project": "momentum",
+       "sources": [
+-        "scripts/repair_bot.py:87",
++        "scripts/repair_bot.py:163",
+         "trade-alerts/src/trade_alerts/repair_runner.py:364"
+       ],
+       "current": {
+@@ -614,7 +614,7 @@
+       "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+       "project": "momentum",
+       "sources": [
+-        "scripts/repair_bot.py:87",
++        "scripts/repair_bot.py:163",
+         "trade-alerts/src/trade_alerts/repair_runner.py:332",
+         "trade-alerts/src/trade_alerts/repair_runner.py:346"
+       ],
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 729de6e..b61950d 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -33,7 +33,7 @@
+     "momentum": {
+       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
+       "branch": "operations",
+-      "commit": "61ff1e5c4fe4e6e543d0a51f8aa2ded1d80ae826"
++      "commit": "43be152f9a68a757e43310f2d67820a1d874fc92"
+     },
+     "seykota": {
+       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
+@@ -59,7 +59,7 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "src/strategy.py:1067 build_safe_halt（Phase 4c）"
++          "evidence": "src/strategy.py:1076 build_safe_halt（Phase 4c）"
+         },
+         "seykota": {
+           "state": "done",
+@@ -222,7 +222,7 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
++          "evidence": "scripts/repair_bot.py:163 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         },
+         "seykota": {
+           "state": "done",
+@@ -246,7 +246,7 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 run_repair_round＋:70 staging_ledger（本策略帳本寫入器整批原子寫入）；自動補寫開關已拿掉（v2-W3）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
++          "evidence": "scripts/repair_bot.py:163 run_repair_round＋scripts/repair_bot.py:95 staging_ledger（本策略帳本寫入器整批原子寫入）；自動補寫開關已拿掉（v2-W3）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         },
+         "seykota": {
+           "state": "done",
+@@ -270,7 +270,7 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 run_repair_round 由共用修復執行器讀 MOMENTUM_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔、不查交易所不寫帳本；正式機每輪輸出都帶 paused 欄位。"
++          "evidence": "scripts/repair_bot.py:163 run_repair_round 由共用修復執行器讀 MOMENTUM_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔、不查交易所不寫帳本；正式機每輪輸出都帶 paused 欄位。"
+         },
+         "seykota": {
+           "state": "done",
+@@ -294,7 +294,7 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
++          "evidence": "scripts/repair_bot.py:163 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
+         },
+         "seykota": {
+           "state": "done",
+@@ -319,7 +319,7 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機另計（2026-09-17 已開）。"
++          "evidence": "scripts/repair_bot.py:163 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機另計（2026-09-17 已開）。"
+         },
+         "seykota": {
+           "state": "done",
+@@ -348,7 +348,7 @@
+         },
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 受控測試事件 3ee1c8c932f14b0e8ba7ca0ba4bf31b8（標明測試、只寫事件未開請求）19:20 UTC sent=1、使用者手機確認收到、19:30 attempted=0 未重送。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
++          "evidence": "scripts/repair_bot.py:163 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 受控測試事件 3ee1c8c932f14b0e8ba7ca0ba4bf31b8（標明測試、只寫事件未開請求）19:20 UTC sent=1、使用者手機確認收到、19:30 attempted=0 未重送。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -469,7 +469,7 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "src/strategy.py:1473 進場迴圈前就寫 last_processed_candle，:1596 送單例外時先存檔再往外拋 → 主迴圈 polling_seconds 後重跑同一根 K 線走 :1189 重複 K 線分支、不再進場；src/strategy.py:1206 每輪開頭先向交易所同步部位、:1216 認回已成交但未追蹤的單；成交確認不了（entry_unconfirmed）同樣不追蹤、重跑仍是重複 K 線。平倉失敗不存檔：重跑先同步部位，已成交就釋放；沒成交則因原生停損已先取消而 PROTECTION_UNVERIFIED 暫停，不再送；平倉一律 reduce-only（src/binance_client.py:55）。src/binance_client.py:184 _mutate 只在 -1021（交易所拒絕）時重送。固定 client id 本身擋不住重複，保護全在上述呼叫端。2026-09-24 h7 查核＋模擬測試確認；回歸測試與自我檢查行為檢查 mexc-4h-momentum-trailing-stop #100。"
++          "evidence": "src/strategy.py:1482 進場迴圈前就寫 last_processed_candle，src/strategy.py:1605 送單例外時先存檔再往外拋 → 主迴圈 polling_seconds 後重跑同一根 K 線走 src/strategy.py:1198 重複 K 線分支、不再進場；src/strategy.py:1215 每輪開頭先向交易所同步部位、src/strategy.py:1225 認回已成交但未追蹤的單；成交確認不了（entry_unconfirmed）同樣不追蹤、重跑仍是重複 K 線。平倉失敗不存檔：重跑先同步部位，已成交就釋放；沒成交則因原生停損已先取消而 PROTECTION_UNVERIFIED 暫停，不再送；平倉一律 reduce-only（src/binance_client.py:55）。src/binance_client.py:184 _mutate 只在 -1021（交易所拒絕）時重送。固定 client id 本身擋不住重複，保護全在上述呼叫端。2026-09-24 h7 查核＋模擬測試確認；回歸測試與自我檢查行為檢查 mexc-4h-momentum-trailing-stop #100。"
+         },
+         "seykota": {
+           "state": "done",
+@@ -495,9 +495,8 @@
+           "evidence": "src/seykota_bot/reconcile/compare.py:111 _recorded_order_ids 併入更正涵蓋的單號（部位不變）；src/seykota_bot/google_ledger_provenance.py:100 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正；src/seykota_bot/external_trade_events.py:192 LINE 查詢套用最新一次 SETTLED_TRADE_CORRECTION；scripts/append_trade_correction.py:163 兩段式更正工具。PR #69，2026-09-24 08:56 UTC 上正式機（operations 6d1edc2）。同日 09:02 UTC 以此工具在正式機追加 9/18（淨損益 21.406→21.448）、9/21（0.008→0.011，−10.387→−13.233）兩筆更正；09:15 UTC 兩筆 correct_close_v2 皆 CONFIRMED、帳本對交易所 DIVERGED→RECONCILED、LINE 查詢已實現損益更正（真倉總額 11.019→8.215）；09:30 UTC 帳本對 Google 表亦 RECONCILED。"
+         },
+         "momentum": {
+-          "state": "pending",
+-          "phase": "unrecorded-fill",
+-          "reason": "帳本對交易所、帳本對 Google 表兩層對帳走共用 ledger_reconcile，改釘到含本功能的版本後就會套用更正；Google 表投影與投資人快照的讀取端還要各自接上 correct_close_v2 與更正後數字，跟修復機器人自動更正（g1）一起做。"
++          "state": "done",
++          "evidence": "src/reconcile_compare.py:62 帳本對交易所走共用 exchange_ledger_compare，更正涵蓋的單號算已記、部位不變；src/google_ledger_provenance.py:77 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正，src/google_ledger_provenance.py:179 依佇列的 ledger digest 選擇；src/google_projection_worker.py:71 送出時帶入該 digest；src/portfolio_snapshot_adapter.py:184 LINE 查詢快照套用 apply_trade_corrections；scripts/append_trade_correction.py:151 兩段式人工更正工具（預覽→確認碼→寫入）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -516,14 +515,12 @@
+       "description": "交易所有成交、帳本沒記到（例如重複成交、數量記錯）時，要有人被通知，並用追加的更正事件把帳本改成跟交易所一致，而不是只在對帳頁面顯示不一致。判斷規則：多出來的成交如果跟帳本裡已記錄的某張單 clientOrderId 相同，就是策略自己重複送單，一律 R3 立刻通知並附根因追查指令；部位還開著時是否減倉交給人決定，不自動做。",
+       "status": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "unrecorded-fill",
+-          "reason": "實例：2026-09-21 16:00:05 UTC 趨勢策略真倉進場，同一個 clientOrderId 成交兩張 0.003 BTC（訂單 1142206675339／1142206692162）；DIVERGED 從 09-21 16:10 UTC 持續到 09-24 09:15 UTC，期間只在變化當下發過一次狀態告警，沒有任何錯誤代碼接手。這一筆已於 2026-09-24 以人工帳本更正（ledger.trade_correction）改成與交易所一致；但自動偵測、升格通知與修復機器人自動更正仍未做（g1）：對帳把多出來的成交列進 unmatched_exchange_fills 後沒有錯誤代碼接手，修復機器人只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:189 修復機器人每輪接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:89 只認 sk-＋32 位十六進位的自有編號。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7），01:35 UTC 第一輪 0 筆、無錯誤。9/21 那一筆已於 9/24 以人工帳本更正處理。"
+         },
+         "momentum": {
+-          "state": "pending",
+-          "phase": "unrecorded-fill",
+-          "reason": "對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -826,7 +823,7 @@
+       "behaviour": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除"
++          "evidence": "src/strategy.py:1076 暫停並等人以 safe_halt_resume 解除"
+         }
+       },
+       "emits_event": {
+@@ -874,13 +871,13 @@
+       "behaviour": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
++          "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         }
+       },
+       "emits_event": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
++          "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+         }
+       }
+     },
+@@ -889,13 +886,13 @@
+       "behaviour": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
++          "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         }
+       },
+       "emits_event": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
++          "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+         }
+       }
+     },
+@@ -904,13 +901,13 @@
+       "behaviour": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
++          "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+         }
+       },
+       "emits_event": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
++          "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+         }
+       }
+     },
+@@ -1267,16 +1264,14 @@
+       "code": "MOM.UNRECORDED_FILL_CORRECTED",
+       "behaviour": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "unrecorded-fill",
+-          "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+         }
+       },
+       "emits_event": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "unrecorded-fill",
+-          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+         }
+       }
+     },
+@@ -1284,16 +1279,14 @@
+       "code": "MOM.UNRECORDED_FILL_UNRESOLVED",
+       "behaviour": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "unrecorded-fill",
+-          "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+         }
+       },
+       "emits_event": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "unrecorded-fill",
+-          "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+         }
+       }
+     },
+@@ -1352,42 +1345,40 @@
+   "recent_changes": [
+     {
+       "kind": "cap",
+-      "id": "orders.single_send",
+-      "project": "btc-competition",
++      "id": "reconcile.unrecorded_fill_handling",
++      "project": "momentum",
+       "type": "completed",
+-      "note": "競賽策略送單結果不明時改為查單、查不到就暫停，不再換新編號重送（h9，PR #35）已上正式機。"
++      "note": "動能策略修復機器人每輪檢查帳本少記的交易所成交（g1-4，PR #104）已上正式機；動能送出的每張單（含移動停損）都帶自己的 mo- 編號，停損出場單也能證明是自己下的。"
+     },
+     {
+-      "kind": "rule",
+-      "id": "BTC.ORDER_STATUS_UNKNOWN",
+-      "project": "btc-competition",
+-      "aspect": "behaviour",
++      "kind": "cap",
++      "id": "ledger.trade_correction",
++      "project": "momentum",
+       "type": "completed",
+-      "note": "同上：結果不明的單查不到就以 ORDER_STATUS_UNKNOWN 暫停，已上正式機。"
++      "note": "動能策略的 Google 表與 LINE 查詢認得帳本更正，另有兩段式人工更正工具（g1-4）。"
+     },
+     {
+       "kind": "rule",
+-      "id": "SEY.PROTECTION_MOVE_DEFERRED",
+-      "project": "seykota",
++      "id": "MOM.UNRECORDED_FILL_CORRECTED",
++      "project": "momentum",
+       "aspect": "behaviour",
+       "type": "completed",
+-      "note": "趨勢策略移動停損時舊停損取消不掉，改為保留舊停損、下一根 K 棒再試，不再無限等（h11，PR #74）已上正式機。"
++      "note": "確定是自己重複送單才自動更正帳本並立刻通知。"
+     },
+     {
+       "kind": "rule",
+-      "id": "SEY.UNRECORDED_FILL_CORRECTED",
+-      "project": "seykota",
++      "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
++      "project": "momentum",
+       "aspect": "behaviour",
+       "type": "completed",
+-      "note": "趨勢策略修復機器人每輪檢查帳本少記的交易所成交（g1-3，PR #76）已上正式機。"
++      "note": "來源無法確定的少記成交一律不寫帳本、開請求並通知。"
+     },
+     {
+-      "kind": "rule",
+-      "id": "SEY.UNRECORDED_FILL_UNRESOLVED",
++      "kind": "cap",
++      "id": "reconcile.unrecorded_fill_handling",
+       "project": "seykota",
+-      "aspect": "behaviour",
+       "type": "completed",
+-      "note": "同上：無法確定來源的少記成交一律不寫帳本、開請求並通知。"
++      "note": "補登：趨勢策略這一格在 g1-3 上正式機（9/25）時漏改，其實已經在跑。"
+     }
+   ]
+ }
