@@ -97,7 +97,7 @@
   <p class="lede">
     四支策略目前所有已知的「出問題」情況，共 <b>44 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>33 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>31 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -531,7 +531,7 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼移動停損單無法驗證：讀 src/strategy.py 的 _ensure_native_trailing_stop 與相關核對函式，對照交易所目前的委託清單與 state/state.json，判斷是單不存在、有多張、還是單號與 state 不一致，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/strategy.py:1067 暫停並等人以 safe_halt_resume 解除",
+    "evidence": "src/strategy.py:1076 暫停並等人以 safe_halt_resume 解除",
     "state": "done"
    },
    "bot": "momentum",
@@ -612,7 +612,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+    "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
     "state": "done"
    },
    "bot": "momentum",
@@ -620,7 +620,7 @@
    "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
    "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+    "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
     "state": "done"
    },
    "notes": [],
@@ -633,7 +633,7 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+    "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
     "state": "done"
    },
    "bot": "momentum",
@@ -641,7 +641,7 @@
    "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
    "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+    "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
     "state": "done"
    },
    "notes": [],
@@ -658,7 +658,7 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:87 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+    "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
     "state": "done"
    },
    "bot": "momentum",
@@ -666,7 +666,7 @@
    "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
    "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:87 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+    "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
     "state": "done"
    },
    "notes": [],
@@ -1174,24 +1174,19 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。",
    "behaviour": {
-    "phase": "unrecorded-fill",
-    "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。",
-    "state": "pending"
+    "evidence": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
+    "state": "done"
    },
    "bot": "momentum",
    "bot_label": "動能策略",
    "code": "MOM.UNRECORDED_FILL_CORRECTED",
    "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
    "emits_event": {
-    "phase": "unrecorded-fill",
-    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
-    "state": "pending"
+    "evidence": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
+    "state": "done"
    },
-   "notes": [
-    "行為未做 — 動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
-    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
-   ],
-   "open": true,
+   "notes": [],
+   "open": false,
    "steps": [
     "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
     "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
@@ -1203,24 +1198,19 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。",
    "behaviour": {
-    "phase": "unrecorded-fill",
-    "reason": "動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。",
-    "state": "pending"
+    "evidence": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
+    "state": "done"
    },
    "bot": "momentum",
    "bot_label": "動能策略",
    "code": "MOM.UNRECORDED_FILL_UNRESOLVED",
    "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
    "emits_event": {
-    "phase": "unrecorded-fill",
-    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
-    "state": "pending"
+    "evidence": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
+    "state": "done"
    },
-   "notes": [
-    "行為未做 — 動能策略的修復機器人計時器每輪跑一次（g1-4 接上，連同 Google 表與 LINE 查詢認得帳本更正），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
-    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
-   ],
-   "open": true,
+   "notes": [],
+   "open": false,
    "steps": [
     "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
     "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
