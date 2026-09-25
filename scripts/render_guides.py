@@ -505,8 +505,10 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
     ``recent_changes`` (see the registry schema) overlays a page-only "recent" marker
     for whatever the latest edit touched, in two flavours that never affect ``complete``
     (which always reflects the real pending/done/n-a state): a ``completed`` entry turns
-    an otherwise done/n-a cell's dot gold for exactly the (kind, id, project) it names;
-    an ``added`` entry (a brand-new row this edit introduced, which has no done/n-a cell
+    an otherwise done/n-a cell's dot gold for exactly the (kind, id, project) it names,
+    and always flags the item -- a rule whose named aspect just flipped while its other
+    aspect is still pending keeps its pending dot (there is still work left) but must
+    still show up as "what changed"; an ``added`` entry (a brand-new row this edit introduced, which has no done/n-a cell
     to point at yet) just flags the whole item so it still shows up as "what changed"."""
     projects, phases = registry["projects"], registry["phases"]
     titles = {entry["code"]: (entry["risk_tier"], entry["title"]) for entry in catalog["entries"]}
@@ -536,7 +538,7 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
         for p in STRATEGY_PROJECTS:
             if item["dots"][p] in ("done", "na") and (item["kind"], item["id"], p) in completed_set:
                 item["dots"][p] = "recent"
-        item["has_recent"] = any(v == "recent" for v in item["dots"].values())
+        item["has_recent"] = any((item["kind"], item["id"], p) in completed_set for p in STRATEGY_PROJECTS)
         item["added_recent"] = (item["kind"], item["id"]) in added_set
     return items
 

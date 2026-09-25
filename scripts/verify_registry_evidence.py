@@ -39,8 +39,25 @@ from trade_alerts.rollout_registry import load_rollout_registry  # noqa: E402
 _CITATION = re.compile(r"(?<![\w./-])((?:(?:src|scripts|tools|tests|docs|deploy)/[\w./-]+\.\w+)|[\w-]+\.py)(?::(\d+))?")
 
 
+# A bare ``:line`` (``…bot.py:844 … :779 …``) is shorthand for the last path
+# cited before it.  2026-09-25: an evidence text cited runner.py lines as bare
+# ``:330``/``:385`` right after an executor.py path, so a reader resolved them
+# to the wrong file and nothing here noticed -- bare lines were not checked.
+_BARE_LINE = re.compile(r"(?<![\w./:-]):(\d+)(?![\d:])")
+
+
 def citations(text: str) -> list[tuple[str, int | None]]:
-    return [(m.group(1), int(m.group(2)) if m.group(2) else None) for m in _CITATION.finditer(text)]
+    """Every cited path, plus every bare ``:line`` resolved against the path
+    cited just before it (the way a reader resolves it)."""
+    named = [(m.start(), m.end(), m.group(1), int(m.group(2)) if m.group(2) else None) for m in _CITATION.finditer(text)]
+    found = [(start, path, line) for start, _end, path, line in named]
+    for m in _BARE_LINE.finditer(text):
+        if any(start <= m.start() < end for start, end, _path, _line in named):
+            continue
+        before = [path for start, _end, path, _line in named if start < m.start()]
+        if before:
+            found.append((m.start(), before[-1], int(m.group(1))))
+    return [(path, line) for _, path, line in sorted(found)]
 
 
 def _cells(registry):

@@ -271,6 +271,9 @@ def test_citation_parser_reads_paths_lines_and_root_modules():
     assert citations("src/seykota_bot/bot.py 守衛；src/seykota_bot/safe_halt_resume.py:103") == [
         ("src/seykota_bot/bot.py", None), ("src/seykota_bot/safe_halt_resume.py", 103)]
     assert citations("程式已照目錄描述處理（Phase 3）") == []
+    # A bare ":line" belongs to the path cited just before it -- and is checked.
+    assert citations("src/a.py:10 先查，:11 再查；src/b.py:20 再停，:30 暫停，2026-09-25 01:22 UTC") == [
+        ("src/a.py", 10), ("src/a.py", 11), ("src/b.py", 20), ("src/b.py", 30)]
 
 
 def test_every_done_cell_cites_a_file(registry):
@@ -412,6 +415,33 @@ def test_rollout_items_recolors_the_dot_for_a_type_completed_change(registry, ca
     assert item["added_recent"] is False
 
 
+def _other_aspect_pending(registry, entry) -> bool:
+    row = next(r for r in registry["catalog"] if r["code"] == entry["id"])
+    other = "emits_event" if entry["aspect"] == "behaviour" else "behaviour"
+    return row[other][entry["project"]]["state"] == "pending"
+
+
+def test_a_rule_whose_other_aspect_is_still_pending_is_still_flagged_recent(registry, catalog):
+    """2026-09-25: BTC.ORDER_STATUS_UNKNOWN's behaviour reached the live host while
+    its emits_event cell stays pending until phase 8.  A completed entry for the
+    behaviour must still badge the row -- before this the page silently showed it
+    as an ordinary pending row, so the latest change was invisible."""
+    render_guides = _render_guides()
+    edited = copy.deepcopy(registry)
+    row = next(r for r in edited["catalog"]
+               for p, st in r["behaviour"].items()
+               if st["state"] == "done" and r["emits_event"][p]["state"] == "pending")
+    project = next(p for p, st in row["behaviour"].items()
+                   if st["state"] == "done" and row["emits_event"][p]["state"] == "pending")
+    edited["recent_changes"] = [{"kind": "rule", "id": row["code"], "project": project,
+                                 "aspect": "behaviour", "note": "x"}]
+    assert registry_problems(edited, catalog) == []
+    item = {i["anchor"]: i for i in render_guides.rollout_items(catalog, edited)}[f"rule-{row['code']}"]
+    assert item["has_recent"] is True
+    assert item["dots"][project] == "pending"
+    assert item["complete"] is False
+
+
 def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog):
     """Both flavours of recent_changes entry -- type=completed (an existing cell
     just flipped to done/n-a) and type=added (a brand-new row, no cell to flip
@@ -428,8 +458,14 @@ def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog
         if entry.get("type", "completed") == "added":
             assert item["added_recent"] is True
         else:
-            assert item["dots"][entry["project"]] == "recent"
             assert item["has_recent"] is True
+            if entry["kind"] == "rule" and _other_aspect_pending(registry, entry):
+                # The named aspect is done, the other one is not: the strategy
+                # still has work left, so its dot stays pending -- only the
+                # badge says this row is what changed.
+                assert item["dots"][entry["project"]] == "pending"
+            else:
+                assert item["dots"][entry["project"]] == "recent"
     pages = {path.name: html for path, html in render_guides.rendered_pages().items()}
     assert "recent_summary" in pages["fleet-rollout-register.html"]
     assert "最新變動" in pages["fleet-rollout-register.html"]
