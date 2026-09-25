@@ -144,8 +144,8 @@
   details.done-card > summary .t{flex:1;min-width:0;font-weight:700;font-size:14.5px;}
   details.done-card > .body{padding:0 16px 14px;}
   .phase-list .card p{margin-top:2px;}
-  #totop{position:fixed;right:20px;bottom:20px;width:46px;height:46px;border-radius:50%;border:1px solid var(--accent-line);background:var(--accent-bg);color:var(--accent);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:0;pointer-events:none;transform:translateY(8px);transition:opacity .2s,transform .2s;}
-  #totop.show{opacity:1;pointer-events:auto;transform:none;}
+  #totop{position:fixed;right:20px;bottom:20px;width:46px;height:46px;border-radius:50%;border:1px solid var(--accent-line);background:var(--accent-bg);color:var(--accent);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:0;pointer-events:none;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility 0s linear .2s;}
+  #totop.show{opacity:1;pointer-events:auto;visibility:visible;transform:none;transition:opacity .2s,transform .2s,visibility 0s;}
   #totop:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
   .c-pending{--c:var(--pending);--cb:var(--pending-bg);} .c-done{--c:var(--done);--cb:var(--done-bg);}
   .gloss-link{font-weight:700;color:var(--accent);}
