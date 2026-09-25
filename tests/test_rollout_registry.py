@@ -271,6 +271,9 @@ def test_citation_parser_reads_paths_lines_and_root_modules():
     assert citations("src/seykota_bot/bot.py 守衛；src/seykota_bot/safe_halt_resume.py:103") == [
         ("src/seykota_bot/bot.py", None), ("src/seykota_bot/safe_halt_resume.py", 103)]
     assert citations("程式已照目錄描述處理（Phase 3）") == []
+    # A bare ":line" belongs to the path cited just before it -- and is checked.
+    assert citations("src/a.py:10 先查，:11 再查；src/b.py:20 再停，:30 暫停，2026-09-25 01:22 UTC") == [
+        ("src/a.py", 10), ("src/a.py", 11), ("src/b.py", 20), ("src/b.py", 30)]
 
 
 def test_every_done_cell_cites_a_file(registry):

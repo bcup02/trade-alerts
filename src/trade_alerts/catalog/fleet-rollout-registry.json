@@ -952,7 +952,7 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:237 單腿結果不明（executor.OrderOutcomeUnknown，src/btc_competition/executor.py:307）時本輪停止送單，:330 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，:385 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
+          "evidence": "src/btc_competition/executor.py:307 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:237 收到後本輪停止送單，src/btc_competition/runner.py:330 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:385 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
         }
       },
       "emits_event": {
