@@ -645,8 +645,8 @@
       "title": "出現負／不可能的餘額，本地帳本本身不可信",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/runner.py:321",
-        "src/btc_competition/runner.py:395"
+        "src/btc_competition/runner.py:330",
+        "src/btc_competition/runner.py:404"
       ],
       "current": {
         "latch": "HOLDINGS_UNVERIFIED:negative",
@@ -677,8 +677,8 @@
       "title": "連續 3 天該再平衡卻零成交",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/runner.py:345",
-        "src/btc_competition/runner.py:397"
+        "src/btc_competition/runner.py:354",
+        "src/btc_competition/runner.py:406"
       ],
       "current": {
         "latch": "EXECUTION_BLOCKED:3 consecutive days with zero fills",
@@ -710,7 +710,7 @@
       "project": "btc-competition",
       "sources": [
         "src/btc_competition/executor.py:307",
-        "src/btc_competition/runner.py:385"
+        "src/btc_competition/runner.py:394"
       ],
       "current": {
         "latch": "ORDER_STATUS_UNKNOWN",
@@ -741,8 +741,8 @@
       "title": "部分成交，目標權重尚未達成",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/runner.py:339",
-        "src/btc_competition/runner.py:347"
+        "src/btc_competition/runner.py:348",
+        "src/btc_competition/runner.py:356"
       ],
       "current": {
         "latch": null,
@@ -769,7 +769,7 @@
       "title": "runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/runner.py:426"
+        "src/btc_competition/runner.py:435"
       ],
       "current": {
         "latch": null,
@@ -1005,7 +1005,7 @@
       "title": "帳本↔交易所對帳 DIVERGED 時故意讓 unit 變紅（exit 2）",
       "project": "fleet",
       "sources": [
-        "btc-bull-market-competition/src/btc_competition/reconcile_compare.py:213",
+        "btc-bull-market-competition/src/btc_competition/reconcile_compare.py:245",
         "ed-seykota-systematic-trend-following/src/seykota_bot/reconcile/compare.py:251",
         "mexc-4h-momentum-trailing-stop/src/reconcile_compare.py:110",
         "my-crypto-bot/reconcile_compare.py:102"

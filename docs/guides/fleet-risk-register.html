@@ -102,7 +102,7 @@
   <p class="lede">
     四支策略目前所有已知的「出問題」情況，共 <b>44 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>31 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>29 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -113,7 +113,7 @@
   <div id="filters"></div>
   <div id="register"></div>
   <div class="foot">
-    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-09-25 盤點）。
+    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-09-26 盤點）。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
   </div>
 </div>
@@ -688,7 +688,7 @@
   {
    "ai_prompt": "請在 btc-bull-market-competition 追查為什麼本地帳本出現負的或不可能的餘額：讀 src/btc_competition/runner.py 的 _holdings_unverified 與 executor.fetch_balances，比對本地 state/帳本與交易所實際餘額，找出差異從哪一筆交易開始，提出讓本地與交易所一致的修正步驟（先給我確認再執行）與治本修正。",
    "behaviour": {
-    "evidence": "src/btc_competition/runner.py:398 暫停並等人以 btc-competition-resume 解除",
+    "evidence": "src/btc_competition/runner.py:407 暫停並等人以 btc-competition-resume 解除",
     "state": "done"
    },
    "bot": "btc-competition",
@@ -748,7 +748,7 @@
   {
    "ai_prompt": "請在 btc-bull-market-competition 追查一張結果不明的單：先看暫停證據（btc-competition-resume preview）裡的 symbol、side、base_qty、client_order_id、submitted_at，用這個 client id 向 Binance 現貨查單（GET /api/v3/order 帶 origClientOrderId，唯讀）確認有沒有成交、成交量與均價與手續費；對照本地帳本（audit/trading_ledger.jsonl）——若已成交而帳本沒有對應的 spot_fill，提出補記的做法（先給我確認再執行）。再讀 src/btc_competition/executor.py 的 _resolve 與當時的日誌，判斷 60 秒都查不到的原因（網路、交易所延遲、還是 client id 對不上），提出治本修正。",
    "behaviour": {
-    "evidence": "src/btc_competition/executor.py:307 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:237 收到後本輪停止送單，src/btc_competition/runner.py:330 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:385 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。",
+    "evidence": "src/btc_competition/executor.py:307 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:243 收到後本輪停止送單，src/btc_competition/runner.py:339 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:394 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。",
     "state": "done"
    },
    "bot": "btc-competition",
@@ -1230,24 +1230,19 @@
   {
    "ai_prompt": "請在 btc-bull-market-competition 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。",
    "behaviour": {
-    "phase": "unrecorded-fill",
-    "reason": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。",
-    "state": "pending"
+    "evidence": "src/btc_competition/unrecorded_fill.py:237 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+    "state": "done"
    },
    "bot": "btc-competition",
    "bot_label": "競賽策略",
    "code": "BTC.UNRECORDED_FILL_CORRECTED",
    "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
    "emits_event": {
-    "phase": "unrecorded-fill",
-    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
-    "state": "pending"
+    "evidence": "src/btc_competition/unrecorded_fill.py:237 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+    "state": "done"
    },
-   "notes": [
-    "行為未做 — 競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
-    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
-   ],
-   "open": true,
+   "notes": [],
+   "open": false,
    "steps": [
     "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
     "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
@@ -1259,24 +1254,19 @@
   {
    "ai_prompt": "請在 btc-bull-market-competition 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。",
    "behaviour": {
-    "phase": "unrecorded-fill",
-    "reason": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。",
-    "state": "pending"
+    "evidence": "src/btc_competition/unrecorded_fill.py:237 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+    "state": "done"
    },
    "bot": "btc-competition",
    "bot_label": "競賽策略",
    "code": "BTC.UNRECORDED_FILL_UNRESOLVED",
    "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
    "emits_event": {
-    "phase": "unrecorded-fill",
-    "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
-    "state": "pending"
+    "evidence": "src/btc_competition/unrecorded_fill.py:237 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+    "state": "done"
    },
-   "notes": [
-    "行為未做 — 競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
-    "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
-   ],
-   "open": true,
+   "notes": [],
+   "open": false,
    "steps": [
     "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
     "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
