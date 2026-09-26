@@ -1005,7 +1005,7 @@
       "title": "帳本↔交易所對帳 DIVERGED 時故意讓 unit 變紅（exit 2）",
       "project": "fleet",
       "sources": [
-        "btc-bull-market-competition/src/btc_competition/reconcile_compare.py:245",
+        "btc-bull-market-competition/src/btc_competition/reconcile_compare.py:229",
         "ed-seykota-systematic-trend-following/src/seykota_bot/reconcile/compare.py:251",
         "mexc-4h-momentum-trailing-stop/src/reconcile_compare.py:110",
         "my-crypto-bot/reconcile_compare.py:102"
