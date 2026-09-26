@@ -177,8 +177,8 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>46</b><span>項未完成——還有策略沒做到</span></a>
-    <a class="c-done" href="#group-done"><b>20</b><span>項已完成——四支都到位，不用再動</span></a>
+    <a class="c-pending" href="#group-pending"><b>44</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-done" href="#group-done"><b>22</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
   <p class="dot-legend">
@@ -193,11 +193,11 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">46 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">44 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
-  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">20 項</span></div>
+  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">22 項</span></div>
   <p class="group-sub">每支相關的策略都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
   <div id="done"></div>
 
@@ -209,8 +209,8 @@
   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
   <div id="glossaryHost"></div>
   <div class="foot">
-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-25 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
-    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 3e3b6f7</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 43be152</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 2d167aa</code>。
+    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-26 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 3e3b6f7</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 43be152</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 9559897</code>。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
   </div>
 </div>
@@ -934,7 +934,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "src/btc_competition/runner.py:398 build_safe_halt（Phase 4c）"
+       "text": "src/btc_competition/runner.py:407 build_safe_halt（Phase 4c）"
       }
      ]
     }
@@ -1554,7 +1554,7 @@
        "aspect": null,
        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
        "state": "pending",
-       "text": "目前沒有任何會通知人的事件來源。"
+       "text": "匯出檔已經有了：src/btc_competition/unrecorded_fill.py:215 每輪（含跳過）重寫 audit/ops_export.json（g1-5，2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤），目前只帶帳本少記成交的通知。策略自己的安全暫停（下單結果不明、帳本持倉出現負數、連續 3 天零成交）還沒寫進事件日誌，所以還不會出現在匯出檔；第 8 關接上後改已做。"
       }
      ]
     }
@@ -1567,12 +1567,12 @@
    "anchor": "cap-ops_notify.export_relay_enabled",
    "complete": false,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "done",
     "mycrypto": "pending",
     "seykota": "done"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "ops_notify.export_relay_enabled",
    "kind": "cap",
    "rows": [
@@ -1614,9 +1614,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
-       "state": "pending",
-       "text": "還沒有匯出檔。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/unrecorded_fill.py:215 寫出的匯出檔由維運通知轉送：正式機 /etc/ops-notify/ops-notify.env 於 2026-09-26 設 OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on，首輪匯出軸 OK、零誤發；開發機 2026-09-25 同樣開啟，DEMO 實測的 R3 通知已送達 Telegram。"
       }
      ]
     }
@@ -1753,12 +1753,12 @@
    "anchor": "cap-ops_notify.units_axis",
    "complete": false,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "done",
     "mycrypto": "pending",
     "seykota": "done"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "ops_notify.units_axis",
    "kind": "cap",
    "rows": [
@@ -1800,9 +1800,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
-       "state": "pending",
-       "text": "還沒決定要盯哪些背景服務。"
+       "phase": null,
+       "state": "done",
+       "text": "deploy/btc-competition-unrecorded-fill.service 與 deploy/btc-competition-unrecorded-fill.timer 列入正式機與開發機的 OPS_NOTIFY_BTC_COMPETITION_UNITS（2026-09-26／09-25），服務單元狀態 OK。"
       }
      ]
     }
@@ -1988,7 +1988,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "src/btc_competition/executor.py:226 market_order：只有交易所明確拒絕（:108 _is_definite_rejection）才丟 OrderRejected 讓收斂迴圈重新規劃；結果不明（逾時、網路錯誤、OrderNotFound）改用同一個 client id 查單，:38 _ORDER_VISIBILITY_SECONDS 60 秒仍查不到就丟 :87 OrderOutcomeUnknown。src/btc_competition/runner.py:237 收到後本輪立刻停止送單，:330 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
+       "text": "src/btc_competition/executor.py:226 market_order：只有交易所明確拒絕（:108 _is_definite_rejection）才丟 OrderRejected 讓收斂迴圈重新規劃；結果不明（逾時、網路錯誤、OrderNotFound）改用同一個 client id 查單，:38 _ORDER_VISIBILITY_SECONDS 60 秒仍查不到就丟 :87 OrderOutcomeUnknown。src/btc_competition/runner.py:243 收到後本輪立刻停止送單，:339 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
       }
      ]
     }
@@ -2002,11 +2002,11 @@
    "complete": false,
    "dots": {
     "btc-competition": "na",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "pending",
     "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "ledger.trade_correction",
    "kind": "cap",
    "rows": [
@@ -2063,10 +2063,10 @@
    "anchor": "cap-reconcile.unrecorded_fill_handling",
    "complete": false,
    "dots": {
-    "btc-competition": "pending",
-    "momentum": "recent",
+    "btc-competition": "recent",
+    "momentum": "done",
     "mycrypto": "pending",
-    "seykota": "recent"
+    "seykota": "done"
    },
    "has_recent": true,
    "id": "reconcile.unrecorded_fill_handling",
@@ -2110,9 +2110,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
-       "state": "pending",
-       "text": "對帳（reconcile_compare）會把多出來的成交列進 unmatched_exchange_fills、狀態顯示 DIVERGED，但沒有任何錯誤代碼接手：不會升格、不會持續提醒，修復機器人也只處理「開倉沒記平倉」（detect_repair_candidates 只看 position_diffs）。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/unrecorded_fill.py:237 新計時器 btc-competition-unrecorded-fill 每 15 分鐘跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關 BTC_COMPETITION_REPAIR_PAUSED 一併擋）：只有交易所回報的 clientOrderId 與帳本已記訂單相同才把那張單補記成一筆現貨成交；src/btc_competition/trade_ledger.py:273 已被批次持倉快照包含的補記不再重算。PR #37（g1-5），2026-09-25 開發機 DEMO 故意重複送單實測整條通過；2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
       }
      ]
     }
@@ -2965,7 +2965,7 @@
        "aspect": "行為",
        "phase": null,
        "state": "done",
-       "text": "src/btc_competition/runner.py:398 暫停並等人以 btc-competition-resume 解除"
+       "text": "src/btc_competition/runner.py:407 暫停並等人以 btc-competition-resume 解除"
       },
       {
        "aspect": "寫進事件日誌",
@@ -3035,7 +3035,7 @@
        "aspect": "行為",
        "phase": null,
        "state": "done",
-       "text": "src/btc_competition/executor.py:307 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:237 收到後本輪停止送單，src/btc_competition/runner.py:330 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:385 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
+       "text": "src/btc_competition/executor.py:307 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:243 收到後本輪停止送單，src/btc_competition/runner.py:339 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:394 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
       },
       {
        "aspect": "寫進事件日誌",
@@ -3436,7 +3436,7 @@
        "aspect": "行為",
        "phase": null,
        "state": "done",
-       "text": "src/btc_competition/reconcile_compare.py:228 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
+       "text": "src/btc_competition/reconcile_compare.py:244 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
       },
       {
        "aspect": "寫進事件日誌",
@@ -3717,11 +3717,11 @@
    "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MOM.UNRECORDED_FILL_CORRECTED",
    "kind": "rule",
    "rows": [
@@ -3752,11 +3752,11 @@
    "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
    "kind": "rule",
    "rows": [
@@ -3784,14 +3784,14 @@
   {
    "added_recent": false,
    "anchor": "rule-BTC.UNRECORDED_FILL_CORRECTED",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "BTC.UNRECORDED_FILL_CORRECTED",
    "kind": "rule",
    "rows": [
@@ -3800,15 +3800,15 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
-       "state": "pending",
-       "text": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/unrecorded_fill.py:237 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
-       "state": "pending",
-       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/unrecorded_fill.py:237 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
       }
      ]
     }
@@ -3819,14 +3819,14 @@
   {
    "added_recent": false,
    "anchor": "rule-BTC.UNRECORDED_FILL_UNRESOLVED",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "BTC.UNRECORDED_FILL_UNRESOLVED",
    "kind": "rule",
    "rows": [
@@ -3835,15 +3835,15 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
-       "state": "pending",
-       "text": "競賽策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-5），上正式機後改 done。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/unrecorded_fill.py:237 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
-       "state": "pending",
-       "text": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/unrecorded_fill.py:237 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
       }
      ]
     }
@@ -3889,7 +3889,7 @@
  ],
  "phase_counts": {
   "7e": 4,
-  "8-btc-competition": 10,
+  "8-btc-competition": 8,
   "8-momentum": 3,
   "8-mycrypto": 18,
   "8-seykota": 19,
@@ -3901,7 +3901,7 @@
   "hotfix-seykota-stop-resolution": 0,
   "naming-rollout": 0,
   "repair-recurrence": 4,
-  "unrecorded-fill": 9,
+  "unrecorded-fill": 4,
   "v2-W2": 0,
   "v2-W3": 0,
   "v2-W4": 0,
@@ -3962,40 +3962,40 @@
  "recent_summary": [
   {
    "anchor": "cap-reconcile.unrecorded_fill_handling",
-   "note": "動能策略修復機器人每輪檢查帳本少記的交易所成交（g1-4，PR #104）已上正式機；動能送出的每張單（含移動停損）都帶自己的 mo- 編號，停損出場單也能證明是自己下的。",
-   "project": "動能策略",
+   "note": "競賽策略每 15 分鐘檢查帳本少記的交易所成交（g1-5，PR #37）已上正式機；開發機 DEMO 故意重複送單實測整條通過。",
+   "project": "競賽策略",
    "title": "帳本少記交易所成交時，升格通知並以交易所為準更正"
   },
   {
-   "anchor": "cap-ledger.trade_correction",
-   "note": "動能策略的 Google 表與 LINE 查詢認得帳本更正，另有兩段式人工更正工具（g1-4）。",
-   "project": "動能策略",
-   "title": "帳本更正事件：以交易所成交為準、只追加，讀帳本的地方都認得"
+   "anchor": "cap-ops_notify.export_relay_enabled",
+   "note": "正式機、開發機的維運通知都開始轉送競賽策略的匯出檔。",
+   "project": "競賽策略",
+   "title": "維運通知已開啟匯出轉送（部署設定）"
   },
   {
-   "anchor": "rule-MOM.UNRECORDED_FILL_CORRECTED",
-   "note": "確定是自己重複送單才自動更正帳本並立刻通知。",
-   "project": "動能策略",
+   "anchor": "cap-ops_notify.units_axis",
+   "note": "維運通知開始盯競賽策略的新背景工作。",
+   "project": "競賽策略",
+   "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
+  },
+  {
+   "anchor": "rule-BTC.UNRECORDED_FILL_CORRECTED",
+   "note": "確定是自己重複送單才自動補記並立刻通知。",
+   "project": "競賽策略",
    "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
   },
   {
-   "anchor": "rule-MOM.UNRECORDED_FILL_UNRESOLVED",
-   "note": "來源無法確定的少記成交一律不寫帳本、開請求並通知。",
-   "project": "動能策略",
+   "anchor": "rule-BTC.UNRECORDED_FILL_UNRESOLVED",
+   "note": "其他未記成交一律只通知、附處理步驟。",
+   "project": "競賽策略",
    "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
-  },
-  {
-   "anchor": "cap-reconcile.unrecorded_fill_handling",
-   "note": "補登：趨勢策略這一格在 g1-3 上正式機（9/25）時漏改，其實已經在跑。",
-   "project": "趨勢策略",
-   "title": "帳本少記交易所成交時，升格通知並以交易所為準更正"
   }
  ],
  "totals": {
   "btc-competition": {
-   "done": 13,
+   "done": 20,
    "n/a": 9,
-   "pending": 18
+   "pending": 11
   },
   "momentum": {
    "done": 31,
