@@ -207,8 +207,8 @@ pgrep -af '/opt/(mexc-4h-momentum-trailing-stop|ed-seykota-systematic-trend-foll
 3. 照 5.2 逐支安裝：`START_SERVICE=0`、沒有任何 `.env`、交易所工具程式用本機 clone（`*_SOURCE` 參數）。
 4. 跑 5.1 的讀回 gate（零輸出），`journalctl` 確認安裝期間沒有機隊服務執行過。
 5. 讀回四支的開關檔：都是 `DRY_RUN_ONLY=1`，`STRATEGY_MODE` 為 OFFLINE 或紙上模擬。
-6. 建服務帳號的跨群組設定、`seykota-admin` 帳號；裝 ARM 版 `cloudflared`，**不放通道憑證、不啟用**。
-7. `cloudflared` 與跨群組設定補進部署腳本（另開 PR，這次搬家範圍內要做完，不留手動步驟）。
+6. 帳號、跨群組設定與通道都由部署腳本建立（2026-09-29 已補進腳本：portfolio-query#25、ops-notify#29、ops-control#14）：先裝四支策略（建出策略群組），再裝維運通知、Telegram 遙控、LINE 查詢；LINE 進站通道用 `START_SERVICE=0 bash deploy/install_line_ingress.sh`（portfolio-query repo）裝 ARM 版 `cloudflared`（固定版本、比對校驗碼）與 `seykota-admin`，**不放通道憑證、不啟用**。
+7. 只有含帳號密碼的設定檔與通道憑證仍是手動（階段 C 才搬）。
 
 ### 階段 B：新主機暫代開發機 1～2 天（不影響正式機）
 
@@ -301,7 +301,7 @@ pgrep -af '/opt/(mexc-4h-momentum-trailing-stop|ed-seykota-systematic-trend-foll
 1. 照第 6 段的方式複製（來源快照 → `rsync -a --delete` → 兩端完整檔案清單＋sha256 完全相同）；
    開關檔複製的是 C-1 改過、`DRY_RUN_ONLY=1` 的版本。
 2. 兩端清單不完全相同就停，回到第 8 段。
-3. 新主機放入通道憑證與設定，但先不啟動。
+3. 新主機放入通道憑證與設定（`/etc/seykota/cloudflared.yml`、憑證 json 640 root:seykota-admin），但先不啟動。
 
 **C-3 新主機啟動前檢查（仍然鎖住真倉）**
 1. 用正式機的金鑰做只讀查詢（Binance 合約／現貨、MEXC 合約）：簽章通過、餘額與持倉跟 C-0 記錄一致。
@@ -310,7 +310,7 @@ pgrep -af '/opt/(mexc-4h-momentum-trailing-stop|ed-seykota-systematic-trend-foll
 **C-4 逐支打開真倉並啟動**
 1. 一次一支：把該支開關檔改回 C-0 記下的原值（`LIVE_ONLINE`、`DRY_RUN_ONLY=0`），讀回確認 → 啟用並啟動該支的服務與
    定時服務 → 看第一輪日誌與對帳正常，才換下一支。
-2. 啟用維運通知、`clock-health`、LINE 查詢、LINE 進站通道、Telegram 遙控。
+2. 啟用維運通知、`clock-health`、LINE 查詢、Telegram 遙控；LINE 進站通道用 `LINE_INGRESS_CUTOVER=old-connector-stopped bash deploy/install_line_ingress.sh` 啟動——這個宣告只能在 C-1 讀回確認舊機通道已停止並停用之後使用，腳本無法遠端驗證舊機，沒有宣告會拒絕啟動。
 3. 用 LINE 查詢、Telegram 遙控各實際操作一次；`systemctl --failed` 為空。
 
 ### 階段 D：穩定後
