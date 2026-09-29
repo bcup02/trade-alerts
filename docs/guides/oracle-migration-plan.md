@@ -4,6 +4,8 @@
 > 對應進度頁項目：f-2（正式機搬到 Oracle 永久免費主機）。用詞照 `src/trade_alerts/catalog/fleet-glossary.json`。
 > 2026-09-29 修訂：依首審 BLOCK 意見改寫——各部署腳本的實際啟動行為、逐檔搬遷清單、舊機先停用再啟動新機、
 > 真倉開關最後才打開、退回改成先凍結再人工裁決；並補上「Oracle 先搬、GitHub 後搬、改用部署金鑰」的順序與閒置回收風險。
+> 2026-09-29 二修（複審 BLOCK）：安裝前就不讓服務啟動（四支部署腳本補上只安裝選項）、陪跑改成「新主機暫代開發機」、
+> 完整服務名單、完整路徑、退回時比對兩端完整檔案集合並先重查交易所。
 
 ## 1. 為什麼要搬、搬去哪
 
@@ -38,8 +40,8 @@
 
 ## 4. 正式機盤點結果（2026-09-29，唯讀）
 
-1. **服務**：四支策略主程式、各自 5～7 個定時服務、`clock-health`、維運通知、Telegram 遙控、LINE 查詢，外加 LINE
-   進站通道 `seykota-cloudflared`。沒有失敗的服務。docker 沒在用（`/opt/containerd` 是殘留，不搬）。
+1. **服務**：完整名單見第 5.1 段（正式機 `systemctl list-unit-files` 實際輸出）。沒有失敗的服務。docker 沒在用
+   （`/opt/containerd` 是殘留，不搬）。
 2. **開機自動啟動**：動能、趨勢、加密三支主程式、LINE 查詢、Telegram 遙控、LINE 進站通道都是 `enabled`；
    競賽策略主程式由它的每日定時服務觸發；維運通知與 `clock-health` 是定時服務。**舊機重開就會自己恢復交易**，
    所以切換時一定要先停用（disable）而不只是停止（stop）。
@@ -64,25 +66,58 @@
 | Telegram 遙控 `87c6272` | — | **會**：`ops-control.service` 立刻啟動（有憑證就開始收 Telegram 訊息） |
 | LINE 查詢 `90dfab2` | — | **會**：服務立刻啟動（只監聽本機；通道沒開就收不到 LINE） |
 
-因此計畫**不寫「裝好先不啟動」**，而是：裝完之後立刻把每支的全部服務與定時服務**停止並停用**，
-再逐項讀回（`systemctl is-active`／`is-enabled` 全部是 inactive／disabled）才算階段 A 完成。
-開關檔一律用 `grep` 讀回確認，不靠記憶。
+因此**不能先裝再關**：有 4 支腳本一裝就會執行。做法是在安裝**之前**就擋住（見 5.2）。
+
+### 5.1 完整服務名單（凍結與啟動都照這份逐一核對）
+
+以下是正式機 2026-09-29 `systemctl list-unit-files` 裡所有機隊服務。凍結舊機、準備新主機時，**這份名單每一項**都要讀回
+`inactive` 且 `disabled`（`static` 的 service 由對應 timer 觸發，讀回 `inactive` 即可）；另外用
+`systemctl list-unit-files | grep -E '^(mexc-momentum|seykota|btc-competition|my-crypto|ops-notify|ops-control|portfolio-query|clock-health)'`
+列出實際名單，**跟下表不完全一樣（多或少任何一項）就視為 BLOCK、停下來查**。
+
+| 服務 | 主程式／常駐 | 定時服務（timer，各有同名 .service） |
+|---|---|---|
+| 動能 | `mexc-momentum-bot.service` | `mexc-momentum-control-consumer`、`-funding-sync`、`-google-projection`、`-portfolio-snapshot`、`-reconcile-fetch`、`-repair-shadow`、`-report-publish` |
+| 趨勢 | `seykota-bot.service` | `seykota-google-projection`、`-portfolio-snapshot`、`-reconcile-fetch`、`-repair-shadow`、`-report-publish` |
+| 加密 | `my-crypto-bot.service` | `my-crypto-bot-funding-sync`、`my-crypto-portfolio-snapshot`、`my-crypto-reconcile-fetch`、`my-crypto-report-publish` |
+| 競賽 | `btc-competition-bot.service`（由 daily 觸發） | `btc-competition-daily`、`-google-projection`、`-portfolio-snapshot`、`-reconcile-fetch`、`-report-publish`、`-unrecorded-fill` |
+| 維運通知 | — | `ops-notify`、`clock-health` |
+| Telegram 遙控 | `ops-control.service` | — |
+| LINE 查詢 | `portfolio-query.service` | — |
+| LINE 進站通道 | `seykota-cloudflared.service` | — |
+
+### 5.2 安裝前就擋住自動啟動
+
+1. **階段 A 之前先開 PR**：競賽、維運通知、Telegram 遙控、LINE 查詢四支的部署腳本，比照另外三支策略支援
+   `START_SERVICE=0`（只安裝、設成停用、不啟動、不跑一次）。預設值維持現在的行為，所以開發機、正式機現有的部署方式不變；
+   這是讓七支腳本行為一致的正式選項，不是過渡開關。照一般流程審閱、合併、進正式機分支。
+2. 新主機只用**含這個選項的正式機分支 commit** 安裝，一律加 `START_SERVICE=0`；安裝前先讀該 commit 的腳本，
+   確認所有 `systemctl start`／`enable --now`／`restart` 都在 `START_SERVICE=1` 條件內，否則不裝。
+3. 第二道保險：安裝時新主機**還沒有任何 `.env` 設定檔與金鑰**（服務就算被誤啟動，也連不到 LINE、Telegram、
+   Google 表，也沒有交易所金鑰），四支開關檔是部署腳本預設的 OFFLINE／紙上模擬＋`DRY_RUN_ONLY=1`。
+4. 安裝後照 5.1 名單逐一讀回 inactive／disabled，並查 `journalctl` 確認安裝期間沒有任何機隊服務執行過。
 
 ## 6. 搬遷清單（階段 C 逐項勾核；反向退回也用同一份）
 
 路徑都來自正式機的設定檔與服務設定（`ReadWritePaths`）。權限、擁有者照舊機原樣（`rsync -a`），複製後逐檔比對 sha256。
 
-| 服務 | 要複製的路徑 |
+| 服務 | 要複製的路徑（完整） |
 |---|---|
 | 動能 | `/opt/mexc-4h-momentum-trailing-stop/audit/`、`/opt/mexc-4h-momentum-trailing-stop/state/`、`/etc/mexc-momentum/momentum.env`、`/var/lib/mexc-4h-momentum-operations/`、`/var/lib/mexc-momentum-control/` |
-| 趨勢 | `/opt/ed-seykota-systematic-trend-following/audit/`、`…/state/`、`…/logs/`、`/etc/seykota/seykota.env`、`/var/lib/seykota-operations/`、`/var/lib/portfolio-query/seykota-btcusdt-4h/` |
+| 趨勢 | `/opt/ed-seykota-systematic-trend-following/audit/`、`/opt/ed-seykota-systematic-trend-following/state/`、`/opt/ed-seykota-systematic-trend-following/logs/`、`/etc/seykota/seykota.env`、`/var/lib/seykota-operations/` |
 | 加密 | `/opt/my-crypto-bot/audit/`、`/opt/my-crypto-bot/state/`、`/etc/my-crypto-bot/my-crypto-bot.env`、`/var/lib/my-crypto-bot-operations/` |
-| 競賽 | `/opt/btc-bull-market-competition/audit/`、`…/state/`、`…/logs/`、`/etc/btc-competition/btc-competition.env`、`/var/lib/btc-competition-operations/`、`/var/lib/portfolio-query/btc-bull-competition/` |
+| 競賽 | `/opt/btc-bull-market-competition/audit/`、`/opt/btc-bull-market-competition/state/`、`/opt/btc-bull-market-competition/logs/`、`/etc/btc-competition/btc-competition.env`、`/var/lib/btc-competition-operations/` |
 | 維運通知 | `/etc/ops-notify/ops-notify.env`、`/var/lib/ops-notify/`（已送紀錄；不搬會把舊通知重送一次） |
 | Telegram 遙控 | `/etc/ops-control/ops-control.env`、`/var/lib/ops-control/`（Telegram 讀取位置） |
-| LINE 查詢 | `/etc/portfolio-query/portfolio-query.env`、`/var/lib/portfolio-query/`（整個目錄，含上面兩支策略寫的子目錄） |
-| LINE 進站通道 | `/etc/seykota/cloudflared.yml`、`/etc/seykota/<通道編號>.json`、`seykota-cloudflared.service`、`seykota-admin` 帳號 |
+| LINE 查詢 | `/etc/portfolio-query/portfolio-query.env`、`/var/lib/portfolio-query/`（整個目錄，含趨勢寫的 `seykota-btcusdt-4h/` 與競賽寫的 `btc-bull-competition/`） |
+| LINE 進站通道 | `/etc/seykota/cloudflared.yml`、`/etc/seykota/b919b953-8278-41c3-9e29-393baf564cb0.json`（通道憑證）、`seykota-cloudflared.service`、`seykota-admin` 帳號 |
 | 帳號與群組 | 維運通知加入四支策略的群組；Telegram 遙控加入動能策略的群組（照舊機 `id` 輸出） |
+
+**複製與核對方式**（正向、反向都一樣）：
+1. 複製前，在**來源端**把上表全部路徑打包成一份唯讀快照（`tar`，附 sha256），留在兩台主機上，事後不改。
+2. 目的端對應目錄先清空再複製（`rsync -a --delete`），不留目的端原有的舊檔。
+3. 兩端各自產生「完整檔案清單＋每個檔案 sha256」（`find … -type f | sort` 後逐檔雜湊），**兩份清單要完全相同**
+   （檔名集合一樣、內容一樣、沒有任何一邊多出來的檔案），才算複製完成。
 
 ## 7. 切換步驟
 
@@ -91,21 +126,29 @@
 
 ### 階段 A：新主機準備（不影響正式機）
 
+0. 先完成 5.2 第 1 點的四個部署腳本 PR，並進入正式機分支。
 1. 設好 10 把唯讀部署金鑰，clone 8 個 repo（策略與維運切到正式機分支，共用程式庫用 main），記下每個 commit。
 2. 時區改 Asia/Tokyo、加 2GB swap；時鐘同步已確認正常。
-3. 逐支跑部署腳本（不設 `START_SERVICE`、不放任何 `.env`），交易所工具程式用本機 clone（`*_SOURCE` 參數）。
-4. 裝完**立刻**：`systemctl disable --now` 每支的全部服務與定時服務（第 5 段所列），讀回全部 inactive／disabled。
+3. 照 5.2 逐支安裝：`START_SERVICE=0`、沒有任何 `.env`、交易所工具程式用本機 clone（`*_SOURCE` 參數）。
+4. 照 5.1 名單逐一讀回 inactive／disabled，`journalctl` 確認安裝期間沒有機隊服務執行過。
 5. 讀回四支的開關檔：都是 `DRY_RUN_ONLY=1`，`STRATEGY_MODE` 為 OFFLINE 或紙上模擬。
 6. 建服務帳號的跨群組設定、`seykota-admin` 帳號；裝 ARM 版 `cloudflared`，**不放通道憑證、不啟用**。
-7. `cloudflared` 與跨群組設定補進 LINE 查詢／各 repo 的部署腳本（另開 PR，這次搬家範圍內要做完，不留手動步驟）。
+7. `cloudflared` 與跨群組設定補進部署腳本（另開 PR，這次搬家範圍內要做完，不留手動步驟）。
 
-### 階段 B：紙上模擬陪跑 1～2 天（不影響正式機）
+### 階段 B：新主機暫代開發機 1～2 天（不影響正式機）
 
-1. **不放任何真倉金鑰**。四支策略維持 `DRY_RUN_ONLY=1`、紙上模擬；需要帳戶資料的部分用模擬倉（DEMO）金鑰或留空。
-2. **只啟動**四支策略主程式與它們讀行情的定時服務；**不啟動**：Telegram 遙控、LINE 查詢、LINE 進站通道、
-   維運通知、Google 表寫入、修復機器人。
-3. 比對兩台同一根 K 棒算出的進出場訊號是否一致；記下 CPU／記憶體用量（第 9 段閒置回收評估要用）。
-4. 陪跑結束：`systemctl disable --now` 全部，刪掉陪跑產生的帳本與狀態（新主機回到階段 A 結束的樣子），讀回確認。
+用開發機已經在跑、已經驗證過的設定，讓新主機跑正式機分支的程式；開發機四支策略同時停下，避免兩台搶同一個模擬倉帳戶。
+
+1. **開發機凍結四支策略**：照 5.1 名單（只含四支策略那幾列）在開發機 `systemctl disable --now`，逐一讀回。
+2. **複製開發機的設定到新主機**：四支策略的 `.env` 與開關檔，照開發機現況是 `STRATEGY_MODE=DRY_RUN_ONLINE`、
+   `DRY_RUN_ONLY=1`（這是紙上模擬上線；動能、趨勢、競賽會在**模擬倉**帳戶下單、加密沒有金鑰），**不放任何真倉金鑰**。
+   複製後把 `.env` 裡 LINE、Telegram、Google 表的設定清空，讀回確認。開關檔用 `grep` 讀回確認四支都是上述兩個值。
+3. **只啟動**四支策略主程式與它們的對帳、快照定時服務；**不啟動**：Google 表寫入、修復機器人、維運通知、
+   Telegram 遙控、LINE 查詢、LINE 進站通道。啟動後照 5.1 讀回，實際在跑的只能是這幾項。
+4. 觀察：每一輪都正常、跟開發機平常的行為一致；動能、趨勢同一根 K 棒的判斷跟正式機一致；記下 CPU／記憶體用量
+   （第 9 段閒置回收評估要用）。
+5. 結束：新主機照 5.1 全部停用並讀回；刪掉陪跑產生的帳本、狀態與 `.env`（新主機回到階段 A 結束的樣子）；
+   開發機四支策略重新啟用、讀回、手動跑一輪確認正常。
 
 ### 階段 C：正式切換（要挑時間）
 
@@ -116,14 +159,16 @@
 - 記下舊機四支開關檔的原始內容（退回時要用）。
 
 **C-1 凍結舊機**
-1. 停止並停用舊機全部服務與定時服務（第 4 段第 1 點的清單，含 LINE 進站通道）：`systemctl disable --now …`。
-2. 讀回：全部 `inactive` 且 `disabled`；`systemctl list-timers` 沒有機隊的定時服務；沒有機隊的 Python 程序。
+1. 停止並停用舊機 5.1 名單的**每一項**（含 LINE 進站通道）：`systemctl disable --now …`。
+2. 讀回：5.1 名單每一項都 `inactive` 且 `disabled`；實際名單跟 5.1 完全一致（多或少都算 BLOCK）；
+   `systemctl list-timers` 沒有機隊的定時服務；沒有機隊的 Python 程序。
 3. 舊機四支的開關檔改成 `DRY_RUN_ONLY=1`（多一道保險：就算有人手動啟動也不能下真單），讀回確認。
    **這一步沒有全部讀回通過，就不准進行 C-2。**
 
 **C-2 複製與核對**
-1. 照第 6 段清單逐項從舊機複製到新主機（開關檔複製的是 C-1 改過、`DRY_RUN_ONLY=1` 的版本）。
-2. 兩邊逐檔 sha256 比對，全部一致才往下。
+1. 照第 6 段的方式複製（來源快照 → `rsync -a --delete` → 兩端完整檔案清單＋sha256 完全相同）；
+   開關檔複製的是 C-1 改過、`DRY_RUN_ONLY=1` 的版本。
+2. 兩端清單不完全相同就停，回到第 8 段。
 3. 新主機放入通道憑證與設定，但先不啟動。
 
 **C-3 新主機啟動前檢查（仍然鎖住真倉）**
@@ -145,13 +190,21 @@
 
 ## 8. 出事怎麼退回
 
-- **階段 A、B**：舊機完全沒動，停用新主機全部服務即可。
-- **階段 C 在 C-4 之前**：新主機還沒下過真單。停用新主機全部服務 → 舊機開關檔改回 C-0 記下的原值 → 舊機重新啟用服務。
+**不論哪個階段，恢復任何一台的真倉之前，一律先做「交易所重查」**：唯讀查四支的持倉與掛單，跟 C-0 的紀錄與
+該主機帳本比對；有任何不一致，兩台都保持停止（停用＋`DRY_RUN_ONLY=1`），由使用者人工裁決。
+
+- **階段 A、B**：舊機（正式機）完全沒動。停用新主機全部服務即可；B 階段另外把開發機四支策略恢復。
+- **階段 C、在 C-4 之前**：新主機還沒下過真單。
+  1. 新主機照 5.1 全部停用並讀回。
+  2. 交易所重查（上面那一條）。
+  3. 通過後，舊機開關檔改回 C-0 記下的原值、讀回，照 5.1 逐支重新啟用。
 - **C-4 之後**（新主機已經用真倉跑過）：
-  1. **凍結兩台**：新主機比照 C-1 停止＋停用＋`DRY_RUN_ONLY=1`，讀回確認；舊機維持凍結。
-  2. 用第 6 段同一份清單把新主機的狀態**整份**複製回舊機（不是只複製新增部分），逐檔 sha256 比對。
-  3. 在舊機手動跑四支對帳；帳本對交易所一致、事件日誌與維運通知已送紀錄沒有重複或缺漏，才依 C-4 的方式逐支打開舊機。
-  4. **任何一項對不上，兩台都保持停止，由使用者人工裁決**，不直接重啟任何一台。
+  1. **凍結兩台**：新主機比照 C-1 停止＋停用＋`DRY_RUN_ONLY=1`，讀回；舊機維持凍結。
+  2. 兩台各自照第 6 段打一份唯讀快照（留存，不改）。
+  3. 用第 6 段的方式把新主機的狀態**整份**反向複製到舊機（`--delete`，舊機不留切換前的舊檔），兩端完整檔案清單＋sha256
+     完全相同才往下。
+  4. 在舊機手動跑四支對帳，並做交易所重查；事件日誌、維運通知已送紀錄沒有重複或缺漏，才照 C-4 的方式逐支打開舊機。
+  5. **任何一項對不上，兩台都保持停止，由使用者人工裁決**，不直接重啟任何一台。
 
 ## 9. 閒置回收風險
 
