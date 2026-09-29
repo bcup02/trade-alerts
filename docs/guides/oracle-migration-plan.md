@@ -26,7 +26,7 @@
 - **Oracle 先搬，不等 GitHub 搬家**。ECP 進度表（`AI-for-column/Engineering-Control-Plane` `PROJECT_STATUS.md`）
   把四支真倉策略排在 ECP-6C 最後一批，前面還有 ECP-4C 啟用、ECP-6B 與四個專案；12/6 前輪到策略的機會很低（推測，
   文件沒寫日期）。
-- **新主機用每個 repo 各一把唯讀部署金鑰取碼**（共 10 把：8 個 repo＋Binance、MEXC 兩個交易所工具程式）。
+- **新主機用每個私有 repo 各一把唯讀部署金鑰取碼**（共 7 把：四支策略＋維運通知、Telegram 遙控、LINE 查詢；共用程式庫 trade-alerts 與 Binance、MEXC 兩個交易所工具程式是公開 repo，直接用 https 取）。2026-09-29 已設好：金鑰在新主機 `~ubuntu/.ssh/deploy/<repo>`，以 `github-<repo>` 主機別名取碼；實測 7 個都能讀、推送一律被 GitHub 以 read only 拒絕。
   部署金鑰綁在 repo 上，repo 轉到新組織時會跟著走；GitHub 會把舊網址轉到新位置，搬完再把新主機的 remote 改成新網址。
 - **兩件事不排在同一週**：換主機與換 GitHub 位置都會影響部署，同時進行出事時分不出原因。
 
@@ -202,7 +202,7 @@ pgrep -af '/opt/(mexc-4h-momentum-trailing-stop|ed-seykota-systematic-trend-foll
 ### 階段 A：新主機準備（不影響正式機）
 
 0. 先完成 5.2 第 1 點的四個部署腳本 PR，並進入正式機分支。
-1. 設好 10 把唯讀部署金鑰，clone 8 個 repo（策略與維運切到正式機分支，共用程式庫用 main），記下每個 commit。
+1. 用已設好的 7 把唯讀部署金鑰（私有 repo）與 https（公開 repo）clone 8 個 repo（策略與維運切到正式機分支，共用程式庫用 main），記下每個 commit。
 2. 時區改 Asia/Tokyo、加 2GB swap；時鐘同步已確認正常。
 3. 照 5.2 逐支安裝：`START_SERVICE=0`、沒有任何 `.env`、交易所工具程式用本機 clone（`*_SOURCE` 參數）。
 4. 跑 5.1 的讀回 gate（零輸出），`journalctl` 確認安裝期間沒有機隊服務執行過。
@@ -357,6 +357,6 @@ Oracle 免費額度只夠一台，給正式機用。開發機（trading-dev，GC
 ## 11. 使用者要做的事
 
 - 審這份計畫，決定開發機去留（第 10 段）。
-- 階段 A：在 10 個 repo 的 GitHub 設定頁貼上部署金鑰（Claude 會列出每一把公開金鑰與設定頁網址）。
+- 階段 A：部署金鑰已於 2026-09-29 由 Claude 經 GitHub API 設好（使用者授權），不需再動手。
 - 階段 B、C、D 每一步開始前再確認一次。
 - 階段 D 在 Binance、MEXC 後台設 IP 白名單。
