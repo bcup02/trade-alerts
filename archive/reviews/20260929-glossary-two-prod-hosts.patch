@@ -1,0 +1,109 @@
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 4966cb5..f490a57 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -205,7 +205,7 @@
+   <p class="group-sub">「未做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
+   <div id="phases" class="phase-list"></div>
+ 
+-  <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">48 條</span></div>
++  <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">50 條</span></div>
+   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+   <div id="glossaryHost"></div>
+   <div class="foot">
+@@ -296,12 +296,12 @@
+    "category": "主機",
+    "entries": [
+     {
+-     "definition": "GCP 上跑正式交易的那台主機，部署來源是正式機分支（operations）。",
++     "definition": "跑正式交易的主機這個角色，部署來源是正式機分支（operations）。搬家期間同時有兩台：A1 正式機（新）與 trading-main 正式機（舊）。",
+      "en": [
+       "trading-main"
+      ],
+      "id": "host.main",
+-     "note": "「真倉」只拿來說交易模式（用真錢），不拿來指這台主機。",
++     "note": "「真倉」只拿來說交易模式（用真錢），不拿來指這台主機。2026-09-29 起到 trading-main 除役前，指某一台主機時一律寫「A1 正式機（新）」或「trading-main 正式機（舊）」，不單寫「正式機」；單寫「正式機」只用在角色或正式機分支（例如「推正式機分支」）。登記冊的「已做」在切換完成前指 trading-main 正式機（舊）上在跑。",
+      "retired": [
+       "策略主機",
+       "seykota 主機",
+@@ -313,6 +313,27 @@
+      ],
+      "zh": "正式機"
+     },
++    {
++     "definition": "Oracle 東京 A1（ARM，2 核心／12GB）上的新正式機，搬家完成後接手正式交易。",
++     "en": [
++      "fleet-prod-tokyo",
++      "161.33.186.220"
++     ],
++     "id": "host.main.a1",
++     "note": "2026-09-29 起使用。切換完成、trading-main 除役後，改回單稱「正式機」並更新這一條。",
++     "retired": [],
++     "zh": "A1 正式機（新）"
++    },
++    {
++     "definition": "GCP 上目前還在跑正式交易的舊正式機，搬家切換完成後凍結、保留到 2026-12-06 前再除役。",
++     "en": [
++      "trading-main"
++     ],
++     "id": "host.main.gcp",
++     "note": "2026-09-29 起使用；除役後刪除這一條。",
++     "retired": [],
++     "zh": "trading-main 正式機（舊）"
++    },
+     {
+      "definition": "GCP 上給開發測試用的那台主機，部署來源是開發機分支（testing）。",
+      "en": [
+diff --git a/src/trade_alerts/catalog/fleet-glossary.json b/src/trade_alerts/catalog/fleet-glossary.json
+index 985cbef..7fef160 100644
+--- a/src/trade_alerts/catalog/fleet-glossary.json
++++ b/src/trade_alerts/catalog/fleet-glossary.json
+@@ -1,6 +1,6 @@
+ {
+   "glossary_version": "fleet-glossary/v1",
+-  "updated_at": "2026-09-18",
++  "updated_at": "2026-09-29",
+   "note": "機隊全專案中文用詞對照表。給人看的文字一律用 zh；retired 是不要再用的舊叫法，tests/test_fleet_glossary.py 會掃描 trade-alerts 內給人看的文字，出現就擋。英文代號只如實列出，不在這裡改。",
+   "entries": [
+     {
+@@ -81,7 +81,7 @@
+       "en": [
+         "trading-main"
+       ],
+-      "definition": "GCP 上跑正式交易的那台主機，部署來源是正式機分支（operations）。",
++      "definition": "跑正式交易的主機這個角色，部署來源是正式機分支（operations）。搬家期間同時有兩台：A1 正式機（新）與 trading-main 正式機（舊）。",
+       "retired": [
+         "策略主機",
+         "seykota 主機",
+@@ -91,7 +91,30 @@
+         "正式環境",
+         "真倉（operations）"
+       ],
+-      "note": "「真倉」只拿來說交易模式（用真錢），不拿來指這台主機。"
++      "note": "「真倉」只拿來說交易模式（用真錢），不拿來指這台主機。2026-09-29 起到 trading-main 除役前，指某一台主機時一律寫「A1 正式機（新）」或「trading-main 正式機（舊）」，不單寫「正式機」；單寫「正式機」只用在角色或正式機分支（例如「推正式機分支」）。登記冊的「已做」在切換完成前指 trading-main 正式機（舊）上在跑。"
++    },
++    {
++      "id": "host.main.a1",
++      "category": "主機",
++      "zh": "A1 正式機（新）",
++      "en": [
++        "fleet-prod-tokyo",
++        "161.33.186.220"
++      ],
++      "definition": "Oracle 東京 A1（ARM，2 核心／12GB）上的新正式機，搬家完成後接手正式交易。",
++      "retired": [],
++      "note": "2026-09-29 起使用。切換完成、trading-main 除役後，改回單稱「正式機」並更新這一條。"
++    },
++    {
++      "id": "host.main.gcp",
++      "category": "主機",
++      "zh": "trading-main 正式機（舊）",
++      "en": [
++        "trading-main"
++      ],
++      "definition": "GCP 上目前還在跑正式交易的舊正式機，搬家切換完成後凍結、保留到 2026-12-06 前再除役。",
++      "retired": [],
++      "note": "2026-09-29 起使用；除役後刪除這一條。"
+     },
+     {
+       "id": "host.dev",
