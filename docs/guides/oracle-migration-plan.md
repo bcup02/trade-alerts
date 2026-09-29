@@ -214,7 +214,65 @@ pgrep -af '/opt/(mexc-4h-momentum-trailing-stop|ed-seykota-systematic-trend-foll
 
 用開發機已經在跑、已經驗證過的設定，讓新主機跑正式機分支的程式；開發機四支策略同時停下，避免兩台搶同一個模擬倉帳戶。
 
-1. **開發機凍結四支策略**：「四支策略子清單」＝5.1 manifest 中以 `mexc-momentum-`、`seykota-`（不含 `seykota-cloudflared.service`）、`my-crypto-`、`btc-competition-` 開頭的 47 行（2026-09-29 已比對：開發機這 47 個 unit 與正式機完全相同）。在開發機用 5.1 的凍結指令與讀回 gate，只套用這份子清單，零輸出才往下。
+1. **開發機凍結四支策略**：用下面的「四支策略子清單」（5.1 manifest 的子集合，逐字取出、排序），在開發機跑 5.1 的凍結指令
+   與讀回 gate（gate 的 manifest 換成這份子清單、集合比對的篩選條件換成 `^(mexc-momentum-|seykota-|my-crypto-|btc-competition-)`
+   並排除 `seykota-cloudflared.service`），零輸出才往下。2026-09-29 已比對：開發機這些 unit 與正式機完全相同。
+
+   子清單共 47 個：動能 15（主程式 1＋7 個 timer＋7 個同名 service）、趨勢 11（1＋5＋5）、加密 9（1＋4＋4）、
+   競賽 12（主程式 1＋6 個 timer＋5 個同名 service；`btc-competition-daily.timer` 觸發的是 `btc-competition-bot.service`，
+   沒有 `btc-competition-daily.service`）。集合關係可機械驗證：這份子清單的每一行都必須原樣出現在 5.1 manifest
+   （`grep -vxFf 5.1-manifest 子清單` 零輸出），且 5.1 manifest 中符合上述篩選條件的行數必須正好 47。
+
+   ```text
+   btc-competition-bot.service static
+   btc-competition-daily.timer disabled
+   btc-competition-google-projection.service static
+   btc-competition-google-projection.timer disabled
+   btc-competition-portfolio-snapshot.service static
+   btc-competition-portfolio-snapshot.timer disabled
+   btc-competition-reconcile-fetch.service static
+   btc-competition-reconcile-fetch.timer disabled
+   btc-competition-report-publish.service static
+   btc-competition-report-publish.timer disabled
+   btc-competition-unrecorded-fill.service static
+   btc-competition-unrecorded-fill.timer disabled
+   mexc-momentum-bot.service disabled
+   mexc-momentum-control-consumer.service static
+   mexc-momentum-control-consumer.timer disabled
+   mexc-momentum-funding-sync.service static
+   mexc-momentum-funding-sync.timer disabled
+   mexc-momentum-google-projection.service static
+   mexc-momentum-google-projection.timer disabled
+   mexc-momentum-portfolio-snapshot.service static
+   mexc-momentum-portfolio-snapshot.timer disabled
+   mexc-momentum-reconcile-fetch.service static
+   mexc-momentum-reconcile-fetch.timer disabled
+   mexc-momentum-repair-shadow.service static
+   mexc-momentum-repair-shadow.timer disabled
+   mexc-momentum-report-publish.service static
+   mexc-momentum-report-publish.timer disabled
+   my-crypto-bot-funding-sync.service static
+   my-crypto-bot-funding-sync.timer disabled
+   my-crypto-bot.service disabled
+   my-crypto-portfolio-snapshot.service static
+   my-crypto-portfolio-snapshot.timer disabled
+   my-crypto-reconcile-fetch.service static
+   my-crypto-reconcile-fetch.timer disabled
+   my-crypto-report-publish.service static
+   my-crypto-report-publish.timer disabled
+   seykota-bot.service disabled
+   seykota-google-projection.service static
+   seykota-google-projection.timer disabled
+   seykota-portfolio-snapshot.service static
+   seykota-portfolio-snapshot.timer disabled
+   seykota-reconcile-fetch.service static
+   seykota-reconcile-fetch.timer disabled
+   seykota-repair-shadow.service static
+   seykota-repair-shadow.timer disabled
+   seykota-report-publish.service static
+   seykota-report-publish.timer disabled
+   ```
+
 2. **複製開發機的設定到新主機**：四支策略的 `.env` 與開關檔，照開發機現況是 `STRATEGY_MODE=DRY_RUN_ONLINE`、
    `DRY_RUN_ONLY=1`（這是紙上模擬上線；動能、趨勢、競賽會在**模擬倉**帳戶下單、加密沒有金鑰），**不放任何真倉金鑰**。
    複製後把 `.env` 裡 LINE、Telegram、Google 表的設定清空，讀回確認。開關檔用 `grep` 讀回確認四支都是上述兩個值。
