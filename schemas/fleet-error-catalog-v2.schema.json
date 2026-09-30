@@ -9,7 +9,8 @@
     "risk_tiers",
     "projects",
     "entries",
-    "retired_codes"
+    "retired_codes",
+    "error_ids_issued"
   ],
   "additionalProperties": false,
   "properties": {
@@ -74,6 +75,11 @@
         "type": "string"
       }
     },
+    "error_ids_issued": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "How many fixed error numbers (ERR-001 ...) have ever been issued. Every number from ERR-001 up to this count appears exactly once across entries and retired_codes; a new entry takes ERR-(issued+1) and bumps this, and a retired entry moves its number to retired_codes, so a number is never reused."
+    },
     "entries": {
       "type": "array",
       "minItems": 1,
@@ -103,6 +109,11 @@
           "reason": {
             "type": "string",
             "minLength": 1
+          },
+          "error_id": {
+            "type": "string",
+            "pattern": "^ERR-[0-9]{3}$",
+            "description": "The retired entry's fixed error number, kept so it is never reused. Codes retired before numbering existed (2026-09-30) have none."
           }
         }
       }
@@ -112,6 +123,7 @@
     "entry": {
       "type": "object",
       "required": [
+        "error_id",
         "code",
         "title",
         "project",
@@ -128,6 +140,11 @@
       ],
       "additionalProperties": false,
       "properties": {
+        "error_id": {
+          "type": "string",
+          "pattern": "^ERR-[0-9]{3}$",
+          "description": "Fixed fleet-wide error number shown to the operator (one sequence for all strategies, never reused)."
+        },
         "code": {
           "type": "string",
           "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$",

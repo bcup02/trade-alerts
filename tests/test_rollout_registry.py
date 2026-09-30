@@ -474,7 +474,7 @@ def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog
     for entry in change:
         anchor_prefix = "cap-" if entry["kind"] == "cap" else "rule-"
         item = items[anchor_prefix + entry["id"]]
-        if entry.get("type", "completed") == "added":
+        if entry.get("type", "completed") in ("added", "updated"):
             assert item["added_recent"] is True
         else:
             assert item["has_recent"] is True
@@ -490,3 +490,22 @@ def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog
     pages = {path.name: html for path, html in render_guides.rendered_pages().items()}
     assert "recent_summary" in pages["fleet-rollout-register.html"]
     assert "最新變動" in pages["fleet-rollout-register.html"]
+
+
+def test_updated_recent_change_is_accepted_and_flagged(registry, catalog):
+    """type=updated names an existing row whose content changed without any
+    cell flipping (e.g. a pending description rewritten, a catalog row
+    retitled): it must validate while the row exists, fail when it doesn't,
+    and show up in the page's 'recently changed' summary like added does."""
+    import copy
+
+    capability = next(c for c in registry["capabilities"]
+                      if any(v.get("state") == "pending" for v in c["status"].values()))
+    reg = copy.deepcopy(registry)
+    reg["recent_changes"] = [{"kind": "cap", "id": capability["id"], "type": "updated", "note": "x"}]
+    assert not [p for p in registry_problems(reg, catalog) if "recent_changes" in p]
+    reg["recent_changes"] = [{"kind": "cap", "id": "nonexistent.capability", "type": "updated", "note": "x"}]
+    assert [p for p in registry_problems(reg, catalog) if "recent_changes" in p]
+    reg["recent_changes"] = [{"kind": "cap", "id": capability["id"], "type": "updated", "note": "x"}]
+    items = {i["anchor"]: i for i in _render_guides().rollout_items(catalog, reg)}
+    assert items["cap-" + capability["id"]]["added_recent"] is True
