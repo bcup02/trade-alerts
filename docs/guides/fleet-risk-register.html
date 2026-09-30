@@ -100,9 +100,9 @@
   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>42 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    四支策略目前所有已知的「出問題」情況，共 <b>49 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>29 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>31 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -1311,6 +1311,177 @@
    "tier": "R3",
    "title": "交易所有成交、帳本沒記，無法自動更正",
    "what": "加密策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。"
+  },
+  {
+   "ai_prompt": "請追查這支策略為什麼帳本跟交易所對不上：讀該策略 audit/ledger_status.json 的 position_diffs 與 unmatched_exchange_fills，對照 audit/trading_ledger.jsonl 與交易所成交（唯讀查詢），判斷是漏記平倉、重複送單、手動下單還是記錄錯誤，提出以交易所為準、只追加的更正步驟（先給我確認再執行），並追查根本原因。",
+   "behaviour": {
+    "state": "done"
+   },
+   "bot": "fleet",
+   "bot_label": "全機隊",
+   "code": "FLEET.OPS_LEDGER_DIVERGED",
+   "direction": "交易所是標準答案。修復機器人能對應的漏記平倉會自己補；補不了、或是多出來的成交，要人確認並讓帳本跟交易所一致。",
+   "emits_event": {
+    "state": "n/a"
+   },
+   "error_id": "ERR-043",
+   "notes": [],
+   "open": false,
+   "steps": [
+    "看訊息裡是哪支策略，到交易所 App 核對這支策略的持倉與最近成交。",
+    "等下一輪對帳（約 15 分鐘）；若修復機器人已自動補好，會收到「已恢復」。",
+    "仍然對不上：把下方「給 AI 的追查指令」整段貼給 Claude，列出差異並提出以交易所為準的更正步驟（先給你確認再執行）。"
+   ],
+   "tier": "R3",
+   "title": "帳本跟交易所對不上（維運通知帳本軸）",
+   "what": "某支策略的本地帳本跟交易所的成交或部位對不上。"
+  },
+  {
+   "ai_prompt": "請追查這支策略的帳本為什麼跟 Google 表對不上：讀 audit/google_reconcile_status.json 的差異清單、Google 表同步佇列與 google-projection 背景工作的日誌，判斷是送出失敗、接收端錯誤還是資料格式問題，並提出讓兩邊一致的做法與治本修正。",
+   "behaviour": {
+    "state": "done"
+   },
+   "bot": "fleet",
+   "bot_label": "全機隊",
+   "code": "FLEET.OPS_GOOGLE_DIVERGED",
+   "direction": "帳本是標準答案，Google 表會由背景工作重送追上。多數幾輪內自己恢復；一直對不上才代表同步卡住。",
+   "emits_event": {
+    "state": "n/a"
+   },
+   "error_id": "ERR-044",
+   "notes": [],
+   "open": false,
+   "steps": [
+    "等下一兩輪對帳，若自動恢復會收到「已恢復」。",
+    "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，追查 Google 表同步為什麼卡住。"
+   ],
+   "tier": "R2",
+   "title": "帳本跟 Google 表對不上（維運通知 Google 表軸）",
+   "what": "某支策略的本地帳本跟共用的 Google 表對不上。"
+  },
+  {
+   "ai_prompt": "請追查這支策略為什麼回報出錯或安全暫停：讀 /var/lib/portfolio-query/<策略>/current.json 的 strategy.runtime_status 與策略狀態檔的暫停原因與證據，對照該策略主程式的 journal，說明原因、該照風險登記冊哪一條處理，並提出治本修正。",
+   "behaviour": {
+    "state": "done"
+   },
+   "bot": "fleet",
+   "bot_label": "全機隊",
+   "code": "FLEET.OPS_RUNTIME_ALERT",
+   "direction": "策略已經停下或跑不動，不會自己恢復交易。先看策略自己的暫停原因，照那條錯誤的處理步驟做。",
+   "emits_event": {
+    "state": "n/a"
+   },
+   "error_id": "ERR-045",
+   "notes": [],
+   "open": false,
+   "steps": [
+    "看訊息裡是哪支策略；到主機用該策略的解除工具 preview 看暫停原因與證據。",
+    "照風險登記冊裡那個原因的處理步驟處理。",
+    "確認後用解除工具解除；恢復後會收到「已恢復」。"
+   ],
+   "tier": "R3",
+   "title": "策略出錯或安全暫停（維運通知運行狀態軸）",
+   "what": "某支策略回報自己出錯（ERROR）或已安全暫停（SAFE_HALT）。"
+  },
+  {
+   "ai_prompt": "請追查這個背景服務為什麼失敗：在該主機用 journalctl -u <服務> 看最近幾次執行的錯誤（例如 226/NAMESPACE、203/EXEC、Python 例外），判斷是環境、權限、設定還是程式問題，並提出治本修正；若是部署造成的暫時失敗，說明並確認已恢復。",
+   "behaviour": {
+    "state": "pending"
+   },
+   "bot": "fleet",
+   "bot_label": "全機隊",
+   "code": "FLEET.OPS_UNIT_FAILED",
+   "direction": "多數是暫時性的（例如部署時剛好在跑），下一輪自己恢復。一直失敗代表程式或設定有問題，例如 2026-09-29 新主機快照資料夾沒建立。",
+   "emits_event": {
+    "state": "n/a"
+   },
+   "error_id": "ERR-046",
+   "notes": [
+    "行為未做 — 加密策略：還沒決定要盯哪些背景服務（見「維運通知盯背景服務有沒有掛掉」）。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡是哪個服務。",
+    "等下一輪；恢復會收到「已恢復」。",
+    "一直失敗：把下方「給 AI 的追查指令」整段貼給 Claude，查服務日誌並修正。"
+   ],
+   "tier": "R2",
+   "title": "背景服務掛掉（維運通知服務單元軸）",
+   "what": "維運通知盯的某個背景服務（systemd unit）狀態是失敗。"
+  },
+  {
+   "ai_prompt": "請追查這支策略的 audit/ops_export.json 為什麼讀不到或沒更新：看寫它的背景工作（修復機器人或帳本少記成交計時器）的 journal、檔案權限與 generated_at，判斷是背景工作沒跑、失敗還是權限問題，並提出治本修正。",
+   "behaviour": {
+    "state": "pending"
+   },
+   "bot": "fleet",
+   "bot_label": "全機隊",
+   "code": "FLEET.OPS_EXPORT_UNAVAILABLE",
+   "direction": "匯出檔是策略把「要通知你的事」交給維運通知的地方，讀不到代表這段期間策略的通知可能送不出來。一直這樣要查寫匯出檔的背景工作。",
+   "emits_event": {
+    "state": "n/a"
+   },
+   "error_id": "ERR-047",
+   "notes": [
+    "行為未做 — 加密策略：還沒有匯出檔。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡是哪支策略。",
+    "等下一輪；恢復會收到「已恢復」。",
+    "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，查寫匯出檔的背景工作。"
+   ],
+   "tier": "R2",
+   "title": "匯出檔讀不到或太久沒更新（維運通知匯出檔軸）",
+   "what": "維運通知讀不到某支策略的匯出檔，或匯出檔太久沒更新。"
+  },
+  {
+   "ai_prompt": "請追查這支策略為什麼停止回報：確認主程式與對帳、快照背景工作的 systemctl 狀態與最近 journal，看狀態檔（audit/ledger_status.json、google_reconcile_status.json、/var/lib/portfolio-query/<策略>/current.json）的 checked_at，判斷是服務停了、卡住還是權限問題，並提出治本修正。",
+   "behaviour": {
+    "state": "done"
+   },
+   "bot": "fleet",
+   "bot_label": "全機隊",
+   "code": "FLEET.OPS_STATUS_STALE",
+   "direction": "通常是寫狀態檔的服務停了或卡住。先確認策略主程式與對帳背景工作還在跑；刻意停用（例如搬家凍結）時可以忽略。",
+   "emits_event": {
+    "state": "n/a"
+   },
+   "error_id": "ERR-048",
+   "notes": [],
+   "open": false,
+   "steps": [
+    "看訊息裡是哪支策略、哪個軸。",
+    "確認這支策略是不是被刻意停用（例如搬家期間凍結）；是的話可忽略。",
+    "不是的話，把下方「給 AI 的追查指令」整段貼給 Claude，查服務為什麼沒在回報。"
+   ],
+   "tier": "R2",
+   "title": "策略停止回報（狀態檔不見或太舊）",
+   "what": "某支策略的狀態檔（對帳結果或運行狀態）不見了或太久沒更新，看起來像是停止回報。"
+  },
+  {
+   "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。",
+   "behaviour": {
+    "state": "n/a"
+   },
+   "bot": "fleet",
+   "bot_label": "全機隊",
+   "code": "FLEET.OPS_CLOCK_DEGRADED",
+   "direction": "時鐘不準時交易所會拒絕下單，真倉的進出場與停損都可能失效。要把時間同步改回 chrony 並確認時間準確。",
+   "emits_event": {
+    "state": "n/a"
+   },
+   "error_id": "ERR-049",
+   "notes": [],
+   "open": false,
+   "steps": [
+    "看訊息裡是哪台主機。",
+    "到那台主機確認 chrony 是否在跑、時間是否同步（chronyc tracking）。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，找出是什麼把時間同步換掉並修正。"
+   ],
+   "tier": "R3",
+   "title": "主機時鐘同步被關掉（維運通知時鐘軸）",
+   "what": "主機的時間同步程式被換掉或停用（例如系統更新後改回 systemd-timesyncd），時鐘可能開始不準。"
   }
  ],
  "tiers": [
