@@ -211,3 +211,27 @@ def test_error_id_is_shown_on_both_register_pages(catalog):
     first = catalog["entries"][0]
     assert f'"error_id": "{first["error_id"]}"' in pages["fleet-risk-register.html"]
     assert f'{first["error_id"]} · {first["code"]}' in pages["fleet-rollout-register.html"]
+
+
+def test_retiring_an_entry_keeps_its_error_id_in_retired_codes(catalog):
+    """#87 review follow-up: the positive case. Moving a live entry (with its
+    error_id) into retired_codes keeps the sequence valid; dropping the number
+    on the way out, or giving it to a new entry, does not."""
+    import copy
+    import re
+
+    def valid(cat):
+        live = [e["error_id"] for e in cat["entries"]]
+        retired = [i["error_id"] for i in cat["retired_codes"] if "error_id" in i]
+        ids = live + retired
+        return (all(re.fullmatch(r"ERR-\d{3}", n) for n in ids) and len(ids) == len(set(ids))
+                and sorted(ids) == [f"ERR-{n:03d}" for n in range(1, cat["error_ids_issued"] + 1)])
+
+    cat = copy.deepcopy(catalog)
+    gone = cat["entries"].pop(3)
+    assert not valid(cat), "a retired entry that drops its number must fail"
+    cat["retired_codes"].append({"code": gone["code"], "retired_in": "fleet-error-catalog/v2",
+                                 "reason": "test", "error_id": gone["error_id"]})
+    assert valid(cat)
+    cat["entries"].append({**cat["entries"][0], "code": "FLEET.TEST_REUSE", "error_id": gone["error_id"]})
+    assert not valid(cat), "reusing a retired number must fail"

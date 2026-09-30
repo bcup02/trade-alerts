@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 42,
+  "error_ids_issued": 49,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -1343,6 +1343,236 @@
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
         ],
         "ai_prompt": "請在 my-crypto-bot 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
+      }
+    },
+    {
+      "error_id": "ERR-043",
+      "code": "FLEET.OPS_LEDGER_DIVERGED",
+      "title": "帳本跟交易所對不上（維運通知帳本軸）",
+      "project": "fleet",
+      "sources": [
+        "ops-notify/src/ops_notify/config.py:15",
+        "ops-notify/src/ops_notify/watch.py:38",
+        "ops-notify/src/ops_notify/watch.py:122",
+        "ops-notify/src/ops_notify/dispatch.py:26"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」，持續則「🔴 對帳狀態升級」，恢復時「✅ 對帳狀態已恢復」",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "維運通知每輪讀策略寫的 ledger_status.json；DIVERGED 就發通知，不自動改帳本。",
+      "human_action": "以交易所為準，確認差異從哪裡來，再讓帳本跟交易所一致（修復機器人能處理的會自己補）。",
+      "resume": "n/a",
+      "lands_in_phase": 4,
+      "rationale": "帳本與交易所不一致可能代表漏記成交或部位不符，牽涉真錢，一定要人確認。",
+      "operator_message": {
+        "what": "某支策略的本地帳本跟交易所的成交或部位對不上。",
+        "direction": "交易所是標準答案。修復機器人能對應的漏記平倉會自己補；補不了、或是多出來的成交，要人確認並讓帳本跟交易所一致。",
+        "steps": [
+          "看訊息裡是哪支策略，到交易所 App 核對這支策略的持倉與最近成交。",
+          "等下一輪對帳（約 15 分鐘）；若修復機器人已自動補好，會收到「已恢復」。",
+          "仍然對不上：把下方「給 AI 的追查指令」整段貼給 Claude，列出差異並提出以交易所為準的更正步驟（先給你確認再執行）。"
+        ],
+        "ai_prompt": "請追查這支策略為什麼帳本跟交易所對不上：讀該策略 audit/ledger_status.json 的 position_diffs 與 unmatched_exchange_fills，對照 audit/trading_ledger.jsonl 與交易所成交（唯讀查詢），判斷是漏記平倉、重複送單、手動下單還是記錄錯誤，提出以交易所為準、只追加的更正步驟（先給我確認再執行），並追查根本原因。"
+      }
+    },
+    {
+      "error_id": "ERR-044",
+      "code": "FLEET.OPS_GOOGLE_DIVERGED",
+      "title": "帳本跟 Google 表對不上（維運通知 Google 表軸）",
+      "project": "fleet",
+      "sources": [
+        "ops-notify/src/ops_notify/config.py:16",
+        "ops-notify/src/ops_notify/watch.py:38",
+        "ops-notify/src/ops_notify/watch.py:122",
+        "ops-notify/src/ops_notify/dispatch.py:26"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」，持續則「🔴 對帳狀態升級」，恢復時「✅ 對帳狀態已恢復」",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "Google 表由背景工作重送追上；維運通知連續幾輪仍 DIVERGED 才升級。",
+      "human_action": "持續對不上時確認 Google 表同步是否卡住，必要時重送。",
+      "resume": "n/a",
+      "lands_in_phase": 4,
+      "rationale": "Google 表只是給人看的投影，不影響交易；多數會在下一輪自動追上，持續不一致才需要人。",
+      "operator_message": {
+        "what": "某支策略的本地帳本跟共用的 Google 表對不上。",
+        "direction": "帳本是標準答案，Google 表會由背景工作重送追上。多數幾輪內自己恢復；一直對不上才代表同步卡住。",
+        "steps": [
+          "等下一兩輪對帳，若自動恢復會收到「已恢復」。",
+          "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，追查 Google 表同步為什麼卡住。"
+        ],
+        "ai_prompt": "請追查這支策略的帳本為什麼跟 Google 表對不上：讀 audit/google_reconcile_status.json 的差異清單、Google 表同步佇列與 google-projection 背景工作的日誌，判斷是送出失敗、接收端錯誤還是資料格式問題，並提出讓兩邊一致的做法與治本修正。"
+      }
+    },
+    {
+      "error_id": "ERR-045",
+      "code": "FLEET.OPS_RUNTIME_ALERT",
+      "title": "策略出錯或安全暫停（維運通知運行狀態軸）",
+      "project": "fleet",
+      "sources": [
+        "ops-notify/src/ops_notify/config.py:28",
+        "ops-notify/src/ops_notify/watch.py:47",
+        "ops-notify/src/ops_notify/watch.py:48",
+        "ops-notify/src/ops_notify/watch.py:176"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」，持續則「🔴 對帳狀態升級」，恢復時「✅ 對帳狀態已恢復」；安全暫停不等去抖、立刻通知",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "維運通知讀策略快照的運行狀態；ERROR 連續異常才通知，SAFE_HALT 立刻通知。不自動解除。",
+      "human_action": "照該策略的暫停原因處理，確認後用解除工具解除。",
+      "resume": "n/a",
+      "lands_in_phase": 4,
+      "rationale": "安全暫停代表策略自己停下來等人，出錯代表策略連續跑不動，兩者都要人判斷。",
+      "operator_message": {
+        "what": "某支策略回報自己出錯（ERROR）或已安全暫停（SAFE_HALT）。",
+        "direction": "策略已經停下或跑不動，不會自己恢復交易。先看策略自己的暫停原因，照那條錯誤的處理步驟做。",
+        "steps": [
+          "看訊息裡是哪支策略；到主機用該策略的解除工具 preview 看暫停原因與證據。",
+          "照風險登記冊裡那個原因的處理步驟處理。",
+          "確認後用解除工具解除；恢復後會收到「已恢復」。"
+        ],
+        "ai_prompt": "請追查這支策略為什麼回報出錯或安全暫停：讀 /var/lib/portfolio-query/<策略>/current.json 的 strategy.runtime_status 與策略狀態檔的暫停原因與證據，對照該策略主程式的 journal，說明原因、該照風險登記冊哪一條處理，並提出治本修正。"
+      }
+    },
+    {
+      "error_id": "ERR-046",
+      "code": "FLEET.OPS_UNIT_FAILED",
+      "title": "背景服務掛掉（維運通知服務單元軸）",
+      "project": "fleet",
+      "sources": [
+        "ops-notify/src/ops_notify/watch.py:239"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」（服務單元狀態 FAILED）",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "定時服務下一輪會自己重跑；維運通知連續幾輪仍 FAILED 才升級。",
+      "human_action": "持續失敗時查該服務的日誌找原因並修正。",
+      "resume": "n/a",
+      "lands_in_phase": 4,
+      "rationale": "定時服務偶爾失敗一輪（例如部署重建環境時）下一輪就會恢復；一直失敗才需要人。",
+      "operator_message": {
+        "what": "維運通知盯的某個背景服務（systemd unit）狀態是失敗。",
+        "direction": "多數是暫時性的（例如部署時剛好在跑），下一輪自己恢復。一直失敗代表程式或設定有問題，例如 2026-09-29 新主機快照資料夾沒建立。",
+        "steps": [
+          "看訊息裡是哪個服務。",
+          "等下一輪；恢復會收到「已恢復」。",
+          "一直失敗：把下方「給 AI 的追查指令」整段貼給 Claude，查服務日誌並修正。"
+        ],
+        "ai_prompt": "請追查這個背景服務為什麼失敗：在該主機用 journalctl -u <服務> 看最近幾次執行的錯誤（例如 226/NAMESPACE、203/EXEC、Python 例外），判斷是環境、權限、設定還是程式問題，並提出治本修正；若是部署造成的暫時失敗，說明並確認已恢復。"
+      }
+    },
+    {
+      "error_id": "ERR-047",
+      "code": "FLEET.OPS_EXPORT_UNAVAILABLE",
+      "title": "匯出檔讀不到或太久沒更新（維運通知匯出檔軸）",
+      "project": "fleet",
+      "sources": [
+        "ops-notify/src/ops_notify/watch.py:260",
+        "ops-notify/src/ops_notify/watch.py:270"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」（匯出檔 UNAVAILABLE／STALE）",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "寫匯出檔的背景工作下一輪會重寫；維運通知連續幾輪仍異常才升級。",
+      "human_action": "持續異常時查寫匯出檔的背景工作。",
+      "resume": "n/a",
+      "lands_in_phase": 4,
+      "rationale": "匯出檔讀不到時，策略要通知你的事送不出來；多數下一輪就恢復，一直這樣才需要人。",
+      "operator_message": {
+        "what": "維運通知讀不到某支策略的匯出檔，或匯出檔太久沒更新。",
+        "direction": "匯出檔是策略把「要通知你的事」交給維運通知的地方，讀不到代表這段期間策略的通知可能送不出來。一直這樣要查寫匯出檔的背景工作。",
+        "steps": [
+          "看訊息裡是哪支策略。",
+          "等下一輪；恢復會收到「已恢復」。",
+          "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，查寫匯出檔的背景工作。"
+        ],
+        "ai_prompt": "請追查這支策略的 audit/ops_export.json 為什麼讀不到或沒更新：看寫它的背景工作（修復機器人或帳本少記成交計時器）的 journal、檔案權限與 generated_at，判斷是背景工作沒跑、失敗還是權限問題，並提出治本修正。"
+      }
+    },
+    {
+      "error_id": "ERR-048",
+      "code": "FLEET.OPS_STATUS_STALE",
+      "title": "策略停止回報（狀態檔不見或太舊）",
+      "project": "fleet",
+      "sources": [
+        "ops-notify/src/ops_notify/watch.py:104",
+        "ops-notify/src/ops_notify/watch.py:116",
+        "ops-notify/src/ops_notify/watch.py:159",
+        "ops-notify/src/ops_notify/watch.py:170"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」（UNAVAILABLE／STALE）",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "寫狀態檔的程式下一輪會重寫；維運通知連續幾輪仍異常才升級。",
+      "human_action": "持續異常時確認策略與對帳背景工作是否還在跑。",
+      "resume": "n/a",
+      "lands_in_phase": 4,
+      "rationale": "狀態檔太舊代表策略或對帳沒在回報，可能是服務停了；短暫缺一輪會自己恢復，一直這樣才需要人。",
+      "operator_message": {
+        "what": "某支策略的狀態檔（對帳結果或運行狀態）不見了或太久沒更新，看起來像是停止回報。",
+        "direction": "通常是寫狀態檔的服務停了或卡住。先確認策略主程式與對帳背景工作還在跑；刻意停用（例如搬家凍結）時可以忽略。",
+        "steps": [
+          "看訊息裡是哪支策略、哪個軸。",
+          "確認這支策略是不是被刻意停用（例如搬家期間凍結）；是的話可忽略。",
+          "不是的話，把下方「給 AI 的追查指令」整段貼給 Claude，查服務為什麼沒在回報。"
+        ],
+        "ai_prompt": "請追查這支策略為什麼停止回報：確認主程式與對帳、快照背景工作的 systemctl 狀態與最近 journal，看狀態檔（audit/ledger_status.json、google_reconcile_status.json、/var/lib/portfolio-query/<策略>/current.json）的 checked_at，判斷是服務停了、卡住還是權限問題，並提出治本修正。"
+      }
+    },
+    {
+      "error_id": "ERR-049",
+      "code": "FLEET.OPS_CLOCK_DEGRADED",
+      "title": "主機時鐘同步被關掉（維運通知時鐘軸）",
+      "project": "fleet",
+      "sources": [
+        "ops-notify/src/ops_notify/config.py:17",
+        "ops-notify/src/ops_notify/watch.py:44"
+      ],
+      "current": {
+        "latch": null,
+        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」（系統時鐘 DEGRADED）",
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "維運通知讀 clock-health 寫的狀態檔；DEGRADED 就發通知，不自動修改系統設定。",
+      "human_action": "把主機的時間同步改回 chrony 並確認時間準確。",
+      "resume": "n/a",
+      "lands_in_phase": 4,
+      "rationale": "時鐘不準會讓交易所以時間戳記拒絕下單（-1021），真倉會下不了單或停損失效，一定要人處理。",
+      "operator_message": {
+        "what": "主機的時間同步程式被換掉或停用（例如系統更新後改回 systemd-timesyncd），時鐘可能開始不準。",
+        "direction": "時鐘不準時交易所會拒絕下單，真倉的進出場與停損都可能失效。要把時間同步改回 chrony 並確認時間準確。",
+        "steps": [
+          "看訊息裡是哪台主機。",
+          "到那台主機確認 chrony 是否在跑、時間是否同步（chronyc tracking）。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，找出是什麼把時間同步換掉並修正。"
+        ],
+        "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。"
       }
     }
   ],

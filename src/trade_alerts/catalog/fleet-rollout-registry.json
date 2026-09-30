@@ -1255,14 +1255,325 @@
           "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
         }
       }
+    },
+    {
+      "code": "FLEET.OPS_LEDGER_DIVERGED",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/reconcile/compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "reconcile_compare.py:101 main 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        }
+      }
+    },
+    {
+      "code": "FLEET.OPS_GOOGLE_DIVERGED",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/google_reconcile.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/reconcile/google_reconcile.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "google_reconcile.py:135 main 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/reconcile_google.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        }
+      }
+    },
+    {
+      "code": "FLEET.OPS_RUNTIME_ALERT",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "portfolio_snapshot_adapter.py:75 _runtime_status 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        }
+      }
+    },
+    {
+      "code": "FLEET.OPS_UNIT_FAILED",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "deploy/mexc-momentum-repair-shadow.service 列入正式機 OPS_NOTIFY_MOMENTUM_UNITS，由維運通知服務單元軸盯。"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "deploy/seykota-repair-shadow.service 列入正式機 OPS_NOTIFY_SEYKOTA_UNITS，由維運通知服務單元軸盯。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "還沒決定要盯哪些背景服務（見「維運通知盯背景服務有沒有掛掉」）。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "deploy/btc-competition-unrecorded-fill.service 列入正式機 OPS_NOTIFY_BTC_COMPETITION_UNITS，由維運通知服務單元軸盯。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        }
+      }
+    },
+    {
+      "code": "FLEET.OPS_EXPORT_UNAVAILABLE",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:163 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on）。"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:186 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "還沒有匯出檔。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/unrecorded_fill.py:215 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on）。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        }
+      }
+    },
+    {
+      "code": "FLEET.OPS_STATUS_STALE",
+      "behaviour": {
+        "momentum": {
+          "state": "done",
+          "evidence": "src/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
+        },
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/reconcile/compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "reconcile_compare.py:101 main 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        }
+      }
+    },
+    {
+      "code": "FLEET.OPS_CLOCK_DEGRADED",
+      "behaviour": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "notify.error_id",
-      "type": "updated",
-      "note": "錯誤目錄每條配好固定編號 ERR-001～ERR-042（e1），風險登記冊與本頁都顯示編號；通知第一行帶編號是 e3，這格仍未做。"
+      "kind": "rule",
+      "id": "FLEET.OPS_LEDGER_DIVERGED",
+      "type": "added",
+      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_GOOGLE_DIVERGED",
+      "type": "added",
+      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_RUNTIME_ALERT",
+      "type": "added",
+      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_UNIT_FAILED",
+      "type": "added",
+      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
+      "type": "added",
+      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_STATUS_STALE",
+      "type": "added",
+      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_CLOCK_DEGRADED",
+      "type": "added",
+      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
     }
   ]
 }
