@@ -1,0 +1,1469 @@
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index 539555f..c499d74 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -12,6 +12,17 @@
+ 
+ ---
+ 
++## 0. 固定錯誤編號（2026-09-30 起）
++
++每一條錯誤都有一個固定編號 `error_id`（`ERR-001`、`ERR-002`…），**全機隊共用一個流水號**、不分策略，給人看的地方（風險登記冊、之後的每則通知）都帶這個編號。
++規則由 `tests/test_fleet_error_catalog.py::test_error_ids_are_dense_unique_and_never_reused` 守住：
++
++- 新增錯誤：用 `ERR-(error_ids_issued+1)`，並把 JSON 最上層的 `error_ids_issued` 加 1。
++- 退役錯誤：條目移到 `retired_codes` 時**帶著原本的 `error_id`**，編號永遠不重用。
++- 從 `ERR-001` 到 `error_ids_issued` 的每個號碼，在現役條目與 `retired_codes` 裡剛好出現一次。
++
++2026-09-30 當天依 JSON 裡的順序配了 `ERR-001`–`ERR-042`；在這之前就退役的代碼沒有編號。
++
+ ## 1. 判準
+ 
+ 貫穿全專案的唯一問題：
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index b2bfa7e..7a6828e 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -159,6 +159,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-001",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+    ],
+@@ -183,6 +184,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-002",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+    ],
+@@ -213,6 +215,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-003",
+    "notes": [
+     "行為未做 — 目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+@@ -243,6 +246,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-004",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+    ],
+@@ -272,6 +276,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-005",
+    "notes": [
+     "行為未做 — 目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+@@ -301,6 +306,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-006",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+    ],
+@@ -330,6 +336,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-007",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+    ],
+@@ -360,6 +367,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-008",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+    ],
+@@ -390,6 +398,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-009",
+    "notes": [
+     "行為未做 — 暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+@@ -420,6 +429,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-010",
+    "notes": [
+     "行為未做 — 暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+@@ -449,6 +459,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-011",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+    ],
+@@ -477,6 +488,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-012",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+    ],
+@@ -501,6 +513,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-013",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+    ],
+@@ -525,6 +538,7 @@
+     "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-014",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
+    ],
+@@ -549,6 +563,7 @@
+     "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-015",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知）"
+    ],
+@@ -578,6 +593,7 @@
+     "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-016",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知）"
+    ],
+@@ -606,6 +622,7 @@
+     "reason": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-017",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知）"
+    ],
+@@ -629,6 +646,7 @@
+     "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+     "state": "done"
+    },
++   "error_id": "ERR-018",
+    "notes": [],
+    "open": false,
+    "steps": [],
+@@ -650,6 +668,7 @@
+     "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+     "state": "done"
+    },
++   "error_id": "ERR-019",
+    "notes": [],
+    "open": false,
+    "steps": [
+@@ -675,6 +694,7 @@
+     "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+     "state": "done"
+    },
++   "error_id": "ERR-020",
+    "notes": [],
+    "open": false,
+    "steps": [
+@@ -700,6 +720,7 @@
+     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-021",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+    ],
+@@ -730,6 +751,7 @@
+     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-022",
+    "notes": [
+     "行為未做 — 目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）",
+     "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+@@ -760,6 +782,7 @@
+     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-023",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+    ],
+@@ -789,6 +812,7 @@
+     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-024",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+    ],
+@@ -813,6 +837,7 @@
+     "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-025",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+    ],
+@@ -836,6 +861,7 @@
+     "evidence": "mexc_futures_bot.py:713 append_fleet_event（R0）",
+     "state": "done"
+    },
++   "error_id": "ERR-026",
+    "notes": [],
+    "open": false,
+    "steps": [],
+@@ -859,6 +885,7 @@
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-027",
+    "notes": [
+     "行為未做 — 目前：每次都照常重試，但沒有計數、連續失敗也不會升格。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
+     "寫進事件日誌未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+@@ -888,6 +915,7 @@
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-028",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+    ],
+@@ -917,6 +945,7 @@
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-029",
+    "notes": [
+     "行為未做 — 目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
+     "寫進事件日誌未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+@@ -946,6 +975,7 @@
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-030",
+    "notes": [
+     "寫進事件日誌未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+    ],
+@@ -975,6 +1005,7 @@
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-031",
+    "notes": [
+     "行為未做 — 下一輪會自動重掛（已符合），但連續失敗不會升格通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
+     "寫進事件日誌未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+@@ -1005,6 +1036,7 @@
+     "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。",
+     "state": "pending"
+    },
++   "error_id": "ERR-032",
+    "notes": [
+     "行為未做 — 目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））",
+     "寫進事件日誌未做 — 目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
+@@ -1033,6 +1065,7 @@
+     "evidence": "scripts/repair_bot.py:186 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+     "state": "done"
+    },
++   "error_id": "ERR-033",
+    "notes": [],
+    "open": false,
+    "steps": [],
+@@ -1054,6 +1087,7 @@
+     "evidence": "scripts/repair_bot.py:186 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+     "state": "done"
+    },
++   "error_id": "ERR-034",
+    "notes": [],
+    "open": false,
+    "steps": [
+@@ -1078,6 +1112,7 @@
+     "evidence": "scripts/repair_bot.py:186 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+     "state": "done"
+    },
++   "error_id": "ERR-035",
+    "notes": [],
+    "open": false,
+    "steps": [
+@@ -1103,6 +1138,7 @@
+     "evidence": "scripts/repair_bot.py:189 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。",
+     "state": "done"
+    },
++   "error_id": "ERR-036",
+    "notes": [],
+    "open": false,
+    "steps": [
+@@ -1127,6 +1163,7 @@
+     "evidence": "scripts/repair_bot.py:189 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。",
+     "state": "done"
+    },
++   "error_id": "ERR-037",
+    "notes": [],
+    "open": false,
+    "steps": [
+@@ -1153,6 +1190,7 @@
+     "evidence": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
+     "state": "done"
+    },
++   "error_id": "ERR-038",
+    "notes": [],
+    "open": false,
+    "steps": [
+@@ -1177,6 +1215,7 @@
+     "evidence": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
+     "state": "done"
+    },
++   "error_id": "ERR-039",
+    "notes": [],
+    "open": false,
+    "steps": [
+@@ -1203,6 +1242,7 @@
+     "evidence": "src/btc_competition/unrecorded_fill.py:237 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+     "state": "done"
+    },
++   "error_id": "ERR-040",
+    "notes": [],
+    "open": false,
+    "steps": [
+@@ -1227,6 +1267,7 @@
+     "evidence": "src/btc_competition/unrecorded_fill.py:237 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+     "state": "done"
+    },
++   "error_id": "ERR-041",
+    "notes": [],
+    "open": false,
+    "steps": [
+@@ -1255,6 +1296,7 @@
+     "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。",
+     "state": "pending"
+    },
++   "error_id": "ERR-042",
+    "notes": [
+     "行為未做 — 加密策略沒有修復機器人，要新增計時器並補上匯出檔通知管道（g1-6），上正式機後改 done。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）",
+     "寫進事件日誌未做 — 共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。（預定：g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。）"
+@@ -1326,7 +1368,7 @@ DATA.tiers.forEach(function(t){
+     row.appendChild(el("span","row-bot",e.bot_label));
+     var body=el("div","row-body");
+     body.appendChild(el("p","row-title",e.title));
+-    body.appendChild(el("p","code",e.code));
++    body.appendChild(el("p","code",e.error_id+" · "+e.code));
+     body.appendChild(el("p","row-what",e.what));
+     body.appendChild(el("p","row-how",e.direction));
+     var st=el("div","status");
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 170b071..6f1c7a6 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -2204,7 +2204,7 @@
+    "title": "自動修補重複發生時升格通知"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-notify.error_id",
+    "complete": false,
+    "dots": {
+@@ -2224,7 +2224,7 @@
+        "aspect": null,
+        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+        "state": "pending",
+-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+       }
+      ]
+     },
+@@ -2235,7 +2235,7 @@
+        "aspect": null,
+        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+        "state": "pending",
+-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+       }
+      ]
+     },
+@@ -2246,7 +2246,7 @@
+        "aspect": null,
+        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+        "state": "pending",
+-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+       }
+      ]
+     },
+@@ -2257,7 +2257,7 @@
+        "aspect": null,
+        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+        "state": "pending",
+-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+       }
+      ]
+     }
+@@ -2297,7 +2297,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
++   "sub": "ERR-001 · SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
+    "title": "R1｜開倉後停損掛單失敗，緊急市價平倉成功"
+   },
+   {
+@@ -2332,7 +2332,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
++   "sub": "ERR-002 · SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
+    "title": "R3｜停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）"
+   },
+   {
+@@ -2367,7 +2367,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.PROTECTION_REPLACE_FAILED",
++   "sub": "ERR-003 · SEY.PROTECTION_REPLACE_FAILED",
+    "title": "R2｜移動停損換單失敗，部位可能沒有交易所端保護"
+   },
+   {
+@@ -2402,7 +2402,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.PROTECTION_MOVE_DEFERRED",
++   "sub": "ERR-004 · SEY.PROTECTION_MOVE_DEFERRED",
+    "title": "R2｜移動停損時舊停損單取消不掉，保留舊停損、這輪不移動"
+   },
+   {
+@@ -2437,7 +2437,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
++   "sub": "ERR-005 · SEY.PROTECTION_CLOSE_CANCEL_FAILED",
+    "title": "R2｜平倉後停損單取消失敗，可能還掛在交易所"
+   },
+   {
+@@ -2472,7 +2472,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.PROTECTION_UNVERIFIED",
++   "sub": "ERR-006 · SEY.PROTECTION_UNVERIFIED",
+    "title": "R3｜交易所存在部位，但沒有可唯一確認的原生保護單"
+   },
+   {
+@@ -2507,7 +2507,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.POSITION_AMBIGUOUS",
++   "sub": "ERR-007 · SEY.POSITION_AMBIGUOUS",
+    "title": "R3｜交易所部位資料無法唯一辨識"
+   },
+   {
+@@ -2542,7 +2542,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.RECONCILE_FAILED",
++   "sub": "ERR-008 · SEY.RECONCILE_FAILED",
+    "title": "R2｜非暫時性的對帳失敗"
+   },
+   {
+@@ -2577,7 +2577,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.EXCHANGE_TARGET_UNSAFE",
++   "sub": "ERR-009 · SEY.EXCHANGE_TARGET_UNSAFE",
+    "title": "R3｜執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）"
+   },
+   {
+@@ -2612,7 +2612,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
++   "sub": "ERR-010 · SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+    "title": "R3｜真倉固定訂單識別能力不足"
+   },
+   {
+@@ -2647,7 +2647,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.RUNTIME_CYCLE_FAILED",
++   "sub": "ERR-011 · SEY.RUNTIME_CYCLE_FAILED",
+    "title": "R2｜未分類的執行期例外（run_forever catch-all）"
+   },
+   {
+@@ -2682,7 +2682,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.CLOSE_FILL_PENDING",
++   "sub": "ERR-012 · SEY.CLOSE_FILL_PENDING",
+    "title": "R0｜交易所部位已消失，等待平倉成交資料回填"
+   },
+   {
+@@ -2717,7 +2717,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.TRADE_EXIT",
++   "sub": "ERR-013 · SEY.TRADE_EXIT",
+    "title": "R0｜原生停損觸發的正常平倉"
+   },
+   {
+@@ -2752,7 +2752,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
++   "sub": "ERR-014 · SEY.ENTRY_SKIPPED_MIN_CAPITAL",
+    "title": "R0｜權益低於最低下單資金，跳過本次進場"
+   },
+   {
+@@ -2787,7 +2787,7 @@
+      ]
+     }
+    ],
+-   "sub": "MOM.PROTECTION_UNVERIFIED",
++   "sub": "ERR-015 · MOM.PROTECTION_UNVERIFIED",
+    "title": "R3｜原生移動停損無法驗證"
+   },
+   {
+@@ -2822,7 +2822,7 @@
+      ]
+     }
+    ],
+-   "sub": "MOM.STATE_REPAIRED_SAFE_HALT",
++   "sub": "ERR-016 · MOM.STATE_REPAIRED_SAFE_HALT",
+    "title": "R3｜工具修復本地 state 後主動 latch，等人明確解除"
+   },
+   {
+@@ -2857,7 +2857,7 @@
+      ]
+     }
+    ],
+-   "sub": "MOM.RUNTIME_CYCLE_FAILED",
++   "sub": "ERR-017 · MOM.RUNTIME_CYCLE_FAILED",
+    "title": "R0｜run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）"
+   },
+   {
+@@ -2892,7 +2892,7 @@
+      ]
+     }
+    ],
+-   "sub": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
++   "sub": "ERR-018 · MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+    "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
+   },
+   {
+@@ -2927,7 +2927,7 @@
+      ]
+     }
+    ],
+-   "sub": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
++   "sub": "ERR-019 · MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+    "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+   },
+   {
+@@ -2962,7 +2962,7 @@
+      ]
+     }
+    ],
+-   "sub": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++   "sub": "ERR-020 · MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+    "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
+   },
+   {
+@@ -2997,7 +2997,7 @@
+      ]
+     }
+    ],
+-   "sub": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
++   "sub": "ERR-021 · BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+    "title": "R3｜出現負／不可能的餘額，本地帳本本身不可信"
+   },
+   {
+@@ -3032,7 +3032,7 @@
+      ]
+     }
+    ],
+-   "sub": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
++   "sub": "ERR-022 · BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+    "title": "R2｜連續 3 天該再平衡卻零成交"
+   },
+   {
+@@ -3067,7 +3067,7 @@
+      ]
+     }
+    ],
+-   "sub": "BTC.ORDER_STATUS_UNKNOWN",
++   "sub": "ERR-023 · BTC.ORDER_STATUS_UNKNOWN",
+    "title": "R3｜送出的單 60 秒內確定不了有沒有成交"
+   },
+   {
+@@ -3102,7 +3102,7 @@
+      ]
+     }
+    ],
+-   "sub": "BTC.REBALANCE_PENDING",
++   "sub": "ERR-024 · BTC.REBALANCE_PENDING",
+    "title": "R0｜部分成交，目標權重尚未達成"
+   },
+   {
+@@ -3137,7 +3137,7 @@
+      ]
+     }
+    ],
+-   "sub": "BTC.RUNTIME_CYCLE_FAILED",
++   "sub": "ERR-025 · BTC.RUNTIME_CYCLE_FAILED",
+    "title": "R0｜runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）"
+   },
+   {
+@@ -3172,7 +3172,7 @@
+      ]
+     }
+    ],
+-   "sub": "MYC.RECONCILE_DELTA_EXCEEDED",
++   "sub": "ERR-026 · MYC.RECONCILE_DELTA_EXCEEDED",
+    "title": "R0｜本地帳本與交易所回報損益差額超過容忍值"
+   },
+   {
+@@ -3207,7 +3207,7 @@
+      ]
+     }
+    ],
+-   "sub": "MYC.RUNTIME_CYCLE_FAILED",
++   "sub": "ERR-027 · MYC.RUNTIME_CYCLE_FAILED",
+    "title": "R2｜未分類的執行期例外（catch-all）"
+   },
+   {
+@@ -3242,7 +3242,7 @@
+      ]
+     }
+    ],
+-   "sub": "MYC.PROTECTION_PLACEMENT_REJECTED",
++   "sub": "ERR-028 · MYC.PROTECTION_PLACEMENT_REJECTED",
+    "title": "R3｜開倉停損單被交易所拒絕，部位可能沒有交易所端保護"
+   },
+   {
+@@ -3277,7 +3277,7 @@
+      ]
+     }
+    ],
+-   "sub": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
++   "sub": "ERR-029 · MYC.PROTECTION_PLACEMENT_NO_POSITION",
+    "title": "R2｜開倉後查不到部位資訊，無法掛停損單"
+   },
+   {
+@@ -3312,7 +3312,7 @@
+      ]
+     }
+    ],
+-   "sub": "MYC.PROTECTION_PLACEMENT_ERROR",
++   "sub": "ERR-030 · MYC.PROTECTION_PLACEMENT_ERROR",
+    "title": "R3｜掛停損單時拋出例外，部位本身已開"
+   },
+   {
+@@ -3347,7 +3347,7 @@
+      ]
+     }
+    ],
+-   "sub": "MYC.PROTECTION_REPLACE_FAILED",
++   "sub": "ERR-031 · MYC.PROTECTION_REPLACE_FAILED",
+    "title": "R2｜搬移移動停損單失敗，交易所端目前沒有停損保護"
+   },
+   {
+@@ -3382,7 +3382,7 @@
+      ]
+     }
+    ],
+-   "sub": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
++   "sub": "ERR-032 · MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
+    "title": "R2｜平倉後取消殘留停損單失敗"
+   },
+   {
+@@ -3417,7 +3417,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++   "sub": "ERR-033 · SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+    "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
+   },
+   {
+@@ -3452,7 +3452,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
++   "sub": "ERR-034 · SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+    "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
+   },
+   {
+@@ -3487,7 +3487,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
++   "sub": "ERR-035 · SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+    "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+   },
+   {
+@@ -3522,7 +3522,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.UNRECORDED_FILL_CORRECTED",
++   "sub": "ERR-036 · SEY.UNRECORDED_FILL_CORRECTED",
+    "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
+   },
+   {
+@@ -3557,7 +3557,7 @@
+      ]
+     }
+    ],
+-   "sub": "SEY.UNRECORDED_FILL_UNRESOLVED",
++   "sub": "ERR-037 · SEY.UNRECORDED_FILL_UNRESOLVED",
+    "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+   },
+   {
+@@ -3592,7 +3592,7 @@
+      ]
+     }
+    ],
+-   "sub": "MOM.UNRECORDED_FILL_CORRECTED",
++   "sub": "ERR-038 · MOM.UNRECORDED_FILL_CORRECTED",
+    "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
+   },
+   {
+@@ -3627,7 +3627,7 @@
+      ]
+     }
+    ],
+-   "sub": "MOM.UNRECORDED_FILL_UNRESOLVED",
++   "sub": "ERR-039 · MOM.UNRECORDED_FILL_UNRESOLVED",
+    "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+   },
+   {
+@@ -3662,7 +3662,7 @@
+      ]
+     }
+    ],
+-   "sub": "BTC.UNRECORDED_FILL_CORRECTED",
++   "sub": "ERR-040 · BTC.UNRECORDED_FILL_CORRECTED",
+    "title": "R3｜策略重複送單造成帳本漏記，已照交易所自動更正"
+   },
+   {
+@@ -3697,7 +3697,7 @@
+      ]
+     }
+    ],
+-   "sub": "BTC.UNRECORDED_FILL_UNRESOLVED",
++   "sub": "ERR-041 · BTC.UNRECORDED_FILL_UNRESOLVED",
+    "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+   },
+   {
+@@ -3732,7 +3732,7 @@
+      ]
+     }
+    ],
+-   "sub": "MYC.UNRECORDED_FILL_UNRESOLVED",
++   "sub": "ERR-042 · MYC.UNRECORDED_FILL_UNRESOLVED",
+    "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+   }
+  ],
+@@ -3808,7 +3808,14 @@
+   "mycrypto": "加密策略",
+   "seykota": "趨勢策略"
+  },
+- "recent_summary": [],
++ "recent_summary": [
++  {
++   "anchor": "cap-notify.error_id",
++   "note": "錯誤目錄每條配好固定編號 ERR-001～ERR-042（e1），風險登記冊與本頁都顯示編號；通知第一行帶編號是 e3，這格仍未做。",
++   "project": null,
++   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
++  }
++ ],
+  "totals": {
+   "btc-competition": {
+    "done": 18,
+diff --git a/schemas/fleet-error-catalog-v2.schema.json b/schemas/fleet-error-catalog-v2.schema.json
+index acec714..d8dcb69 100644
+--- a/schemas/fleet-error-catalog-v2.schema.json
++++ b/schemas/fleet-error-catalog-v2.schema.json
+@@ -9,7 +9,8 @@
+     "risk_tiers",
+     "projects",
+     "entries",
+-    "retired_codes"
++    "retired_codes",
++    "error_ids_issued"
+   ],
+   "additionalProperties": false,
+   "properties": {
+@@ -74,6 +75,11 @@
+         "type": "string"
+       }
+     },
++    "error_ids_issued": {
++      "type": "integer",
++      "minimum": 1,
++      "description": "How many fixed error numbers (ERR-001 ...) have ever been issued. Every number from ERR-001 up to this count appears exactly once across entries and retired_codes; a new entry takes ERR-(issued+1) and bumps this, and a retired entry moves its number to retired_codes, so a number is never reused."
++    },
+     "entries": {
+       "type": "array",
+       "minItems": 1,
+@@ -103,6 +109,11 @@
+           "reason": {
+             "type": "string",
+             "minLength": 1
++          },
++          "error_id": {
++            "type": "string",
++            "pattern": "^ERR-[0-9]{3}$",
++            "description": "The retired entry's fixed error number, kept so it is never reused. Codes retired before numbering existed (2026-09-30) have none."
+           }
+         }
+       }
+@@ -112,6 +123,7 @@
+     "entry": {
+       "type": "object",
+       "required": [
++        "error_id",
+         "code",
+         "title",
+         "project",
+@@ -128,6 +140,11 @@
+       ],
+       "additionalProperties": false,
+       "properties": {
++        "error_id": {
++          "type": "string",
++          "pattern": "^ERR-[0-9]{3}$",
++          "description": "Fixed fleet-wide error number shown to the operator (one sequence for all strategies, never reused)."
++        },
+         "code": {
+           "type": "string",
+           "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$",
+diff --git a/schemas/fleet-rollout-registry-v1.schema.json b/schemas/fleet-rollout-registry-v1.schema.json
+index 8b46b74..1da987e 100644
+--- a/schemas/fleet-rollout-registry-v1.schema.json
++++ b/schemas/fleet-rollout-registry-v1.schema.json
+@@ -263,10 +263,11 @@
+           "type": {
+             "enum": [
+               "completed",
+-              "added"
++              "added",
++              "updated"
+             ],
+             "default": "completed",
+-            "description": "completed: an existing cell just flipped to done/n-a (needs project, checked against current state). added: this whole capability/catalog row is new in this edit (no cell check, project optional)."
++            "description": "completed: an existing cell just flipped to done/n-a (needs project, checked against current state). added: this whole capability/catalog row is new in this edit (no cell check, project optional). updated: an existing row whose content (not its done/pending state) this edit changed, e.g. a pending cell's description or the catalog entry it shows (no cell check, project optional)."
+           },
+           "project": {
+             "enum": [
+@@ -275,7 +276,7 @@
+               "mycrypto",
+               "btc-competition"
+             ],
+-            "description": "Which strategy's cell/row this is about. Required for type=completed; optional for type=added."
++            "description": "Which strategy's cell/row this is about. Required for type=completed; optional for type=added/updated."
+           },
+           "aspect": {
+             "enum": [
+@@ -296,7 +297,10 @@
+               "not": {
+                 "properties": {
+                   "type": {
+-                    "const": "added"
++                    "enum": [
++                      "added",
++                      "updated"
++                    ]
+                   }
+                 },
+                 "required": [
+@@ -324,7 +328,10 @@
+                   "not": {
+                     "properties": {
+                       "type": {
+-                        "const": "added"
++                        "enum": [
++                          "added",
++                          "updated"
++                        ]
+                       }
+                     },
+                     "required": [
+diff --git a/scripts/render_guides.py b/scripts/render_guides.py
+index 069ec55..5ad0fae 100644
+--- a/scripts/render_guides.py
++++ b/scripts/render_guides.py
+@@ -174,7 +174,7 @@ DATA.tiers.forEach(function(t){
+     row.appendChild(el("span","row-bot",e.bot_label));
+     var body=el("div","row-body");
+     body.appendChild(el("p","row-title",e.title));
+-    body.appendChild(el("p","code",e.code));
++    body.appendChild(el("p","code",e.error_id+" · "+e.code));
+     body.appendChild(el("p","row-what",e.what));
+     body.appendChild(el("p","row-how",e.direction));
+     var st=el("div","status");
+@@ -459,7 +459,7 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
+                     notes.append(f"{label}未做 — {who}{status['reason']}（預定：{phases[status['phase']]}）")
+         message = entry["operator_message"]
+         entries.append({
+-            "code": code, "tier": entry["risk_tier"], "title": entry["title"],
++            "code": code, "error_id": entry["error_id"], "tier": entry["risk_tier"], "title": entry["title"],
+             "bot": "fleet" if fleet else project_keys[0],
+             "bot_label": BOT_LABEL_FLEET if fleet else projects[project_keys[0]],
+             "what": message["what"], "direction": message["direction"],
+@@ -524,7 +524,7 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
+     still show up as "what changed"; an ``added`` entry (a brand-new row this edit introduced, which has no done/n-a cell
+     to point at yet) just flags the whole item so it still shows up as "what changed"."""
+     projects, phases = registry["projects"], registry["phases"]
+-    titles = {entry["code"]: (entry["risk_tier"], entry["title"]) for entry in catalog["entries"]}
++    titles = {entry["code"]: (entry["risk_tier"], entry["title"], entry["error_id"]) for entry in catalog["entries"]}
+     items = []
+     for capability in registry["capabilities"]:
+         rows = [{"label": projects[p], "lines": [_line(capability["status"][p], None, phases)]}
+@@ -533,17 +533,17 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
+         items.append({"kind": "cap", "id": capability["id"], "anchor": f"cap-{capability['id']}", "title": capability["title"],
+                       "sub": capability["description"], "rows": rows, "states": states})
+     for row in registry["catalog"]:
+-        tier, title = titles[row["code"]]
++        tier, title, error_id = titles[row["code"]]
+         present = [p for p in STRATEGY_PROJECTS if p in row["behaviour"]]
+         rows = [{"label": projects[p], "lines": [_line(row["behaviour"][p], "行為", phases),
+                                                  _line(row["emits_event"][p], "寫進事件日誌", phases)]} for p in present]
+         states = {p: ({row["behaviour"][p]["state"], row["emits_event"][p]["state"]} if p in present else set())
+                   for p in STRATEGY_PROJECTS}
+         items.append({"kind": "rule", "id": row["code"], "anchor": f"rule-{row['code']}", "title": f"{tier}｜{title}",
+-                      "sub": row["code"], "rows": rows, "states": states})
++                      "sub": f"{error_id} · {row['code']}", "rows": rows, "states": states})
+     changes = registry.get("recent_changes") or []
+     completed_set = {(c["kind"], c["id"], c["project"]) for c in changes if c.get("type", "completed") == "completed"}
+-    added_set = {(c["kind"], c["id"]) for c in changes if c.get("type") == "added"}
++    added_set = {(c["kind"], c["id"]) for c in changes if c.get("type") in ("added", "updated")}
+     for item in items:
+         states = item.pop("states")
+         item["dots"] = {p: _dot(s) for p, s in states.items()}
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index d4e4121..b567fac 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -36,8 +36,10 @@
+     "btc-competition": "btc-bull-market-competition",
+     "fleet": "(cross-repo: same condition implemented in every strategy)"
+   },
++  "error_ids_issued": 42,
+   "entries": [
+     {
++      "error_id": "ERR-001",
+       "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
+       "title": "開倉後停損掛單失敗，緊急市價平倉成功",
+       "project": "seykota",
+@@ -67,6 +69,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-002",
+       "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
+       "title": "停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）",
+       "project": "seykota",
+@@ -99,6 +102,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-003",
+       "code": "SEY.PROTECTION_REPLACE_FAILED",
+       "title": "移動停損換單失敗，部位可能沒有交易所端保護",
+       "project": "seykota",
+@@ -131,6 +135,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-004",
+       "code": "SEY.PROTECTION_MOVE_DEFERRED",
+       "title": "移動停損時舊停損單取消不掉，保留舊停損、這輪不移動",
+       "project": "seykota",
+@@ -161,6 +166,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-005",
+       "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
+       "title": "平倉後停損單取消失敗，可能還掛在交易所",
+       "project": "seykota",
+@@ -191,6 +197,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-006",
+       "code": "SEY.PROTECTION_UNVERIFIED",
+       "title": "交易所存在部位，但沒有可唯一確認的原生保護單",
+       "project": "seykota",
+@@ -222,6 +229,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-007",
+       "code": "SEY.POSITION_AMBIGUOUS",
+       "title": "交易所部位資料無法唯一辨識",
+       "project": "seykota",
+@@ -255,6 +263,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-008",
+       "code": "SEY.RECONCILE_FAILED",
+       "title": "非暫時性的對帳失敗",
+       "project": "seykota",
+@@ -286,6 +295,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-009",
+       "code": "SEY.EXCHANGE_TARGET_UNSAFE",
+       "title": "執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）",
+       "project": "seykota",
+@@ -316,6 +326,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-010",
+       "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+       "title": "真倉固定訂單識別能力不足",
+       "project": "seykota",
+@@ -346,6 +357,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-011",
+       "code": "SEY.RUNTIME_CYCLE_FAILED",
+       "title": "未分類的執行期例外（run_forever catch-all）",
+       "project": "seykota",
+@@ -376,6 +388,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-012",
+       "code": "SEY.CLOSE_FILL_PENDING",
+       "title": "交易所部位已消失，等待平倉成交資料回填",
+       "project": "seykota",
+@@ -403,6 +416,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-013",
+       "code": "SEY.TRADE_EXIT",
+       "title": "原生停損觸發的正常平倉",
+       "project": "seykota",
+@@ -431,6 +445,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-014",
+       "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
+       "title": "權益低於最低下單資金，跳過本次進場",
+       "project": "seykota",
+@@ -458,6 +473,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-015",
+       "code": "MOM.PROTECTION_UNVERIFIED",
+       "title": "原生移動停損無法驗證",
+       "project": "momentum",
+@@ -492,6 +508,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-016",
+       "code": "MOM.STATE_REPAIRED_SAFE_HALT",
+       "title": "工具修復本地 state 後主動 latch，等人明確解除",
+       "project": "momentum",
+@@ -522,6 +539,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-017",
+       "code": "MOM.RUNTIME_CYCLE_FAILED",
+       "title": "run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）",
+       "project": "momentum",
+@@ -550,6 +568,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-018",
+       "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+       "title": "無歧義的漏記平倉已自動補寫進帳本",
+       "project": "momentum",
+@@ -579,6 +598,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-019",
+       "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+       "project": "momentum",
+@@ -610,6 +630,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-020",
+       "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+       "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+       "project": "momentum",
+@@ -641,6 +662,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-021",
+       "code": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+       "title": "出現負／不可能的餘額，本地帳本本身不可信",
+       "project": "btc-competition",
+@@ -673,6 +695,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-022",
+       "code": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+       "title": "連續 3 天該再平衡卻零成交",
+       "project": "btc-competition",
+@@ -705,6 +728,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-023",
+       "code": "BTC.ORDER_STATUS_UNKNOWN",
+       "title": "送出的單 60 秒內確定不了有沒有成交",
+       "project": "btc-competition",
+@@ -737,6 +761,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-024",
+       "code": "BTC.REBALANCE_PENDING",
+       "title": "部分成交，目標權重尚未達成",
+       "project": "btc-competition",
+@@ -765,6 +790,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-025",
+       "code": "BTC.RUNTIME_CYCLE_FAILED",
+       "title": "runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）",
+       "project": "btc-competition",
+@@ -793,6 +819,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-026",
+       "code": "MYC.RECONCILE_DELTA_EXCEEDED",
+       "title": "本地帳本與交易所回報損益差額超過容忍值",
+       "project": "mycrypto",
+@@ -820,6 +847,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-027",
+       "code": "MYC.RUNTIME_CYCLE_FAILED",
+       "title": "未分類的執行期例外（catch-all）",
+       "project": "mycrypto",
+@@ -850,6 +878,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-028",
+       "code": "MYC.PROTECTION_PLACEMENT_REJECTED",
+       "title": "開倉停損單被交易所拒絕，部位可能沒有交易所端保護",
+       "project": "mycrypto",
+@@ -880,6 +909,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-029",
+       "code": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
+       "title": "開倉後查不到部位資訊，無法掛停損單",
+       "project": "mycrypto",
+@@ -910,6 +940,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-030",
+       "code": "MYC.PROTECTION_PLACEMENT_ERROR",
+       "title": "掛停損單時拋出例外，部位本身已開",
+       "project": "mycrypto",
+@@ -940,6 +971,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-031",
+       "code": "MYC.PROTECTION_REPLACE_FAILED",
+       "title": "搬移移動停損單失敗，交易所端目前沒有停損保護",
+       "project": "mycrypto",
+@@ -971,6 +1003,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-032",
+       "code": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
+       "title": "平倉後取消殘留停損單失敗",
+       "project": "mycrypto",
+@@ -1001,6 +1034,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-033",
+       "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+       "title": "無歧義的漏記平倉已自動補寫進帳本",
+       "project": "seykota",
+@@ -1030,6 +1064,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-034",
+       "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+       "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+       "project": "seykota",
+@@ -1061,6 +1096,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-035",
+       "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+       "project": "seykota",
+@@ -1092,6 +1128,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-036",
+       "code": "SEY.UNRECORDED_FILL_CORRECTED",
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "seykota",
+@@ -1121,6 +1158,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-037",
+       "code": "SEY.UNRECORDED_FILL_UNRESOLVED",
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "seykota",
+@@ -1152,6 +1190,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-038",
+       "code": "MOM.UNRECORDED_FILL_CORRECTED",
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "momentum",
+@@ -1181,6 +1220,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-039",
+       "code": "MOM.UNRECORDED_FILL_UNRESOLVED",
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "momentum",
+@@ -1212,6 +1252,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-040",
+       "code": "BTC.UNRECORDED_FILL_CORRECTED",
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "btc-competition",
+@@ -1241,6 +1282,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-041",
+       "code": "BTC.UNRECORDED_FILL_UNRESOLVED",
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "btc-competition",
+@@ -1272,6 +1314,7 @@
+       }
+     },
+     {
++      "error_id": "ERR-042",
+       "code": "MYC.UNRECORDED_FILL_UNRESOLVED",
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "mycrypto",
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index e4f6035..0e46dc6 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -566,22 +566,22 @@
+         "momentum": {
+           "state": "pending",
+           "phase": "error-ids",
+-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+         },
+         "seykota": {
+           "state": "pending",
+           "phase": "error-ids",
+-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+         },
+         "mycrypto": {
+           "state": "pending",
+           "phase": "error-ids",
+-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+         },
+         "btc-competition": {
+           "state": "pending",
+           "phase": "error-ids",
+-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄 38 條沒有編號；策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+         }
+       }
+     }
+@@ -1257,5 +1257,12 @@
+       }
+     }
+   ],
+-  "recent_changes": []
++  "recent_changes": [
++    {
++      "kind": "cap",
++      "id": "notify.error_id",
++      "type": "updated",
++      "note": "錯誤目錄每條配好固定編號 ERR-001～ERR-042（e1），風險登記冊與本頁都顯示編號；通知第一行帶編號是 e3，這格仍未做。"
++    }
++  ]
+ }
+diff --git a/src/trade_alerts/rollout_registry.py b/src/trade_alerts/rollout_registry.py
+index d0a1164..8888da8 100644
+--- a/src/trade_alerts/rollout_registry.py
++++ b/src/trade_alerts/rollout_registry.py
+@@ -158,8 +158,8 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
+             continue
+         kind, cid = change.get("kind"), change.get("id")
+         change_type = change.get("type", "completed")
+-        if change_type not in ("completed", "added"):
+-            problems.append(f"{where}: type must be completed or added, got {change_type!r}")
++        if change_type not in ("completed", "added", "updated"):
++            problems.append(f"{where}: type must be completed, added or updated, got {change_type!r}")
+             continue
+         if kind == "cap":
+             row_or_cap = cap_by_id.get(cid)
+@@ -173,10 +173,11 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
+         if row_or_cap is None:
+             problems.append(missing_msg)
+             continue
+-        if change_type == "added":
+-            # A brand-new row/capability this edit introduced -- nothing to
+-            # check it against yet, only that it (and its optional project)
+-            # are real.
++        if change_type in ("added", "updated"):
++            # added: a brand-new row/capability this edit introduced; updated:
++            # an existing one whose content (not its state) this edit changed.
++            # Nothing to check it against, only that it (and its optional
++            # project) are real.
+             project = change.get("project")
+             if project is not None and project not in STRATEGY_PROJECTS:
+                 problems.append(f"{where}: project {project!r} is not a known strategy")
+diff --git a/tests/test_fleet_error_catalog.py b/tests/test_fleet_error_catalog.py
+index 9f0e584..f68ff47 100644
+--- a/tests/test_fleet_error_catalog.py
++++ b/tests/test_fleet_error_catalog.py
+@@ -180,3 +180,34 @@ def test_both_proposed_codes_are_retired_and_removed_together(catalog):
+     codes = {"MOM.VERIFIED_CLOSE_PROPOSED", "SEY.VERIFIED_CLOSE_PROPOSED"}
+     assert not codes & {entry["code"] for entry in catalog["entries"]}
+     assert codes <= {item["code"] for item in catalog["retired_codes"]}
++
++
++def test_error_ids_are_dense_unique_and_never_reused(catalog):
++    """e1: every entry has a fixed ERR-NNN number, one fleet-wide sequence.
++    Every number from ERR-001 up to error_ids_issued appears exactly once
++    across entries and retired_codes -- so deleting an entry without moving
++    its number to retired_codes, reusing a retired number, or skipping ahead
++    all fail here."""
++    import re
++
++    live = [entry["error_id"] for entry in catalog["entries"]]
++    retired = [item["error_id"] for item in catalog["retired_codes"] if "error_id" in item]
++    issued = catalog["error_ids_issued"]
++    for number in live + retired:
++        assert re.fullmatch(r"ERR-\d{3}", number), number
++    assert len(live + retired) == len(set(live + retired)), "an error number is used twice"
++    assert sorted(live + retired) == [f"ERR-{n:03d}" for n in range(1, issued + 1)]
++
++
++def test_error_id_is_shown_on_both_register_pages(catalog):
++    from importlib import util
++    from pathlib import Path
++
++    root = Path(__file__).resolve().parents[1]
++    spec = util.spec_from_file_location("render_guides", root / "scripts" / "render_guides.py")
++    module = util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    pages = {path.name: html for path, html in module.rendered_pages().items()}
++    first = catalog["entries"][0]
++    assert f'"error_id": "{first["error_id"]}"' in pages["fleet-risk-register.html"]
++    assert f'{first["error_id"]} · {first["code"]}' in pages["fleet-rollout-register.html"]
+diff --git a/tests/test_rollout_registry.py b/tests/test_rollout_registry.py
+index 402bf46..e0bf251 100644
+--- a/tests/test_rollout_registry.py
++++ b/tests/test_rollout_registry.py
+@@ -474,7 +474,7 @@ def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog
+     for entry in change:
+         anchor_prefix = "cap-" if entry["kind"] == "cap" else "rule-"
+         item = items[anchor_prefix + entry["id"]]
+-        if entry.get("type", "completed") == "added":
++        if entry.get("type", "completed") in ("added", "updated"):
+             assert item["added_recent"] is True
+         else:
+             assert item["has_recent"] is True
+@@ -490,3 +490,22 @@ def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog
+     pages = {path.name: html for path, html in render_guides.rendered_pages().items()}
+     assert "recent_summary" in pages["fleet-rollout-register.html"]
+     assert "最新變動" in pages["fleet-rollout-register.html"]
++
++
++def test_updated_recent_change_is_accepted_and_flagged(registry, catalog):
++    """type=updated names an existing row whose content changed without any
++    cell flipping (e.g. a pending description rewritten, a catalog row
++    retitled): it must validate while the row exists, fail when it doesn't,
++    and show up in the page's 'recently changed' summary like added does."""
++    import copy
++
++    capability = next(c for c in registry["capabilities"]
++                      if any(v.get("state") == "pending" for v in c["status"].values()))
++    reg = copy.deepcopy(registry)
++    reg["recent_changes"] = [{"kind": "cap", "id": capability["id"], "type": "updated", "note": "x"}]
++    assert not [p for p in registry_problems(reg, catalog) if "recent_changes" in p]
++    reg["recent_changes"] = [{"kind": "cap", "id": "nonexistent.capability", "type": "updated", "note": "x"}]
++    assert [p for p in registry_problems(reg, catalog) if "recent_changes" in p]
++    reg["recent_changes"] = [{"kind": "cap", "id": capability["id"], "type": "updated", "note": "x"}]
++    items = {i["anchor"]: i for i in _render_guides().rollout_items(catalog, reg)}
++    assert items["cap-" + capability["id"]]["added_recent"] is True
