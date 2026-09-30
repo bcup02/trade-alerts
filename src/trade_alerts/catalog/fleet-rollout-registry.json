@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-09-26",
+  "updated_at": "2026-09-30",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -1105,84 +1105,6 @@
       }
     },
     {
-      "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
-      "behaviour": {
-        "momentum": {
-          "state": "done",
-          "evidence": "src/reconcile_compare.py:107 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
-        },
-        "seykota": {
-          "state": "done",
-          "evidence": "src/seykota_bot/reconcile/compare.py:255 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
-        },
-        "mycrypto": {
-          "state": "done",
-          "evidence": "reconcile_compare.py:101 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
-        },
-        "btc-competition": {
-          "state": "done",
-          "evidence": "src/btc_competition/reconcile_compare.py:244 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的帳本軸通知"
-        }
-      },
-      "emits_event": {
-        "momentum": {
-          "state": "n/a",
-          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
-        },
-        "seykota": {
-          "state": "n/a",
-          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
-        },
-        "mycrypto": {
-          "state": "n/a",
-          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
-        },
-        "btc-competition": {
-          "state": "n/a",
-          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
-        }
-      }
-    },
-    {
-      "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
-      "behaviour": {
-        "momentum": {
-          "state": "done",
-          "evidence": "src/google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
-        },
-        "seykota": {
-          "state": "done",
-          "evidence": "src/seykota_bot/reconcile/google_reconcile.py:137 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
-        },
-        "mycrypto": {
-          "state": "done",
-          "evidence": "google_reconcile.py:135 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
-        },
-        "btc-competition": {
-          "state": "done",
-          "evidence": "src/btc_competition/reconcile_google.py:283 main 每種判定都 exit 0（Phase 4b），分歧改由維運通知的 Google 軸通知"
-        }
-      },
-      "emits_event": {
-        "momentum": {
-          "state": "n/a",
-          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
-        },
-        "seykota": {
-          "state": "n/a",
-          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
-        },
-        "mycrypto": {
-          "state": "n/a",
-          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
-        },
-        "btc-competition": {
-          "state": "n/a",
-          "reason": "對帳分歧由維運通知直接讀狀態檔，不經事件日誌。"
-        }
-      }
-    },
-    {
       "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
       "behaviour": {
         "seykota": {
@@ -1335,43 +1257,5 @@
       }
     }
   ],
-  "recent_changes": [
-    {
-      "kind": "cap",
-      "id": "reconcile.unrecorded_fill_handling",
-      "project": "btc-competition",
-      "type": "completed",
-      "note": "競賽策略每 15 分鐘檢查帳本少記的交易所成交（g1-5，PR #37）已上正式機；開發機 DEMO 故意重複送單實測整條通過。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.export_relay_enabled",
-      "project": "btc-competition",
-      "type": "completed",
-      "note": "正式機、開發機的維運通知都開始轉送競賽策略的匯出檔。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.units_axis",
-      "project": "btc-competition",
-      "type": "completed",
-      "note": "維運通知開始盯競賽策略的新背景工作。"
-    },
-    {
-      "kind": "rule",
-      "id": "BTC.UNRECORDED_FILL_CORRECTED",
-      "project": "btc-competition",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "確定是自己重複送單才自動補記並立刻通知。"
-    },
-    {
-      "kind": "rule",
-      "id": "BTC.UNRECORDED_FILL_UNRESOLVED",
-      "project": "btc-competition",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "其他未記成交一律只通知、附處理步驟。"
-    }
-  ]
+  "recent_changes": []
 }

@@ -188,6 +188,9 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障�
 LINE 以外的任何決策，而且紅 unit 會在下次部署的健康檢查裡製造假訊號（Phase 2a 部署期間實際撞
 到過）。Phase 4 把退出碼改回 0，偵測與狀態檔照舊寫出，升級與去抖交給 ops-notify。
 
+**2026-09-30 退役（進度頁 f-8）：** Phase 4b 已把四支的退出碼全部改回 0 並上正式機，這兩條描述的情況已不存在，
+從 JSON 條目移除、代碼移入 `retired_codes`（永不重用）。帳本／Google 表不一致仍由 ops-notify 的 `ledger`／`google` 兩軸偵測與通知。
+
 ## 4. 四支 latch 模型統一（Phase 4 落地規格）
 
 ### 4.1 目前的不一致

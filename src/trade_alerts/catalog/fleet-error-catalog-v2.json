@@ -1001,66 +1001,6 @@
       }
     },
     {
-      "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
-      "title": "帳本↔交易所對帳 DIVERGED 時故意讓 unit 變紅（exit 2）",
-      "project": "fleet",
-      "sources": [
-        "btc-bull-market-competition/src/btc_competition/reconcile_compare.py:229",
-        "ed-seykota-systematic-trend-following/src/seykota_bot/reconcile/compare.py:251",
-        "mexc-4h-momentum-trailing-stop/src/reconcile_compare.py:110",
-        "my-crypto-bot/reconcile_compare.py:102"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": 2
-      },
-      "verdict": "MECHANICAL",
-      "risk_tier": "R0",
-      "auto_action": "維持寫出 ledger_status.json；由 ops-notify 的 ledger 軸負責升級與去抖。exit 改回 0。",
-      "human_action": "無（LINE 告警已經送同一件事）。",
-      "resume": "n/a",
-      "lands_in_phase": 4,
-      "rationale": "unit 變紅不提供 LINE 告警以外的任何決策，而且紅 unit 會在下次部署的健康檢查裡製造假訊號（Phase 2a 部署期間就撞到過）。偵測本身保留，只是不再用退出碼當第二套通知管道。",
-      "operator_message": {
-        "what": "本地帳本跟交易所對不上時，對帳程式故意讓自己的服務顯示紅色失敗。",
-        "direction": "不需要另外處理這個紅燈：同一件事維運通知的「帳本↔交易所」會通知你，照那則處理。",
-        "steps": [
-          "不需要任何動作。"
-        ]
-      }
-    },
-    {
-      "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
-      "title": "帳本↔Google 表對帳 DIVERGED 時故意讓 unit 變紅（exit 3）",
-      "project": "fleet",
-      "sources": [
-        "btc-bull-market-competition/src/btc_competition/reconcile_google.py:289",
-        "ed-seykota-systematic-trend-following/src/seykota_bot/reconcile/google_reconcile.py:140",
-        "mexc-4h-momentum-trailing-stop/src/google_reconcile.py:138",
-        "my-crypto-bot/google_reconcile.py:137"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": 3
-      },
-      "verdict": "MECHANICAL",
-      "risk_tier": "R0",
-      "auto_action": "維持寫出 google_reconcile_status.json；由 ops-notify 的 google 軸負責升級與去抖。exit 改回 0。",
-      "human_action": "無（LINE 告警已經送同一件事）。",
-      "resume": "n/a",
-      "lands_in_phase": 4,
-      "rationale": "與 FLEET.LEDGER_DIVERGED_UNIT_EXIT 同一理由。Google 表是投影目標而非權威來源，它落後帳本更不構成需要人介入的錯誤。",
-      "operator_message": {
-        "what": "本地帳本跟共用的 Google 表格對不上時，對帳程式故意讓自己的服務顯示紅色失敗。",
-        "direction": "不需要另外處理這個紅燈：同一件事維運通知的「帳本↔Google 表」會通知你，照那則處理。",
-        "steps": [
-          "不需要任何動作。"
-        ]
-      }
-    },
-    {
       "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
       "title": "無歧義的漏記平倉已自動補寫進帳本",
       "project": "seykota",
@@ -1378,6 +1318,16 @@
       "code": "SEY.PROTECTION_ORPHAN_CANCEL_FAILED",
       "retired_in": "fleet-error-catalog/v2",
       "reason": "The flow it describes -- place the new stop while the old one could not be cancelled, then clean the old one up as an orphan -- cannot happen on Binance: a second closePosition stop in the same direction is refused with -4130 (testnet 2026-09-24, h5), and the branch was only reachable on a resolver exception. ed-seykota PR #74 (h11) removes it: a trailing move now places a new stop only after the old one is confirmed gone, and an old stop that will not cancel is SEY.PROTECTION_MOVE_DEFERRED. Entry removed 2026-09-25 after #74 reached the live host (seykota operations 3e3b6f7); the code stays here so it is never reused."
+    },
+    {
+      "code": "FLEET.LEDGER_DIVERGED_UNIT_EXIT",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "Described the ledger<->exchange reconcile unit deliberately exiting 2 on DIVERGED. Phase 4b changed all four strategies' reconcile_compare main to exit 0 on every verdict (registry behaviour rows were already done on the live hosts), so the condition no longer exists and the entry described old behaviour (flagged in the #77 review, progress item f-8). Divergence itself is still detected and reported by ops-notify's ledger axis from ledger_status.json. Entry removed 2026-09-30; the code stays here so it is never reused."
+    },
+    {
+      "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "Same as FLEET.LEDGER_DIVERGED_UNIT_EXIT for the ledger<->Google sheet reconcile (was exit 3). All four google_reconcile mains exit 0 since Phase 4b; ops-notify's google axis reports divergence from google_reconcile_status.json. Entry removed 2026-09-30; the code stays here so it is never reused."
     }
   ]
 }
