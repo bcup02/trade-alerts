@@ -263,10 +263,11 @@
           "type": {
             "enum": [
               "completed",
-              "added"
+              "added",
+              "updated"
             ],
             "default": "completed",
-            "description": "completed: an existing cell just flipped to done/n-a (needs project, checked against current state). added: this whole capability/catalog row is new in this edit (no cell check, project optional)."
+            "description": "completed: an existing cell just flipped to done/n-a (needs project, checked against current state). added: this whole capability/catalog row is new in this edit (no cell check, project optional). updated: an existing row whose content (not its done/pending state) this edit changed, e.g. a pending cell's description or the catalog entry it shows (no cell check, project optional)."
           },
           "project": {
             "enum": [
@@ -275,7 +276,7 @@
               "mycrypto",
               "btc-competition"
             ],
-            "description": "Which strategy's cell/row this is about. Required for type=completed; optional for type=added."
+            "description": "Which strategy's cell/row this is about. Required for type=completed; optional for type=added/updated."
           },
           "aspect": {
             "enum": [
@@ -296,7 +297,10 @@
               "not": {
                 "properties": {
                   "type": {
-                    "const": "added"
+                    "enum": [
+                      "added",
+                      "updated"
+                    ]
                   }
                 },
                 "required": [
@@ -324,7 +328,10 @@
                   "not": {
                     "properties": {
                       "type": {
-                        "const": "added"
+                        "enum": [
+                          "added",
+                          "updated"
+                        ]
                       }
                     },
                     "required": [

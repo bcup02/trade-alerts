@@ -12,6 +12,17 @@
 
 ---
 
+## 0. 固定錯誤編號（2026-09-30 起）
+
+每一條錯誤都有一個固定編號 `error_id`（`ERR-001`、`ERR-002`…），**全機隊共用一個流水號**、不分策略，給人看的地方（風險登記冊、之後的每則通知）都帶這個編號。
+規則由 `tests/test_fleet_error_catalog.py::test_error_ids_are_dense_unique_and_never_reused` 守住：
+
+- 新增錯誤：用 `ERR-(error_ids_issued+1)`，並把 JSON 最上層的 `error_ids_issued` 加 1。
+- 退役錯誤：條目移到 `retired_codes` 時**帶著原本的 `error_id`**，編號永遠不重用。
+- 從 `ERR-001` 到 `error_ids_issued` 的每個號碼，在現役條目與 `retired_codes` 裡剛好出現一次。
+
+2026-09-30 當天依 JSON 裡的順序配了 `ERR-001`–`ERR-042`；在這之前就退役的代碼沒有編號。
+
 ## 1. 判準
 
 貫穿全專案的唯一問題：

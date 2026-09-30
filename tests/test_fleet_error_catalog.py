@@ -180,3 +180,34 @@ def test_both_proposed_codes_are_retired_and_removed_together(catalog):
     codes = {"MOM.VERIFIED_CLOSE_PROPOSED", "SEY.VERIFIED_CLOSE_PROPOSED"}
     assert not codes & {entry["code"] for entry in catalog["entries"]}
     assert codes <= {item["code"] for item in catalog["retired_codes"]}
+
+
+def test_error_ids_are_dense_unique_and_never_reused(catalog):
+    """e1: every entry has a fixed ERR-NNN number, one fleet-wide sequence.
+    Every number from ERR-001 up to error_ids_issued appears exactly once
+    across entries and retired_codes -- so deleting an entry without moving
+    its number to retired_codes, reusing a retired number, or skipping ahead
+    all fail here."""
+    import re
+
+    live = [entry["error_id"] for entry in catalog["entries"]]
+    retired = [item["error_id"] for item in catalog["retired_codes"] if "error_id" in item]
+    issued = catalog["error_ids_issued"]
+    for number in live + retired:
+        assert re.fullmatch(r"ERR-\d{3}", number), number
+    assert len(live + retired) == len(set(live + retired)), "an error number is used twice"
+    assert sorted(live + retired) == [f"ERR-{n:03d}" for n in range(1, issued + 1)]
+
+
+def test_error_id_is_shown_on_both_register_pages(catalog):
+    from importlib import util
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    spec = util.spec_from_file_location("render_guides", root / "scripts" / "render_guides.py")
+    module = util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    pages = {path.name: html for path, html in module.rendered_pages().items()}
+    first = catalog["entries"][0]
+    assert f'"error_id": "{first["error_id"]}"' in pages["fleet-risk-register.html"]
+    assert f'{first["error_id"]} · {first["code"]}' in pages["fleet-rollout-register.html"]

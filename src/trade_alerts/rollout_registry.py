@@ -158,8 +158,8 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
             continue
         kind, cid = change.get("kind"), change.get("id")
         change_type = change.get("type", "completed")
-        if change_type not in ("completed", "added"):
-            problems.append(f"{where}: type must be completed or added, got {change_type!r}")
+        if change_type not in ("completed", "added", "updated"):
+            problems.append(f"{where}: type must be completed, added or updated, got {change_type!r}")
             continue
         if kind == "cap":
             row_or_cap = cap_by_id.get(cid)
@@ -173,10 +173,11 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
         if row_or_cap is None:
             problems.append(missing_msg)
             continue
-        if change_type == "added":
-            # A brand-new row/capability this edit introduced -- nothing to
-            # check it against yet, only that it (and its optional project)
-            # are real.
+        if change_type in ("added", "updated"):
+            # added: a brand-new row/capability this edit introduced; updated:
+            # an existing one whose content (not its state) this edit changed.
+            # Nothing to check it against, only that it (and its optional
+            # project) are real.
             project = change.get("project")
             if project is not None and project not in STRATEGY_PROJECTS:
                 problems.append(f"{where}: project {project!r} is not a known strategy")

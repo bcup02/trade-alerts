@@ -174,7 +174,7 @@ DATA.tiers.forEach(function(t){
     row.appendChild(el("span","row-bot",e.bot_label));
     var body=el("div","row-body");
     body.appendChild(el("p","row-title",e.title));
-    body.appendChild(el("p","code",e.code));
+    body.appendChild(el("p","code",e.error_id+" · "+e.code));
     body.appendChild(el("p","row-what",e.what));
     body.appendChild(el("p","row-how",e.direction));
     var st=el("div","status");
@@ -459,7 +459,7 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
                     notes.append(f"{label}未做 — {who}{status['reason']}（預定：{phases[status['phase']]}）")
         message = entry["operator_message"]
         entries.append({
-            "code": code, "tier": entry["risk_tier"], "title": entry["title"],
+            "code": code, "error_id": entry["error_id"], "tier": entry["risk_tier"], "title": entry["title"],
             "bot": "fleet" if fleet else project_keys[0],
             "bot_label": BOT_LABEL_FLEET if fleet else projects[project_keys[0]],
             "what": message["what"], "direction": message["direction"],
@@ -524,7 +524,7 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
     still show up as "what changed"; an ``added`` entry (a brand-new row this edit introduced, which has no done/n-a cell
     to point at yet) just flags the whole item so it still shows up as "what changed"."""
     projects, phases = registry["projects"], registry["phases"]
-    titles = {entry["code"]: (entry["risk_tier"], entry["title"]) for entry in catalog["entries"]}
+    titles = {entry["code"]: (entry["risk_tier"], entry["title"], entry["error_id"]) for entry in catalog["entries"]}
     items = []
     for capability in registry["capabilities"]:
         rows = [{"label": projects[p], "lines": [_line(capability["status"][p], None, phases)]}
@@ -533,17 +533,17 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
         items.append({"kind": "cap", "id": capability["id"], "anchor": f"cap-{capability['id']}", "title": capability["title"],
                       "sub": capability["description"], "rows": rows, "states": states})
     for row in registry["catalog"]:
-        tier, title = titles[row["code"]]
+        tier, title, error_id = titles[row["code"]]
         present = [p for p in STRATEGY_PROJECTS if p in row["behaviour"]]
         rows = [{"label": projects[p], "lines": [_line(row["behaviour"][p], "行為", phases),
                                                  _line(row["emits_event"][p], "寫進事件日誌", phases)]} for p in present]
         states = {p: ({row["behaviour"][p]["state"], row["emits_event"][p]["state"]} if p in present else set())
                   for p in STRATEGY_PROJECTS}
         items.append({"kind": "rule", "id": row["code"], "anchor": f"rule-{row['code']}", "title": f"{tier}｜{title}",
-                      "sub": row["code"], "rows": rows, "states": states})
+                      "sub": f"{error_id} · {row['code']}", "rows": rows, "states": states})
     changes = registry.get("recent_changes") or []
     completed_set = {(c["kind"], c["id"], c["project"]) for c in changes if c.get("type", "completed") == "completed"}
-    added_set = {(c["kind"], c["id"]) for c in changes if c.get("type") == "added"}
+    added_set = {(c["kind"], c["id"]) for c in changes if c.get("type") in ("added", "updated")}
     for item in items:
         states = item.pop("states")
         item["dots"] = {p: _dot(s) for p, s in states.items()}
