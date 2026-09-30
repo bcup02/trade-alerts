@@ -57,7 +57,7 @@ def test_every_stored_event_validates_against_the_published_schema(tmp_path):
         details={"expected_order_id": "o-9"},
         measurements={"observed_orders": 0},
     )
-    append_fleet_event(path, project="fleet", code="LEDGER_DIVERGED_UNIT_EXIT")
+    append_fleet_event(path, project="fleet", code="LEDGER_DIVERGED")
     for record in read_jsonl(path):
         jsonschema.validate(record, SCHEMA)
 
