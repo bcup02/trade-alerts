@@ -204,9 +204,9 @@ pgrep -af '/opt/(mexc-4h-momentum-trailing-stop|ed-seykota-systematic-trend-foll
 0. 先完成 5.2 第 1 點的四個部署腳本 PR，並進入正式機分支。
 1. 用已設好的 7 把唯讀部署金鑰（私有 repo）與 https（公開 repo）clone 8 個 repo（策略與維運切到正式機分支，共用程式庫用 main），記下每個 commit。
 2. 時區改 Asia/Tokyo、加 2GB swap；時鐘同步已確認正常。
-3. 照 5.2 逐支安裝：`START_SERVICE=0`、沒有任何 `.env`、交易所工具程式用本機 clone（`*_SOURCE` 參數）。
+3. 照 5.2 逐支安裝：`START_SERVICE=0`、**不帶任何 `*_SOURCE` 參數**（讓各策略照自己釘的版本從 GitHub 取共用程式庫與交易所工具程式；2026-09-29 曾用本機 main 的 clone 蓋掉釘選版本，Binance 工具 main 停在 0.2.1，動能因此起不來）。策略腳本會放一份與範例相同、不含金鑰的設定檔範本，這是預期行為。
 4. 跑 5.1 的讀回 gate（零輸出），`journalctl` 確認安裝期間沒有機隊服務執行過。
-5. 讀回四支的開關檔：都是 `DRY_RUN_ONLY=1`，`STRATEGY_MODE` 為 OFFLINE 或紙上模擬。
+5. 讀回四支的開關檔：都是 `DRY_RUN_ONLY=1`，`STRATEGY_MODE` 為 OFFLINE 或紙上模擬。動能、加密的腳本在全新主機會自己建立快照資料夾（動能 #106、加密 #53，2026-09-30 起）。
 6. 帳號、跨群組設定與通道都由部署腳本建立（2026-09-29 已補進腳本：portfolio-query#25、ops-notify#29、ops-control#14）：先裝四支策略（建出策略群組），再裝維運通知、Telegram 遙控、LINE 查詢；LINE 進站通道用 `START_SERVICE=0 bash deploy/install_line_ingress.sh`（portfolio-query repo）裝 ARM 版 `cloudflared`（固定版本、比對校驗碼）與 `seykota-admin`，**不放通道憑證、不啟用**。
 7. 只有含帳號密碼的設定檔與通道憑證仍是手動（階段 C 才搬）。
 
@@ -340,11 +340,9 @@ pgrep -af '/opt/(mexc-4h-momentum-trailing-stop|ed-seykota-systematic-trend-foll
 
 ## 9. 閒置回收風險
 
-- Oracle 官方免費額度頁：Always Free 主機若連續 7 天 CPU（95 百分位）、網路、記憶體（A1）使用率都低於 20%，
-  可能被回收。官方文字只寫「Always Free 主機」，**沒寫升級成隨用隨付的帳戶是否適用**。
-- 機隊很省資源：正式機現在記憶體約 0.9GB，放到 12GB 不到 10%；所以就算搬上來也可能被判定閒置。
-- 應對：階段 B 量實際用量；向 Oracle 確認隨用隨付帳戶是否適用；確認前，從開發機定時檢查新主機是否在線，
-  被停機時能立刻知道並依第 8 段退回。
+- Oracle 官方免費額度頁：Always Free 主機若連續 7 天 CPU（95 百分位）、網路、記憶體（A1）使用率都低於 20%，可能被回收；機隊用量遠低於此（A1 實測 CPU 約 2–4%、記憶體約 6%）。
+- 2026-09-30 Oracle 客服回覆（引用 KB38747）：帳戶轉成隨用隨付後不會因閒置被停機；本帳戶 9/26 已轉。客服同時說免費額度 4 核心／24GB，與官方頁 2／12 矛盾，**照官方頁維持一台 2 核心／12GB**。
+- 仍要防的是主機故障：A1 故障時由兩台免費小 VM 備援上線（進度頁 f-11，階段 D 之後做）。
 
 ## 10. 開發機怎麼辦
 
