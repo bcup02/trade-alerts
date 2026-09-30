@@ -1,0 +1,1682 @@
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 7a6828e..fd0d0c5 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -100,9 +100,9 @@
+   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>42 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    四支策略目前所有已知的「出問題」情況，共 <b>49 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>29 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>31 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -1311,6 +1311,177 @@
+    "tier": "R3",
+    "title": "交易所有成交、帳本沒記，無法自動更正",
+    "what": "加密策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。"
++  },
++  {
++   "ai_prompt": "請追查這支策略為什麼帳本跟交易所對不上：讀該策略 audit/ledger_status.json 的 position_diffs 與 unmatched_exchange_fills，對照 audit/trading_ledger.jsonl 與交易所成交（唯讀查詢），判斷是漏記平倉、重複送單、手動下單還是記錄錯誤，提出以交易所為準、只追加的更正步驟（先給我確認再執行），並追查根本原因。",
++   "behaviour": {
++    "state": "done"
++   },
++   "bot": "fleet",
++   "bot_label": "全機隊",
++   "code": "FLEET.OPS_LEDGER_DIVERGED",
++   "direction": "交易所是標準答案。修復機器人能對應的漏記平倉會自己補；補不了、或是多出來的成交，要人確認並讓帳本跟交易所一致。",
++   "emits_event": {
++    "state": "n/a"
++   },
++   "error_id": "ERR-043",
++   "notes": [],
++   "open": false,
++   "steps": [
++    "看訊息裡是哪支策略，到交易所 App 核對這支策略的持倉與最近成交。",
++    "等下一輪對帳（約 15 分鐘）；若修復機器人已自動補好，會收到「已恢復」。",
++    "仍然對不上：把下方「給 AI 的追查指令」整段貼給 Claude，列出差異並提出以交易所為準的更正步驟（先給你確認再執行）。"
++   ],
++   "tier": "R3",
++   "title": "帳本跟交易所對不上（維運通知帳本軸）",
++   "what": "某支策略的本地帳本跟交易所的成交或部位對不上。"
++  },
++  {
++   "ai_prompt": "請追查這支策略的帳本為什麼跟 Google 表對不上：讀 audit/google_reconcile_status.json 的差異清單、Google 表同步佇列與 google-projection 背景工作的日誌，判斷是送出失敗、接收端錯誤還是資料格式問題，並提出讓兩邊一致的做法與治本修正。",
++   "behaviour": {
++    "state": "done"
++   },
++   "bot": "fleet",
++   "bot_label": "全機隊",
++   "code": "FLEET.OPS_GOOGLE_DIVERGED",
++   "direction": "帳本是標準答案，Google 表會由背景工作重送追上。多數幾輪內自己恢復；一直對不上才代表同步卡住。",
++   "emits_event": {
++    "state": "n/a"
++   },
++   "error_id": "ERR-044",
++   "notes": [],
++   "open": false,
++   "steps": [
++    "等下一兩輪對帳，若自動恢復會收到「已恢復」。",
++    "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，追查 Google 表同步為什麼卡住。"
++   ],
++   "tier": "R2",
++   "title": "帳本跟 Google 表對不上（維運通知 Google 表軸）",
++   "what": "某支策略的本地帳本跟共用的 Google 表對不上。"
++  },
++  {
++   "ai_prompt": "請追查這支策略為什麼回報出錯或安全暫停：讀 /var/lib/portfolio-query/<策略>/current.json 的 strategy.runtime_status 與策略狀態檔的暫停原因與證據，對照該策略主程式的 journal，說明原因、該照風險登記冊哪一條處理，並提出治本修正。",
++   "behaviour": {
++    "state": "done"
++   },
++   "bot": "fleet",
++   "bot_label": "全機隊",
++   "code": "FLEET.OPS_RUNTIME_ALERT",
++   "direction": "策略已經停下或跑不動，不會自己恢復交易。先看策略自己的暫停原因，照那條錯誤的處理步驟做。",
++   "emits_event": {
++    "state": "n/a"
++   },
++   "error_id": "ERR-045",
++   "notes": [],
++   "open": false,
++   "steps": [
++    "看訊息裡是哪支策略；到主機用該策略的解除工具 preview 看暫停原因與證據。",
++    "照風險登記冊裡那個原因的處理步驟處理。",
++    "確認後用解除工具解除；恢復後會收到「已恢復」。"
++   ],
++   "tier": "R3",
++   "title": "策略出錯或安全暫停（維運通知運行狀態軸）",
++   "what": "某支策略回報自己出錯（ERROR）或已安全暫停（SAFE_HALT）。"
++  },
++  {
++   "ai_prompt": "請追查這個背景服務為什麼失敗：在該主機用 journalctl -u <服務> 看最近幾次執行的錯誤（例如 226/NAMESPACE、203/EXEC、Python 例外），判斷是環境、權限、設定還是程式問題，並提出治本修正；若是部署造成的暫時失敗，說明並確認已恢復。",
++   "behaviour": {
++    "state": "pending"
++   },
++   "bot": "fleet",
++   "bot_label": "全機隊",
++   "code": "FLEET.OPS_UNIT_FAILED",
++   "direction": "多數是暫時性的（例如部署時剛好在跑），下一輪自己恢復。一直失敗代表程式或設定有問題，例如 2026-09-29 新主機快照資料夾沒建立。",
++   "emits_event": {
++    "state": "n/a"
++   },
++   "error_id": "ERR-046",
++   "notes": [
++    "行為未做 — 加密策略：還沒決定要盯哪些背景服務（見「維運通知盯背景服務有沒有掛掉」）。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡是哪個服務。",
++    "等下一輪；恢復會收到「已恢復」。",
++    "一直失敗：把下方「給 AI 的追查指令」整段貼給 Claude，查服務日誌並修正。"
++   ],
++   "tier": "R2",
++   "title": "背景服務掛掉（維運通知服務單元軸）",
++   "what": "維運通知盯的某個背景服務（systemd unit）狀態是失敗。"
++  },
++  {
++   "ai_prompt": "請追查這支策略的 audit/ops_export.json 為什麼讀不到或沒更新：看寫它的背景工作（修復機器人或帳本少記成交計時器）的 journal、檔案權限與 generated_at，判斷是背景工作沒跑、失敗還是權限問題，並提出治本修正。",
++   "behaviour": {
++    "state": "pending"
++   },
++   "bot": "fleet",
++   "bot_label": "全機隊",
++   "code": "FLEET.OPS_EXPORT_UNAVAILABLE",
++   "direction": "匯出檔是策略把「要通知你的事」交給維運通知的地方，讀不到代表這段期間策略的通知可能送不出來。一直這樣要查寫匯出檔的背景工作。",
++   "emits_event": {
++    "state": "n/a"
++   },
++   "error_id": "ERR-047",
++   "notes": [
++    "行為未做 — 加密策略：還沒有匯出檔。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡是哪支策略。",
++    "等下一輪；恢復會收到「已恢復」。",
++    "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，查寫匯出檔的背景工作。"
++   ],
++   "tier": "R2",
++   "title": "匯出檔讀不到或太久沒更新（維運通知匯出檔軸）",
++   "what": "維運通知讀不到某支策略的匯出檔，或匯出檔太久沒更新。"
++  },
++  {
++   "ai_prompt": "請追查這支策略為什麼停止回報：確認主程式與對帳、快照背景工作的 systemctl 狀態與最近 journal，看狀態檔（audit/ledger_status.json、google_reconcile_status.json、/var/lib/portfolio-query/<策略>/current.json）的 checked_at，判斷是服務停了、卡住還是權限問題，並提出治本修正。",
++   "behaviour": {
++    "state": "done"
++   },
++   "bot": "fleet",
++   "bot_label": "全機隊",
++   "code": "FLEET.OPS_STATUS_STALE",
++   "direction": "通常是寫狀態檔的服務停了或卡住。先確認策略主程式與對帳背景工作還在跑；刻意停用（例如搬家凍結）時可以忽略。",
++   "emits_event": {
++    "state": "n/a"
++   },
++   "error_id": "ERR-048",
++   "notes": [],
++   "open": false,
++   "steps": [
++    "看訊息裡是哪支策略、哪個軸。",
++    "確認這支策略是不是被刻意停用（例如搬家期間凍結）；是的話可忽略。",
++    "不是的話，把下方「給 AI 的追查指令」整段貼給 Claude，查服務為什麼沒在回報。"
++   ],
++   "tier": "R2",
++   "title": "策略停止回報（狀態檔不見或太舊）",
++   "what": "某支策略的狀態檔（對帳結果或運行狀態）不見了或太久沒更新，看起來像是停止回報。"
++  },
++  {
++   "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。",
++   "behaviour": {
++    "state": "n/a"
++   },
++   "bot": "fleet",
++   "bot_label": "全機隊",
++   "code": "FLEET.OPS_CLOCK_DEGRADED",
++   "direction": "時鐘不準時交易所會拒絕下單，真倉的進出場與停損都可能失效。要把時間同步改回 chrony 並確認時間準確。",
++   "emits_event": {
++    "state": "n/a"
++   },
++   "error_id": "ERR-049",
++   "notes": [],
++   "open": false,
++   "steps": [
++    "看訊息裡是哪台主機。",
++    "到那台主機確認 chrony 是否在跑、時間是否同步（chronyc tracking）。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，找出是什麼把時間同步換掉並修正。"
++   ],
++   "tier": "R3",
++   "title": "主機時鐘同步被關掉（維運通知時鐘軸）",
++   "what": "主機的時間同步程式被換掉或停用（例如系統更新後改回 systemd-timesyncd），時鐘可能開始不準。"
+   }
+  ],
+  "tiers": [
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 6f1c7a6..0d893e4 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,8 +177,8 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>44</b><span>項未完成——還有策略沒做到</span></a>
+-    <a class="c-done" href="#group-done"><b>20</b><span>項已完成——四支都到位，不用再動</span></a>
++    <a class="c-pending" href="#group-pending"><b>46</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-done" href="#group-done"><b>25</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+   <p class="dot-legend">
+@@ -193,11 +193,11 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">44 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">46 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+-  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">20 項</span></div>
++  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">25 項</span></div>
+   <p class="group-sub">每支相關的策略都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
+   <div id="done"></div>
+ 
+@@ -2204,7 +2204,7 @@
+    "title": "自動修補重複發生時升格通知"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-notify.error_id",
+    "complete": false,
+    "dots": {
+@@ -3734,107 +3734,745 @@
+    ],
+    "sub": "ERR-042 · MYC.UNRECORDED_FILL_UNRESOLVED",
+    "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+-  }
+- ],
+- "phase_counts": {
+-  "7e": 4,
+-  "8-btc-competition": 8,
+-  "8-momentum": 3,
+-  "8-mycrypto": 18,
+-  "8-seykota": 19,
+-  "binance-funding-sync": 2,
+-  "error-ids": 4,
+-  "h4-trade-correction": 0,
+-  "hotfix-btc-order-resend": 0,
+-  "hotfix-seykota-order-resend": 0,
+-  "hotfix-seykota-stop-resolution": 0,
+-  "naming-rollout": 0,
+-  "repair-recurrence": 4,
+-  "unrecorded-fill": 4,
+-  "v2-W2": 0,
+-  "v2-W3": 0,
+-  "v2-W4": 0,
+-  "v2-W6": 0
+- },
+- "phase_order": [
+-  "v2-W2",
+-  "v2-W3",
+-  "v2-W4",
+-  "v2-W6",
+-  "8-momentum",
+-  "8-seykota",
+-  "8-mycrypto",
+-  "8-btc-competition",
+-  "binance-funding-sync",
+-  "naming-rollout",
+-  "7e",
+-  "hotfix-seykota-order-resend",
+-  "unrecorded-fill",
+-  "repair-recurrence",
+-  "error-ids",
+-  "hotfix-btc-order-resend",
+-  "h4-trade-correction",
+-  "hotfix-seykota-stop-resolution"
+- ],
+- "phases": {
+-  "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+-  "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
+-  "8-momentum": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
+-  "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
+-  "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
+-  "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
+-  "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+-  "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
+-  "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+-  "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
+-  "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
+-  "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
+-  "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+-  "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+-  "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
+-  "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+-  "v2-W4": "分級 v2：趨勢策略的修復機器人升到完整版",
+-  "v2-W6": "分級 v2：部署到開發機與正式機"
+- },
+- "project_order": [
+-  "seykota",
+-  "momentum",
+-  "mycrypto",
+-  "btc-competition"
+- ],
+- "projects": {
+-  "btc-competition": "競賽策略",
+-  "momentum": "動能策略",
+-  "mycrypto": "加密策略",
+-  "seykota": "趨勢策略"
+- },
+- "recent_summary": [
++  },
+   {
+-   "anchor": "cap-notify.error_id",
+-   "note": "錯誤目錄每條配好固定編號 ERR-001～ERR-042（e1），風險登記冊與本頁都顯示編號；通知第一行帶編號是 e3，這格仍未做。",
+-   "project": null,
+-   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
++   "added_recent": true,
++   "anchor": "rule-FLEET.OPS_LEDGER_DIVERGED",
++   "complete": true,
++   "dots": {
++    "btc-competition": "done",
++    "momentum": "done",
++    "mycrypto": "done",
++    "seykota": "done"
++   },
++   "has_recent": false,
++   "id": "FLEET.OPS_LEDGER_DIVERGED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/seykota_bot/reconcile/compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "reconcile_compare.py:101 main 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/btc_competition/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-043 · FLEET.OPS_LEDGER_DIVERGED",
++   "title": "R3｜帳本跟交易所對不上（維運通知帳本軸）"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-FLEET.OPS_GOOGLE_DIVERGED",
++   "complete": true,
++   "dots": {
++    "btc-competition": "done",
++    "momentum": "done",
++    "mycrypto": "done",
++    "seykota": "done"
++   },
++   "has_recent": false,
++   "id": "FLEET.OPS_GOOGLE_DIVERGED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/seykota_bot/reconcile/google_reconcile.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/google_reconcile.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "google_reconcile.py:135 main 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/btc_competition/reconcile_google.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-044 · FLEET.OPS_GOOGLE_DIVERGED",
++   "title": "R2｜帳本跟 Google 表對不上（維運通知 Google 表軸）"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-FLEET.OPS_RUNTIME_ALERT",
++   "complete": true,
++   "dots": {
++    "btc-competition": "done",
++    "momentum": "done",
++    "mycrypto": "done",
++    "seykota": "done"
++   },
++   "has_recent": false,
++   "id": "FLEET.OPS_RUNTIME_ALERT",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/seykota_bot/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "portfolio_snapshot_adapter.py:75 _runtime_status 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/btc_competition/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-045 · FLEET.OPS_RUNTIME_ALERT",
++   "title": "R3｜策略出錯或安全暫停（維運通知運行狀態軸）"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-FLEET.OPS_UNIT_FAILED",
++   "complete": false,
++   "dots": {
++    "btc-competition": "done",
++    "momentum": "done",
++    "mycrypto": "pending",
++    "seykota": "done"
++   },
++   "has_recent": false,
++   "id": "FLEET.OPS_UNIT_FAILED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "deploy/seykota-repair-shadow.service 列入正式機 OPS_NOTIFY_SEYKOTA_UNITS，由維運通知服務單元軸盯。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "deploy/mexc-momentum-repair-shadow.service 列入正式機 OPS_NOTIFY_MOMENTUM_UNITS，由維運通知服務單元軸盯。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
++       "state": "pending",
++       "text": "還沒決定要盯哪些背景服務（見「維運通知盯背景服務有沒有掛掉」）。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "deploy/btc-competition-unrecorded-fill.service 列入正式機 OPS_NOTIFY_BTC_COMPETITION_UNITS，由維運通知服務單元軸盯。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-046 · FLEET.OPS_UNIT_FAILED",
++   "title": "R2｜背景服務掛掉（維運通知服務單元軸）"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-FLEET.OPS_EXPORT_UNAVAILABLE",
++   "complete": false,
++   "dots": {
++    "btc-competition": "done",
++    "momentum": "done",
++    "mycrypto": "pending",
++    "seykota": "done"
++   },
++   "has_recent": false,
++   "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:186 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "scripts/repair_bot.py:163 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on）。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
++       "state": "pending",
++       "text": "還沒有匯出檔。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/btc_competition/unrecorded_fill.py:215 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on）。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-047 · FLEET.OPS_EXPORT_UNAVAILABLE",
++   "title": "R2｜匯出檔讀不到或太久沒更新（維運通知匯出檔軸）"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-FLEET.OPS_STATUS_STALE",
++   "complete": true,
++   "dots": {
++    "btc-competition": "done",
++    "momentum": "done",
++    "mycrypto": "done",
++    "seykota": "done"
++   },
++   "has_recent": false,
++   "id": "FLEET.OPS_STATUS_STALE",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/seykota_bot/reconcile/compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "reconcile_compare.py:101 main 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "done",
++       "text": "src/btc_competition/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-048 · FLEET.OPS_STATUS_STALE",
++   "title": "R2｜策略停止回報（狀態檔不見或太舊）"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-FLEET.OPS_CLOCK_DEGRADED",
++   "complete": true,
++   "dots": {
++    "btc-competition": "na",
++    "momentum": "na",
++    "mycrypto": "na",
++    "seykota": "na"
++   },
++   "has_recent": false,
++   "id": "FLEET.OPS_CLOCK_DEGRADED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "n/a",
++       "text": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "n/a",
++       "text": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "n/a",
++       "text": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "n/a",
++       "text": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "維運通知直接讀狀態檔，不經事件日誌。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-049 · FLEET.OPS_CLOCK_DEGRADED",
++   "title": "R3｜主機時鐘同步被關掉（維運通知時鐘軸）"
++  }
++ ],
++ "phase_counts": {
++  "7e": 4,
++  "8-btc-competition": 8,
++  "8-momentum": 3,
++  "8-mycrypto": 20,
++  "8-seykota": 19,
++  "binance-funding-sync": 2,
++  "error-ids": 4,
++  "h4-trade-correction": 0,
++  "hotfix-btc-order-resend": 0,
++  "hotfix-seykota-order-resend": 0,
++  "hotfix-seykota-stop-resolution": 0,
++  "naming-rollout": 0,
++  "repair-recurrence": 4,
++  "unrecorded-fill": 4,
++  "v2-W2": 0,
++  "v2-W3": 0,
++  "v2-W4": 0,
++  "v2-W6": 0
++ },
++ "phase_order": [
++  "v2-W2",
++  "v2-W3",
++  "v2-W4",
++  "v2-W6",
++  "8-momentum",
++  "8-seykota",
++  "8-mycrypto",
++  "8-btc-competition",
++  "binance-funding-sync",
++  "naming-rollout",
++  "7e",
++  "hotfix-seykota-order-resend",
++  "unrecorded-fill",
++  "repair-recurrence",
++  "error-ids",
++  "hotfix-btc-order-resend",
++  "h4-trade-correction",
++  "hotfix-seykota-stop-resolution"
++ ],
++ "phases": {
++  "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
++  "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
++  "8-momentum": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
++  "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
++  "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
++  "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
++  "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
++  "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
++  "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
++  "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
++  "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
++  "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
++  "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
++  "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
++  "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
++  "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
++  "v2-W4": "分級 v2：趨勢策略的修復機器人升到完整版",
++  "v2-W6": "分級 v2：部署到開發機與正式機"
++ },
++ "project_order": [
++  "seykota",
++  "momentum",
++  "mycrypto",
++  "btc-competition"
++ ],
++ "projects": {
++  "btc-competition": "競賽策略",
++  "momentum": "動能策略",
++  "mycrypto": "加密策略",
++  "seykota": "趨勢策略"
++ },
++ "recent_summary": [
++  {
++   "anchor": "rule-FLEET.OPS_LEDGER_DIVERGED",
++   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
++   "project": null,
++   "title": "R3｜帳本跟交易所對不上（維運通知帳本軸）"
++  },
++  {
++   "anchor": "rule-FLEET.OPS_GOOGLE_DIVERGED",
++   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
++   "project": null,
++   "title": "R2｜帳本跟 Google 表對不上（維運通知 Google 表軸）"
++  },
++  {
++   "anchor": "rule-FLEET.OPS_RUNTIME_ALERT",
++   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
++   "project": null,
++   "title": "R3｜策略出錯或安全暫停（維運通知運行狀態軸）"
++  },
++  {
++   "anchor": "rule-FLEET.OPS_UNIT_FAILED",
++   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
++   "project": null,
++   "title": "R2｜背景服務掛掉（維運通知服務單元軸）"
++  },
++  {
++   "anchor": "rule-FLEET.OPS_EXPORT_UNAVAILABLE",
++   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
++   "project": null,
++   "title": "R2｜匯出檔讀不到或太久沒更新（維運通知匯出檔軸）"
++  },
++  {
++   "anchor": "rule-FLEET.OPS_STATUS_STALE",
++   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
++   "project": null,
++   "title": "R2｜策略停止回報（狀態檔不見或太舊）"
++  },
++  {
++   "anchor": "rule-FLEET.OPS_CLOCK_DEGRADED",
++   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
++   "project": null,
++   "title": "R3｜主機時鐘同步被關掉（維運通知時鐘軸）"
+   }
+  ],
+  "totals": {
+   "btc-competition": {
+-   "done": 18,
+-   "n/a": 7,
++   "done": 24,
++   "n/a": 15,
+    "pending": 11
+   },
+   "momentum": {
+-   "done": 29,
+-   "n/a": 2,
++   "done": 35,
++   "n/a": 10,
+    "pending": 7
+   },
+   "mycrypto": {
+-   "done": 10,
+-   "n/a": 3,
+-   "pending": 25
++   "done": 14,
++   "n/a": 11,
++   "pending": 27
+   },
+   "seykota": {
+-   "done": 37,
+-   "n/a": 0,
++   "done": 43,
++   "n/a": 8,
+    "pending": 23
+   }
+  }
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index b567fac..091150a 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -36,7 +36,7 @@
+     "btc-competition": "btc-bull-market-competition",
+     "fleet": "(cross-repo: same condition implemented in every strategy)"
+   },
+-  "error_ids_issued": 42,
++  "error_ids_issued": 49,
+   "entries": [
+     {
+       "error_id": "ERR-001",
+@@ -1344,6 +1344,236 @@
+         ],
+         "ai_prompt": "請在 my-crypto-bot 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
+       }
++    },
++    {
++      "error_id": "ERR-043",
++      "code": "FLEET.OPS_LEDGER_DIVERGED",
++      "title": "帳本跟交易所對不上（維運通知帳本軸）",
++      "project": "fleet",
++      "sources": [
++        "ops-notify/src/ops_notify/config.py:15",
++        "ops-notify/src/ops_notify/watch.py:38",
++        "ops-notify/src/ops_notify/watch.py:122",
++        "ops-notify/src/ops_notify/dispatch.py:26"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」，持續則「🔴 對帳狀態升級」，恢復時「✅ 對帳狀態已恢復」",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "維運通知每輪讀策略寫的 ledger_status.json；DIVERGED 就發通知，不自動改帳本。",
++      "human_action": "以交易所為準，確認差異從哪裡來，再讓帳本跟交易所一致（修復機器人能處理的會自己補）。",
++      "resume": "n/a",
++      "lands_in_phase": 4,
++      "rationale": "帳本與交易所不一致可能代表漏記成交或部位不符，牽涉真錢，一定要人確認。",
++      "operator_message": {
++        "what": "某支策略的本地帳本跟交易所的成交或部位對不上。",
++        "direction": "交易所是標準答案。修復機器人能對應的漏記平倉會自己補；補不了、或是多出來的成交，要人確認並讓帳本跟交易所一致。",
++        "steps": [
++          "看訊息裡是哪支策略，到交易所 App 核對這支策略的持倉與最近成交。",
++          "等下一輪對帳（約 15 分鐘）；若修復機器人已自動補好，會收到「已恢復」。",
++          "仍然對不上：把下方「給 AI 的追查指令」整段貼給 Claude，列出差異並提出以交易所為準的更正步驟（先給你確認再執行）。"
++        ],
++        "ai_prompt": "請追查這支策略為什麼帳本跟交易所對不上：讀該策略 audit/ledger_status.json 的 position_diffs 與 unmatched_exchange_fills，對照 audit/trading_ledger.jsonl 與交易所成交（唯讀查詢），判斷是漏記平倉、重複送單、手動下單還是記錄錯誤，提出以交易所為準、只追加的更正步驟（先給我確認再執行），並追查根本原因。"
++      }
++    },
++    {
++      "error_id": "ERR-044",
++      "code": "FLEET.OPS_GOOGLE_DIVERGED",
++      "title": "帳本跟 Google 表對不上（維運通知 Google 表軸）",
++      "project": "fleet",
++      "sources": [
++        "ops-notify/src/ops_notify/config.py:16",
++        "ops-notify/src/ops_notify/watch.py:38",
++        "ops-notify/src/ops_notify/watch.py:122",
++        "ops-notify/src/ops_notify/dispatch.py:26"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」，持續則「🔴 對帳狀態升級」，恢復時「✅ 對帳狀態已恢復」",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "Google 表由背景工作重送追上；維運通知連續幾輪仍 DIVERGED 才升級。",
++      "human_action": "持續對不上時確認 Google 表同步是否卡住，必要時重送。",
++      "resume": "n/a",
++      "lands_in_phase": 4,
++      "rationale": "Google 表只是給人看的投影，不影響交易；多數會在下一輪自動追上，持續不一致才需要人。",
++      "operator_message": {
++        "what": "某支策略的本地帳本跟共用的 Google 表對不上。",
++        "direction": "帳本是標準答案，Google 表會由背景工作重送追上。多數幾輪內自己恢復；一直對不上才代表同步卡住。",
++        "steps": [
++          "等下一兩輪對帳，若自動恢復會收到「已恢復」。",
++          "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，追查 Google 表同步為什麼卡住。"
++        ],
++        "ai_prompt": "請追查這支策略的帳本為什麼跟 Google 表對不上：讀 audit/google_reconcile_status.json 的差異清單、Google 表同步佇列與 google-projection 背景工作的日誌，判斷是送出失敗、接收端錯誤還是資料格式問題，並提出讓兩邊一致的做法與治本修正。"
++      }
++    },
++    {
++      "error_id": "ERR-045",
++      "code": "FLEET.OPS_RUNTIME_ALERT",
++      "title": "策略出錯或安全暫停（維運通知運行狀態軸）",
++      "project": "fleet",
++      "sources": [
++        "ops-notify/src/ops_notify/config.py:28",
++        "ops-notify/src/ops_notify/watch.py:47",
++        "ops-notify/src/ops_notify/watch.py:48",
++        "ops-notify/src/ops_notify/watch.py:176"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」，持續則「🔴 對帳狀態升級」，恢復時「✅ 對帳狀態已恢復」；安全暫停不等去抖、立刻通知",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "維運通知讀策略快照的運行狀態；ERROR 連續異常才通知，SAFE_HALT 立刻通知。不自動解除。",
++      "human_action": "照該策略的暫停原因處理，確認後用解除工具解除。",
++      "resume": "n/a",
++      "lands_in_phase": 4,
++      "rationale": "安全暫停代表策略自己停下來等人，出錯代表策略連續跑不動，兩者都要人判斷。",
++      "operator_message": {
++        "what": "某支策略回報自己出錯（ERROR）或已安全暫停（SAFE_HALT）。",
++        "direction": "策略已經停下或跑不動，不會自己恢復交易。先看策略自己的暫停原因，照那條錯誤的處理步驟做。",
++        "steps": [
++          "看訊息裡是哪支策略；到主機用該策略的解除工具 preview 看暫停原因與證據。",
++          "照風險登記冊裡那個原因的處理步驟處理。",
++          "確認後用解除工具解除；恢復後會收到「已恢復」。"
++        ],
++        "ai_prompt": "請追查這支策略為什麼回報出錯或安全暫停：讀 /var/lib/portfolio-query/<策略>/current.json 的 strategy.runtime_status 與策略狀態檔的暫停原因與證據，對照該策略主程式的 journal，說明原因、該照風險登記冊哪一條處理，並提出治本修正。"
++      }
++    },
++    {
++      "error_id": "ERR-046",
++      "code": "FLEET.OPS_UNIT_FAILED",
++      "title": "背景服務掛掉（維運通知服務單元軸）",
++      "project": "fleet",
++      "sources": [
++        "ops-notify/src/ops_notify/watch.py:239"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」（服務單元狀態 FAILED）",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "定時服務下一輪會自己重跑；維運通知連續幾輪仍 FAILED 才升級。",
++      "human_action": "持續失敗時查該服務的日誌找原因並修正。",
++      "resume": "n/a",
++      "lands_in_phase": 4,
++      "rationale": "定時服務偶爾失敗一輪（例如部署重建環境時）下一輪就會恢復；一直失敗才需要人。",
++      "operator_message": {
++        "what": "維運通知盯的某個背景服務（systemd unit）狀態是失敗。",
++        "direction": "多數是暫時性的（例如部署時剛好在跑），下一輪自己恢復。一直失敗代表程式或設定有問題，例如 2026-09-29 新主機快照資料夾沒建立。",
++        "steps": [
++          "看訊息裡是哪個服務。",
++          "等下一輪；恢復會收到「已恢復」。",
++          "一直失敗：把下方「給 AI 的追查指令」整段貼給 Claude，查服務日誌並修正。"
++        ],
++        "ai_prompt": "請追查這個背景服務為什麼失敗：在該主機用 journalctl -u <服務> 看最近幾次執行的錯誤（例如 226/NAMESPACE、203/EXEC、Python 例外），判斷是環境、權限、設定還是程式問題，並提出治本修正；若是部署造成的暫時失敗，說明並確認已恢復。"
++      }
++    },
++    {
++      "error_id": "ERR-047",
++      "code": "FLEET.OPS_EXPORT_UNAVAILABLE",
++      "title": "匯出檔讀不到或太久沒更新（維運通知匯出檔軸）",
++      "project": "fleet",
++      "sources": [
++        "ops-notify/src/ops_notify/watch.py:260",
++        "ops-notify/src/ops_notify/watch.py:270"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」（匯出檔 UNAVAILABLE／STALE）",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "寫匯出檔的背景工作下一輪會重寫；維運通知連續幾輪仍異常才升級。",
++      "human_action": "持續異常時查寫匯出檔的背景工作。",
++      "resume": "n/a",
++      "lands_in_phase": 4,
++      "rationale": "匯出檔讀不到時，策略要通知你的事送不出來；多數下一輪就恢復，一直這樣才需要人。",
++      "operator_message": {
++        "what": "維運通知讀不到某支策略的匯出檔，或匯出檔太久沒更新。",
++        "direction": "匯出檔是策略把「要通知你的事」交給維運通知的地方，讀不到代表這段期間策略的通知可能送不出來。一直這樣要查寫匯出檔的背景工作。",
++        "steps": [
++          "看訊息裡是哪支策略。",
++          "等下一輪；恢復會收到「已恢復」。",
++          "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，查寫匯出檔的背景工作。"
++        ],
++        "ai_prompt": "請追查這支策略的 audit/ops_export.json 為什麼讀不到或沒更新：看寫它的背景工作（修復機器人或帳本少記成交計時器）的 journal、檔案權限與 generated_at，判斷是背景工作沒跑、失敗還是權限問題，並提出治本修正。"
++      }
++    },
++    {
++      "error_id": "ERR-048",
++      "code": "FLEET.OPS_STATUS_STALE",
++      "title": "策略停止回報（狀態檔不見或太舊）",
++      "project": "fleet",
++      "sources": [
++        "ops-notify/src/ops_notify/watch.py:104",
++        "ops-notify/src/ops_notify/watch.py:116",
++        "ops-notify/src/ops_notify/watch.py:159",
++        "ops-notify/src/ops_notify/watch.py:170"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」（UNAVAILABLE／STALE）",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "寫狀態檔的程式下一輪會重寫；維運通知連續幾輪仍異常才升級。",
++      "human_action": "持續異常時確認策略與對帳背景工作是否還在跑。",
++      "resume": "n/a",
++      "lands_in_phase": 4,
++      "rationale": "狀態檔太舊代表策略或對帳沒在回報，可能是服務停了；短暫缺一輪會自己恢復，一直這樣才需要人。",
++      "operator_message": {
++        "what": "某支策略的狀態檔（對帳結果或運行狀態）不見了或太久沒更新，看起來像是停止回報。",
++        "direction": "通常是寫狀態檔的服務停了或卡住。先確認策略主程式與對帳背景工作還在跑；刻意停用（例如搬家凍結）時可以忽略。",
++        "steps": [
++          "看訊息裡是哪支策略、哪個軸。",
++          "確認這支策略是不是被刻意停用（例如搬家期間凍結）；是的話可忽略。",
++          "不是的話，把下方「給 AI 的追查指令」整段貼給 Claude，查服務為什麼沒在回報。"
++        ],
++        "ai_prompt": "請追查這支策略為什麼停止回報：確認主程式與對帳、快照背景工作的 systemctl 狀態與最近 journal，看狀態檔（audit/ledger_status.json、google_reconcile_status.json、/var/lib/portfolio-query/<策略>/current.json）的 checked_at，判斷是服務停了、卡住還是權限問題，並提出治本修正。"
++      }
++    },
++    {
++      "error_id": "ERR-049",
++      "code": "FLEET.OPS_CLOCK_DEGRADED",
++      "title": "主機時鐘同步被關掉（維運通知時鐘軸）",
++      "project": "fleet",
++      "sources": [
++        "ops-notify/src/ops_notify/config.py:17",
++        "ops-notify/src/ops_notify/watch.py:44"
++      ],
++      "current": {
++        "latch": null,
++        "notify": "維運通知 LINE「⚠️ 對帳狀態異常」（系統時鐘 DEGRADED）",
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "維運通知讀 clock-health 寫的狀態檔；DEGRADED 就發通知，不自動修改系統設定。",
++      "human_action": "把主機的時間同步改回 chrony 並確認時間準確。",
++      "resume": "n/a",
++      "lands_in_phase": 4,
++      "rationale": "時鐘不準會讓交易所以時間戳記拒絕下單（-1021），真倉會下不了單或停損失效，一定要人處理。",
++      "operator_message": {
++        "what": "主機的時間同步程式被換掉或停用（例如系統更新後改回 systemd-timesyncd），時鐘可能開始不準。",
++        "direction": "時鐘不準時交易所會拒絕下單，真倉的進出場與停損都可能失效。要把時間同步改回 chrony 並確認時間準確。",
++        "steps": [
++          "看訊息裡是哪台主機。",
++          "到那台主機確認 chrony 是否在跑、時間是否同步（chronyc tracking）。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，找出是什麼把時間同步換掉並修正。"
++        ],
++        "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。"
++      }
+     }
+   ],
+   "retired_codes": [
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 0e46dc6..2cce086 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1255,14 +1255,325 @@
+           "reason": "共用處理程式（trade_alerts.unrecorded_fill）直接寫進事件日誌，由匯出檔交給維運通知；跟著這支策略接上一起生效。"
+         }
+       }
++    },
++    {
++      "code": "FLEET.OPS_LEDGER_DIVERGED",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/reconcile/compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
++        },
++        "mycrypto": {
++          "state": "done",
++          "evidence": "reconcile_compare.py:101 main 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "seykota": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        }
++      }
++    },
++    {
++      "code": "FLEET.OPS_GOOGLE_DIVERGED",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/google_reconcile.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/reconcile/google_reconcile.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
++        },
++        "mycrypto": {
++          "state": "done",
++          "evidence": "google_reconcile.py:135 main 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/reconcile_google.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "seykota": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        }
++      }
++    },
++    {
++      "code": "FLEET.OPS_RUNTIME_ALERT",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
++        },
++        "mycrypto": {
++          "state": "done",
++          "evidence": "portfolio_snapshot_adapter.py:75 _runtime_status 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "seykota": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        }
++      }
++    },
++    {
++      "code": "FLEET.OPS_UNIT_FAILED",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "deploy/mexc-momentum-repair-shadow.service 列入正式機 OPS_NOTIFY_MOMENTUM_UNITS，由維運通知服務單元軸盯。"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "deploy/seykota-repair-shadow.service 列入正式機 OPS_NOTIFY_SEYKOTA_UNITS，由維運通知服務單元軸盯。"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "還沒決定要盯哪些背景服務（見「維運通知盯背景服務有沒有掛掉」）。"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "deploy/btc-competition-unrecorded-fill.service 列入正式機 OPS_NOTIFY_BTC_COMPETITION_UNITS，由維運通知服務單元軸盯。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "seykota": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        }
++      }
++    },
++    {
++      "code": "FLEET.OPS_EXPORT_UNAVAILABLE",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:163 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on）。"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "scripts/repair_bot.py:186 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）。"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "8-mycrypto",
++          "reason": "還沒有匯出檔。"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/unrecorded_fill.py:215 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on）。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "seykota": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        }
++      }
++    },
++    {
++      "code": "FLEET.OPS_STATUS_STALE",
++      "behaviour": {
++        "momentum": {
++          "state": "done",
++          "evidence": "src/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
++        },
++        "seykota": {
++          "state": "done",
++          "evidence": "src/seykota_bot/reconcile/compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
++        },
++        "mycrypto": {
++          "state": "done",
++          "evidence": "reconcile_compare.py:101 main 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
++        },
++        "btc-competition": {
++          "state": "done",
++          "evidence": "src/btc_competition/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "seykota": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        }
++      }
++    },
++    {
++      "code": "FLEET.OPS_CLOCK_DEGRADED",
++      "behaviour": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
++        },
++        "seykota": {
++          "state": "n/a",
++          "reason": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "seykota": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        },
++        "btc-competition": {
++          "state": "n/a",
++          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
+     {
+-      "kind": "cap",
+-      "id": "notify.error_id",
+-      "type": "updated",
+-      "note": "錯誤目錄每條配好固定編號 ERR-001～ERR-042（e1），風險登記冊與本頁都顯示編號；通知第一行帶編號是 e3，這格仍未做。"
++      "kind": "rule",
++      "id": "FLEET.OPS_LEDGER_DIVERGED",
++      "type": "added",
++      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
++    },
++    {
++      "kind": "rule",
++      "id": "FLEET.OPS_GOOGLE_DIVERGED",
++      "type": "added",
++      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
++    },
++    {
++      "kind": "rule",
++      "id": "FLEET.OPS_RUNTIME_ALERT",
++      "type": "added",
++      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
++    },
++    {
++      "kind": "rule",
++      "id": "FLEET.OPS_UNIT_FAILED",
++      "type": "added",
++      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
++    },
++    {
++      "kind": "rule",
++      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
++      "type": "added",
++      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
++    },
++    {
++      "kind": "rule",
++      "id": "FLEET.OPS_STATUS_STALE",
++      "type": "added",
++      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
++    },
++    {
++      "kind": "rule",
++      "id": "FLEET.OPS_CLOCK_DEGRADED",
++      "type": "added",
++      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+     }
+   ]
+ }
+diff --git a/tests/test_fleet_error_catalog.py b/tests/test_fleet_error_catalog.py
+index f68ff47..6fb9a0e 100644
+--- a/tests/test_fleet_error_catalog.py
++++ b/tests/test_fleet_error_catalog.py
+@@ -211,3 +211,27 @@ def test_error_id_is_shown_on_both_register_pages(catalog):
+     first = catalog["entries"][0]
+     assert f'"error_id": "{first["error_id"]}"' in pages["fleet-risk-register.html"]
+     assert f'{first["error_id"]} · {first["code"]}' in pages["fleet-rollout-register.html"]
++
++
++def test_retiring_an_entry_keeps_its_error_id_in_retired_codes(catalog):
++    """#87 review follow-up: the positive case. Moving a live entry (with its
++    error_id) into retired_codes keeps the sequence valid; dropping the number
++    on the way out, or giving it to a new entry, does not."""
++    import copy
++    import re
++
++    def valid(cat):
++        live = [e["error_id"] for e in cat["entries"]]
++        retired = [i["error_id"] for i in cat["retired_codes"] if "error_id" in i]
++        ids = live + retired
++        return (all(re.fullmatch(r"ERR-\d{3}", n) for n in ids) and len(ids) == len(set(ids))
++                and sorted(ids) == [f"ERR-{n:03d}" for n in range(1, cat["error_ids_issued"] + 1)])
++
++    cat = copy.deepcopy(catalog)
++    gone = cat["entries"].pop(3)
++    assert not valid(cat), "a retired entry that drops its number must fail"
++    cat["retired_codes"].append({"code": gone["code"], "retired_in": "fleet-error-catalog/v2",
++                                 "reason": "test", "error_id": gone["error_id"]})
++    assert valid(cat)
++    cat["entries"].append({**cat["entries"][0], "code": "FLEET.TEST_REUSE", "error_id": gone["error_id"]})
++    assert not valid(cat), "reusing a retired number must fail"
