@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>50</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>52</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>25</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">50 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">52 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -1026,7 +1026,7 @@
    "title": "兩段式解除工具"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-latch.restart_only_clear",
    "complete": false,
    "dots": {
@@ -2266,7 +2266,7 @@
    "title": "通知一定附錯誤編號，標題與風險登記冊一致"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-stop.graceful",
    "complete": false,
    "dots": {
@@ -2286,7 +2286,7 @@
        "aspect": null,
        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "f-12 第 2 個 PR，動能之後做。"
+       "text": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作；還沒上正式機，上線後改已做。"
       }
      ]
     },
@@ -2297,7 +2297,7 @@
        "aspect": null,
        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "f-12 動能 PR（第 1 個）：已寫完，等審閱與上線。"
+       "text": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作；還沒上正式機，上線後改已做。"
       }
      ]
     },
@@ -2308,7 +2308,7 @@
        "aspect": null,
        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "f-12 第 3 個 PR。"
+       "text": "2026-10-01 已在開發主幹的 f-12 加密 PR 實作（當輪做完才停、停止時不開新倉也不寫 Google 表、TimeoutStopSec=180、部署腳本等 oneshot）；還沒上正式機，上線後改已做。"
       }
      ]
     },
@@ -2319,7 +2319,7 @@
        "aspect": null,
        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "f-12 第 4 個 PR（調倉要整輪跑完）。"
+       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（SIGTERM 只設旗標、送完手上那張單再停、其餘留 pending 下次接著做；TimeoutStopSec=600、TimeoutStartSec=1800；部署腳本等 oneshot）；還沒上正式機，上線後改已做。"
       }
      ]
     }
@@ -2328,7 +2328,7 @@
    "title": "收到停止訊號時等當輪做完再結束"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-recovery.interrupted_order",
    "complete": false,
    "dots": {
@@ -2348,7 +2348,7 @@
        "aspect": null,
        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "f-12 第 2 個 PR。"
+       "text": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作（entry_intent 沿用 trade_id、被中斷的停損原價重掛、孤兒接管通知）；還沒上正式機，上線後改已做。"
       }
      ]
     },
@@ -2359,7 +2359,7 @@
        "aspect": null,
        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "f-12 動能 PR：用 order_attempt 沿用 trade_id；撤停損後被殺會重新掛停損。"
+       "text": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作（order_attempt 沿用 trade_id；撤停損後被殺重新掛停損；孤兒接管通知）；還沒上正式機，上線後改已做。"
       }
      ]
     },
@@ -2370,7 +2370,7 @@
        "aspect": null,
        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "f-12 第 3 個 PR（開倉進行中狀態、停損存在性驗證）。"
+       "text": "2026-10-01 已在開發主幹的 f-12 加密 PR 實作（開倉進行中紀錄沿用 trade_id、每輪核對交易所停損單、重複平倉防護）；還沒上正式機，上線後改已做。加密沒有通知管道，接管只寫稽核日誌。"
       }
      ]
     },
@@ -2381,7 +2381,7 @@
        "aspect": null,
        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "f-12 第 4 個 PR（送單前寫 order_attempt、補記以 order_id 去重）。"
+       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt；被殺後由 unrecorded-fill 作業補記並以交易所 order_id 去重；補排隊遺漏的 Google 投影；狀態檔損毀改安全暫停）；還沒上正式機，上線後改已做。"
       }
      ]
     }
@@ -3116,7 +3116,7 @@
        "aspect": "寫進事件日誌",
        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
        "state": "pending",
-       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
       }
      ]
     }
@@ -3151,7 +3151,7 @@
        "aspect": "寫進事件日誌",
        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
        "state": "pending",
-       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
       }
      ]
     }
@@ -3186,7 +3186,7 @@
        "aspect": "寫進事件日誌",
        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
        "state": "pending",
-       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
       }
      ]
     }
@@ -3221,7 +3221,7 @@
        "aspect": "寫進事件日誌",
        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
        "state": "pending",
-       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
       }
      ]
     }
@@ -3256,7 +3256,7 @@
        "aspect": "寫進事件日誌",
        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
        "state": "pending",
-       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
       }
      ]
     }
@@ -4497,7 +4497,7 @@
    "title": "R3｜重啟後接管了一個帳本沒有記完的部位"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
    "complete": false,
    "dots": {
@@ -4530,6 +4530,76 @@
    ],
    "sub": "ERR-051 · SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
    "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+   "complete": false,
+   "dots": {
+    "btc-competition": "pending",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+       "state": "pending",
+       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt、被中斷的單由 unrecorded-fill 作業照交易所補記並以交易所 order_id 去重）；還沒上正式機，上線後改已做。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+       "state": "pending",
+       "text": "同上：補記時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
+      }
+     ]
+    }
+   ],
+   "sub": "ERR-052 · BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+   "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-BTC.STATE_FILE_CORRUPT",
+   "complete": false,
+   "dots": {
+    "btc-competition": "pending",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "BTC.STATE_FILE_CORRUPT",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+       "state": "pending",
+       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（狀態檔讀不出來就鎖安全暫停、留損毀備份，不再當成第一次執行重新調倉）；還沒上正式機，上線後改已做。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+       "state": "pending",
+       "text": "同上：暫停時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
+      }
+     ]
+    }
+   ],
+   "sub": "ERR-053 · BTC.STATE_FILE_CORRUPT",
+   "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
   }
  ],
  "phase_counts": {
@@ -4540,7 +4610,7 @@
   "8-seykota": 19,
   "binance-funding-sync": 2,
   "error-ids": 4,
-  "f-12": 12,
+  "f-12": 16,
   "h4-trade-correction": 0,
   "hotfix-btc-order-resend": 0,
   "hotfix-seykota-order-resend": 0,
@@ -4609,23 +4679,35 @@
  },
  "recent_summary": [
   {
-   "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
-   "note": "趨勢重啟後接管／補停損要通知（f-12，ERR-051）。",
+   "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+   "note": "競賽每日調整被中斷、重啟後把已成交的單照交易所補記並通知（f-12，ERR-052）。",
    "project": null,
-   "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
+   "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
   },
   {
-   "anchor": "cap-latch.restart_only_clear",
-   "note": "趨勢的理由改寫：f-12 趨勢 PR 已實作，仍未上正式機。",
+   "anchor": "rule-BTC.STATE_FILE_CORRUPT",
+   "note": "競賽狀態檔讀不出來就安全暫停、不再當成第一次執行（f-12，ERR-053）。",
    "project": null,
-   "title": "「改好設定重啟」就能解除的安全暫停真的會被清掉"
+   "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
+  },
+  {
+   "anchor": "cap-stop.graceful",
+   "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。",
+   "project": null,
+   "title": "收到停止訊號時等當輪做完再結束"
+  },
+  {
+   "anchor": "cap-recovery.interrupted_order",
+   "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。",
+   "project": null,
+   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
   }
  ],
  "totals": {
   "btc-competition": {
    "done": 24,
    "n/a": 15,
-   "pending": 13
+   "pending": 17
   },
   "momentum": {
    "done": 35,

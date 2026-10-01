@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 51,
+  "error_ids_issued": 53,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -1637,6 +1637,71 @@
           "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
         ],
         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查一次重啟後接管：讀 state/bot_state.json 的 pending_operations（entry_intent、protective_stop_replace）與 audit 事件（position_recovered_from_entry_intent、protective_stop_rearmed_after_interruption、exchange_position_adopted），audit/trading_ledger.jsonl 裡該 trade_id 的 trade_open，以及 journalctl 在那個時間點前後的 graceful_stop／position_adopted 紀錄，判斷是進場途中被中斷、換停損途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。"
+      }
+    },
+    {
+      "error_id": "ERR-052",
+      "code": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+      "title": "每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記",
+      "project": "btc-competition",
+      "sources": [
+        "src/btc_competition/interrupted_orders.py:165"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "每 15 分鐘的 unrecorded-fill 作業先處理：超過 30 分鐘還沒有成交紀錄的送單意圖（order_attempt），用自訂編號向交易所查單；已成交就照成交明細補記一筆 spot_fill（交易所 order_id 已在帳本就不寫）、排入 Google 表，並寫事件日誌；交易所沒有這張單或沒成交就標記處理完畢；仍掛著或查詢失敗留到下一輪。",
+      "human_action": "確認補記的那張單是預期的（上一次每日調整被部署或當機打斷），確認帳本、Google 表與交易所一致；剩下沒調完的部分會在下一次每日調整接著做。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-01 f-12：競賽每日調整一輪最多送 6 張市價單；被硬殺在「單已送出、帳本還沒記」之間時，交易所有成交、帳本沒有，以前會被當成「來源不明」的 R3，要人去交易所查，其實是策略自己的單。f-12 競賽 PR 在送單前先寫 order_attempt，被殺後由 unrecorded-fill 作業證明這張單是自己的、補記並通知；「發生過一次被中斷」是人需要知道的事，所以發 R3。",
+      "operator_message": {
+        "what": "競賽策略的每日調整上一次被中斷（例如部署時停掉），其中一張單已經在交易所成交、但帳本當時沒記到；現在已經照交易所的成交明細補記了。",
+        "direction": "不需要立刻動作，帳本已補齊；請確認這張單是預期的，並確認帳本與交易所一致。沒調完的部分會在下一次每日調整接著做。",
+        "steps": [
+          "看訊息裡的 symbol、方向、數量、訂單編號與自訂編號（btc-日期-第幾腿）。",
+          "到交易所 App 確認這張單存在、成交量與訊息一致。",
+          "之後的對帳（帳本對交易所、帳本對 Google 表）應該恢復一致；若仍顯示不一致，照該則通知處理。",
+          "這則通知不需要另外解除；若不是部署或當機造成的（沒有人動過服務），把下方指令貼給 Claude 追查。"
+        ],
+        "ai_prompt": "請在 btc-bull-market-competition 追查一次被中斷後補記的單：讀 audit/trading_ledger.jsonl 裡該 client_order_id 的 order_attempt、spot_fill（reason=interrupted_order_recovered）與同一 rebalance_id 的其他列，audit/fleet_event_log.jsonl 裡 ORDER_RECOVERED_AFTER_INTERRUPTION 事件，以及 journalctl 在那個時間點前後 btc-competition-bot.service 的停止紀錄（graceful_stop／被 SIGKILL），判斷是部署、當機還是手動停止造成，並確認帳本、Google 表與交易所三方一致。"
+      }
+    },
+    {
+      "error_id": "ERR-053",
+      "code": "BTC.STATE_FILE_CORRUPT",
+      "title": "狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）",
+      "project": "btc-competition",
+      "sources": [
+        "src/btc_competition/runner.py:543"
+      ],
+      "current": {
+        "latch": "STATE_FILE_CORRUPT",
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "鎖安全暫停 STATE_FILE_CORRUPT，把損毀的檔案複製成 bot_state.json.corrupt-<時間> 留證，本輪與之後都不送任何單；寫事件日誌。",
+      "human_action": "看 btc-competition-resume preview 顯示的損毀原因與備份檔；需要前一次決策紀錄就先把備份修好後放回 state/bot_state.json；確認交易所持倉合理後以 btc-competition-resume 解除（解除後下一輪從全新狀態、依實際持倉再平衡）。",
+      "resume": "two_stage_fingerprint",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-01 f-12：以前 state 檔壞掉時 load_state 回傳全新狀態＝把今天當成第一次執行，會把整本持倉從零重新調倉（initial）。狀態檔現在是原子寫入，被殺不會造成損毀，剩下的是磁碟問題或人為改動，這時不能自作主張重新調倉。",
+      "operator_message": {
+        "what": "競賽策略的狀態檔（state/bot_state.json）存在、但讀不出來（不是合法的 JSON 或格式不對）。",
+        "direction": "系統已經停下來，不送任何單；以前會把這當成第一次執行而整本重新調倉，現在改成等人確認。損毀的檔案已另存一份留證。",
+        "steps": [
+          "在主機執行 `btc-competition-resume preview`，記下損毀原因與備份檔路徑。",
+          "確認是不是有人手動改過、或磁碟出問題；需要保留前一次的決策紀錄就先修好備份檔、放回 state/bot_state.json（修好後這個暫停會因為檔案可讀而不再成立，請重新 preview）。",
+          "到交易所確認目前持倉與預期相符。",
+          "確認後執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。注意：解除後下一輪從全新狀態開始，會依實際餘額把持倉調整到今天的目標。",
+          "把下方指令貼給 Claude 追查為什麼狀態檔壞掉。"
+        ],
+        "ai_prompt": "請在 btc-bull-market-competition 追查狀態檔損毀：讀 btc-competition-resume preview 的證據（path、problem、damaged_copy），檢查損毀備份檔的內容與大小、state/ 目錄的磁碟空間與檔案系統錯誤（dmesg、df）、journalctl 在狀態檔最後一次正常寫入前後的紀錄，以及有沒有人手動編輯過；state 現在是原子寫入（src/btc_competition/state.py），所以被殺不應造成損毀，請判斷真正原因並提出治本修正。"
       }
     }
   ],
