@@ -1,0 +1,785 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 72f5dfe..40bb1de 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -764,3 +764,17 @@ trade-alerts：v0.24.1（f-12 趨勢前置：只有資料變更，無程式碼
+ 版本驗證／服務驗證／部署時間：待趨勢 f-12 PR 部署後補記。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.24.2（f-12 競賽前置：只有資料變更，無程式碼變更）
++變更摘要：1. 錯誤清單新增 ERR-052 BTC.ORDER_RECOVERED_AFTER_INTERRUPTION（R3）：競賽每日調整被中斷、重啟後發現已成交但沒記的單，
++             照交易所補記並通知；ERR-053 BTC.STATE_FILE_CORRUPT（R3，latch）：狀態檔讀不出來就安全暫停，不再當成第一次執行重新調倉
++             （皆含白話 operator_message 與給 AI 的追查指令）。
++          2. 一致性登記冊：新增這兩條的目錄列（競賽未做，預定 f-12 競賽 PR）；競賽 BTC.* 既有安全暫停條目的「寫進事件日誌」格理由改寫
++             （已在開發主幹實作、未上正式機）；stop.graceful／recovery.interrupted_order 四支的理由改寫為現況。沒有任何格子改成已做。
++          向後相容：只有資料；既有 API 不變。
++受影響消費專案：競賽（f-12 競賽 PR 釘 v0.24.2）。其他專案不受影響。
++部署入口：各專案既有部署腳本（開發機 → 正式機）。
++版本驗證／服務驗證／部署時間：待競賽 f-12 PR 部署後補記。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index 5fc1f67..4914056 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -160,6 +160,8 @@ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原
+ | `BTC.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+ | `BTC.REBALANCE_PENDING` | 不 latch，自動續做 | MECHANICAL | R0 | — |
+ | `BTC.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重新拋出 | MECHANICAL | R0 | — |
++| `BTC.ORDER_RECOVERED_AFTER_INTERRUPTION` | 未發出（f-12 競賽 PR 接上；被中斷的單照交易所補記，ERR-052） | JUDGEMENT | R3 | P8（v2） |
++| `BTC.STATE_FILE_CORRUPT` | latch `STATE_FILE_CORRUPT`（f-12 競賽 PR 接上；ERR-053） | JUDGEMENT | R3 | P8（v2） |
+ 
+ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障」分開的實作，這個區辨在 Phase 4
+ 要推廣到其他三支。
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 56184ff..141866e 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -100,9 +100,9 @@
+   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>51 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    四支策略目前所有已知的「出問題」情況，共 <b>53 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>33 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>35 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -717,12 +717,12 @@
+    "direction": "系統停下來。交易所的實際餘額是標準答案，要先讓本地記錄跟交易所一致。",
+    "emits_event": {
+     "phase": "8-btc-competition",
+-    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。",
+     "state": "pending"
+    },
+    "error_id": "ERR-021",
+    "notes": [
+-    "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
++    "寫進事件日誌未做 — 2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+    ],
+    "open": true,
+    "steps": [
+@@ -748,13 +748,13 @@
+    "direction": "系統會自動重新取價、重算下單量再試一次完整的調整，最多 3 次；都失敗才通知你。",
+    "emits_event": {
+     "phase": "8-btc-competition",
+-    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。",
+     "state": "pending"
+    },
+    "error_id": "ERR-022",
+    "notes": [
+     "行為未做 — 目前：連 3 天零成交就暫停等人。v2：自動重新取價重試完整再平衡，最多 3 次，失敗才通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）",
+-    "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
++    "寫進事件日誌未做 — 2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+    ],
+    "open": true,
+    "steps": [
+@@ -779,12 +779,12 @@
+    "direction": "系統停下來，這一輪不再送任何單，免得同一筆調整被送兩次。交易所的紀錄是標準答案。",
+    "emits_event": {
+     "phase": "8-btc-competition",
+-    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。",
+     "state": "pending"
+    },
+    "error_id": "ERR-023",
+    "notes": [
+-    "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
++    "寫進事件日誌未做 — 2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+    ],
+    "open": true,
+    "steps": [
+@@ -809,12 +809,12 @@
+    "direction": "剩下的部分下一輪會自動繼續做。",
+    "emits_event": {
+     "phase": "8-btc-competition",
+-    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。",
+     "state": "pending"
+    },
+    "error_id": "ERR-024",
+    "notes": [
+-    "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
++    "寫進事件日誌未做 — 2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+    ],
+    "open": true,
+    "steps": [],
+@@ -834,12 +834,12 @@
+    "direction": "系統記一筆「有狀況」的標記，隔天自動重試。",
+    "emits_event": {
+     "phase": "8-btc-competition",
+-    "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。",
+     "state": "pending"
+    },
+    "error_id": "ERR-025",
+    "notes": [
+-    "寫進事件日誌未做 — 目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
++    "寫進事件日誌未做 — 2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
+    ],
+    "open": true,
+    "steps": [],
+@@ -1546,6 +1546,71 @@
+    "tier": "R3",
+    "title": "重啟後接管了一個沒記完的部位，或補上了被中斷的停損",
+    "what": "趨勢策略重啟後，發現交易所上有一個部位或停損是上一次執行到一半留下的，已經自動接管或補上。"
++  },
++  {
++   "ai_prompt": "請在 btc-bull-market-competition 追查一次被中斷後補記的單：讀 audit/trading_ledger.jsonl 裡該 client_order_id 的 order_attempt、spot_fill（reason=interrupted_order_recovered）與同一 rebalance_id 的其他列，audit/fleet_event_log.jsonl 裡 ORDER_RECOVERED_AFTER_INTERRUPTION 事件，以及 journalctl 在那個時間點前後 btc-competition-bot.service 的停止紀錄（graceful_stop／被 SIGKILL），判斷是部署、當機還是手動停止造成，並確認帳本、Google 表與交易所三方一致。",
++   "behaviour": {
++    "phase": "f-12",
++    "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt、被中斷的單由 unrecorded-fill 作業照交易所補記並以交易所 order_id 去重）；還沒上正式機，上線後改已做。",
++    "state": "pending"
++   },
++   "bot": "btc-competition",
++   "bot_label": "競賽策略",
++   "code": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
++   "direction": "不需要立刻動作，帳本已補齊；請確認這張單是預期的，並確認帳本與交易所一致。沒調完的部分會在下一次每日調整接著做。",
++   "emits_event": {
++    "phase": "f-12",
++    "reason": "同上：補記時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。",
++    "state": "pending"
++   },
++   "error_id": "ERR-052",
++   "notes": [
++    "行為未做 — 2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt、被中斷的單由 unrecorded-fill 作業照交易所補記並以交易所 order_id 去重）；還沒上正式機，上線後改已做。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）",
++    "寫進事件日誌未做 — 同上：補記時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡的 symbol、方向、數量、訂單編號與自訂編號（btc-日期-第幾腿）。",
++    "到交易所 App 確認這張單存在、成交量與訊息一致。",
++    "之後的對帳（帳本對交易所、帳本對 Google 表）應該恢復一致；若仍顯示不一致，照該則通知處理。",
++    "這則通知不需要另外解除；若不是部署或當機造成的（沒有人動過服務），把下方指令貼給 Claude 追查。"
++   ],
++   "tier": "R3",
++   "title": "每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記",
++   "what": "競賽策略的每日調整上一次被中斷（例如部署時停掉），其中一張單已經在交易所成交、但帳本當時沒記到；現在已經照交易所的成交明細補記了。"
++  },
++  {
++   "ai_prompt": "請在 btc-bull-market-competition 追查狀態檔損毀：讀 btc-competition-resume preview 的證據（path、problem、damaged_copy），檢查損毀備份檔的內容與大小、state/ 目錄的磁碟空間與檔案系統錯誤（dmesg、df）、journalctl 在狀態檔最後一次正常寫入前後的紀錄，以及有沒有人手動編輯過；state 現在是原子寫入（src/btc_competition/state.py），所以被殺不應造成損毀，請判斷真正原因並提出治本修正。",
++   "behaviour": {
++    "phase": "f-12",
++    "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（狀態檔讀不出來就鎖安全暫停、留損毀備份，不再當成第一次執行重新調倉）；還沒上正式機，上線後改已做。",
++    "state": "pending"
++   },
++   "bot": "btc-competition",
++   "bot_label": "競賽策略",
++   "code": "BTC.STATE_FILE_CORRUPT",
++   "direction": "系統已經停下來，不送任何單；以前會把這當成第一次執行而整本重新調倉，現在改成等人確認。損毀的檔案已另存一份留證。",
++   "emits_event": {
++    "phase": "f-12",
++    "reason": "同上：暫停時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。",
++    "state": "pending"
++   },
++   "error_id": "ERR-053",
++   "notes": [
++    "行為未做 — 2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（狀態檔讀不出來就鎖安全暫停、留損毀備份，不再當成第一次執行重新調倉）；還沒上正式機，上線後改已做。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）",
++    "寫進事件日誌未做 — 同上：暫停時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）"
++   ],
++   "open": true,
++   "steps": [
++    "在主機執行 `btc-competition-resume preview`，記下損毀原因與備份檔路徑。",
++    "確認是不是有人手動改過、或磁碟出問題；需要保留前一次的決策紀錄就先修好備份檔、放回 state/bot_state.json（修好後這個暫停會因為檔案可讀而不再成立，請重新 preview）。",
++    "到交易所確認目前持倉與預期相符。",
++    "確認後執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。注意：解除後下一輪從全新狀態開始，會依實際餘額把持倉調整到今天的目標。",
++    "把下方指令貼給 Claude 追查為什麼狀態檔壞掉。"
++   ],
++   "tier": "R3",
++   "title": "狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）",
++   "what": "競賽策略的狀態檔（state/bot_state.json）存在、但讀不出來（不是合法的 JSON 或格式不對）。"
+   }
+  ],
+  "tiers": [
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index dc96149..6cdff99 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,7 +177,7 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>50</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-pending" href="#group-pending"><b>52</b><span>項未完成——還有策略沒做到</span></a>
+     <a class="c-done" href="#group-done"><b>25</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+@@ -193,7 +193,7 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">50 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">52 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+@@ -1026,7 +1026,7 @@
+    "title": "兩段式解除工具"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-latch.restart_only_clear",
+    "complete": false,
+    "dots": {
+@@ -2266,7 +2266,7 @@
+    "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-stop.graceful",
+    "complete": false,
+    "dots": {
+@@ -2286,7 +2286,7 @@
+        "aspect": null,
+        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "f-12 第 2 個 PR，動能之後做。"
++       "text": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作；還沒上正式機，上線後改已做。"
+       }
+      ]
+     },
+@@ -2297,7 +2297,7 @@
+        "aspect": null,
+        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "f-12 動能 PR（第 1 個）：已寫完，等審閱與上線。"
++       "text": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作；還沒上正式機，上線後改已做。"
+       }
+      ]
+     },
+@@ -2308,7 +2308,7 @@
+        "aspect": null,
+        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "f-12 第 3 個 PR。"
++       "text": "2026-10-01 已在開發主幹的 f-12 加密 PR 實作（當輪做完才停、停止時不開新倉也不寫 Google 表、TimeoutStopSec=180、部署腳本等 oneshot）；還沒上正式機，上線後改已做。"
+       }
+      ]
+     },
+@@ -2319,7 +2319,7 @@
+        "aspect": null,
+        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "f-12 第 4 個 PR（調倉要整輪跑完）。"
++       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（SIGTERM 只設旗標、送完手上那張單再停、其餘留 pending 下次接著做；TimeoutStopSec=600、TimeoutStartSec=1800；部署腳本等 oneshot）；還沒上正式機，上線後改已做。"
+       }
+      ]
+     }
+@@ -2328,7 +2328,7 @@
+    "title": "收到停止訊號時等當輪做完再結束"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-recovery.interrupted_order",
+    "complete": false,
+    "dots": {
+@@ -2348,7 +2348,7 @@
+        "aspect": null,
+        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "f-12 第 2 個 PR。"
++       "text": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作（entry_intent 沿用 trade_id、被中斷的停損原價重掛、孤兒接管通知）；還沒上正式機，上線後改已做。"
+       }
+      ]
+     },
+@@ -2359,7 +2359,7 @@
+        "aspect": null,
+        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "f-12 動能 PR：用 order_attempt 沿用 trade_id；撤停損後被殺會重新掛停損。"
++       "text": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作（order_attempt 沿用 trade_id；撤停損後被殺重新掛停損；孤兒接管通知）；還沒上正式機，上線後改已做。"
+       }
+      ]
+     },
+@@ -2370,7 +2370,7 @@
+        "aspect": null,
+        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "f-12 第 3 個 PR（開倉進行中狀態、停損存在性驗證）。"
++       "text": "2026-10-01 已在開發主幹的 f-12 加密 PR 實作（開倉進行中紀錄沿用 trade_id、每輪核對交易所停損單、重複平倉防護）；還沒上正式機，上線後改已做。加密沒有通知管道，接管只寫稽核日誌。"
+       }
+      ]
+     },
+@@ -2381,7 +2381,7 @@
+        "aspect": null,
+        "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "f-12 第 4 個 PR（送單前寫 order_attempt、補記以 order_id 去重）。"
++       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt；被殺後由 unrecorded-fill 作業補記並以交易所 order_id 去重；補排隊遺漏的 Google 投影；狀態檔損毀改安全暫停）；還沒上正式機，上線後改已做。"
+       }
+      ]
+     }
+@@ -3116,7 +3116,7 @@
+        "aspect": "寫進事件日誌",
+        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
+        "state": "pending",
+-       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+       }
+      ]
+     }
+@@ -3151,7 +3151,7 @@
+        "aspect": "寫進事件日誌",
+        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
+        "state": "pending",
+-       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+       }
+      ]
+     }
+@@ -3186,7 +3186,7 @@
+        "aspect": "寫進事件日誌",
+        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
+        "state": "pending",
+-       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+       }
+      ]
+     }
+@@ -3221,7 +3221,7 @@
+        "aspect": "寫進事件日誌",
+        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
+        "state": "pending",
+-       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+       }
+      ]
+     }
+@@ -3256,7 +3256,7 @@
+        "aspect": "寫進事件日誌",
+        "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
+        "state": "pending",
+-       "text": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+       }
+      ]
+     }
+@@ -4497,7 +4497,7 @@
+    "title": "R3｜重啟後接管了一個帳本沒有記完的部位"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+    "complete": false,
+    "dots": {
+@@ -4530,6 +4530,76 @@
+    ],
+    "sub": "ERR-051 · SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+    "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
++   "complete": false,
++   "dots": {
++    "btc-competition": "pending",
++    "momentum": "none",
++    "mycrypto": "none",
++    "seykota": "none"
++   },
++   "has_recent": false,
++   "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt、被中斷的單由 unrecorded-fill 作業照交易所補記並以交易所 order_id 去重）；還沒上正式機，上線後改已做。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "同上：補記時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-052 · BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
++   "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-BTC.STATE_FILE_CORRUPT",
++   "complete": false,
++   "dots": {
++    "btc-competition": "pending",
++    "momentum": "none",
++    "mycrypto": "none",
++    "seykota": "none"
++   },
++   "has_recent": false,
++   "id": "BTC.STATE_FILE_CORRUPT",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（狀態檔讀不出來就鎖安全暫停、留損毀備份，不再當成第一次執行重新調倉）；還沒上正式機，上線後改已做。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "同上：暫停時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-053 · BTC.STATE_FILE_CORRUPT",
++   "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
+   }
+  ],
+  "phase_counts": {
+@@ -4540,7 +4610,7 @@
+   "8-seykota": 19,
+   "binance-funding-sync": 2,
+   "error-ids": 4,
+-  "f-12": 12,
++  "f-12": 16,
+   "h4-trade-correction": 0,
+   "hotfix-btc-order-resend": 0,
+   "hotfix-seykota-order-resend": 0,
+@@ -4609,23 +4679,35 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+-   "note": "趨勢重啟後接管／補停損要通知（f-12，ERR-051）。",
++   "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
++   "note": "競賽每日調整被中斷、重啟後把已成交的單照交易所補記並通知（f-12，ERR-052）。",
+    "project": null,
+-   "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
++   "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
+   },
+   {
+-   "anchor": "cap-latch.restart_only_clear",
+-   "note": "趨勢的理由改寫：f-12 趨勢 PR 已實作，仍未上正式機。",
++   "anchor": "rule-BTC.STATE_FILE_CORRUPT",
++   "note": "競賽狀態檔讀不出來就安全暫停、不再當成第一次執行（f-12，ERR-053）。",
+    "project": null,
+-   "title": "「改好設定重啟」就能解除的安全暫停真的會被清掉"
++   "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
++  },
++  {
++   "anchor": "cap-stop.graceful",
++   "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。",
++   "project": null,
++   "title": "收到停止訊號時等當輪做完再結束"
++  },
++  {
++   "anchor": "cap-recovery.interrupted_order",
++   "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。",
++   "project": null,
++   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
+   }
+  ],
+  "totals": {
+   "btc-competition": {
+    "done": 24,
+    "n/a": 15,
+-   "pending": 13
++   "pending": 17
+   },
+   "momentum": {
+    "done": 35,
+diff --git a/pyproject.toml b/pyproject.toml
+index 4a5dc84..27e5aac 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.24.1"
++version = "0.24.2"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 66ca028..cf78457 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -333,4 +333,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.24.1"
++__version__ = "0.24.2"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index b67db1b..839a8e0 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -36,7 +36,7 @@
+     "btc-competition": "btc-bull-market-competition",
+     "fleet": "(cross-repo: same condition implemented in every strategy)"
+   },
+-  "error_ids_issued": 51,
++  "error_ids_issued": 53,
+   "entries": [
+     {
+       "error_id": "ERR-001",
+@@ -1638,6 +1638,71 @@
+         ],
+         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查一次重啟後接管：讀 state/bot_state.json 的 pending_operations（entry_intent、protective_stop_replace）與 audit 事件（position_recovered_from_entry_intent、protective_stop_rearmed_after_interruption、exchange_position_adopted），audit/trading_ledger.jsonl 裡該 trade_id 的 trade_open，以及 journalctl 在那個時間點前後的 graceful_stop／position_adopted 紀錄，判斷是進場途中被中斷、換停損途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。"
+       }
++    },
++    {
++      "error_id": "ERR-052",
++      "code": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
++      "title": "每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記",
++      "project": "btc-competition",
++      "sources": [
++        "src/btc_competition/interrupted_orders.py:165"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "每 15 分鐘的 unrecorded-fill 作業先處理：超過 30 分鐘還沒有成交紀錄的送單意圖（order_attempt），用自訂編號向交易所查單；已成交就照成交明細補記一筆 spot_fill（交易所 order_id 已在帳本就不寫）、排入 Google 表，並寫事件日誌；交易所沒有這張單或沒成交就標記處理完畢；仍掛著或查詢失敗留到下一輪。",
++      "human_action": "確認補記的那張單是預期的（上一次每日調整被部署或當機打斷），確認帳本、Google 表與交易所一致；剩下沒調完的部分會在下一次每日調整接著做。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-10-01 f-12：競賽每日調整一輪最多送 6 張市價單；被硬殺在「單已送出、帳本還沒記」之間時，交易所有成交、帳本沒有，以前會被當成「來源不明」的 R3，要人去交易所查，其實是策略自己的單。f-12 競賽 PR 在送單前先寫 order_attempt，被殺後由 unrecorded-fill 作業證明這張單是自己的、補記並通知；「發生過一次被中斷」是人需要知道的事，所以發 R3。",
++      "operator_message": {
++        "what": "競賽策略的每日調整上一次被中斷（例如部署時停掉），其中一張單已經在交易所成交、但帳本當時沒記到；現在已經照交易所的成交明細補記了。",
++        "direction": "不需要立刻動作，帳本已補齊；請確認這張單是預期的，並確認帳本與交易所一致。沒調完的部分會在下一次每日調整接著做。",
++        "steps": [
++          "看訊息裡的 symbol、方向、數量、訂單編號與自訂編號（btc-日期-第幾腿）。",
++          "到交易所 App 確認這張單存在、成交量與訊息一致。",
++          "之後的對帳（帳本對交易所、帳本對 Google 表）應該恢復一致；若仍顯示不一致，照該則通知處理。",
++          "這則通知不需要另外解除；若不是部署或當機造成的（沒有人動過服務），把下方指令貼給 Claude 追查。"
++        ],
++        "ai_prompt": "請在 btc-bull-market-competition 追查一次被中斷後補記的單：讀 audit/trading_ledger.jsonl 裡該 client_order_id 的 order_attempt、spot_fill（reason=interrupted_order_recovered）與同一 rebalance_id 的其他列，audit/fleet_event_log.jsonl 裡 ORDER_RECOVERED_AFTER_INTERRUPTION 事件，以及 journalctl 在那個時間點前後 btc-competition-bot.service 的停止紀錄（graceful_stop／被 SIGKILL），判斷是部署、當機還是手動停止造成，並確認帳本、Google 表與交易所三方一致。"
++      }
++    },
++    {
++      "error_id": "ERR-053",
++      "code": "BTC.STATE_FILE_CORRUPT",
++      "title": "狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）",
++      "project": "btc-competition",
++      "sources": [
++        "src/btc_competition/runner.py:543"
++      ],
++      "current": {
++        "latch": "STATE_FILE_CORRUPT",
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "鎖安全暫停 STATE_FILE_CORRUPT，把損毀的檔案複製成 bot_state.json.corrupt-<時間> 留證，本輪與之後都不送任何單；寫事件日誌。",
++      "human_action": "看 btc-competition-resume preview 顯示的損毀原因與備份檔；需要前一次決策紀錄就先把備份修好後放回 state/bot_state.json；確認交易所持倉合理後以 btc-competition-resume 解除（解除後下一輪從全新狀態、依實際持倉再平衡）。",
++      "resume": "two_stage_fingerprint",
++      "lands_in_phase": 8,
++      "rationale": "2026-10-01 f-12：以前 state 檔壞掉時 load_state 回傳全新狀態＝把今天當成第一次執行，會把整本持倉從零重新調倉（initial）。狀態檔現在是原子寫入，被殺不會造成損毀，剩下的是磁碟問題或人為改動，這時不能自作主張重新調倉。",
++      "operator_message": {
++        "what": "競賽策略的狀態檔（state/bot_state.json）存在、但讀不出來（不是合法的 JSON 或格式不對）。",
++        "direction": "系統已經停下來，不送任何單；以前會把這當成第一次執行而整本重新調倉，現在改成等人確認。損毀的檔案已另存一份留證。",
++        "steps": [
++          "在主機執行 `btc-competition-resume preview`，記下損毀原因與備份檔路徑。",
++          "確認是不是有人手動改過、或磁碟出問題；需要保留前一次的決策紀錄就先修好備份檔、放回 state/bot_state.json（修好後這個暫停會因為檔案可讀而不再成立，請重新 preview）。",
++          "到交易所確認目前持倉與預期相符。",
++          "確認後執行 `btc-competition-resume resume --confirm <確認碼> --holdings-verified`。注意：解除後下一輪從全新狀態開始，會依實際餘額把持倉調整到今天的目標。",
++          "把下方指令貼給 Claude 追查為什麼狀態檔壞掉。"
++        ],
++        "ai_prompt": "請在 btc-bull-market-competition 追查狀態檔損毀：讀 btc-competition-resume preview 的證據（path、problem、damaged_copy），檢查損毀備份檔的內容與大小、state/ 目錄的磁碟空間與檔案系統錯誤（dmesg、df）、journalctl 在狀態檔最後一次正常寫入前後的紀錄，以及有沒有人手動編輯過；state 現在是原子寫入（src/btc_competition/state.py），所以被殺不應造成損毀，請判斷真正原因並提出治本修正。"
++      }
+     }
+   ],
+   "retired_codes": [
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index b887807..93d76e8 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -594,22 +594,22 @@
+         "momentum": {
+           "state": "pending",
+           "phase": "f-12",
+-          "reason": "f-12 動能 PR（第 1 個）：已寫完，等審閱與上線。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作；還沒上正式機，上線後改已做。"
+         },
+         "seykota": {
+           "state": "pending",
+           "phase": "f-12",
+-          "reason": "f-12 第 2 個 PR，動能之後做。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作；還沒上正式機，上線後改已做。"
+         },
+         "mycrypto": {
+           "state": "pending",
+           "phase": "f-12",
+-          "reason": "f-12 第 3 個 PR。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 加密 PR 實作（當輪做完才停、停止時不開新倉也不寫 Google 表、TimeoutStopSec=180、部署腳本等 oneshot）；還沒上正式機，上線後改已做。"
+         },
+         "btc-competition": {
+           "state": "pending",
+           "phase": "f-12",
+-          "reason": "f-12 第 4 個 PR（調倉要整輪跑完）。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（SIGTERM 只設旗標、送完手上那張單再停、其餘留 pending 下次接著做；TimeoutStopSec=600、TimeoutStartSec=1800；部署腳本等 oneshot）；還沒上正式機，上線後改已做。"
+         }
+       }
+     },
+@@ -621,22 +621,22 @@
+         "momentum": {
+           "state": "pending",
+           "phase": "f-12",
+-          "reason": "f-12 動能 PR：用 order_attempt 沿用 trade_id；撤停損後被殺會重新掛停損。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作（order_attempt 沿用 trade_id；撤停損後被殺重新掛停損；孤兒接管通知）；還沒上正式機，上線後改已做。"
+         },
+         "seykota": {
+           "state": "pending",
+           "phase": "f-12",
+-          "reason": "f-12 第 2 個 PR。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作（entry_intent 沿用 trade_id、被中斷的停損原價重掛、孤兒接管通知）；還沒上正式機，上線後改已做。"
+         },
+         "mycrypto": {
+           "state": "pending",
+           "phase": "f-12",
+-          "reason": "f-12 第 3 個 PR（開倉進行中狀態、停損存在性驗證）。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 加密 PR 實作（開倉進行中紀錄沿用 trade_id、每輪核對交易所停損單、重複平倉防護）；還沒上正式機，上線後改已做。加密沒有通知管道，接管只寫稽核日誌。"
+         },
+         "btc-competition": {
+           "state": "pending",
+           "phase": "f-12",
+-          "reason": "f-12 第 4 個 PR（送單前寫 order_attempt、補記以 order_id 去重）。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt；被殺後由 unrecorded-fill 作業補記並以交易所 order_id 去重；補排隊遺漏的 Google 投影；狀態檔損毀改安全暫停）；還沒上正式機，上線後改已做。"
+         }
+       }
+     }
+@@ -975,7 +975,7 @@
+         "btc-competition": {
+           "state": "pending",
+           "phase": "8-btc-competition",
+-          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+         }
+       }
+     },
+@@ -992,7 +992,7 @@
+         "btc-competition": {
+           "state": "pending",
+           "phase": "8-btc-competition",
+-          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+         }
+       }
+     },
+@@ -1008,7 +1008,7 @@
+         "btc-competition": {
+           "state": "pending",
+           "phase": "8-btc-competition",
+-          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+         }
+       }
+     },
+@@ -1024,7 +1024,7 @@
+         "btc-competition": {
+           "state": "pending",
+           "phase": "8-btc-competition",
+-          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+         }
+       }
+     },
+@@ -1040,7 +1040,7 @@
+         "btc-competition": {
+           "state": "pending",
+           "phase": "8-btc-competition",
+-          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+         }
+       }
+     },
+@@ -1619,20 +1619,66 @@
+           "reason": "同上：接管時寫 R3 事件日誌，等 f-12 趨勢 PR 上正式機。"
+         }
+       }
++    },
++    {
++      "code": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
++      "behaviour": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt、被中斷的單由 unrecorded-fill 作業照交易所補記並以交易所 order_id 去重）；還沒上正式機，上線後改已做。"
++        }
++      },
++      "emits_event": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "同上：補記時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
++        }
++      }
++    },
++    {
++      "code": "BTC.STATE_FILE_CORRUPT",
++      "behaviour": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（狀態檔讀不出來就鎖安全暫停、留損毀備份，不再當成第一次執行重新調倉）；還沒上正式機，上線後改已做。"
++        }
++      },
++      "emits_event": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "同上：暫停時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
+     {
+       "kind": "rule",
+-      "id": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
++      "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+       "type": "added",
+-      "note": "趨勢重啟後接管／補停損要通知（f-12，ERR-051）。"
++      "note": "競賽每日調整被中斷、重啟後把已成交的單照交易所補記並通知（f-12，ERR-052）。"
++    },
++    {
++      "kind": "rule",
++      "id": "BTC.STATE_FILE_CORRUPT",
++      "type": "added",
++      "note": "競賽狀態檔讀不出來就安全暫停、不再當成第一次執行（f-12，ERR-053）。"
+     },
+     {
+       "kind": "cap",
+-      "id": "latch.restart_only_clear",
++      "id": "stop.graceful",
++      "type": "updated",
++      "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。"
++    },
++    {
++      "kind": "cap",
++      "id": "recovery.interrupted_order",
+       "type": "updated",
+-      "note": "趨勢的理由改寫：f-12 趨勢 PR 已實作，仍未上正式機。"
++      "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。"
+     }
+   ]
+ }
