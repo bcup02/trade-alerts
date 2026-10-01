@@ -594,22 +594,22 @@
         "momentum": {
           "state": "pending",
           "phase": "f-12",
-          "reason": "f-12 動能 PR（第 1 個）：已寫完，等審閱與上線。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作；還沒上正式機，上線後改已做。"
         },
         "seykota": {
           "state": "pending",
           "phase": "f-12",
-          "reason": "f-12 第 2 個 PR，動能之後做。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作；還沒上正式機，上線後改已做。"
         },
         "mycrypto": {
           "state": "pending",
           "phase": "f-12",
-          "reason": "f-12 第 3 個 PR。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 加密 PR 實作（當輪做完才停、停止時不開新倉也不寫 Google 表、TimeoutStopSec=180、部署腳本等 oneshot）；還沒上正式機，上線後改已做。"
         },
         "btc-competition": {
           "state": "pending",
           "phase": "f-12",
-          "reason": "f-12 第 4 個 PR（調倉要整輪跑完）。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（SIGTERM 只設旗標、送完手上那張單再停、其餘留 pending 下次接著做；TimeoutStopSec=600、TimeoutStartSec=1800；部署腳本等 oneshot）；還沒上正式機，上線後改已做。"
         }
       }
     },
@@ -621,22 +621,22 @@
         "momentum": {
           "state": "pending",
           "phase": "f-12",
-          "reason": "f-12 動能 PR：用 order_attempt 沿用 trade_id；撤停損後被殺會重新掛停損。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作（order_attempt 沿用 trade_id；撤停損後被殺重新掛停損；孤兒接管通知）；還沒上正式機，上線後改已做。"
         },
         "seykota": {
           "state": "pending",
           "phase": "f-12",
-          "reason": "f-12 第 2 個 PR。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作（entry_intent 沿用 trade_id、被中斷的停損原價重掛、孤兒接管通知）；還沒上正式機，上線後改已做。"
         },
         "mycrypto": {
           "state": "pending",
           "phase": "f-12",
-          "reason": "f-12 第 3 個 PR（開倉進行中狀態、停損存在性驗證）。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 加密 PR 實作（開倉進行中紀錄沿用 trade_id、每輪核對交易所停損單、重複平倉防護）；還沒上正式機，上線後改已做。加密沒有通知管道，接管只寫稽核日誌。"
         },
         "btc-competition": {
           "state": "pending",
           "phase": "f-12",
-          "reason": "f-12 第 4 個 PR（送單前寫 order_attempt、補記以 order_id 去重）。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt；被殺後由 unrecorded-fill 作業補記並以交易所 order_id 去重；補排隊遺漏的 Google 投影；狀態檔損毀改安全暫停）；還沒上正式機，上線後改已做。"
         }
       }
     }
@@ -975,7 +975,7 @@
         "btc-competition": {
           "state": "pending",
           "phase": "8-btc-competition",
-          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
         }
       }
     },
@@ -992,7 +992,7 @@
         "btc-competition": {
           "state": "pending",
           "phase": "8-btc-competition",
-          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
         }
       }
     },
@@ -1008,7 +1008,7 @@
         "btc-competition": {
           "state": "pending",
           "phase": "8-btc-competition",
-          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
         }
       }
     },
@@ -1024,7 +1024,7 @@
         "btc-competition": {
           "state": "pending",
           "phase": "8-btc-competition",
-          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
         }
       }
     },
@@ -1040,7 +1040,7 @@
         "btc-competition": {
           "state": "pending",
           "phase": "8-btc-competition",
-          "reason": "目前只寫 log／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
         }
       }
     },
@@ -1619,20 +1619,66 @@
           "reason": "同上：接管時寫 R3 事件日誌，等 f-12 趨勢 PR 上正式機。"
         }
       }
+    },
+    {
+      "code": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+      "behaviour": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt、被中斷的單由 unrecorded-fill 作業照交易所補記並以交易所 order_id 去重）；還沒上正式機，上線後改已做。"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "同上：補記時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
+        }
+      }
+    },
+    {
+      "code": "BTC.STATE_FILE_CORRUPT",
+      "behaviour": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（狀態檔讀不出來就鎖安全暫停、留損毀備份，不再當成第一次執行重新調倉）；還沒上正式機，上線後改已做。"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "同上：暫停時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
       "kind": "rule",
-      "id": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
       "type": "added",
-      "note": "趨勢重啟後接管／補停損要通知（f-12，ERR-051）。"
+      "note": "競賽每日調整被中斷、重啟後把已成交的單照交易所補記並通知（f-12，ERR-052）。"
+    },
+    {
+      "kind": "rule",
+      "id": "BTC.STATE_FILE_CORRUPT",
+      "type": "added",
+      "note": "競賽狀態檔讀不出來就安全暫停、不再當成第一次執行（f-12，ERR-053）。"
     },
     {
       "kind": "cap",
-      "id": "latch.restart_only_clear",
+      "id": "stop.graceful",
       "type": "updated",
-      "note": "趨勢的理由改寫：f-12 趨勢 PR 已實作，仍未上正式機。"
+      "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。"
+    },
+    {
+      "kind": "cap",
+      "id": "recovery.interrupted_order",
+      "type": "updated",
+      "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。"
     }
   ]
 }

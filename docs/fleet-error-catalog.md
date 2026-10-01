@@ -160,6 +160,8 @@ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原�
 | `BTC.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
 | `BTC.REBALANCE_PENDING` | 不 latch，自動續做 | MECHANICAL | R0 | — |
 | `BTC.RUNTIME_CYCLE_FAILED` | 不 latch，ERROR heartbeat + 重新拋出 | MECHANICAL | R0 | — |
+| `BTC.ORDER_RECOVERED_AFTER_INTERRUPTION` | 未發出（f-12 競賽 PR 接上；被中斷的單照交易所補記，ERR-052） | JUDGEMENT | R3 | P8（v2） |
+| `BTC.STATE_FILE_CORRUPT` | latch `STATE_FILE_CORRUPT`（f-12 競賽 PR 接上；ERR-053） | JUDGEMENT | R3 | P8（v2） |
 
 btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障」分開的實作，這個區辨在 Phase 4
 要推廣到其他三支。
