@@ -1,0 +1,47 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index d76d5c1..725c741 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -735,3 +735,19 @@ trade-alerts：v0.23.0（帳本少記交易所成交的共用處理程式，g1
+ 版本驗證／服務驗證／部署時間：待改釘與部署完成後補記。
+ 交易安全：未啟用實盤、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.24.0（f-12 前置：重啟後接管通知的錯誤條目＋未記成交處理跳過查不到的編號，f-13）
++變更摘要：1. 錯誤清單新增 ERR-050 MOM.POSITION_ADOPTED_AFTER_INTERRUPTION（R3）：動能重啟後接管一個帳本沒記完的部位時通知
++             （#93，f-12c 實驗：被殺重啟 2 秒內接管並補掛停損，原本沒有任何通知）。
++          2. 一致性登記冊新增 phase f-12、功能列 stop.graceful（收到停止訊號時等當輪做完）與 recovery.interrupted_order
++             （被硬殺後重啟接回原本的交易），四支皆未做（預定 f-12 各 PR）；沒有任何格子改成已做。
++          3. trade_alerts.unrecorded_fill（f-13）：UnrecordedFillAdapter 新增選用欄位 order_not_found(exc)。帳本裡記的
++             「不是一般訂單」的編號（動能的原生移動停損 algo 編號）查單回 -2013，過去會讓整輪延後兩小時、也可能擋住真正
++             重複送單的自動更正；現在 adapter 明確判定「交易所沒有這張單」的已記錄編號會被略過，其他失敗照舊重試。
++          向後相容：沒設 order_not_found 的 adapter 行為完全不變；既有 API 不變。
++受影響消費專案：動能（f-12 動能 PR 釘 v0.24.0 並接上 order_not_found）；趨勢、加密、競賽於各自 f-12 PR 改釘。
++部署入口：各專案既有部署腳本（開發機 → 正式機）。
++版本驗證／服務驗證／部署時間：待動能 f-12 PR 部署後補記。
++交易安全：未啟用實盤、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index a9a0f89..0aa205d 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.23.0"
++version = "0.24.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index a1b5cc6..c8d454c 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -333,4 +333,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.23.0"
++__version__ = "0.24.0"

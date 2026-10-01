@@ -1,0 +1,845 @@
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index c499d74..db23253 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -135,6 +135,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `MOM.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W3 接上） | JUDGEMENT | R2 | P8（v2） |
+ | `MOM.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+ | `MOM.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
++| `MOM.POSITION_ADOPTED_AFTER_INTERRUPTION` | 未發出（f-12 動能 PR 接上；重啟後接管帳本沒記完的部位，ERR-050） | JUDGEMENT | R3 | P8（v2） |
+ 
+ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
+ 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index fd0d0c5..6788dae 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -100,9 +100,9 @@
+   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>49 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    四支策略目前所有已知的「出問題」情況，共 <b>50 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>31 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>32 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -113,7 +113,7 @@
+   <div id="filters"></div>
+   <div id="register"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-09-30 盤點）。
++    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-10-01 盤點）。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
+   </div>
+ </div>
+@@ -1482,6 +1482,38 @@
+    "tier": "R3",
+    "title": "主機時鐘同步被關掉（維運通知時鐘軸）",
+    "what": "主機的時間同步程式被換掉或停用（例如系統更新後改回 systemd-timesyncd），時鐘可能開始不準。"
++  },
++  {
++   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查一次重啟後接管部位：讀 audit/trading_ledger.jsonl 裡該 trade_id 的 order_attempt／position_recovered／trade_open，以及 journalctl 在那個時間點前後的 graceful_stop／position_adopted 紀錄，判斷是進場途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。",
++   "behaviour": {
++    "phase": "f-12",
++    "reason": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作（沿用 trade_id 接管＋補寫 trade_open）；還沒上正式機，上線後改已做。",
++    "state": "pending"
++   },
++   "bot": "momentum",
++   "bot_label": "動能策略",
++   "code": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
++   "direction": "部位已有停損保護，不需要立刻動作；請確認它是怎麼來的，並確認帳本與交易所一致。",
++   "emits_event": {
++    "phase": "f-12",
++    "reason": "同上：接管時寫 R3 事件日誌，等 f-12 動能 PR 上正式機。",
++    "state": "pending"
++   },
++   "error_id": "ERR-050",
++   "notes": [
++    "行為未做 — 2026-10-01 已在開發主幹的 f-12 動能 PR 實作（沿用 trade_id 接管＋補寫 trade_open）；還沒上正式機，上線後改已做。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）",
++    "寫進事件日誌未做 — 同上：接管時寫 R3 事件日誌，等 f-12 動能 PR 上正式機。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡的 symbol、trade_id、數量、均價，以及 kind：interrupted_entry＝上一次進場被中斷，unknown_origin＝帳本裡找不到對應的下單紀錄。",
++    "到交易所 App 確認這個部位存在、且有一張移動停損單。",
++    "kind 是 unknown_origin 時，確認是不是你自己手動下的單；不是的話把下方指令貼給 Claude 追查。",
++    "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
++   ],
++   "tier": "R3",
++   "title": "重啟後接管了一個帳本沒有記完的部位",
++   "what": "動能策略重啟後，發現交易所上有一個部位是本地狀態裡沒有的，已經自動接管並補掛移動停損。"
+   }
+  ],
+  "tiers": [
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 0d893e4..12a1c53 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,7 +177,7 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>46</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-pending" href="#group-pending"><b>49</b><span>項未完成——還有策略沒做到</span></a>
+     <a class="c-done" href="#group-done"><b>25</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+@@ -193,7 +193,7 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">46 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">49 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+@@ -209,7 +209,7 @@
+   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+   <div id="glossaryHost"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-09-30 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
++    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-01 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 3e3b6f7</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 43be152</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 9559897</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+   </div>
+@@ -2265,6 +2265,130 @@
+    "sub": "錯誤目錄每條有固定編號（ERR-001 起，全機隊一個流水號、永不重用，退役保留原號）；每則通知第一行是【編號】＋目錄標題，自動檢查擋住標題不一致。",
+    "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+   },
++  {
++   "added_recent": true,
++   "anchor": "cap-stop.graceful",
++   "complete": false,
++   "dots": {
++    "btc-competition": "pending",
++    "momentum": "pending",
++    "mycrypto": "pending",
++    "seykota": "pending"
++   },
++   "has_recent": false,
++   "id": "stop.graceful",
++   "kind": "cap",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "f-12 第 2 個 PR，動能之後做。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "f-12 動能 PR（第 1 個）：已寫完，等審閱與上線。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "f-12 第 3 個 PR。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "f-12 第 4 個 PR（調倉要整輪跑完）。"
++      }
++     ]
++    }
++   ],
++   "sub": "系統自動更新、部署或手動停止都會送停止訊號。策略要把正在進行的「下單→帳本→停損→存狀態」做完才結束，不能在中途被殺留下半套狀態。",
++   "title": "收到停止訊號時等當輪做完再結束"
++  },
++  {
++   "added_recent": true,
++   "anchor": "cap-recovery.interrupted_order",
++   "complete": false,
++   "dots": {
++    "btc-competition": "pending",
++    "momentum": "pending",
++    "mycrypto": "pending",
++    "seykota": "pending"
++   },
++   "has_recent": false,
++   "id": "recovery.interrupted_order",
++   "kind": "cap",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "f-12 第 2 個 PR。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "f-12 動能 PR：用 order_attempt 沿用 trade_id；撤停損後被殺會重新掛停損。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "f-12 第 3 個 PR（開倉進行中狀態、停損存在性驗證）。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": null,
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "f-12 第 4 個 PR（送單前寫 order_attempt、補記以 order_id 去重）。"
++      }
++     ]
++    }
++   ],
++   "sub": "停止訊號擋不住的情況（強制終止、當機、斷電）之後，重啟要能用送單前寫好的紀錄找回原本的交易編號，補齊帳本，而不是產生第二個編號讓帳本與 Google 表對不上。",
++   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
++  },
+   {
+    "added_recent": false,
+    "anchor": "rule-SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
+@@ -3736,7 +3860,7 @@
+    "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-FLEET.OPS_LEDGER_DIVERGED",
+    "complete": true,
+    "dots": {
+@@ -3822,7 +3946,7 @@
+    "title": "R3｜帳本跟交易所對不上（維運通知帳本軸）"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-FLEET.OPS_GOOGLE_DIVERGED",
+    "complete": true,
+    "dots": {
+@@ -3908,7 +4032,7 @@
+    "title": "R2｜帳本跟 Google 表對不上（維運通知 Google 表軸）"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-FLEET.OPS_RUNTIME_ALERT",
+    "complete": true,
+    "dots": {
+@@ -3994,7 +4118,7 @@
+    "title": "R3｜策略出錯或安全暫停（維運通知運行狀態軸）"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-FLEET.OPS_UNIT_FAILED",
+    "complete": false,
+    "dots": {
+@@ -4080,7 +4204,7 @@
+    "title": "R2｜背景服務掛掉（維運通知服務單元軸）"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-FLEET.OPS_EXPORT_UNAVAILABLE",
+    "complete": false,
+    "dots": {
+@@ -4166,7 +4290,7 @@
+    "title": "R2｜匯出檔讀不到或太久沒更新（維運通知匯出檔軸）"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-FLEET.OPS_STATUS_STALE",
+    "complete": true,
+    "dots": {
+@@ -4252,7 +4376,7 @@
+    "title": "R2｜策略停止回報（狀態檔不見或太舊）"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-FLEET.OPS_CLOCK_DEGRADED",
+    "complete": true,
+    "dots": {
+@@ -4336,6 +4460,41 @@
+    ],
+    "sub": "ERR-049 · FLEET.OPS_CLOCK_DEGRADED",
+    "title": "R3｜主機時鐘同步被關掉（維運通知時鐘軸）"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
++   "complete": false,
++   "dots": {
++    "btc-competition": "none",
++    "momentum": "pending",
++    "mycrypto": "none",
++    "seykota": "none"
++   },
++   "has_recent": false,
++   "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作（沿用 trade_id 接管＋補寫 trade_open）；還沒上正式機，上線後改已做。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "同上：接管時寫 R3 事件日誌，等 f-12 動能 PR 上正式機。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-050 · MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
++   "title": "R3｜重啟後接管了一個帳本沒有記完的部位"
+   }
+  ],
+  "phase_counts": {
+@@ -4346,6 +4505,7 @@
+   "8-seykota": 19,
+   "binance-funding-sync": 2,
+   "error-ids": 4,
++  "f-12": 10,
+   "h4-trade-correction": 0,
+   "hotfix-btc-order-resend": 0,
+   "hotfix-seykota-order-resend": 0,
+@@ -4376,7 +4536,8 @@
+   "error-ids",
+   "hotfix-btc-order-resend",
+   "h4-trade-correction",
+-  "hotfix-seykota-stop-resolution"
++  "hotfix-seykota-stop-resolution",
++  "f-12"
+  ],
+  "phases": {
+   "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+@@ -4386,6 +4547,7 @@
+   "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
+   "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
+   "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
++  "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+   "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
+   "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
+@@ -4412,68 +4574,44 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "rule-FLEET.OPS_LEDGER_DIVERGED",
+-   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
+-   "project": null,
+-   "title": "R3｜帳本跟交易所對不上（維運通知帳本軸）"
+-  },
+-  {
+-   "anchor": "rule-FLEET.OPS_GOOGLE_DIVERGED",
+-   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
+-   "project": null,
+-   "title": "R2｜帳本跟 Google 表對不上（維運通知 Google 表軸）"
+-  },
+-  {
+-   "anchor": "rule-FLEET.OPS_RUNTIME_ALERT",
+-   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
++   "anchor": "rule-MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
++   "note": "動能重啟後接管帳本沒記完的部位（f-12），要發通知。",
+    "project": null,
+-   "title": "R3｜策略出錯或安全暫停（維運通知運行狀態軸）"
++   "title": "R3｜重啟後接管了一個帳本沒有記完的部位"
+   },
+   {
+-   "anchor": "rule-FLEET.OPS_UNIT_FAILED",
+-   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
++   "anchor": "cap-stop.graceful",
++   "note": "收到停止訊號時等當輪做完再結束：四支都列為未做（f-12）。",
+    "project": null,
+-   "title": "R2｜背景服務掛掉（維運通知服務單元軸）"
++   "title": "收到停止訊號時等當輪做完再結束"
+   },
+   {
+-   "anchor": "rule-FLEET.OPS_EXPORT_UNAVAILABLE",
+-   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
++   "anchor": "cap-recovery.interrupted_order",
++   "note": "被硬殺後重啟接回原本的交易：四支都列為未做（f-12）。",
+    "project": null,
+-   "title": "R2｜匯出檔讀不到或太久沒更新（維運通知匯出檔軸）"
+-  },
+-  {
+-   "anchor": "rule-FLEET.OPS_STATUS_STALE",
+-   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
+-   "project": null,
+-   "title": "R2｜策略停止回報（狀態檔不見或太舊）"
+-  },
+-  {
+-   "anchor": "rule-FLEET.OPS_CLOCK_DEGRADED",
+-   "note": "維運通知自己發的告警補進錯誤清單（e2）。",
+-   "project": null,
+-   "title": "R3｜主機時鐘同步被關掉（維運通知時鐘軸）"
++   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
+   }
+  ],
+  "totals": {
+   "btc-competition": {
+    "done": 24,
+    "n/a": 15,
+-   "pending": 11
++   "pending": 13
+   },
+   "momentum": {
+    "done": 35,
+    "n/a": 10,
+-   "pending": 7
++   "pending": 11
+   },
+   "mycrypto": {
+    "done": 14,
+    "n/a": 11,
+-   "pending": 27
++   "pending": 29
+   },
+   "seykota": {
+    "done": 43,
+    "n/a": 8,
+-   "pending": 23
++   "pending": 25
+   }
+  }
+ }
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 091150a..a8b4a1d 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -36,7 +36,7 @@
+     "btc-competition": "btc-bull-market-competition",
+     "fleet": "(cross-repo: same condition implemented in every strategy)"
+   },
+-  "error_ids_issued": 49,
++  "error_ids_issued": 50,
+   "entries": [
+     {
+       "error_id": "ERR-001",
+@@ -1133,7 +1133,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "seykota",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:420"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:440"
+       ],
+       "current": {
+         "latch": null,
+@@ -1163,7 +1163,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "seykota",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
+       ],
+       "current": {
+         "latch": null,
+@@ -1195,7 +1195,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "momentum",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:420"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:440"
+       ],
+       "current": {
+         "latch": null,
+@@ -1225,7 +1225,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "momentum",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
+       ],
+       "current": {
+         "latch": null,
+@@ -1257,7 +1257,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "btc-competition",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:464"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:484"
+       ],
+       "current": {
+         "latch": null,
+@@ -1287,7 +1287,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "btc-competition",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
+       ],
+       "current": {
+         "latch": null,
+@@ -1319,7 +1319,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "mycrypto",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
+       ],
+       "current": {
+         "latch": null,
+@@ -1574,6 +1574,38 @@
+         ],
+         "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。"
+       }
++    },
++    {
++      "error_id": "ERR-050",
++      "code": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
++      "title": "重啟後接管了一個帳本沒有記完的部位",
++      "project": "momentum",
++      "sources": [
++        "src/strategy.py:1335"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "交易所上有部位、本地狀態沒有時（常見於進場下單途中被中斷重啟）：用帳本裡送單前寫好的 order_attempt 沿用原本的 trade_id、補寫 trade_open（訂單編號查得到時）與 position_recovered，並掛上移動停損；找不到對應紀錄（例如手動下的單）就用新的 trade_id 接管。兩種都寫事件日誌。",
++      "human_action": "確認這個部位是不是預期的（上一次進場被中斷，還是有人在交易所手動下單）；對帳若顯示未記成交，照該通知處理。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "使用者 2026-10-01 定案（f-12c）：實測動能在進場單送出後被殺、重啟，2 秒內自動接管並補掛停損，但沒有任何人知道。接管本身是對的（有部位就要有停損），但「發生過一次被中斷的進場」是人需要知道的事，所以發 R3 通知，不自動當作無事。",
++      "operator_message": {
++        "what": "動能策略重啟後，發現交易所上有一個部位是本地狀態裡沒有的，已經自動接管並補掛移動停損。",
++        "direction": "部位已有停損保護，不需要立刻動作；請確認它是怎麼來的，並確認帳本與交易所一致。",
++        "steps": [
++          "看訊息裡的 symbol、trade_id、數量、均價，以及 kind：interrupted_entry＝上一次進場被中斷，unknown_origin＝帳本裡找不到對應的下單紀錄。",
++          "到交易所 App 確認這個部位存在、且有一張移動停損單。",
++          "kind 是 unknown_origin 時，確認是不是你自己手動下的單；不是的話把下方指令貼給 Claude 追查。",
++          "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
++        ],
++        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查一次重啟後接管部位：讀 audit/trading_ledger.jsonl 裡該 trade_id 的 order_attempt／position_recovered／trade_open，以及 journalctl 在那個時間點前後的 graceful_stop／position_adopted 紀錄，判斷是進場途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。"
++      }
+     }
+   ],
+   "retired_codes": [
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 2cce086..83b97de 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1,7 +1,7 @@
+ {
+   "registry_version": "fleet-rollout-registry/v1",
+   "catalog_version": "fleet-error-catalog/v2",
+-  "updated_at": "2026-09-30",
++  "updated_at": "2026-10-01",
+   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
+   "projects": {
+     "momentum": "動能策略",
+@@ -27,7 +27,8 @@
+     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+     "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
+-    "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）"
++    "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
++    "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知"
+   },
+   "sources": {
+     "momentum": {
+@@ -584,6 +585,60 @@
+           "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+         }
+       }
++    },
++    {
++      "id": "stop.graceful",
++      "title": "收到停止訊號時等當輪做完再結束",
++      "description": "系統自動更新、部署或手動停止都會送停止訊號。策略要把正在進行的「下單→帳本→停損→存狀態」做完才結束，不能在中途被殺留下半套狀態。",
++      "status": {
++        "momentum": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "f-12 動能 PR（第 1 個）：已寫完，等審閱與上線。"
++        },
++        "seykota": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "f-12 第 2 個 PR，動能之後做。"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "f-12 第 3 個 PR。"
++        },
++        "btc-competition": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "f-12 第 4 個 PR（調倉要整輪跑完）。"
++        }
++      }
++    },
++    {
++      "id": "recovery.interrupted_order",
++      "title": "被硬殺後重啟，接回原本的交易而不是另開一筆",
++      "description": "停止訊號擋不住的情況（強制終止、當機、斷電）之後，重啟要能用送單前寫好的紀錄找回原本的交易編號，補齊帳本，而不是產生第二個編號讓帳本與 Google 表對不上。",
++      "status": {
++        "momentum": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "f-12 動能 PR：用 order_attempt 沿用 trade_id；撤停損後被殺會重新掛停損。"
++        },
++        "seykota": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "f-12 第 2 個 PR。"
++        },
++        "mycrypto": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "f-12 第 3 個 PR（開倉進行中狀態、停損存在性驗證）。"
++        },
++        "btc-competition": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "f-12 第 4 個 PR（送單前寫 order_attempt、補記以 order_id 去重）。"
++        }
++      }
+     }
+   ],
+   "catalog": [
+@@ -1530,50 +1585,43 @@
+           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
+         }
+       }
++    },
++    {
++      "code": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
++      "behaviour": {
++        "momentum": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作（沿用 trade_id 接管＋補寫 trade_open）；還沒上正式機，上線後改已做。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "同上：接管時寫 R3 事件日誌，等 f-12 動能 PR 上正式機。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
+     {
+       "kind": "rule",
+-      "id": "FLEET.OPS_LEDGER_DIVERGED",
++      "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
+       "type": "added",
+-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
++      "note": "動能重啟後接管帳本沒記完的部位（f-12），要發通知。"
+     },
+     {
+-      "kind": "rule",
+-      "id": "FLEET.OPS_GOOGLE_DIVERGED",
++      "kind": "cap",
++      "id": "stop.graceful",
+       "type": "added",
+-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
++      "note": "收到停止訊號時等當輪做完再結束：四支都列為未做（f-12）。"
+     },
+     {
+-      "kind": "rule",
+-      "id": "FLEET.OPS_RUNTIME_ALERT",
+-      "type": "added",
+-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "FLEET.OPS_UNIT_FAILED",
+-      "type": "added",
+-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
+-      "type": "added",
+-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "FLEET.OPS_STATUS_STALE",
+-      "type": "added",
+-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "FLEET.OPS_CLOCK_DEGRADED",
++      "kind": "cap",
++      "id": "recovery.interrupted_order",
+       "type": "added",
+-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
++      "note": "被硬殺後重啟接回原本的交易：四支都列為未做（f-12）。"
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/unrecorded_fill.py b/src/trade_alerts/unrecorded_fill.py
+index 487d74c..0bfcd5b 100644
+--- a/src/trade_alerts/unrecorded_fill.py
++++ b/src/trade_alerts/unrecorded_fill.py
+@@ -127,6 +127,14 @@ class UnrecordedFillAdapter:
+     norm_symbol: Callable[[Any], str] = norm_symbol_plain
+     is_paper: Callable[[dict[str, Any]], bool] = is_paper_event
+     qty_multiplier: float = 1.0
++    #: ``order_not_found(exc)`` is True when a lookup failed because the
++    #: exchange has *no such order* (e.g. Binance ``-2013``).  A ledger row can
++    #: carry an id that is not an ordinary order at all -- momentum records the
++    #: algo id of its native trailing stop as an ``order_id`` -- and looking
++    #: that up can only ever say "not found".  Such a recorded row cannot be the
++    #: partner of a duplicate send, so it is skipped; any other failure (network,
++    #: rate limit) still makes the lookup retry.  ``None``: every failure retries.
++    order_not_found: Callable[[BaseException], bool] | None = None
+ 
+     def __post_init__(self) -> None:
+         if self.style not in ("trade", "spot"):
+@@ -316,7 +324,19 @@ class _Round:
+             at = _event_ms(event)
+             if at is None or abs(at - when) > DUPLICATE_WINDOW_MS:
+                 continue
+-            if self._client_id(str(order["symbol"]), oid) == mine:
++            try:
++                theirs = self._client_id(str(order["symbol"]), oid)
++            except Exception as exc:  # noqa: BLE001
++                # A recorded id the exchange does not know as an order (a
++                # native trailing stop's algo id) cannot be the duplicate's
++                # partner: skip it instead of failing the whole round.  Our own
++                # unrecorded order failing to look up is handled above and
++                # still retries.
++                if self.adapter.order_not_found is not None and self.adapter.order_not_found(exc):
++                    self._client_ids[oid] = None
++                    continue
++                raise
++            if theirs == mine:
+                 return {"event": event, "order_id": oid, "client_order_id": mine}
+         return None
+ 
+diff --git a/tests/test_unrecorded_fill.py b/tests/test_unrecorded_fill.py
+index 1e784fe..e1aae95 100644
+--- a/tests/test_unrecorded_fill.py
++++ b/tests/test_unrecorded_fill.py
+@@ -339,3 +339,74 @@ def test_a_spot_duplicate_send_is_recorded_from_its_fills(tmp_path):
+     assert [c["order_ids"] for c in result["corrected"]] == [["502"]]
+     assert [e["order_id"] for e in read_ledger(paths.ledger) if e["event_type"] == "spot_fill"] == ["501", "502"]
+     assert _codes(paths) == [CODE_CORRECTED]
++
++
++# --- f-13: a recorded id the exchange does not know as an order ----------------
++
++ALGO_ID = "1000000224458885"
++
++
++class NotFound(Exception):
++    """The exchange has no such order (Binance -2013)."""
++
++
++def _ledger_with_a_native_stop_id():
++    """The ledger also records the native trailing stop's *algo* id as an
++    ``order_id`` (momentum does).  An ordinary order lookup of it can only say
++    "not found"."""
++    duplicate_ms = next(f["time_ms"] for f in STATE["fills"] if str(f["order_id"]) == DUPLICATE)
++    stop_row = {"event_type": "order_result", "event_id": "algo-row", "symbol": "BTCUSDT", "order_id": ALGO_ID,
++                "action": "protective_trailing_stop", "status": "accepted", "trade_id": TRADE_B,
++                "event_epoch_ms": duplicate_ms + 1_000}
++    return [stop_row, *LEDGER]            # first in the file: the lookup meets it before the real partner
++
++
++class _AlgoAwareExchange(Exchange):
++    def client_order_id(self, symbol: str, order_id: str) -> str | None:
++        if order_id == ALGO_ID:
++            self.lookups.append(order_id)
++            raise NotFound("code -2013: Order does not exist.")
++        return super().client_order_id(symbol, order_id)
++
++
++def test_a_recorded_native_stop_id_does_not_block_a_certain_duplicate_correction(tmp_path):
++    paths = _setup(tmp_path, ledger=_ledger_with_a_native_stop_id())
++    exchange = _AlgoAwareExchange(_client_ids())
++    adapter = _trade_adapter(paths, exchange, order_not_found=lambda exc: isinstance(exc, NotFound))
++
++    result = _round(adapter, paths)
++
++    assert ALGO_ID in exchange.lookups                       # it was looked up, found unknown, skipped
++    assert result["deferred"] == [] and result["unresolved"] == []
++    [corrected] = result["corrected"]
++    assert corrected["trade_id"] == TRADE_B and DUPLICATE in corrected["order_ids"]
++    assert _codes(paths) == [CODE_CORRECTED]
++
++
++def test_without_the_hook_the_same_failure_still_defers_the_whole_round(tmp_path):
++    """Back-compat: an adapter that does not say what "not found" looks like
++    keeps the old behaviour (retry, then LOOKUP_FAILED)."""
++    paths = _setup(tmp_path, ledger=_ledger_with_a_native_stop_id())
++    adapter = _trade_adapter(paths, _AlgoAwareExchange(_client_ids()))
++
++    result = _round(adapter, paths)
++
++    assert result["corrected"] == []
++    assert "LOOKUP_FAILED" in {u["reason_code"] for u in result["unresolved"]}      # NOW is past the grace
++
++
++def test_a_network_failure_on_a_recorded_order_still_retries_even_with_the_hook(tmp_path):
++    paths = _setup(tmp_path, ledger=_ledger_with_a_native_stop_id())
++
++    class Flaky(_AlgoAwareExchange):
++        def client_order_id(self, symbol, order_id):
++            if order_id == ALGO_ID:
++                raise ConnectionError("read timed out")
++            return Exchange.client_order_id(self, symbol, order_id)
++
++    adapter = _trade_adapter(paths, Flaky(_client_ids()), order_not_found=lambda exc: isinstance(exc, NotFound))
++
++    result = _round(adapter, paths)
++
++    assert result["corrected"] == []                          # not "not found": do not guess
++    assert "LOOKUP_FAILED" in {u["reason_code"] for u in result["unresolved"]}
