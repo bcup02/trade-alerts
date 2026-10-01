@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 50,
+  "error_ids_issued": 51,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -1605,6 +1605,38 @@
           "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
         ],
         "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查一次重啟後接管部位：讀 audit/trading_ledger.jsonl 裡該 trade_id 的 order_attempt／position_recovered／trade_open，以及 journalctl 在那個時間點前後的 graceful_stop／position_adopted 紀錄，判斷是進場途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。"
+      }
+    },
+    {
+      "error_id": "ERR-051",
+      "code": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "title": "重啟後接管了一個沒記完的部位，或補上了被中斷的停損",
+      "project": "seykota",
+      "sources": [
+        "src/seykota_bot/bot.py:1272"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "重啟後的對帳發現交易所有部位、本地狀態沒有（或停損沒了）時：用進場前記下的委託（固定 client id）找回原本的交易並沿用 trade_id、補寫 trade_open；若只有我們自己未完成的停損紀錄且交易所沒有任何停損，用原停損價重掛（同一個 client id）；找不到對應紀錄（手動單）就用新 id 接管並沿用它身上唯一的保護停損。三種都寫事件日誌。",
+      "human_action": "確認這個部位是不是預期的（上一次進場／換停損被中斷，還是有人在交易所手動操作）；對帳若顯示未記成交，照該通知處理。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-01 f-12：趨勢被硬殺後重啟，原本會把部位當成「交易所接管」而 trade_id 分裂，或在移動停損撤舊掛新的空窗被殺後直接 PROTECTION_UNVERIFIED 暫停。f-12 趨勢 PR 讓程式自己接回並補齊，但「發生過一次被中斷」是人需要知道的事，所以發 R3 通知，不當作無事。",
+      "operator_message": {
+        "what": "趨勢策略重啟後，發現交易所上有一個部位或停損是上一次執行到一半留下的，已經自動接管或補上。",
+        "direction": "部位有停損保護，不需要立刻動作；請確認它是怎麼來的，並確認帳本與交易所一致。",
+        "steps": [
+          "看訊息裡的 symbol、trade_id、方向、數量、停損價，以及 kind：interrupted_entry＝上一次進場被中斷並已找回，stop_rearmed＝停損掛到一半被中斷、已用原價重掛，unknown_origin＝找不到任何對應紀錄（可能是手動單）。",
+          "到交易所 App 確認這個部位存在、且恰好有一張全部平倉的停損單。",
+          "kind 是 unknown_origin 時，確認是不是你自己手動下的單；不是的話把下方指令貼給 Claude 追查。",
+          "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查一次重啟後接管：讀 state/bot_state.json 的 pending_operations（entry_intent、protective_stop_replace）與 audit 事件（position_recovered_from_entry_intent、protective_stop_rearmed_after_interruption、exchange_position_adopted），audit/trading_ledger.jsonl 裡該 trade_id 的 trade_open，以及 journalctl 在那個時間點前後的 graceful_stop／position_adopted 紀錄，判斷是進場途中被中斷、換停損途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。"
       }
     }
   ],

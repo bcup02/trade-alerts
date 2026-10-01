@@ -116,6 +116,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `SEY.VERIFIED_CLOSE_REPAIR_BLOCKED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R3 | P8（v2） |
 | `SEY.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
 | `SEY.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+| `SEY.POSITION_ADOPTED_AFTER_INTERRUPTION` | 未發出（f-12 趨勢 PR 接上；重啟後接管或補停損，ERR-051） | JUDGEMENT | R3 | P8（v2） |
 
 **`protective_stop_failed` 拆成兩碼**是本節最重要的改動。現行程式在「停損掛單失敗」之後會立刻
 嘗試緊急市價平倉，但不論平倉成功或失敗，都收斂成同一個 latch 原因碼。這兩種結果的真倉風險相差
