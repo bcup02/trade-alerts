@@ -111,7 +111,7 @@
         "seykota": {
           "state": "pending",
           "phase": "8-seykota",
-          "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。"
+          "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。　2026-10-01：已在開發主幹的 f-12 趨勢 PR 實作（守衛通過後自動清除並記 safe_halt_cleared），還沒上正式機，上線後改已做。"
         },
         "mycrypto": {
           "state": "n/a",
@@ -1602,26 +1602,37 @@
           "reason": "同上：接管時寫 R3 事件日誌，等 f-12 動能 PR 上正式機。"
         }
       }
+    },
+    {
+      "code": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作（沿用 trade_id 找回進場、補寫 trade_open、原價重掛被中斷的停損）；還沒上正式機，上線後改已做。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "同上：接管時寫 R3 事件日誌，等 f-12 趨勢 PR 上正式機。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
       "kind": "rule",
-      "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "id": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
       "type": "added",
-      "note": "動能重啟後接管帳本沒記完的部位（f-12），要發通知。"
+      "note": "趨勢重啟後接管／補停損要通知（f-12，ERR-051）。"
     },
     {
       "kind": "cap",
-      "id": "stop.graceful",
-      "type": "added",
-      "note": "收到停止訊號時等當輪做完再結束：四支都列為未做（f-12）。"
-    },
-    {
-      "kind": "cap",
-      "id": "recovery.interrupted_order",
-      "type": "added",
-      "note": "被硬殺後重啟接回原本的交易：四支都列為未做（f-12）。"
+      "id": "latch.restart_only_clear",
+      "type": "updated",
+      "note": "趨勢的理由改寫：f-12 趨勢 PR 已實作，仍未上正式機。"
     }
   ]
 }

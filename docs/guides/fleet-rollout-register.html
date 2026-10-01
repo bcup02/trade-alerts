@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>49</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>50</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>25</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">49 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">50 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -1026,7 +1026,7 @@
    "title": "兩段式解除工具"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-latch.restart_only_clear",
    "complete": false,
    "dots": {
@@ -1046,7 +1046,7 @@
        "aspect": null,
        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
        "state": "pending",
-       "text": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。"
+       "text": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。　2026-10-01：已在開發主幹的 f-12 趨勢 PR 實作（守衛通過後自動清除並記 safe_halt_cleared），還沒上正式機，上線後改已做。"
       }
      ]
     },
@@ -2266,7 +2266,7 @@
    "title": "通知一定附錯誤編號，標題與風險登記冊一致"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-stop.graceful",
    "complete": false,
    "dots": {
@@ -2328,7 +2328,7 @@
    "title": "收到停止訊號時等當輪做完再結束"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-recovery.interrupted_order",
    "complete": false,
    "dots": {
@@ -4462,7 +4462,7 @@
    "title": "R3｜主機時鐘同步被關掉（維運通知時鐘軸）"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
    "complete": false,
    "dots": {
@@ -4495,6 +4495,41 @@
    ],
    "sub": "ERR-050 · MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
    "title": "R3｜重啟後接管了一個帳本沒有記完的部位"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+       "state": "pending",
+       "text": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作（沿用 trade_id 找回進場、補寫 trade_open、原價重掛被中斷的停損）；還沒上正式機，上線後改已做。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+       "state": "pending",
+       "text": "同上：接管時寫 R3 事件日誌，等 f-12 趨勢 PR 上正式機。"
+      }
+     ]
+    }
+   ],
+   "sub": "ERR-051 · SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+   "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
   }
  ],
  "phase_counts": {
@@ -4505,7 +4540,7 @@
   "8-seykota": 19,
   "binance-funding-sync": 2,
   "error-ids": 4,
-  "f-12": 10,
+  "f-12": 12,
   "h4-trade-correction": 0,
   "hotfix-btc-order-resend": 0,
   "hotfix-seykota-order-resend": 0,
@@ -4574,22 +4609,16 @@
  },
  "recent_summary": [
   {
-   "anchor": "rule-MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
-   "note": "動能重啟後接管帳本沒記完的部位（f-12），要發通知。",
+   "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+   "note": "趨勢重啟後接管／補停損要通知（f-12，ERR-051）。",
    "project": null,
-   "title": "R3｜重啟後接管了一個帳本沒有記完的部位"
+   "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
   },
   {
-   "anchor": "cap-stop.graceful",
-   "note": "收到停止訊號時等當輪做完再結束：四支都列為未做（f-12）。",
+   "anchor": "cap-latch.restart_only_clear",
+   "note": "趨勢的理由改寫：f-12 趨勢 PR 已實作，仍未上正式機。",
    "project": null,
-   "title": "收到停止訊號時等當輪做完再結束"
-  },
-  {
-   "anchor": "cap-recovery.interrupted_order",
-   "note": "被硬殺後重啟接回原本的交易：四支都列為未做（f-12）。",
-   "project": null,
-   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
+   "title": "「改好設定重啟」就能解除的安全暫停真的會被清掉"
   }
  ],
  "totals": {
@@ -4611,7 +4640,7 @@
   "seykota": {
    "done": 43,
    "n/a": 8,
-   "pending": 25
+   "pending": 27
   }
  }
 }
