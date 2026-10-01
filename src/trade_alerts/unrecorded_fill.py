@@ -127,6 +127,14 @@ class UnrecordedFillAdapter:
     norm_symbol: Callable[[Any], str] = norm_symbol_plain
     is_paper: Callable[[dict[str, Any]], bool] = is_paper_event
     qty_multiplier: float = 1.0
+    #: ``order_not_found(exc)`` is True when a lookup failed because the
+    #: exchange has *no such order* (e.g. Binance ``-2013``).  A ledger row can
+    #: carry an id that is not an ordinary order at all -- momentum records the
+    #: algo id of its native trailing stop as an ``order_id`` -- and looking
+    #: that up can only ever say "not found".  Such a recorded row cannot be the
+    #: partner of a duplicate send, so it is skipped; any other failure (network,
+    #: rate limit) still makes the lookup retry.  ``None``: every failure retries.
+    order_not_found: Callable[[BaseException], bool] | None = None
 
     def __post_init__(self) -> None:
         if self.style not in ("trade", "spot"):
@@ -316,7 +324,19 @@ class _Round:
             at = _event_ms(event)
             if at is None or abs(at - when) > DUPLICATE_WINDOW_MS:
                 continue
-            if self._client_id(str(order["symbol"]), oid) == mine:
+            try:
+                theirs = self._client_id(str(order["symbol"]), oid)
+            except Exception as exc:  # noqa: BLE001
+                # A recorded id the exchange does not know as an order (a
+                # native trailing stop's algo id) cannot be the duplicate's
+                # partner: skip it instead of failing the whole round.  Our own
+                # unrecorded order failing to look up is handled above and
+                # still retries.
+                if self.adapter.order_not_found is not None and self.adapter.order_not_found(exc):
+                    self._client_ids[oid] = None
+                    continue
+                raise
+            if theirs == mine:
                 return {"event": event, "order_id": oid, "client_order_id": mine}
         return None
 

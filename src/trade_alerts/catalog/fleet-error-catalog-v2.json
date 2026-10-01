@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 49,
+  "error_ids_issued": 50,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -1133,7 +1133,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "seykota",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:420"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:440"
       ],
       "current": {
         "latch": null,
@@ -1163,7 +1163,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "seykota",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
       ],
       "current": {
         "latch": null,
@@ -1195,7 +1195,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:420"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:440"
       ],
       "current": {
         "latch": null,
@@ -1225,7 +1225,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
       ],
       "current": {
         "latch": null,
@@ -1257,7 +1257,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "btc-competition",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:464"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:484"
       ],
       "current": {
         "latch": null,
@@ -1287,7 +1287,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "btc-competition",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
       ],
       "current": {
         "latch": null,
@@ -1319,7 +1319,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "mycrypto",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:494"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
       ],
       "current": {
         "latch": null,
@@ -1573,6 +1573,38 @@
           "把下方「給 AI 的追查指令」整段貼給 Claude，找出是什麼把時間同步換掉並修正。"
         ],
         "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。"
+      }
+    },
+    {
+      "error_id": "ERR-050",
+      "code": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "title": "重啟後接管了一個帳本沒有記完的部位",
+      "project": "momentum",
+      "sources": [
+        "src/strategy.py:1335"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "交易所上有部位、本地狀態沒有時（常見於進場下單途中被中斷重啟）：用帳本裡送單前寫好的 order_attempt 沿用原本的 trade_id、補寫 trade_open（訂單編號查得到時）與 position_recovered，並掛上移動停損；找不到對應紀錄（例如手動下的單）就用新的 trade_id 接管。兩種都寫事件日誌。",
+      "human_action": "確認這個部位是不是預期的（上一次進場被中斷，還是有人在交易所手動下單）；對帳若顯示未記成交，照該通知處理。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "使用者 2026-10-01 定案（f-12c）：實測動能在進場單送出後被殺、重啟，2 秒內自動接管並補掛停損，但沒有任何人知道。接管本身是對的（有部位就要有停損），但「發生過一次被中斷的進場」是人需要知道的事，所以發 R3 通知，不自動當作無事。",
+      "operator_message": {
+        "what": "動能策略重啟後，發現交易所上有一個部位是本地狀態裡沒有的，已經自動接管並補掛移動停損。",
+        "direction": "部位已有停損保護，不需要立刻動作；請確認它是怎麼來的，並確認帳本與交易所一致。",
+        "steps": [
+          "看訊息裡的 symbol、trade_id、數量、均價，以及 kind：interrupted_entry＝上一次進場被中斷，unknown_origin＝帳本裡找不到對應的下單紀錄。",
+          "到交易所 App 確認這個部位存在、且有一張移動停損單。",
+          "kind 是 unknown_origin 時，確認是不是你自己手動下的單；不是的話把下方指令貼給 Claude 追查。",
+          "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
+        ],
+        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查一次重啟後接管部位：讀 audit/trading_ledger.jsonl 裡該 trade_id 的 order_attempt／position_recovered／trade_open，以及 journalctl 在那個時間點前後的 graceful_stop／position_adopted 紀錄，判斷是進場途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。"
       }
     }
   ],
