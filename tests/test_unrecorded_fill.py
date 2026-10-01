@@ -339,3 +339,74 @@ def test_a_spot_duplicate_send_is_recorded_from_its_fills(tmp_path):
     assert [c["order_ids"] for c in result["corrected"]] == [["502"]]
     assert [e["order_id"] for e in read_ledger(paths.ledger) if e["event_type"] == "spot_fill"] == ["501", "502"]
     assert _codes(paths) == [CODE_CORRECTED]
+
+
+# --- f-13: a recorded id the exchange does not know as an order ----------------
+
+ALGO_ID = "1000000224458885"
+
+
+class NotFound(Exception):
+    """The exchange has no such order (Binance -2013)."""
+
+
+def _ledger_with_a_native_stop_id():
+    """The ledger also records the native trailing stop's *algo* id as an
+    ``order_id`` (momentum does).  An ordinary order lookup of it can only say
+    "not found"."""
+    duplicate_ms = next(f["time_ms"] for f in STATE["fills"] if str(f["order_id"]) == DUPLICATE)
+    stop_row = {"event_type": "order_result", "event_id": "algo-row", "symbol": "BTCUSDT", "order_id": ALGO_ID,
+                "action": "protective_trailing_stop", "status": "accepted", "trade_id": TRADE_B,
+                "event_epoch_ms": duplicate_ms + 1_000}
+    return [stop_row, *LEDGER]            # first in the file: the lookup meets it before the real partner
+
+
+class _AlgoAwareExchange(Exchange):
+    def client_order_id(self, symbol: str, order_id: str) -> str | None:
+        if order_id == ALGO_ID:
+            self.lookups.append(order_id)
+            raise NotFound("code -2013: Order does not exist.")
+        return super().client_order_id(symbol, order_id)
+
+
+def test_a_recorded_native_stop_id_does_not_block_a_certain_duplicate_correction(tmp_path):
+    paths = _setup(tmp_path, ledger=_ledger_with_a_native_stop_id())
+    exchange = _AlgoAwareExchange(_client_ids())
+    adapter = _trade_adapter(paths, exchange, order_not_found=lambda exc: isinstance(exc, NotFound))
+
+    result = _round(adapter, paths)
+
+    assert ALGO_ID in exchange.lookups                       # it was looked up, found unknown, skipped
+    assert result["deferred"] == [] and result["unresolved"] == []
+    [corrected] = result["corrected"]
+    assert corrected["trade_id"] == TRADE_B and DUPLICATE in corrected["order_ids"]
+    assert _codes(paths) == [CODE_CORRECTED]
+
+
+def test_without_the_hook_the_same_failure_still_defers_the_whole_round(tmp_path):
+    """Back-compat: an adapter that does not say what "not found" looks like
+    keeps the old behaviour (retry, then LOOKUP_FAILED)."""
+    paths = _setup(tmp_path, ledger=_ledger_with_a_native_stop_id())
+    adapter = _trade_adapter(paths, _AlgoAwareExchange(_client_ids()))
+
+    result = _round(adapter, paths)
+
+    assert result["corrected"] == []
+    assert "LOOKUP_FAILED" in {u["reason_code"] for u in result["unresolved"]}      # NOW is past the grace
+
+
+def test_a_network_failure_on_a_recorded_order_still_retries_even_with_the_hook(tmp_path):
+    paths = _setup(tmp_path, ledger=_ledger_with_a_native_stop_id())
+
+    class Flaky(_AlgoAwareExchange):
+        def client_order_id(self, symbol, order_id):
+            if order_id == ALGO_ID:
+                raise ConnectionError("read timed out")
+            return Exchange.client_order_id(self, symbol, order_id)
+
+    adapter = _trade_adapter(paths, Flaky(_client_ids()), order_not_found=lambda exc: isinstance(exc, NotFound))
+
+    result = _round(adapter, paths)
+
+    assert result["corrected"] == []                          # not "not found": do not guess
+    assert "LOOKUP_FAILED" in {u["reason_code"] for u in result["unresolved"]}

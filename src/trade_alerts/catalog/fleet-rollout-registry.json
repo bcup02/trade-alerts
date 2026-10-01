@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-09-30",
+  "updated_at": "2026-10-01",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -27,7 +27,8 @@
     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
     "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
-    "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）"
+    "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
+    "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知"
   },
   "sources": {
     "momentum": {
@@ -582,6 +583,60 @@
           "state": "pending",
           "phase": "error-ids",
           "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+        }
+      }
+    },
+    {
+      "id": "stop.graceful",
+      "title": "收到停止訊號時等當輪做完再結束",
+      "description": "系統自動更新、部署或手動停止都會送停止訊號。策略要把正在進行的「下單→帳本→停損→存狀態」做完才結束，不能在中途被殺留下半套狀態。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "f-12 動能 PR（第 1 個）：已寫完，等審閱與上線。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "f-12 第 2 個 PR，動能之後做。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "f-12 第 3 個 PR。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "f-12 第 4 個 PR（調倉要整輪跑完）。"
+        }
+      }
+    },
+    {
+      "id": "recovery.interrupted_order",
+      "title": "被硬殺後重啟，接回原本的交易而不是另開一筆",
+      "description": "停止訊號擋不住的情況（強制終止、當機、斷電）之後，重啟要能用送單前寫好的紀錄找回原本的交易編號，補齊帳本，而不是產生第二個編號讓帳本與 Google 表對不上。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "f-12 動能 PR：用 order_attempt 沿用 trade_id；撤停損後被殺會重新掛停損。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "f-12 第 2 個 PR。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "f-12 第 3 個 PR（開倉進行中狀態、停損存在性驗證）。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "f-12 第 4 個 PR（送單前寫 order_attempt、補記以 order_id 去重）。"
         }
       }
     }
@@ -1530,50 +1585,43 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
+    },
+    {
+      "code": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作（沿用 trade_id 接管＋補寫 trade_open）；還沒上正式機，上線後改已做。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "同上：接管時寫 R3 事件日誌，等 f-12 動能 PR 上正式機。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
       "kind": "rule",
-      "id": "FLEET.OPS_LEDGER_DIVERGED",
+      "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
       "type": "added",
-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+      "note": "動能重啟後接管帳本沒記完的部位（f-12），要發通知。"
     },
     {
-      "kind": "rule",
-      "id": "FLEET.OPS_GOOGLE_DIVERGED",
+      "kind": "cap",
+      "id": "stop.graceful",
       "type": "added",
-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+      "note": "收到停止訊號時等當輪做完再結束：四支都列為未做（f-12）。"
     },
     {
-      "kind": "rule",
-      "id": "FLEET.OPS_RUNTIME_ALERT",
+      "kind": "cap",
+      "id": "recovery.interrupted_order",
       "type": "added",
-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_UNIT_FAILED",
-      "type": "added",
-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
-      "type": "added",
-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_STATUS_STALE",
-      "type": "added",
-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_CLOCK_DEGRADED",
-      "type": "added",
-      "note": "維運通知自己發的告警補進錯誤清單（e2）。"
+      "note": "被硬殺後重啟接回原本的交易：四支都列為未做（f-12）。"
     }
   ]
 }

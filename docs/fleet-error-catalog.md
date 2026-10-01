@@ -135,6 +135,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `MOM.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W3 接上） | JUDGEMENT | R2 | P8（v2） |
 | `MOM.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
 | `MOM.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+| `MOM.POSITION_ADOPTED_AFTER_INTERRUPTION` | 未發出（f-12 動能 PR 接上；重啟後接管帳本沒記完的部位，ERR-050） | JUDGEMENT | R3 | P8（v2） |
 
 momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
