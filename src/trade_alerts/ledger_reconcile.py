@@ -42,7 +42,7 @@ import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 import requests
 
@@ -632,10 +632,19 @@ def sheet_ledger_compare(
     since_ms: int | None = None,
     price_tol_pct: float = 0.001,
     pnl_tol: float = 0.01,
+    ignore: Mapping[str, str] | None = None,
+    ignore_problem: str | None = None,
 ) -> dict[str, Any]:
     """Pure verdict function for the ledger-vs-sheet layer.  Returns a
     ``google_reconcile_status.json`` document (``RECONCILED`` / ``DIVERGED`` /
-    ``UNKNOWN`` + a per-row ``discrepancies`` list)."""
+    ``UNKNOWN`` + a per-row ``discrepancies`` list).
+
+    ``ignore`` maps ``trade_id`` -> reason for trades the operator has decided
+    are not wanted on the sheet (see :func:`load_reconcile_ignore`).  They are
+    left out of the comparison -- but never silently: the document lists each
+    one under ``ignored`` and counts them in ``summary['ignored']``.
+    ``ignore_problem`` (a list file that could not be used) is carried into the
+    document as ``ignore_list_problem`` so it is visible rather than hidden."""
     now = now or datetime.now(timezone.utc)
     checked_at = utc_now_iso(now)
     base = {"checked_at": checked_at, "scope": scope, "sheet_name": sheet_name,
@@ -668,8 +677,13 @@ def sheet_ledger_compare(
     matched_rows: set[Any] = set()
     discrepancies: list[dict[str, Any]] = []
 
+    ignore = dict(ignore or {})
+    ignored: list[dict[str, str]] = []
     for tid, rec in sorted(trades.items(), key=lambda kv: max(kv[1]["opened_ms"], kv[1]["closed_ms"])):
         if not _in_scope(rec):
+            continue
+        if tid in ignore:
+            ignored.append({"trade_id": tid, "symbol": rec["symbol"], "reason": ignore[tid]})
             continue
         entry = sheet_by_id.get(tid)
         matched_by = "trade_id"
@@ -771,13 +785,56 @@ def sheet_ledger_compare(
         "actionable": len(actionable),
         "by_kind": by_kind,
     }
+    extra: dict[str, Any] = {}
+    if ignore or ignore_problem:
+        summary["ignored"] = len(ignored)
+        extra["ignored"] = ignored
+    if ignore_problem:
+        extra["ignore_list_problem"] = ignore_problem
+    ignored_note = f"; {len(ignored)} trade(s) ignored by the operator's list" if ignored else ""
 
     if actionable:
         return {**base, "value": "DIVERGED",
-                "note": f"{len(actionable)} sheet row(s) disagree with the local ledger",
-                "discrepancies": discrepancies, "summary": summary}
+                "note": f"{len(actionable)} sheet row(s) disagree with the local ledger" + ignored_note,
+                "discrepancies": discrepancies, "summary": summary, **extra}
     info = [f"{by_kind[k]}x {k}" for k in SHEET_INFO_KINDS if by_kind.get(k)]
     return {**base, "value": "RECONCILED", "last_reconciled_at": checked_at,
             "note": "every real ledger trade agrees with its Google sheet row"
-                    + (f" ({', '.join(info)} -- informational)" if info else ""),
-            "discrepancies": discrepancies, "summary": summary}
+                    + (f" ({', '.join(info)} -- informational)" if info else "") + ignored_note,
+            "discrepancies": discrepancies, "summary": summary, **extra}
+
+
+RECONCILE_IGNORE_FILENAME = "google-reconcile-ignore.json"
+
+
+def load_reconcile_ignore(path: str | Path) -> tuple[dict[str, str], str | None]:
+    """Read the operator's "do not reconcile these trades" list.
+
+    The file is ``{"ignore": [{"trade_id": "...", "reason": "..."}, ...]}``.  A
+    missing file is an empty list.  Anything unusable -- not JSON, wrong shape,
+    an entry without a ``trade_id`` or without a ``reason`` -- returns an empty
+    list and a one-line problem: a broken list must never hide a divergence, so
+    the caller reports the problem and compares everything.
+    """
+    p = Path(path)
+    try:
+        raw = p.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {}, None
+    except (OSError, UnicodeDecodeError) as exc:
+        return {}, f"cannot read {p.name} ({type(exc).__name__})"
+    try:
+        doc = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}, f"{p.name} is not valid JSON"
+    entries = doc.get("ignore") if isinstance(doc, dict) else None
+    if not isinstance(entries, list):
+        return {}, f'{p.name} must be {{"ignore": [...]}}'
+    out: dict[str, str] = {}
+    for index, entry in enumerate(entries, start=1):
+        trade_id = entry.get("trade_id") if isinstance(entry, dict) else None
+        reason = entry.get("reason") if isinstance(entry, dict) else None
+        if not isinstance(trade_id, str) or not trade_id.strip() or not isinstance(reason, str) or not reason.strip():
+            return {}, f"{p.name} entry {index} needs a non-empty trade_id and reason"
+        out[trade_id.strip()] = reason.strip()
+    return out, None
