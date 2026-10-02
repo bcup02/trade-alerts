@@ -339,4 +339,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.25.1"
+__version__ = "0.26.0"

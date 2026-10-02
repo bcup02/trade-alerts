@@ -807,3 +807,18 @@ trade-alerts：v0.25.1（f-16：投影佇列停放「找不到開倉列的關單
 版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.26.0（f-16：「帳本↔Google 表」對帳的操作者忽略清單；程式碼變更，PR #107 審閱 PASS）
+變更摘要：1. sheet_ledger_compare 新增選用參數 ignore（trade_id→原因）與 ignore_problem：清單內、且帳本裡真的有的交易不參與比對；
+             狀態文件多 ignored（逐筆 trade_id／symbol／reason）、summary.ignored 計數、note 註明忽略幾筆，不是靜默。清單有但帳本沒有的 id 不列入、也不影響表端比對。
+          2. 新增 load_reconcile_ignore(path)：讀 {"ignore":[{"trade_id","reason"}]}；檔案不存在＝空清單；任一筆缺 trade_id／reason、不是 JSON、讀不到＝整份當空清單，
+             並在狀態文件的 ignore_list_problem 顯示一行問題（壞清單不會藏住差異）。預設檔名 google-reconcile-ignore.json（RECONCILE_IGNORE_FILENAME，放策略的 audit 目錄）。
+          3. 沒有清單時輸出與以前相同（測試鎖定）。
+          4. 另含 v0.25.1（#105）停放測試的不穩定修正（同秒排序）；程式行為沒有變。
+向後相容：既有 API 不變，新參數皆為選用。
+受影響消費專案：動能（接線、釘此版）、趨勢（釘此版，連同 v0.25.1 的佇列停放）；競賽、加密、維運通知不用動（目前沒有要忽略的交易；維運通知是否顯示 ignored／ignore_list_problem 欄位未處理）。
+部署入口：各專案既有部署腳本（開發機 → 正式機）。
+版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
+交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+```
