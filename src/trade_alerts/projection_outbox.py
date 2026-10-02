@@ -25,6 +25,15 @@ _ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_clos
 # Each write action projects exactly one kind of ledger event.
 _ACTION_EVENT_TYPE = {"append_open_v2": "trade_open", "update_close_v2": "trade_close", "correct_close_v2": "trade_correction"}
 _TERMINAL_STATUSES = frozenset({"CONFIRMED", "REJECTED"})
+#: A close whose trade the receiver has never heard of (``trade_id_not_found``)
+#: is not a transport problem: the open row is missing, so no retry will help
+#: (f-16: one such intent sat at the head of a strategy's queue for days and
+#: blocked every later row).  After this many consecutive answers it is parked
+#: as REJECTED so the queue moves on; the sheet check keeps reporting the gap.
+ORPHAN_CLOSE_PARK_AFTER = 12
+ORPHAN_CLOSE_ERROR = "trade_id_not_found"
+ORPHAN_CLOSE_PARKED_CODE = "orphan_close_no_open_row"
+_CLOSE_ACTIONS = frozenset({"update_close_v2", "correct_close_v2"})
 
 
 @dataclass(frozen=True)
@@ -255,7 +264,23 @@ def dispatch_next_projection(
                 status, receiver_row, error_code = "REJECTED", None, "submission_invalid"
         except Exception:
             status, receiver_row, error_code = "TRANSPORT_FAILED", None, "transport_failed"
+        if status == "TRANSPORT_FAILED" and error_code == ORPHAN_CLOSE_ERROR and intent.action in _CLOSE_ACTIONS:
+            if _consecutive_orphan_answers(path, intent.intent_id) + 1 >= ORPHAN_CLOSE_PARK_AFTER:
+                status, receiver_row, error_code = "REJECTED", None, ORPHAN_CLOSE_PARKED_CODE
         return ProjectionDispatchResult(intent, record_projection_dispatch(path, intent=intent, status=status, receiver_row=receiver_row, error_code=error_code))
+
+
+def _consecutive_orphan_answers(path: str | Path, intent_id: str) -> int:
+    """How many dispatches of this intent in a row were ``trade_id_not_found``."""
+    count = 0
+    for record in _read_records(path):
+        if record.get("kind") != "projection_dispatch_v1":
+            continue
+        raw = record.get("dispatch")
+        if not isinstance(raw, Mapping) or raw.get("intent_id") != intent_id:
+            continue
+        count = count + 1 if raw.get("error_code") == ORPHAN_CLOSE_ERROR else 0
+    return count
 
 
 def _validate_rebuilt(intent: ProjectionIntent, rebuilt: RebuiltProjection) -> None:
