@@ -670,3 +670,52 @@ def test_same_orders_different_trade_or_figures_are_different_corrections(tmp_pa
     assert sorted(_announced(paths)) == ["corr-1", "corr-2", "corr-3"]
     _round(adapter, paths)
     assert len(_announced(paths)) == 3                    # and nothing is announced twice
+
+
+# --- review of #99, round 3: state-file hardening and no guessing -----------------
+
+def _failing_hook(_c):
+    raise ConnectionError("down")
+
+
+@pytest.mark.parametrize("junk", ["[]", "null", '"damaged"', "123", "{not json", '{"x": true}'])
+def test_a_first_seen_file_of_any_shape_never_blocks_the_notice(tmp_path, monkeypatch, junk):
+    from datetime import timedelta
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, _failing_hook)
+    Path(paths.evidence_dir, "replay-first-seen.json").write_text(junk, encoding="utf-8")
+    _round(adapter, paths, now=NOW)
+    assert _codes(paths) == []                                   # restarted clock, still held back
+    _round(adapter, paths, now=NOW + timedelta(hours=2, minutes=1))
+    assert _codes(paths) == [CODE_CORRECTED]
+
+
+def test_a_first_seen_file_that_cannot_be_written_announces_instead_of_waiting_for_ever(tmp_path, monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, _failing_hook)
+
+    def refuse(*_a, **_k):
+        raise PermissionError("read-only")
+
+    monkeypatch.setattr(unrecorded_fill, "atomic_write", refuse)
+    _round(adapter, paths, now=NOW)
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert "PermissionError" in event["details"]["projection_error"] and "不再等待" in event["details"]["notice_text"]
+
+
+def test_a_manual_fix_or_incomplete_evidence_is_reported_not_guessed(tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()))
+    _round(adapter, paths)
+    ev = Path(paths.evidence_dir)
+    first = json.loads(next(p for p in sorted(ev.glob("*.json"))).read_text())
+    # two unannounced candidates, evidence without corrected figures
+    for eid, pnl in (("corr-old", 1.0), ("corr-new", 2.0)):
+        with open(paths.ledger, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"event_type": TRADE_CORRECTION_EVENT, "event_id": eid, "trade_id": "T1",
+                                 "exchange_order_ids": [DUPLICATE, EXIT, "77"], "corrected": {"net_pnl": pnl}}) + "\n")
+    ev.joinpath("x.json").write_text(json.dumps(dict(first, trade_id="T1", correction={"previous": {}})), encoding="utf-8")
+    result = _round(adapter, paths)
+    assert _announced(paths) == ["corr-1"]                       # nothing picked for the incomplete evidence
+    assert any(r.get("evidence_path", "").endswith("x.json") and "error" in r for r in result["replayed"])
