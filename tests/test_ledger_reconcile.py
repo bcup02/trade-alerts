@@ -14,6 +14,7 @@ from trade_alerts.ledger_reconcile import (
     fetch_sheet_rows,
     fold_ledger_trades,
     is_paper_event,
+    load_reconcile_ignore,
     norm_symbol_ccxt,
     norm_symbol_plain,
     parse_iso,
@@ -498,3 +499,71 @@ def test_fetch_empty_body_exhausts(monkeypatch):
     rows, err = fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s",
                                  attempts=2, sleep=lambda _s: None)
     assert rows is None and err == "empty response body"
+
+
+# --------------------------------------------------------------------------- #
+# the operator's ignore list (f-16)
+# --------------------------------------------------------------------------- #
+
+def test_ignored_trades_are_left_out_but_listed():
+    trades = {**_trade("old1", symbol="XRP_USDT"), **_trade("old2", symbol="BOME_USDT", opened_ms=2)}
+    doc = sheet_ledger_compare(trades, [], sheet_name="S", norm_symbol=norm_symbol_plain,
+                               now=NOW, ignore={"old1": "smoke test", "old2": "MEXC era, not wanted"})
+    assert doc["value"] == "RECONCILED"                     # both missing rows are ignored
+    assert doc["summary"]["ignored"] == 2 and doc["summary"]["actionable"] == 0
+    assert doc["ignored"] == [
+        {"trade_id": "old1", "symbol": "XRP_USDT", "reason": "smoke test"},
+        {"trade_id": "old2", "symbol": "BOME_USDT", "reason": "MEXC era, not wanted"},
+    ]
+    assert "2 trade(s) ignored" in doc["note"]
+
+
+def test_a_trade_that_is_not_ignored_is_still_reported():
+    trades = {**_trade("old1"), **_trade("new1", opened_ms=2)}
+    doc = sheet_ledger_compare(trades, [], sheet_name="S", norm_symbol=norm_symbol_plain,
+                               now=NOW, ignore={"old1": "not wanted"})
+    assert doc["value"] == "DIVERGED"
+    assert [d["trade_id"] for d in doc["discrepancies"] if d["divergence"]] == ["new1"]
+    assert doc["summary"]["ignored"] == 1
+
+
+def test_an_id_on_the_list_that_is_not_in_the_ledger_is_not_reported_as_ignored():
+    trades = _trade("t1", closed=True, close_event={"event_type": "trade_close", "exit_price": 1.0, "net_pnl": 0.5,
+                    "order_id": "x2"}, closed_ms=2)
+    rows = [_row(14, trade_id="t1", exit_time="2026-09-01", exit_price="1.0", net_pnl="0.5", exit_order_id="x2")]
+    doc = sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW,
+                               ignore={"gone": "stale entry"})
+    assert doc["value"] == "RECONCILED" and doc["ignored"] == [] and doc["summary"]["ignored"] == 0
+
+
+def test_a_sheet_row_of_an_ignored_trade_is_not_reported_as_unknown_to_the_ledger():
+    doc = sheet_ledger_compare(_trade("old1"), [_row(5, trade_id="old1")], sheet_name="S",
+                               norm_symbol=norm_symbol_plain, now=NOW, ignore={"old1": "not wanted"})
+    assert doc["value"] == "RECONCILED" and doc["ignored"][0]["trade_id"] == "old1"
+
+
+def test_without_a_list_the_document_is_unchanged():
+    doc = sheet_ledger_compare(_trade("t1"), [], sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
+    assert "ignored" not in doc and "ignored" not in doc["summary"] and "ignore_list_problem" not in doc
+
+
+def test_a_broken_list_is_reported_and_hides_nothing():
+    doc = sheet_ledger_compare(_trade("t1"), [], sheet_name="S", norm_symbol=norm_symbol_plain,
+                               now=NOW, ignore={}, ignore_problem="google-reconcile-ignore.json is not valid JSON")
+    assert doc["value"] == "DIVERGED"
+    assert doc["ignore_list_problem"] == "google-reconcile-ignore.json is not valid JSON"
+
+
+def test_load_reconcile_ignore(tmp_path):
+    path = tmp_path / "google-reconcile-ignore.json"
+    assert load_reconcile_ignore(path) == ({}, None)                         # no file = empty list
+    path.write_text(json.dumps({"ignore": [{"trade_id": " a ", "reason": " old "}, {"trade_id": "b", "reason": "x"}]}))
+    assert load_reconcile_ignore(path) == ({"a": "old", "b": "x"}, None)
+    for bad in ('not json', '[]', '{"ignore": {}}', '{"ignore": [{"trade_id": "a"}]}',
+                '{"ignore": [{"trade_id": "a", "reason": "  "}]}', '{"ignore": ["a"]}',
+                '{"ignore": [{"trade_id": "ok", "reason": "r"}, {"reason": "no id"}]}'):
+        path.write_text(bad)
+        entries, problem = load_reconcile_ignore(path)
+        assert entries == {} and problem, bad                                 # one bad entry voids the whole list
+    path.write_bytes(b"\xff\xfe")
+    assert load_reconcile_ignore(path)[0] == {} and load_reconcile_ignore(path)[1]
