@@ -512,7 +512,7 @@ def test_the_runner_codes_are_catalogued_the_same_for_every_strategy_that_runs_i
         for key in ("verdict", "risk_tier", "resume"):
             assert mom[key] == sey[key], (code, key)
     tiers = {code: catalog_entry(catalog, "momentum", code)["risk_tier"] for code in RUNNER_CODES}
-    assert tiers == {REPAIRED: "R1", FAILED: "R2", BLOCKED: "R3"}
+    assert tiers == {REPAIRED: "R1", FAILED: "R2", BLOCKED: "R3", "VERIFIED_CLOSE_REPAIR_RECURRING": "R3"}
 
 
 def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
@@ -535,6 +535,177 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
                             if name.startswith("CODE_") and value == bare)
             assert f"code={constant}" in call, source
             cited += 1
-    # 3 runner codes x 2 strategies; FAILED is emitted from two call sites.
+    # 4 runner codes x 2 strategies; FAILED is emitted from two call sites.
     # g1: UNRECORDED_FILL_CORRECTED for 3 strategies, UNRESOLVED for all 4.
-    assert cited == 8 + 7
+    assert cited == 10 + 7
+
+
+# --------------------------------------------------------------------------- #
+# f-12: a kill between opening a request and writing its fleet event
+# --------------------------------------------------------------------------- #
+class _Killed(BaseException):
+    """Stands in for SIGKILL: not an Exception, so no handler swallows it."""
+
+
+def _kill_on(monkeypatch, code):
+    from trade_alerts import repair_runner
+
+    real = repair_runner.append_fleet_event
+
+    def maybe_die(path, **kwargs):
+        if kwargs.get("code") == code and (kwargs.get("details") or {}).get("request_id"):
+            raise _Killed()
+        return real(path, **kwargs)
+
+    monkeypatch.setattr(repair_runner, "append_fleet_event", maybe_die)
+    return lambda: monkeypatch.setattr(repair_runner, "append_fleet_event", real)
+
+
+def test_an_escalation_killed_before_its_notice_is_announced_next_round(host, monkeypatch):
+    _seed(host, _open())
+    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE]})
+    _round(exchange, host)
+    _round(exchange, host)
+    restore = _kill_on(monkeypatch, FAILED)
+    with pytest.raises(_Killed):
+        _round(exchange, host)  # third failure: request opened, then killed
+    [request] = outstanding_error_requests(host.request_queue)
+    assert _export(host)["notices"] == []
+    restore()
+
+    result = _round(exchange, host)
+    assert [r["request_id"] for r in result["replayed"]] == [request["request_id"]]
+    replayed = [e for e in _events(host, FAILED) if e["details"].get("replayed")]
+    assert len(replayed) == 1 and replayed[0]["details"]["escalated"] is True and replayed[0]["risk_tier"] == "R2"
+    [notice] = _export(host)["notices"]
+    assert notice["code"] == "MOM.VERIFIED_CLOSE_REPAIR_FAILED" and "補發" in notice["text"]
+    assert "not this trade's close" in notice["text"]
+    assert _round(exchange, host)["replayed"] == [] and len(_export(host)["notices"]) == 1
+
+
+def test_a_stop_killed_before_its_notice_is_announced_next_round(host, monkeypatch):
+    _seed(host, _open())
+    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
+    exchange.staging_error = OSError("read-only file system")
+    restore = _kill_on(monkeypatch, BLOCKED)
+    with pytest.raises(_Killed):
+        _round(exchange, host)
+    restore()
+    open_now = outstanding_error_requests(host.request_queue)
+    assert [r["code"] for r in open_now] == [BLOCKED] and _export(host)["notices"] == []
+
+    result = _round(exchange, host)
+    assert [r["code"] for r in result["replayed"]] == [BLOCKED]
+    [notice] = _export(host)["notices"]
+    assert notice["risk_tier"] == "R3" and "補發" in notice["text"]
+
+
+def test_a_normally_announced_request_is_never_replayed(host):
+    _seed(host, _open())
+    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE]})
+    for _ in range(3):
+        _round(exchange, host)
+    assert _round(exchange, host)["replayed"] == []
+    assert len(_events(host, FAILED)) == 3
+
+
+# --------------------------------------------------------------------------- #
+# g2: automatic repairs that keep happening are announced once
+# --------------------------------------------------------------------------- #
+RECURRING = "VERIFIED_CLOSE_REPAIR_RECURRING"
+
+
+def test_a_single_automatic_repair_stays_silent(host):
+    _seed(host, _open())
+    result = _round(_Exchange(host.ledger, {"T1": [[_fill()]]}), host)
+    assert result["recurring"] is None and _events(host, RECURRING) == [] and _export(host)["notices"] == []
+
+
+def test_the_second_automatic_repair_in_a_week_tells_the_operator_once(host):
+    _seed(host, _open("T1", "AAA_USDT"), _open("T2", "BBB_USDT"))
+    exchange = _Exchange(host.ledger, {"T1": [[_fill()]], "T2": [[_fill()]]})
+
+    assert _round(exchange, host)["recurring"] is None
+    second = _round(exchange, host)
+
+    assert second["recurring"]["count"] == 2 and second["recurring"]["trade_ids"] == ["T1", "T2"]
+    [event] = _events(host, RECURRING)
+    assert (event["risk_tier"], event["evidence"]["count"]) == ("R3", 2)
+    assert event["evidence"]["trade_ids"] == ["T1", "T2"] and event["evidence"]["window_days"] == 7
+    assert outstanding_error_requests(host.request_queue) == []   # a notice, not a request
+    [notice] = _export(host)["notices"]
+    assert notice["code"] == "MOM.VERIFIED_CLOSE_REPAIR_RECURRING" and notice["risk_tier"] == "R3"
+    assert "trade_id: T1" in notice["text"] and "trade_id: T2" in notice["text"]
+    assert "給 AI 的追查指令" in notice["text"]
+
+    third = _round(exchange, host)           # nothing new to repair, and the week is not over
+    assert third["recurring"] is None and len(_events(host, RECURRING)) == 1
+
+
+def test_a_third_repair_inside_the_quiet_week_is_not_announced_again(host):
+    _seed(host, _open("T1", "AAA_USDT"), _open("T2", "BBB_USDT"), _open("T3", "CCC_USDT"))
+    exchange = _Exchange(host.ledger, {t: [[_fill()]] for t in ("T1", "T2", "T3")})
+    for _ in range(3):
+        _round(exchange, host)
+    assert len(_events(host, REPAIRED)) == 3 and len(_events(host, RECURRING)) == 1
+
+
+def test_the_notice_comes_again_after_a_quiet_week_if_it_is_still_happening(host):
+    from datetime import datetime, timedelta, timezone
+    from trade_alerts.fleet_event_log import append_fleet_event, utc_now_iso
+
+    now = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
+    stamp = lambda days: utc_now_iso(now - timedelta(days=days))
+    for trade_id, days in (("T1", 6.5), ("T2", 6.0)):
+        append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
+                           evidence={"trade_id": trade_id}, recorded_at=stamp(days))
+    append_fleet_event(host.fleet_event_log, project="momentum", code=RECURRING, risk_tier="R3",
+                       recorded_at=stamp(7.2))       # last announced 7.2 days ago: outside the quiet week
+    _seed(host)
+    result = _round(_Exchange(host.ledger, {}), host, now=now)
+    assert result["recurring"]["count"] == 2
+
+
+def test_the_notice_waits_while_its_own_week_has_not_passed(host):
+    from datetime import datetime, timedelta, timezone
+    from trade_alerts.fleet_event_log import append_fleet_event, utc_now_iso
+
+    now = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
+    stamp = lambda days: utc_now_iso(now - timedelta(days=days))
+    for trade_id, days in (("T1", 5), ("T2", 4)):
+        append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
+                           evidence={"trade_id": trade_id}, recorded_at=stamp(days))
+    append_fleet_event(host.fleet_event_log, project="momentum", code=RECURRING, risk_tier="R3", recorded_at=stamp(3))
+    _seed(host)
+    assert _round(_Exchange(host.ledger, {}), host, now=now)["recurring"] is None
+
+
+def test_repairs_older_than_a_week_and_other_strategies_do_not_count(host):
+    from datetime import datetime, timedelta, timezone
+    from trade_alerts.fleet_event_log import append_fleet_event, utc_now_iso
+
+    now = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
+    append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
+                       evidence={"trade_id": "OLD"}, recorded_at=utc_now_iso(now - timedelta(days=8)))
+    append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
+                       evidence={"trade_id": "NEW"}, recorded_at=utc_now_iso(now - timedelta(days=1)))
+    append_fleet_event(host.fleet_event_log, project="seykota", code=REPAIRED, risk_tier="R1",
+                       evidence={"trade_id": "OTHER"}, recorded_at=utc_now_iso(now - timedelta(days=1)))
+    _seed(host)
+    assert _round(_Exchange(host.ledger, {}), host, now=now)["recurring"] is None
+
+
+def test_the_quiet_week_holds_under_an_injected_clock_across_rounds(host):
+    from datetime import datetime, timedelta, timezone
+    from trade_alerts.fleet_event_log import append_fleet_event, utc_now_iso
+
+    now = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
+    for trade_id in ("T1", "T2"):
+        append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
+                           evidence={"trade_id": trade_id}, recorded_at=utc_now_iso(now - timedelta(days=1)))
+    _seed(host)
+    exchange = _Exchange(host.ledger, {})
+    assert _round(exchange, host, now=now)["recurring"]["count"] == 2
+    assert _round(exchange, host, now=now)["recurring"] is None            # same clock: still quiet
+    assert [e["recorded_at"] for e in _events(host, RECURRING)] == [utc_now_iso(now)]
+    assert _round(exchange, host, now=now + timedelta(days=7))["recurring"] is None   # repairs aged out of the window

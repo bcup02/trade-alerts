@@ -12,6 +12,7 @@ from trade_alerts.ops_export import (
     OPS_EXPORT_VERSION,
     build_ops_export,
     needs_human,
+    render_ai_text,
     render_notice_text,
     write_ops_export,
 )
@@ -76,7 +77,7 @@ def test_r2_stays_silent_until_it_escalates(paths):
     [notice] = _build(paths)["notices"]
     assert notice["event_id"] == escalated["event_id"]
     assert notice["risk_tier"] == "R2" and notice["critical"] is False
-    assert notice["text"].startswith("⚠️ 自動處理失敗，需要你處理")
+    assert notice["text"].split("\n")[:2] == ["【未編號】VERIFIED_CLOSE_PROPOSED", "⚠️ 自動處理失敗，需要你處理"]
 
 
 def test_escalation_flag_must_be_literally_true(paths):
@@ -105,14 +106,19 @@ def test_r3_notice_carries_header_plain_language_technical_detail_and_ai_block(p
     assert notice["code"] == "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"
     assert notice["risk_tier"] == "R3" and notice["critical"] is True
     text = notice["text"]
-    assert text.startswith("🔴 需要人工處理\n自動修復停手")
+    entry = BY_CODE["MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"]
+    assert text.split("\n")[:2] == [f"【{entry['error_id']}】{entry['title']}", "🔴 需要人工處理"]
+    assert entry["operator_message"]["ai_prompt"] not in text and "事件資料：" not in text  # the prompt is message two
     assert "發生什麼事：" in text and "解決方向：" in text and "處理步驟：\n1. " in text
     assert "技術細節：\nincident_id: inc-1\ntrade_id: T1" in text
     assert "ledger write failed" not in text  # notice_text wins over the summary
-    ai_prompt = BY_CODE["MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"]["operator_message"]["ai_prompt"]
-    assert "給 AI 的追查指令（整段貼給 Claude）：\n" + ai_prompt in text
-    assert f"錯誤碼：momentum/VERIFIED_CLOSE_REPAIR_BLOCKED　事件編號：{event['event_id']}" in text
-    assert text.endswith('事件資料：{"incident_id": "inc-1", "trade_id": "T1"}')
+    assert text.endswith("incident_id: inc-1\ntrade_id: T1")
+    ai_prompt = entry["operator_message"]["ai_prompt"]
+    assert notice["ai_text"].split("\n") == [
+        f"【{entry['error_id']}】給 AI 的追查指令（整段貼給 Claude）", ai_prompt,
+        f"錯誤碼：momentum/VERIFIED_CLOSE_REPAIR_BLOCKED　事件編號：{event['event_id']}",
+        '事件資料：{"incident_id": "inc-1", "trade_id": "T1"}',
+    ]
 
 
 def test_summary_is_the_technical_detail_when_no_notice_text(paths):
@@ -148,7 +154,8 @@ def test_uncatalogued_event_with_a_recorded_tier_still_notifies_under_its_code(p
     log, _queue = paths
     _event(log, code="SOMETHING_NEW", risk_tier="R3", summary="brand new condition")
     [notice] = _build(paths)["notices"]
-    assert notice["text"] == "🔴 需要人工處理\nSOMETHING_NEW\n\n技術細節：\nbrand new condition"
+    assert notice["text"] == "【未編號】SOMETHING_NEW\n🔴 需要人工處理\n\n技術細節：\nbrand new condition"
+    assert "ai_text" not in notice
 
 
 def test_uncatalogued_event_without_a_tier_is_skipped(paths):
@@ -217,7 +224,7 @@ def test_malformed_event_log_raises_instead_of_exporting_a_partial_view(paths):
 
 
 def test_render_notice_text_without_entry_or_detail():
-    assert render_notice_text({"code": "X"}, None, "R3") == "🔴 需要人工處理\nX"
+    assert render_notice_text({"code": "X"}, None, "R3") == "【未編號】X\n🔴 需要人工處理"
 
 
 def test_write_is_atomic_world_readable_and_round_trips(paths, tmp_path):
@@ -248,3 +255,23 @@ def test_export_matches_its_json_schema(paths):
     jsonschema.Draft7Validator.check_schema(schema)
     errors = list(jsonschema.Draft7Validator(schema).iter_errors(export))
     assert not errors, [f"{list(e.path)}: {e.message}" for e in errors]
+
+
+def test_every_catalogued_notice_starts_with_its_error_id_and_the_exact_catalog_title():
+    """e3 (2026-10-01): the first line of every message is 【ERR-xxx】 plus the
+    risk register's title, character for character -- for every catalog entry,
+    in the main message and the AI message alike."""
+    for entry in load_error_catalog()["entries"]:
+        bare = entry["code"].split(".", 1)[1]
+        event = {"project": entry["project"], "code": bare, "event_id": "e1", "evidence": {"k": "v"}}
+        expected = f"【{entry['error_id']}】{entry['title']}"
+        assert render_notice_text(event, entry, "R3").split("\n")[0] == expected, entry["code"]
+        ai = render_ai_text(event, entry, bare)
+        if ai is not None:
+            assert ai.split("\n")[0] == f"【{entry['error_id']}】給 AI 的追查指令（整段貼給 Claude）", entry["code"]
+
+
+def test_the_ai_message_is_absent_when_the_catalog_has_no_prompt():
+    entry = {"error_id": "ERR-999", "title": "x", "operator_message": {"what": "a", "direction": "b", "steps": ["c"]}}
+    assert render_ai_text({"code": "X", "project": "momentum", "event_id": "e"}, entry, "X") is None
+    assert render_ai_text({"code": "X", "project": "momentum", "event_id": "e"}, None, "X") is None

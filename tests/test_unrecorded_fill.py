@@ -410,3 +410,312 @@ def test_a_network_failure_on_a_recorded_order_still_retries_even_with_the_hook(
 
     assert result["corrected"] == []                          # not "not found": do not guess
     assert "LOOKUP_FAILED" in {u["reason_code"] for u in result["unresolved"]}
+
+
+# --- f-12: a kill between the durable write and its announcement --------------
+
+class _Killed(BaseException):
+    """Stands in for SIGKILL: not an Exception, so no handler can swallow it."""
+
+
+def _kill_before_announcing(monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    def dies(*_a, **_k):
+        raise _Killed()
+
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", dies)
+
+
+def test_a_correction_killed_before_its_notice_is_announced_next_round(tmp_path, monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    paths = _setup(tmp_path)
+    replayed_for: list[str] = []
+    adapter = _trade_adapter(paths, Exchange(_client_ids()),
+                             replay_trade_correction=lambda c: (replayed_for.append(c["event_id"]) or {"queued": c["event_id"]}))
+    real = unrecorded_fill.append_fleet_event
+    _kill_before_announcing(monkeypatch)
+    with pytest.raises(_Killed):
+        _round(adapter, paths)
+    assert _codes(paths) == []  # the ledger has the correction, nobody was told
+    assert any(e.get("event_type") == TRADE_CORRECTION_EVENT for e in read_ledger(paths.ledger))
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
+
+    result = _round(adapter, paths)
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert event["code"] == CODE_CORRECTED and event["risk_tier"] == "R3"
+    assert event["details"]["replayed"] is True and event["details"]["correction_event_id"] == "corr-1"
+    assert "補發" in event["details"]["notice_text"] and "-13.233" in event["details"]["notice_text"]
+    assert set(event["evidence"]["order_ids"]) == {DUPLICATE, EXIT}
+    assert replayed_for == ["corr-1"]
+    assert [r["code"] for r in result["replayed"]] == ["PROJECTION", CODE_CORRECTED]
+    assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "SEY." + CODE_CORRECTED
+
+    again = _round(adapter, paths)  # idempotent: nothing more to announce
+    assert again["replayed"] == [] and replayed_for == ["corr-1"] and _codes(paths) == [CODE_CORRECTED]
+
+
+def test_a_normally_announced_correction_is_never_replayed(tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()), replay_trade_correction=lambda c: pytest.fail("replayed"))
+    _round(adapter, paths)
+    assert _round(adapter, paths)["replayed"] == [] and _codes(paths) == [CODE_CORRECTED]
+
+
+def test_an_evidence_file_whose_write_never_happened_is_not_announced(tmp_path):
+    paths = _setup(tmp_path)
+    Path(paths.evidence_dir).mkdir()
+    Path(paths.evidence_dir, "x.json").write_text(json.dumps(
+        {"order_ids": [DUPLICATE, EXIT], "duplicate_of": ORIGINAL, "client_order_id": "c", "trade_id": TRADE_B,
+         "correction": {"previous": {}, "corrected": {}}}), encoding="utf-8")
+    result = _round(_trade_adapter(paths, Exchange(_client_ids(DUPLICATE=None))), paths)
+    assert result["replayed"] == []  # ledger does not account for the orders: the normal path runs instead
+
+
+def test_an_unresolved_request_killed_before_its_notice_is_announced_next_round(tmp_path, monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids(DUPLICATE="app-manual-order")), owns=lambda cid: False)
+    real = unrecorded_fill.append_fleet_event
+    _kill_before_announcing(monkeypatch)
+    with pytest.raises(_Killed):
+        _round(adapter, paths)
+    assert _codes(paths) == [] and len(outstanding_error_requests(paths.request_queue)) >= 1
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
+
+    result = _round(adapter, paths)
+    events = [e for e in read_fleet_events(paths.fleet_event_log) if e["details"].get("replayed")]
+    assert events and all(e["code"] == CODE_UNRESOLVED and e["risk_tier"] == "R3" for e in events)
+    assert "補發" in events[0]["details"]["notice_text"]
+    assert {e["details"]["request_id"] for e in events} == {r["request_id"] for r in outstanding_error_requests(paths.request_queue)}
+    assert result["replayed"]
+    again = _round(adapter, paths)
+    assert [r for r in again["replayed"] if r.get("code") == CODE_UNRESOLVED] == []
+
+
+def test_a_spot_recording_killed_before_its_notice_is_announced_next_round(tmp_path, monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    paths, state = _spot_setup(tmp_path)
+    client = {"501": "btc-a", "502": "btc-a"}
+
+    def append_spot_fills(symbol, order_id, fills):
+        with open(paths.ledger, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"event_type": "spot_fill", "event_id": f"x{order_id}", "order_id": order_id,
+                                 "symbol": symbol}) + "\n")
+        return {"event_ids": [f"x{order_id}"]}
+
+    adapter = UnrecordedFillAdapter(
+        project="btc-competition", style="spot", client_ids=True, evidence_source="fixture",
+        client_order_id=lambda _s, oid: client.get(oid),
+        fetch_fills=lambda _s, ids: [f for f in state["fills"] if str(f["order_id"]) in ids],
+        append_spot_fills=append_spot_fills,
+    )
+    real = unrecorded_fill.append_fleet_event
+    _kill_before_announcing(monkeypatch)
+    with pytest.raises(_Killed):
+        run_unrecorded_fill_round(adapter, paths, catalog=CATALOG, now=NOW)
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
+    run_unrecorded_fill_round(adapter, paths, catalog=CATALOG, now=NOW)
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert event["code"] == CODE_CORRECTED and event["details"]["replayed"] is True
+    assert event["evidence"]["order_ids"] == ["502"]
+
+
+# --- review of #99: replay ordering and identity --------------------------------
+
+def _killed_correction(tmp_path, monkeypatch, hook):
+    """A correction in the ledger with no notice yet, plus its adapter."""
+    from trade_alerts import unrecorded_fill
+
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()), replay_trade_correction=hook)
+    real = unrecorded_fill.append_fleet_event
+    _kill_before_announcing(monkeypatch)
+    with pytest.raises(_Killed):
+        _round(adapter, paths)
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
+    return paths, adapter, real
+
+
+def test_a_kill_between_the_replayed_notice_and_the_hook_cannot_lose_the_hook(tmp_path, monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    calls: list[str] = []
+    paths, adapter, real = _killed_correction(tmp_path, monkeypatch, lambda c: (calls.append(c["event_id"]) or {}))
+    # the replay's own announcement dies: the hook has already run, the notice is not written
+    _kill_before_announcing(monkeypatch)
+    with pytest.raises(_Killed):
+        _round(adapter, paths)
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
+    assert calls == ["corr-1"] and _codes(paths) == []
+    _round(adapter, paths)                               # restart: hook again (idempotent), notice written
+    assert calls == ["corr-1", "corr-1"] and _codes(paths) == [CODE_CORRECTED]
+    _round(adapter, paths)
+    assert calls == ["corr-1", "corr-1"]                 # done: not called again
+
+
+def test_a_failing_hook_holds_the_notice_back_then_retries_then_announces_with_the_error(tmp_path, monkeypatch):
+    import os, time
+
+    state = {"fail": True, "calls": 0}
+
+    def hook(c):
+        state["calls"] += 1
+        if state["fail"]:
+            raise ConnectionError("outbox busy")
+        return {"queued": c["event_id"]}
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
+    first = _round(adapter, paths)
+    assert _codes(paths) == [] and first["deferred"] and "outbox busy" in first["deferred"][0]["reason"]
+    state["fail"] = False
+    _round(adapter, paths)                               # transient failure over: hook ok, notice written
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert "projection_error" not in event["details"] and state["calls"] == 2
+
+
+def test_a_hook_that_keeps_failing_still_announces_after_the_grace_period(tmp_path, monkeypatch):
+    from datetime import timedelta
+
+    def hook(_c):
+        raise ConnectionError("down")
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
+    first = _round(adapter, paths, now=NOW)
+    assert _codes(paths) == [] and first["deferred"]
+    _round(adapter, paths, now=NOW + timedelta(hours=1))
+    assert _codes(paths) == []                                   # still inside the 2 h grace
+    _round(adapter, paths, now=NOW + timedelta(hours=2, minutes=1))
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert "ConnectionError" in event["details"]["projection_error"]
+    assert "ConnectionError" in event["details"]["notice_text"]   # what the operator actually reads
+    export = json.loads(Path(paths.ops_export).read_text())
+    assert "補排失敗" in export["notices"][0]["text"]
+
+
+def test_touching_or_postdating_the_evidence_file_cannot_extend_the_deadline(tmp_path, monkeypatch):
+    import os
+    from datetime import timedelta
+
+    def hook(_c):
+        raise ConnectionError("down")
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
+    _round(adapter, paths, now=NOW)                               # first held back at NOW
+    future = (NOW + timedelta(days=30)).timestamp()
+    for f in Path(paths.evidence_dir).glob("[!r]*.json"):
+        os.utime(f, (future, future))                             # touched / set to the future
+    _round(adapter, paths, now=NOW + timedelta(hours=3))
+    assert _codes(paths) == [CODE_CORRECTED]
+
+
+def test_a_damaged_first_seen_file_or_a_clock_that_ran_ahead_restarts_the_clock_not_the_notice(tmp_path, monkeypatch):
+    from datetime import timedelta
+
+    def hook(_c):
+        raise ConnectionError("down")
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
+    _round(adapter, paths, now=NOW + timedelta(days=5))           # recorded "first seen" is in the future
+    _round(adapter, paths, now=NOW)
+    assert _codes(paths) == []
+    _round(adapter, paths, now=NOW + timedelta(hours=3))
+    assert _codes(paths) == [CODE_CORRECTED]
+
+
+def _add_correction(paths, *, event_id, trade_id, order_ids, corrected):
+    ev = Path(paths.evidence_dir)
+    first = json.loads(next(p for p in sorted(ev.glob("*.json")) if p.name != "replay-first-seen.json").read_text())
+    content = dict(first, order_ids=list(order_ids), trade_id=trade_id,
+                   correction={"previous": first["correction"]["previous"], "corrected": corrected})
+    ev.joinpath(f"{event_id}.json").write_text(json.dumps(content), encoding="utf-8")
+    with open(paths.ledger, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"event_type": TRADE_CORRECTION_EVENT, "event_id": event_id, "trade_id": trade_id,
+                             "exchange_order_ids": list(order_ids), "corrected": corrected,
+                             "event_epoch_ms": 1790200001000}) + "\n")
+
+
+def _announced(paths):
+    return [e["details"]["correction_event_id"] for e in read_fleet_events(paths.fleet_event_log)]
+
+
+def test_a_new_correction_sharing_orders_with_an_announced_one_is_still_announced(tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()))
+    _round(adapter, paths)                                # corr-1 announced normally
+    _add_correction(paths, event_id="corr-2", trade_id="OTHER", order_ids=[EXIT, "999"], corrected={"net_pnl": 1.0})
+    result = _round(adapter, paths)
+    assert _announced(paths) == ["corr-1", "corr-2"] and [r["code"] for r in result["replayed"]] == [CODE_CORRECTED]
+
+
+def test_a_new_correction_whose_orders_are_a_subset_of_an_announced_one_is_announced(tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()))
+    _round(adapter, paths)                                # corr-1 covers all of ORDERS_B for trade B
+    _add_correction(paths, event_id="corr-2", trade_id="T2", order_ids=[DUPLICATE, EXIT], corrected={"net_pnl": 2.0})
+    _round(adapter, paths)
+    assert _announced(paths) == ["corr-1", "corr-2"]      # the old superset must not be picked for the new evidence
+
+
+def test_same_orders_different_trade_or_figures_are_different_corrections(tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()))
+    _round(adapter, paths)
+    _add_correction(paths, event_id="corr-2", trade_id=TRADE_B, order_ids=[DUPLICATE, EXIT], corrected={"net_pnl": 3.0})
+    _add_correction(paths, event_id="corr-3", trade_id="T3", order_ids=[DUPLICATE, EXIT], corrected={"net_pnl": 3.0})
+    _round(adapter, paths)
+    assert sorted(_announced(paths)) == ["corr-1", "corr-2", "corr-3"]
+    _round(adapter, paths)
+    assert len(_announced(paths)) == 3                    # and nothing is announced twice
+
+
+# --- review of #99, round 3: state-file hardening and no guessing -----------------
+
+def _failing_hook(_c):
+    raise ConnectionError("down")
+
+
+@pytest.mark.parametrize("junk", ["[]", "null", '"damaged"', "123", "{not json", '{"x": true}'])
+def test_a_first_seen_file_of_any_shape_never_blocks_the_notice(tmp_path, monkeypatch, junk):
+    from datetime import timedelta
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, _failing_hook)
+    Path(paths.evidence_dir, "replay-first-seen.json").write_text(junk, encoding="utf-8")
+    _round(adapter, paths, now=NOW)
+    assert _codes(paths) == []                                   # restarted clock, still held back
+    _round(adapter, paths, now=NOW + timedelta(hours=2, minutes=1))
+    assert _codes(paths) == [CODE_CORRECTED]
+
+
+def test_a_first_seen_file_that_cannot_be_written_announces_instead_of_waiting_for_ever(tmp_path, monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, _failing_hook)
+
+    def refuse(*_a, **_k):
+        raise PermissionError("read-only")
+
+    monkeypatch.setattr(unrecorded_fill, "atomic_write", refuse)
+    _round(adapter, paths, now=NOW)
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert "PermissionError" in event["details"]["projection_error"] and "不再等待" in event["details"]["notice_text"]
+
+
+def test_a_manual_fix_or_incomplete_evidence_is_reported_not_guessed(tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()))
+    _round(adapter, paths)
+    ev = Path(paths.evidence_dir)
+    first = json.loads(next(p for p in sorted(ev.glob("*.json"))).read_text())
+    # two unannounced candidates, evidence without corrected figures
+    for eid, pnl in (("corr-old", 1.0), ("corr-new", 2.0)):
+        with open(paths.ledger, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"event_type": TRADE_CORRECTION_EVENT, "event_id": eid, "trade_id": "T1",
+                                 "exchange_order_ids": [DUPLICATE, EXIT, "77"], "corrected": {"net_pnl": pnl}}) + "\n")
+    ev.joinpath("x.json").write_text(json.dumps(dict(first, trade_id="T1", correction={"previous": {}})), encoding="utf-8")
+    result = _round(adapter, paths)
+    assert _announced(paths) == ["corr-1"]                       # nothing picked for the incomplete evidence
+    assert any(r.get("evidence_path", "").endswith("x.json") and "error" in r for r in result["replayed"])

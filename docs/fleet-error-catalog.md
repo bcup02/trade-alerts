@@ -99,7 +99,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED` | latch `protective_stop_failed` | MECHANICAL | R1 | P4 |
 | `SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED` | latch `protective_stop_failed` | JUDGEMENT | R3 | P4 |
 | `SEY.PROTECTION_REPLACE_FAILED` | latch `protective_stop_replace_failed` | JUDGEMENT | R2 | P8（v2） |
-| `SEY.PROTECTION_MOVE_DEFERRED` | 通知 only（h11 新增：舊停損取消不掉時保留舊停損、下一根 K 棒再試） | JUDGEMENT | R2 | P8（v2） |
+| `SEY.PROTECTION_MOVE_DEFERRED` | 通知 only（h11 新增：舊停損取消不掉時保留舊停損；f-14：每 10 分鐘重試，連續第 3 次失敗通知一次） | JUDGEMENT | R2 | P8（v2） |
 | `SEY.PROTECTION_CLOSE_CANCEL_FAILED` | 通知 only | JUDGEMENT | R2 | P8（v2） |
 | `SEY.PROTECTION_UNVERIFIED` | latch | JUDGEMENT | R3 | P4 |
 | `SEY.POSITION_AMBIGUOUS` | latch | JUDGEMENT | R3 | P4 |
@@ -114,6 +114,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `SEY.VERIFIED_CLOSE_AUTO_REPAIRED` | 未發出（共用修復執行器，v2-W4 接上） | MECHANICAL | R1 | P8（v2） |
 | `SEY.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R2 | P8（v2） |
 | `SEY.VERIFIED_CLOSE_REPAIR_BLOCKED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R3 | P8（v2） |
+| `SEY.VERIFIED_CLOSE_REPAIR_RECURRING` | 未發出（共用修復執行器 v0.25.0；7 天內自動補寫 ≥2 次通知一次，ERR-055） | JUDGEMENT | R3 | P8（v2） |
 | `SEY.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
 | `SEY.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
 | `SEY.POSITION_ADOPTED_AFTER_INTERRUPTION` | 未發出（f-12 趨勢 PR 接上；重啟後接管或補停損，ERR-051） | JUDGEMENT | R3 | P8（v2） |
@@ -133,6 +134,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `MOM.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知（v0.21.1 已退役、移出 entries） | JUDGEMENT | R2 | P8（v2） |
 | `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R1 | **P6** |
 | `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R3 | **P6** |
+| `MOM.VERIFIED_CLOSE_REPAIR_RECURRING` | 未發出（共用修復執行器 v0.25.0；7 天內自動補寫 ≥2 次通知一次，ERR-054） | JUDGEMENT | R3 | P8（v2） |
 | `MOM.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W3 接上） | JUDGEMENT | R2 | P8（v2） |
 | `MOM.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
 | `MOM.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |

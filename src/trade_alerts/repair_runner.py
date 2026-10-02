@@ -49,14 +49,15 @@ import logging
 import os
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from .atomic_ledger_append import append_lines_atomically, stage_lines
 from .error_request_queue import open_error_request, outstanding_error_requests, record_request_outcome
-from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for
+from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for, utc_now_iso
 from .ledger_reconcile import atomic_write, norm_symbol_plain, read_json, read_ledger
+from .notice_replay import replay_unannounced_requests
 from .ops_export import build_ops_export, write_ops_export
 from .verified_close_backfill import (
     HALT,
@@ -73,7 +74,14 @@ LOGGER = logging.getLogger("trade_alerts.repair_runner")
 CODE_AUTO_REPAIRED = "VERIFIED_CLOSE_AUTO_REPAIRED"
 CODE_REPAIR_FAILED = "VERIFIED_CLOSE_REPAIR_FAILED"
 CODE_REPAIR_BLOCKED = "VERIFIED_CLOSE_REPAIR_BLOCKED"
-RUNNER_CODES = (CODE_AUTO_REPAIRED, CODE_REPAIR_FAILED, CODE_REPAIR_BLOCKED)
+CODE_REPAIR_RECURRING = "VERIFIED_CLOSE_REPAIR_RECURRING"
+RUNNER_CODES = (CODE_AUTO_REPAIRED, CODE_REPAIR_FAILED, CODE_REPAIR_BLOCKED, CODE_REPAIR_RECURRING)
+#: g2 (2026-10-01): an automatic repair is silent, so a bug that keeps losing
+#: the same record would be patched over for ever.  This many automatic repairs
+#: within the window tell the operator once; the notice then stays quiet for a
+#: full window.
+RECURRING_THRESHOLD = 2
+RECURRING_WINDOW_DAYS = 7
 
 _TRUE = {"1", "true", "yes", "on"}
 
@@ -138,6 +146,7 @@ def run_repair_round(
     paused: bool | None = None,
     catalog: Mapping[str, Any] | None = None,
     environ: Mapping[str, str] | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """One repair round; returns what it did, for the caller to print.
 
@@ -154,11 +163,11 @@ def run_repair_round(
     result: dict[str, Any] = {
         "project": adapter.project, "paused": paused, "candidates": [], "repaired": [], "failed": [],
         "escalated": [], "blocked": [], "still_open": [], "awaiting_human": [], "deferred": [],
-        "closed_requests": [], "ops_export_written": False,
+        "closed_requests": [], "replayed": [], "recurring": None, "ops_export_written": False,
     }
     try:
         if not paused:
-            _Round(adapter, paths, tiers, escalate_after, result).run()
+            _Round(adapter, paths, tiers, escalate_after, result, now=now).run()
     finally:
         result["ops_export_written"] = _refresh_ops_export(adapter.project, paths, catalog)
     return result
@@ -180,8 +189,9 @@ def _refresh_ops_export(project: str, paths: RepairPaths, catalog: Mapping[str, 
 class _Round:
     def __init__(
         self, adapter: RepairAdapter, paths: RepairPaths, tiers: dict[str, str], escalate_after: int,
-        result: dict[str, Any],
+        result: dict[str, Any], *, now: datetime | None = None,
     ) -> None:
+        self.now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
         self.adapter = adapter
         self.project = adapter.project
         self.paths = paths
@@ -191,6 +201,7 @@ class _Round:
         self.fleet_events: list[dict[str, Any]] = []
 
     def run(self) -> None:
+        self._replay_unannounced()
         ledger_events = read_ledger(self.paths.ledger)
         self.fleet_events = [
             event for event in read_fleet_events(self.paths.fleet_event_log) if event.get("project") == self.project
@@ -212,6 +223,65 @@ class _Round:
                 self.result["deferred"].append(trade_id)
                 continue
             write_attempted = self._handle(trade_id, ledger_events, request)
+        self._check_recurring()
+
+    def _replay_unannounced(self) -> None:
+        """A kill between opening a request and writing its fleet event leaves a
+        request nobody was told about; the candidate is "already escalated" so no
+        later round would announce it.  Write the missing event now."""
+        for code, headline, extra in ((CODE_REPAIR_FAILED, "自動補寫連續失敗，已升格需要你處理", {"escalated": True}),
+                                      (CODE_REPAIR_BLOCKED, "自動補寫已停手，這筆不會再自動重試", {})):
+            try:
+                written = replay_unannounced_requests(
+                    fleet_event_log=self.paths.fleet_event_log, request_queue=self.paths.request_queue,
+                    project=self.project, code=code, risk_tier=self.tiers[code],
+                    notice_text=lambda request, headline=headline: _replayed_notice(request, headline),
+                    extra_details=extra,
+                )
+            except Exception as exc:  # noqa: BLE001 -- a replay must never fail the round
+                LOGGER.warning("repair_replay_failed code=%s error=%s: %s", code, type(exc).__name__, exc)
+                self.result["replayed"].append({"code": code, "error": f"{type(exc).__name__}: {exc}"})
+                continue
+            self.result["replayed"] += [{"code": code, "request_id": e["details"]["request_id"],
+                                         "fleet_event_id": e["event_id"]} for e in written]
+
+    def _check_recurring(self) -> None:
+        """g2: tell the operator once when automatic repairs keep happening.
+
+        Evaluated every round, not only after a write, so a kill between the
+        repair and this check cannot lose it.  Counts this strategy's
+        ``VERIFIED_CLOSE_AUTO_REPAIRED`` events inside the window; stays quiet
+        while a recurring notice of its own is itself inside the window.
+        """
+        cutoff = self.now - timedelta(days=RECURRING_WINDOW_DAYS)
+        repairs, last_notice = [], None
+        for event in read_fleet_events(self.paths.fleet_event_log):
+            if event.get("project") != self.project:
+                continue
+            recorded = _parse_time(event.get("recorded_at"))
+            if recorded is None or recorded < cutoff:
+                continue
+            if event.get("code") == CODE_AUTO_REPAIRED:
+                repairs.append(event)
+            elif event.get("code") == CODE_REPAIR_RECURRING:
+                last_notice = event
+        if len(repairs) < RECURRING_THRESHOLD or last_notice is not None:
+            return
+        trade_ids = [str((e.get("evidence") or {}).get("trade_id")) for e in repairs]
+        notice = "\n".join([
+            f"最近 {RECURRING_WINDOW_DAYS} 天內，這支策略已經被自動補寫漏記的平倉 {len(repairs)} 次。",
+            "自動補寫只是把帳本補對，但一直需要補，代表有 bug 在持續漏記平倉，請追根因。",
+            *[f"- trade_id: {trade_id}" for trade_id in trade_ids],
+        ])
+        event = append_fleet_event(
+            self.paths.fleet_event_log, project=self.project, code=CODE_REPAIR_RECURRING,
+            risk_tier=self.tiers[CODE_REPAIR_RECURRING], recorded_at=utc_now_iso(self.now),
+            summary=f"{len(repairs)} automatic verified-close repairs in {RECURRING_WINDOW_DAYS} days",
+            evidence={"window_days": RECURRING_WINDOW_DAYS, "count": len(repairs), "trade_ids": trade_ids},
+            details={"threshold": RECURRING_THRESHOLD, "repair_event_ids": [e.get("event_id") for e in repairs],
+                     "notice_text": notice},
+        )
+        self.result["recurring"] = {"count": len(repairs), "trade_ids": trade_ids, "fleet_event_id": event["event_id"]}
 
     # -- one candidate ------------------------------------------------------ #
     def _handle(
@@ -402,6 +472,16 @@ class _Round:
         })
 
 
+def _parse_time(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return (parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
+
+
 def _symbol_of(ledger_events: list[dict[str, Any]], trade_id: str) -> str | None:
     for event in ledger_events:
         if event.get("event_type") == "trade_open" and str(event.get("trade_id")) == trade_id:
@@ -419,6 +499,14 @@ def _failures_since_last_escalation(fleet_events: list[dict[str, Any]], trade_id
             continue
         count = 0 if (event.get("details") or {}).get("escalated") is True else count + 1
     return count
+
+
+def _replayed_notice(request: Mapping[str, Any], headline: str) -> str:
+    evidence = request.get("evidence") if isinstance(request.get("evidence"), Mapping) else {}
+    details = request.get("details") if isinstance(request.get("details"), Mapping) else {}
+    reasons = [str(r) for r in details.get("reasons") or []] or [str(request.get("summary") or "")]
+    return "（補發：上一輪開了請求後被中斷，沒來得及通知。）\n" + _notice_text(
+        {"trade_id": evidence.get("trade_id"), "symbol": evidence.get("symbol")}, reasons, headline)
 
 
 def _notice_text(identity: dict[str, Any], reasons: list[str], headline: str) -> str:

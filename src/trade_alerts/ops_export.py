@@ -13,7 +13,9 @@ relay side can fabricate an item to send.
 The file is a full snapshot rewritten every time, not an append log, so a
 reader never has to reconcile partial writes: ``notices`` are the events of the
 last ``window_days`` that need a human, identified by ``event_id`` so the reader
-can send each exactly once, and ``open_requests`` is everything still open.
+can send each exactly once (``text`` is the main message and the optional
+``ai_text`` the second, paste-to-AI message -- a reader that only knows ``text``
+still sends a complete, if shorter, notice), and ``open_requests`` is everything still open.
 
 Which events need a human follows fleet-error-catalog/v2: every ``R3`` event,
 and an ``R2`` event only once the automatic retries gave up
@@ -87,22 +89,55 @@ def needs_human(event: Mapping[str, Any], risk_tier: str | None) -> bool:
     return risk_tier == "R2" and details.get("escalated") is True
 
 
-def _ai_block(event: Mapping[str, Any], ai_prompt: str) -> list[str]:
-    """The catalog's prompt plus this occurrence's own identifiers, so it can be
-    pasted to an AI as-is without the operator digging anything up."""
+def notice_title(entry: Mapping[str, Any] | None, code: str) -> str:
+    """First line of every notice: ``【ERR-007】`` plus the catalog title,
+    character for character.  The title is read from the catalog entry, never
+    retyped, so a message can only differ from the risk register by the
+    catalog changing.  An event with no catalog entry (a strategy emitting a
+    code nobody catalogued) is marked ``【未編號】`` rather than given an
+    invented number."""
+    entry = entry or {}
+    error_id = entry.get("error_id")
+    title = entry.get("title")
+    if isinstance(error_id, str) and error_id and isinstance(title, str) and title:
+        return f"【{error_id}】{title}"
+    return f"【未編號】{code}"
+
+
+def render_ai_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None, code: str | None = None) -> str | None:
+    """The second message of a notice: only what to paste to an AI.
+
+    The catalog's prompt plus this occurrence's own identifiers, so it can be
+    copied as one block without digging anything up.  Its first line carries the
+    same ``【ERR-xxx】`` as the main message so the two read as one notice.
+    ``None`` when the catalog entry has no prompt.
+    """
+    message = (entry or {}).get("operator_message")
+    ai_prompt = message.get("ai_prompt") if isinstance(message, Mapping) else None
+    if not (isinstance(ai_prompt, str) and ai_prompt.strip()):
+        return None
     evidence = event.get("evidence") if isinstance(event.get("evidence"), Mapping) else {}
-    return ["", "給 AI 的追查指令（整段貼給 Claude）：", ai_prompt.strip(),
-            f"錯誤碼：{event.get('project')}/{event.get('code')}　事件編號：{event.get('event_id')}",
-            "事件資料：" + json.dumps(dict(evidence), ensure_ascii=False, sort_keys=True)]
+    code = code if code is not None else str(event.get("code") or "")
+    first = notice_title(entry, code).split("】", 1)[0] + "】" if entry else "【未編號】"
+    return "\n".join([
+        f"{first}給 AI 的追查指令（整段貼給 Claude）",
+        ai_prompt.strip(),
+        f"錯誤碼：{event.get('project')}/{event.get('code')}　事件編號：{event.get('event_id')}",
+        "事件資料：" + json.dumps(dict(evidence), ensure_ascii=False, sort_keys=True),
+    ])
 
 
 def render_notice_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None, risk_tier: str) -> str:
-    """Plain-language message for one event: tier header, catalog title, the
-    entry's ``operator_message`` when it has one, the technical detail the
-    strategy attached (``details.notice_text``, else the event summary), and the
-    entry's AI root-cause prompt with this event's identifiers."""
+    """Plain-language main message for one event.
+
+    Line 1 is ``【ERR-xxx】<catalog title>`` (see ``notice_title``), line 2 the
+    tier header, then the entry's ``operator_message`` when it has one and the
+    technical detail the strategy attached (``details.notice_text``, else the
+    event summary).  The AI root-cause prompt is the *second* message
+    (``render_ai_text``), not part of this one.
+    """
     code = str(event.get("code") or "")
-    lines = [_TIER_HEADERS.get(risk_tier, risk_tier), str((entry or {}).get("title") or code)]
+    lines = [notice_title(entry, code), _TIER_HEADERS.get(risk_tier, risk_tier)]
 
     message = (entry or {}).get("operator_message")
     if isinstance(message, Mapping):
@@ -116,10 +151,6 @@ def render_notice_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None
         technical = event.get("summary")
     if isinstance(technical, str) and technical.strip():
         lines += ["", "技術細節：", technical.strip()]
-
-    ai_prompt = message.get("ai_prompt") if isinstance(message, Mapping) else None
-    if isinstance(ai_prompt, str) and ai_prompt.strip():
-        lines += _ai_block(event, ai_prompt)
     return "\n".join(lines)
 
 
@@ -163,14 +194,18 @@ def build_ops_export(
         tier = _resolve_tier(event, entry)
         if not needs_human(event, tier):
             continue
-        notices.append({
+        notice = {
             "event_id": str(event.get("event_id") or ""),
             "recorded_at": event.get("recorded_at"),
             "code": catalog_code(project, bare_code),
             "risk_tier": tier,
             "critical": tier == "R3",
             "text": render_notice_text(event, entry, tier),
-        })
+        }
+        ai_text = render_ai_text(event, entry, bare_code)
+        if ai_text is not None:
+            notice["ai_text"] = ai_text
+        notices.append(notice)
     notices.sort(key=lambda notice: (str(notice["recorded_at"] or ""), notice["event_id"]))
 
     open_requests: list[dict[str, Any]] = []
