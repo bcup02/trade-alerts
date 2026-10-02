@@ -763,7 +763,7 @@ def sheet_ledger_compare(
     for entry in sheet_rows:
         values = entry.get("values") or []
         tid = _str_id(sheet_cell(values, "trade_id"))
-        if (not tid or tid in known_ids or tid in ignore or entry.get("row") in matched_rows
+        if (not tid or tid in known_ids or entry.get("row") in matched_rows
                 or not _row_in_scope(values)):
             continue
         discrepancies.append({

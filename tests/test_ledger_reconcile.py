@@ -567,3 +567,24 @@ def test_load_reconcile_ignore(tmp_path):
         assert entries == {} and problem, bad                                 # one bad entry voids the whole list
     path.write_bytes(b"\xff\xfe")
     assert load_reconcile_ignore(path)[0] == {} and load_reconcile_ignore(path)[1]
+
+
+def test_an_id_on_the_list_that_the_ledger_does_not_have_never_hides_a_stray_sheet_row():
+    """Review finding F1: the list may only exclude trades the ledger really has."""
+    trades = _trade("t1")
+    rows = [_row(5, trade_id="t1"), _row(6, trade_id="gone")]
+    doc = sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW,
+                               ignore={"gone": "stale entry"})
+    assert doc["value"] == "DIVERGED"
+    assert [(d["kind"], d["trade_id"]) for d in doc["discrepancies"] if d["divergence"]][-1] == ("LEDGER_MISSING_ROW", "gone")
+    assert doc["ignored"] == [] and doc["summary"]["ignored"] == 0
+
+
+def test_an_empty_or_missing_list_leaves_the_document_exactly_as_before():
+    trades = {**_trade("t1"), **_trade("t2", opened_ms=2)}
+    rows = [_row(5, trade_id="t1"), _row(6, trade_id="stray")]
+    without = sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
+    empty = sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW, ignore={})
+    assert json.dumps(without, sort_keys=True) == json.dumps(empty, sort_keys=True)
+    assert sorted(without) == ["checked_at", "discrepancies", "last_reconciled_at", "note", "scope", "sheet_name", "summary", "value"]
+    assert sorted(without["summary"]) == ["actionable", "by_kind", "discrepancies", "local_trades", "sheet_rows"]
