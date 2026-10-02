@@ -6,6 +6,8 @@ from uuid import uuid4
 
 from trade_alerts.ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance
 from trade_alerts.projection_outbox import (
+    ORPHAN_CLOSE_PARK_AFTER,
+    ORPHAN_CLOSE_PARKED_CODE,
     RebuiltProjection,
     dispatch_next_projection,
     enqueue_projection_intent,
@@ -181,3 +183,54 @@ def test_other_rebuild_errors_are_still_terminal(tmp_path: Path) -> None:
     result = dispatch_next_projection(path, rebuild=ambiguous, submit=lambda payload, proof: Submission("CONFIRMED", receiver_row=2))
     assert result.dispatch is not None and result.dispatch.status == "REJECTED"
     assert result.paused_reason is None
+
+
+def _open_provenance() -> LedgerProvenance:
+    return LedgerProvenance(
+        project_id="mexc-4h-momentum", trade_id="trade-002", event_type="trade_open", ledger_event_digest=DIGEST_A,
+        payload_digest=DIGEST_B, request_id=str(uuid4()), issued_at="2026-08-26T00:00:00Z",
+        source_id="momentum-wsl-prod", schema_version=LEDGER_PROJECTION_SCHEMA_VERSION,
+    )
+
+
+def test_a_close_the_receiver_cannot_find_is_parked_so_the_queue_moves_on(tmp_path: Path) -> None:
+    path = tmp_path / "projection-outbox.jsonl"
+    orphan = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    later = enqueue_projection_intent(path, action="append_open_v2", provenance=_open_provenance())
+    not_found = lambda *_a: Submission("TRANSPORT_FAILED", error_code="trade_id_not_found")  # noqa: E731
+
+    for attempt in range(1, ORPHAN_CLOSE_PARK_AFTER):
+        result = dispatch_next_projection(path, rebuild=rebuilt, submit=not_found)
+        assert result.dispatch.status == "TRANSPORT_FAILED", attempt
+        assert outstanding_projection_intents(path)[0].intent_id == orphan.intent_id  # still blocking, as before
+
+    parked = dispatch_next_projection(path, rebuild=rebuilt, submit=not_found)
+    assert parked.dispatch.status == "REJECTED"
+    assert parked.dispatch.error_code == ORPHAN_CLOSE_PARKED_CODE
+    assert [i.intent_id for i in outstanding_projection_intents(path)] == [later.intent_id]
+
+
+def test_orphan_count_restarts_when_the_answer_changes(tmp_path: Path) -> None:
+    path = tmp_path / "projection-outbox.jsonl"
+    enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    not_found = lambda *_a: Submission("TRANSPORT_FAILED", error_code="trade_id_not_found")  # noqa: E731
+    flaky = lambda *_a: Submission("TRANSPORT_FAILED", error_code="transport_failed")  # noqa: E731
+    for _ in range(ORPHAN_CLOSE_PARK_AFTER - 1):
+        dispatch_next_projection(path, rebuild=rebuilt, submit=not_found)
+    dispatch_next_projection(path, rebuild=rebuilt, submit=flaky)  # a different failure breaks the run
+    result = dispatch_next_projection(path, rebuild=rebuilt, submit=not_found)
+    assert result.dispatch.status == "TRANSPORT_FAILED"  # one answer again, not the 12th in a row
+
+
+def test_an_open_that_is_not_found_is_never_parked(tmp_path: Path) -> None:
+    path = tmp_path / "projection-outbox.jsonl"
+    enqueue_projection_intent(path, action="append_open_v2", provenance=_open_provenance())
+    not_found = lambda *_a: Submission("TRANSPORT_FAILED", error_code="trade_id_not_found")  # noqa: E731
+
+    def rebuilt_open(intent):
+        proof = _open_provenance()
+        return RebuiltProjection(payload={**rebuilt(intent).payload, "provenance": proof.as_dict()}, provenance=proof)
+
+    for _ in range(ORPHAN_CLOSE_PARK_AFTER + 3):
+        result = dispatch_next_projection(path, rebuild=rebuilt_open, submit=not_found)
+        assert result.dispatch.status == "TRANSPORT_FAILED"
