@@ -193,7 +193,21 @@ def _open_provenance() -> LedgerProvenance:
     )
 
 
-def test_a_close_the_receiver_cannot_find_is_parked_so_the_queue_moves_on(tmp_path: Path) -> None:
+def _ticking_clock(monkeypatch) -> None:
+    """``created_at`` has one-second resolution and the queue is ordered by it,
+    so two intents queued in the same second would be ordered by their random
+    ids.  Give every intent its own second so the tests control the order."""
+    counter = iter(range(1, 100000))
+
+    def tick() -> str:
+        n = next(counter)
+        return f"2026-08-26T{n // 3600:02d}:{n // 60 % 60:02d}:{n % 60:02d}Z"
+
+    monkeypatch.setattr("trade_alerts.projection_outbox._utc_now", tick)
+
+
+def test_a_close_the_receiver_cannot_find_is_parked_so_the_queue_moves_on(tmp_path: Path, monkeypatch) -> None:
+    _ticking_clock(monkeypatch)
     path = tmp_path / "projection-outbox.jsonl"
     orphan = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
     later = enqueue_projection_intent(path, action="append_open_v2", provenance=_open_provenance())
