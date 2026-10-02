@@ -787,7 +787,7 @@ trade-alerts：v0.25.0（f-12 共用庫那版：程式碼變更＋兩條新錯�
           3. g2：修復機器人 7 天內自動補寫 ≥2 次就通知一次（ERR-054 MOM／ERR-055 SEY.VERIFIED_CLOSE_REPAIR_RECURRING，R3），之後 7 天不重發。
           4. 通知格式：ops_export 的 notice.text 第一行＝【ERR-編號】＋目錄標題，第二行等級標頭；給 AI 的指令拆成選用欄位 ai_text（第二則）。
              schema 加選用欄位 ai_text（版本仍 v2）。run_repair_round 新增選用參數 now。
-          5. LINE 超過 5000 字改切成多個 message（最多 5 個，超過才截斷並寫明）；Telegram 超過 4096 字分多則送；split_text／sendable 不丟字、不送空訊息。
+          5. LINE 超過 5000 字改切成多個 message（最多 5 個，超過才截斷並寫明）；Telegram 超過 4096 字分多則送；split_text 保留原文字；sender 避免新增空／純空白分段（原始空或全空白輸入保留既有失敗語意）。
           6. 錯誤清單 ERR-004 文字同步趨勢策略 f-14；登記冊與兩張頁面更新。沒有任何格子改成已做。
           向後相容：既有 API 不變；舊版維運通知只讀 text，仍送出完整主訊息（少第二則）。部署順序：維運通知先升級（認得 ai_text），再各策略改釘。
 受影響消費專案：維運通知（發兩則、自己的告警帶編號）、動能、趨勢、競賽（改釘、raise LedgerUnreadableError、replay hook、drain 非 0）；加密仍釘 v0.15.0（不升）。
