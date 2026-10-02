@@ -1,0 +1,264 @@
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index d7e81c8..6e07f74 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -166,6 +166,8 @@ from .ledger_reconcile import (
+     recorded_order_ids,
+     sheet_cell,
+     sheet_ledger_compare,
++    load_reconcile_ignore,
++    RECONCILE_IGNORE_FILENAME,
+     to_float,
+     to_number,
+     unsettled_pending_markers,
+@@ -329,6 +331,8 @@ __all__ = [
+     "recorded_order_ids",
+     "sheet_cell",
+     "sheet_ledger_compare",
++    "load_reconcile_ignore",
++    "RECONCILE_IGNORE_FILENAME",
+     "to_float",
+     "to_number",
+     "unsettled_pending_markers",
+diff --git a/src/trade_alerts/ledger_reconcile.py b/src/trade_alerts/ledger_reconcile.py
+index c9fc278..b8fa1fd 100644
+--- a/src/trade_alerts/ledger_reconcile.py
++++ b/src/trade_alerts/ledger_reconcile.py
+@@ -42,7 +42,7 @@ import tempfile
+ import time
+ from datetime import datetime, timezone
+ from pathlib import Path
+-from typing import Any, Callable
++from typing import Any, Callable, Mapping
+ 
+ import requests
+ 
+@@ -632,10 +632,19 @@ def sheet_ledger_compare(
+     since_ms: int | None = None,
+     price_tol_pct: float = 0.001,
+     pnl_tol: float = 0.01,
++    ignore: Mapping[str, str] | None = None,
++    ignore_problem: str | None = None,
+ ) -> dict[str, Any]:
+     """Pure verdict function for the ledger-vs-sheet layer.  Returns a
+     ``google_reconcile_status.json`` document (``RECONCILED`` / ``DIVERGED`` /
+-    ``UNKNOWN`` + a per-row ``discrepancies`` list)."""
++    ``UNKNOWN`` + a per-row ``discrepancies`` list).
++
++    ``ignore`` maps ``trade_id`` -> reason for trades the operator has decided
++    are not wanted on the sheet (see :func:`load_reconcile_ignore`).  They are
++    left out of the comparison -- but never silently: the document lists each
++    one under ``ignored`` and counts them in ``summary['ignored']``.
++    ``ignore_problem`` (a list file that could not be used) is carried into the
++    document as ``ignore_list_problem`` so it is visible rather than hidden."""
+     now = now or datetime.now(timezone.utc)
+     checked_at = utc_now_iso(now)
+     base = {"checked_at": checked_at, "scope": scope, "sheet_name": sheet_name,
+@@ -668,9 +677,14 @@ def sheet_ledger_compare(
+     matched_rows: set[Any] = set()
+     discrepancies: list[dict[str, Any]] = []
+ 
++    ignore = dict(ignore or {})
++    ignored: list[dict[str, str]] = []
+     for tid, rec in sorted(trades.items(), key=lambda kv: max(kv[1]["opened_ms"], kv[1]["closed_ms"])):
+         if not _in_scope(rec):
+             continue
++        if tid in ignore:
++            ignored.append({"trade_id": tid, "symbol": rec["symbol"], "reason": ignore[tid]})
++            continue
+         entry = sheet_by_id.get(tid)
+         matched_by = "trade_id"
+         local_eoid = _str_id((rec.get("open_event") or {}).get("order_id"))
+@@ -771,13 +785,56 @@ def sheet_ledger_compare(
+         "actionable": len(actionable),
+         "by_kind": by_kind,
+     }
++    extra: dict[str, Any] = {}
++    if ignore or ignore_problem:
++        summary["ignored"] = len(ignored)
++        extra["ignored"] = ignored
++    if ignore_problem:
++        extra["ignore_list_problem"] = ignore_problem
++    ignored_note = f"; {len(ignored)} trade(s) ignored by the operator's list" if ignored else ""
+ 
+     if actionable:
+         return {**base, "value": "DIVERGED",
+-                "note": f"{len(actionable)} sheet row(s) disagree with the local ledger",
+-                "discrepancies": discrepancies, "summary": summary}
++                "note": f"{len(actionable)} sheet row(s) disagree with the local ledger" + ignored_note,
++                "discrepancies": discrepancies, "summary": summary, **extra}
+     info = [f"{by_kind[k]}x {k}" for k in SHEET_INFO_KINDS if by_kind.get(k)]
+     return {**base, "value": "RECONCILED", "last_reconciled_at": checked_at,
+             "note": "every real ledger trade agrees with its Google sheet row"
+-                    + (f" ({', '.join(info)} -- informational)" if info else ""),
+-            "discrepancies": discrepancies, "summary": summary}
++                    + (f" ({', '.join(info)} -- informational)" if info else "") + ignored_note,
++            "discrepancies": discrepancies, "summary": summary, **extra}
++
++
++RECONCILE_IGNORE_FILENAME = "google-reconcile-ignore.json"
++
++
++def load_reconcile_ignore(path: str | Path) -> tuple[dict[str, str], str | None]:
++    """Read the operator's "do not reconcile these trades" list.
++
++    The file is ``{"ignore": [{"trade_id": "...", "reason": "..."}, ...]}``.  A
++    missing file is an empty list.  Anything unusable -- not JSON, wrong shape,
++    an entry without a ``trade_id`` or without a ``reason`` -- returns an empty
++    list and a one-line problem: a broken list must never hide a divergence, so
++    the caller reports the problem and compares everything.
++    """
++    p = Path(path)
++    try:
++        raw = p.read_text(encoding="utf-8")
++    except FileNotFoundError:
++        return {}, None
++    except (OSError, UnicodeDecodeError) as exc:
++        return {}, f"cannot read {p.name} ({type(exc).__name__})"
++    try:
++        doc = json.loads(raw)
++    except json.JSONDecodeError:
++        return {}, f"{p.name} is not valid JSON"
++    entries = doc.get("ignore") if isinstance(doc, dict) else None
++    if not isinstance(entries, list):
++        return {}, f'{p.name} must be {{"ignore": [...]}}'
++    out: dict[str, str] = {}
++    for index, entry in enumerate(entries, start=1):
++        trade_id = entry.get("trade_id") if isinstance(entry, dict) else None
++        reason = entry.get("reason") if isinstance(entry, dict) else None
++        if not isinstance(trade_id, str) or not trade_id.strip() or not isinstance(reason, str) or not reason.strip():
++            return {}, f"{p.name} entry {index} needs a non-empty trade_id and reason"
++        out[trade_id.strip()] = reason.strip()
++    return out, None
+diff --git a/tests/test_ledger_reconcile.py b/tests/test_ledger_reconcile.py
+index b290b60..55b178d 100644
+--- a/tests/test_ledger_reconcile.py
++++ b/tests/test_ledger_reconcile.py
+@@ -14,6 +14,7 @@ from trade_alerts.ledger_reconcile import (
+     fetch_sheet_rows,
+     fold_ledger_trades,
+     is_paper_event,
++    load_reconcile_ignore,
+     norm_symbol_ccxt,
+     norm_symbol_plain,
+     parse_iso,
+@@ -498,3 +499,92 @@ def test_fetch_empty_body_exhausts(monkeypatch):
+     rows, err = fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s",
+                                  attempts=2, sleep=lambda _s: None)
+     assert rows is None and err == "empty response body"
++
++
++# --------------------------------------------------------------------------- #
++# the operator's ignore list (f-16)
++# --------------------------------------------------------------------------- #
++
++def test_ignored_trades_are_left_out_but_listed():
++    trades = {**_trade("old1", symbol="XRP_USDT"), **_trade("old2", symbol="BOME_USDT", opened_ms=2)}
++    doc = sheet_ledger_compare(trades, [], sheet_name="S", norm_symbol=norm_symbol_plain,
++                               now=NOW, ignore={"old1": "smoke test", "old2": "MEXC era, not wanted"})
++    assert doc["value"] == "RECONCILED"                     # both missing rows are ignored
++    assert doc["summary"]["ignored"] == 2 and doc["summary"]["actionable"] == 0
++    assert doc["ignored"] == [
++        {"trade_id": "old1", "symbol": "XRP_USDT", "reason": "smoke test"},
++        {"trade_id": "old2", "symbol": "BOME_USDT", "reason": "MEXC era, not wanted"},
++    ]
++    assert "2 trade(s) ignored" in doc["note"]
++
++
++def test_a_trade_that_is_not_ignored_is_still_reported():
++    trades = {**_trade("old1"), **_trade("new1", opened_ms=2)}
++    doc = sheet_ledger_compare(trades, [], sheet_name="S", norm_symbol=norm_symbol_plain,
++                               now=NOW, ignore={"old1": "not wanted"})
++    assert doc["value"] == "DIVERGED"
++    assert [d["trade_id"] for d in doc["discrepancies"] if d["divergence"]] == ["new1"]
++    assert doc["summary"]["ignored"] == 1
++
++
++def test_an_id_on_the_list_that_is_not_in_the_ledger_is_not_reported_as_ignored():
++    trades = _trade("t1", closed=True, close_event={"event_type": "trade_close", "exit_price": 1.0, "net_pnl": 0.5,
++                    "order_id": "x2"}, closed_ms=2)
++    rows = [_row(14, trade_id="t1", exit_time="2026-09-01", exit_price="1.0", net_pnl="0.5", exit_order_id="x2")]
++    doc = sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW,
++                               ignore={"gone": "stale entry"})
++    assert doc["value"] == "RECONCILED" and doc["ignored"] == [] and doc["summary"]["ignored"] == 0
++
++
++def test_a_sheet_row_of_an_ignored_trade_is_not_reported_as_unknown_to_the_ledger():
++    doc = sheet_ledger_compare(_trade("old1"), [_row(5, trade_id="old1")], sheet_name="S",
++                               norm_symbol=norm_symbol_plain, now=NOW, ignore={"old1": "not wanted"})
++    assert doc["value"] == "RECONCILED" and doc["ignored"][0]["trade_id"] == "old1"
++
++
++def test_without_a_list_the_document_is_unchanged():
++    doc = sheet_ledger_compare(_trade("t1"), [], sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
++    assert "ignored" not in doc and "ignored" not in doc["summary"] and "ignore_list_problem" not in doc
++
++
++def test_a_broken_list_is_reported_and_hides_nothing():
++    doc = sheet_ledger_compare(_trade("t1"), [], sheet_name="S", norm_symbol=norm_symbol_plain,
++                               now=NOW, ignore={}, ignore_problem="google-reconcile-ignore.json is not valid JSON")
++    assert doc["value"] == "DIVERGED"
++    assert doc["ignore_list_problem"] == "google-reconcile-ignore.json is not valid JSON"
++
++
++def test_load_reconcile_ignore(tmp_path):
++    path = tmp_path / "google-reconcile-ignore.json"
++    assert load_reconcile_ignore(path) == ({}, None)                         # no file = empty list
++    path.write_text(json.dumps({"ignore": [{"trade_id": " a ", "reason": " old "}, {"trade_id": "b", "reason": "x"}]}))
++    assert load_reconcile_ignore(path) == ({"a": "old", "b": "x"}, None)
++    for bad in ('not json', '[]', '{"ignore": {}}', '{"ignore": [{"trade_id": "a"}]}',
++                '{"ignore": [{"trade_id": "a", "reason": "  "}]}', '{"ignore": ["a"]}',
++                '{"ignore": [{"trade_id": "ok", "reason": "r"}, {"reason": "no id"}]}'):
++        path.write_text(bad)
++        entries, problem = load_reconcile_ignore(path)
++        assert entries == {} and problem, bad                                 # one bad entry voids the whole list
++    path.write_bytes(b"\xff\xfe")
++    assert load_reconcile_ignore(path)[0] == {} and load_reconcile_ignore(path)[1]
++
++
++def test_an_id_on_the_list_that_the_ledger_does_not_have_never_hides_a_stray_sheet_row():
++    """Review finding F1: the list may only exclude trades the ledger really has."""
++    trades = _trade("t1")
++    rows = [_row(5, trade_id="t1"), _row(6, trade_id="gone")]
++    doc = sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW,
++                               ignore={"gone": "stale entry"})
++    assert doc["value"] == "DIVERGED"
++    assert [(d["kind"], d["trade_id"]) for d in doc["discrepancies"] if d["divergence"]][-1] == ("LEDGER_MISSING_ROW", "gone")
++    assert doc["ignored"] == [] and doc["summary"]["ignored"] == 0
++
++
++def test_an_empty_or_missing_list_leaves_the_document_exactly_as_before():
++    trades = {**_trade("t1"), **_trade("t2", opened_ms=2)}
++    rows = [_row(5, trade_id="t1"), _row(6, trade_id="stray")]
++    without = sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
++    empty = sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW, ignore={})
++    assert json.dumps(without, sort_keys=True) == json.dumps(empty, sort_keys=True)
++    assert sorted(without) == ["checked_at", "discrepancies", "last_reconciled_at", "note", "scope", "sheet_name", "summary", "value"]
++    assert sorted(without["summary"]) == ["actionable", "by_kind", "discrepancies", "local_trades", "sheet_rows"]
+diff --git a/tests/test_projection_outbox.py b/tests/test_projection_outbox.py
+index 9d0d273..5c15814 100644
+--- a/tests/test_projection_outbox.py
++++ b/tests/test_projection_outbox.py
+@@ -193,7 +193,21 @@ def _open_provenance() -> LedgerProvenance:
+     )
+ 
+ 
+-def test_a_close_the_receiver_cannot_find_is_parked_so_the_queue_moves_on(tmp_path: Path) -> None:
++def _ticking_clock(monkeypatch) -> None:
++    """``created_at`` has one-second resolution and the queue is ordered by it,
++    so two intents queued in the same second would be ordered by their random
++    ids.  Give every intent its own second so the tests control the order."""
++    counter = iter(range(1, 100000))
++
++    def tick() -> str:
++        n = next(counter)
++        return f"2026-08-26T{n // 3600:02d}:{n // 60 % 60:02d}:{n % 60:02d}Z"
++
++    monkeypatch.setattr("trade_alerts.projection_outbox._utc_now", tick)
++
++
++def test_a_close_the_receiver_cannot_find_is_parked_so_the_queue_moves_on(tmp_path: Path, monkeypatch) -> None:
++    _ticking_clock(monkeypatch)
+     path = tmp_path / "projection-outbox.jsonl"
+     orphan = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+     later = enqueue_projection_intent(path, action="append_open_v2", provenance=_open_provenance())
