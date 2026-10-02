@@ -1,0 +1,2504 @@
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index 4914056..b54f4f6 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -99,7 +99,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED` | latch `protective_stop_failed` | MECHANICAL | R1 | P4 |
+ | `SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED` | latch `protective_stop_failed` | JUDGEMENT | R3 | P4 |
+ | `SEY.PROTECTION_REPLACE_FAILED` | latch `protective_stop_replace_failed` | JUDGEMENT | R2 | P8（v2） |
+-| `SEY.PROTECTION_MOVE_DEFERRED` | 通知 only（h11 新增：舊停損取消不掉時保留舊停損、下一根 K 棒再試） | JUDGEMENT | R2 | P8（v2） |
++| `SEY.PROTECTION_MOVE_DEFERRED` | 通知 only（h11 新增：舊停損取消不掉時保留舊停損；f-14：每 10 分鐘重試，連續第 3 次失敗通知一次） | JUDGEMENT | R2 | P8（v2） |
+ | `SEY.PROTECTION_CLOSE_CANCEL_FAILED` | 通知 only | JUDGEMENT | R2 | P8（v2） |
+ | `SEY.PROTECTION_UNVERIFIED` | latch | JUDGEMENT | R3 | P4 |
+ | `SEY.POSITION_AMBIGUOUS` | latch | JUDGEMENT | R3 | P4 |
+@@ -114,6 +114,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `SEY.VERIFIED_CLOSE_AUTO_REPAIRED` | 未發出（共用修復執行器，v2-W4 接上） | MECHANICAL | R1 | P8（v2） |
+ | `SEY.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R2 | P8（v2） |
+ | `SEY.VERIFIED_CLOSE_REPAIR_BLOCKED` | 未發出（共用修復執行器，v2-W4 接上） | JUDGEMENT | R3 | P8（v2） |
++| `SEY.VERIFIED_CLOSE_REPAIR_RECURRING` | 未發出（共用修復執行器 v0.25.0；7 天內自動補寫 ≥2 次通知一次，ERR-055） | JUDGEMENT | R3 | P8（v2） |
+ | `SEY.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+ | `SEY.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+ | `SEY.POSITION_ADOPTED_AFTER_INTERRUPTION` | 未發出（f-12 趨勢 PR 接上；重啟後接管或補停損，ERR-051） | JUDGEMENT | R3 | P8（v2） |
+@@ -133,6 +134,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `MOM.VERIFIED_CLOSE_PROPOSED` | 修復機器人 提案通知（v0.21.1 已退役、移出 entries） | JUDGEMENT | R2 | P8（v2） |
+ | `MOM.VERIFIED_CLOSE_AUTO_REPAIRED` | 開關開啟 + 無歧義才自動寫帳本，事後稽核通知 | MECHANICAL | R1 | **P6** |
+ | `MOM.VERIFIED_CLOSE_REPAIR_BLOCKED` | 修復痕跡／寫入失敗 → 停手 critical 一次 | JUDGEMENT | R3 | **P6** |
++| `MOM.VERIFIED_CLOSE_REPAIR_RECURRING` | 未發出（共用修復執行器 v0.25.0；7 天內自動補寫 ≥2 次通知一次，ERR-054） | JUDGEMENT | R3 | P8（v2） |
+ | `MOM.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（共用修復執行器，v2-W3 接上） | JUDGEMENT | R2 | P8（v2） |
+ | `MOM.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+ | `MOM.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 141866e..e19e8c1 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -100,9 +100,9 @@
+   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>53 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    四支策略目前所有已知的「出問題」情況，共 <b>55 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>35 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>37 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -113,7 +113,7 @@
+   <div id="filters"></div>
+   <div id="register"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-10-01 盤點）。
++    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-10-02 盤點）。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
+   </div>
+ </div>
+@@ -240,15 +240,15 @@
+    "bot": "seykota",
+    "bot_label": "趨勢策略",
+    "code": "SEY.PROTECTION_MOVE_DEFERRED",
+-   "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，下一根 K 棒自動再試。目前每次發生都只在主機日誌記一筆緊急紀錄，還不會送到你的手機——趨勢策略的通知要到第 8 關接上共用事件日誌才會送出；屆時規劃改成連續 3 次都移不動才通知你。",
++   "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，每 10 分鐘自動再試。連續第 3 次都取消不掉時會通知你一次（約 20～30 分鐘後），之後繼續重試但不再重發。",
+    "emits_event": {
+-    "phase": "8-seykota",
+-    "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。",
++    "phase": "f-12",
++    "reason": "2026-10-01 f-14（ed-seykota #81）已在開發主幹實作：每 10 分鐘重試，連續第 3 次失敗寫一筆升格事件並通知一次；還沒上正式機，上線後改已做。",
+     "state": "pending"
+    },
+    "error_id": "ERR-004",
+    "notes": [
+-    "寫進事件日誌未做 — 目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）"
++    "寫進事件日誌未做 — 2026-10-01 f-14（ed-seykota #81）已在開發主幹實作：每 10 分鐘重試，連續第 3 次失敗寫一筆升格事件並通知一次；還沒上正式機，上線後改已做。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）"
+    ],
+    "open": true,
+    "steps": [
+@@ -1611,6 +1611,66 @@
+    "tier": "R3",
+    "title": "狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）",
+    "what": "競賽策略的狀態檔（state/bot_state.json）存在、但讀不出來（不是合法的 JSON 或格式不對）。"
++  },
++  {
++   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查平倉一直漏記的原因：讀 audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、還是交易所路徑沒走到記帳），提出治本修正與回歸測試。",
++   "behaviour": {
++    "phase": "f-12",
++    "reason": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；動能策略升級共用庫並部署後才會發，上正式機後改已做。",
++    "state": "pending"
++   },
++   "bot": "momentum",
++   "bot_label": "動能策略",
++   "code": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
++   "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
++   "emits_event": {
++    "phase": "f-12",
++    "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。",
++    "state": "pending"
++   },
++   "error_id": "ERR-054",
++   "notes": [
++    "行為未做 — 2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；動能策略升級共用庫並部署後才會發，上正式機後改已做。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）",
++    "寫進事件日誌未做 — 同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
++   "what": "動能策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。"
++  },
++  {
++   "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查平倉一直漏記的原因：讀 audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、還是交易所路徑沒走到記帳），提出治本修正與回歸測試。",
++   "behaviour": {
++    "phase": "f-12",
++    "reason": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；趨勢策略升級共用庫並部署後才會發，上正式機後改已做。",
++    "state": "pending"
++   },
++   "bot": "seykota",
++   "bot_label": "趨勢策略",
++   "code": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
++   "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
++   "emits_event": {
++    "phase": "f-12",
++    "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。",
++    "state": "pending"
++   },
++   "error_id": "ERR-055",
++   "notes": [
++    "行為未做 — 2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；趨勢策略升級共用庫並部署後才會發，上正式機後改已做。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）",
++    "寫進事件日誌未做 — 同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
++   ],
++   "tier": "R3",
++   "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
++   "what": "趨勢策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。"
+   }
+  ],
+  "tiers": [
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 6cdff99..fa5b658 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,7 +177,7 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>52</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-pending" href="#group-pending"><b>54</b><span>項未完成——還有策略沒做到</span></a>
+     <a class="c-done" href="#group-done"><b>25</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+@@ -193,7 +193,7 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">52 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">54 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+@@ -209,7 +209,7 @@
+   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+   <div id="glossaryHost"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-01 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
++    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-02 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 3e3b6f7</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 43be152</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 9559897</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+   </div>
+@@ -2142,7 +2142,7 @@
+    "title": "帳本少記交易所成交時，升格通知並以交易所為準更正"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-repair_bot.recurrence_escalation",
+    "complete": false,
+    "dots": {
+@@ -2160,9 +2160,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
++       "text": "2026-10-02 已在共用庫（trade-alerts 開發中的 v0.25.0）實作：修復機器人每輪數最近 7 天自動補寫次數，達 2 次通知一次、之後 7 天內不重發；趨勢策略已接共用修復執行器，升級共用庫後自動具備。還沒發版、沒上任何主機，上正式機後改已做。"
+       }
+      ]
+     },
+@@ -2171,9 +2171,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
++       "text": "2026-10-02 已在共用庫（trade-alerts 開發中的 v0.25.0）實作：修復機器人每輪數最近 7 天自動補寫次數，達 2 次通知一次、之後 7 天內不重發；動能策略已接共用修復執行器，升級共用庫後自動具備。還沒發版、沒上任何主機，上正式機後改已做。"
+       }
+      ]
+     },
+@@ -2182,7 +2182,7 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
++       "phase": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
+        "state": "pending",
+        "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+       }
+@@ -2193,18 +2193,18 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
++       "phase": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
+        "state": "pending",
+        "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+       }
+      ]
+     }
+    ],
+-   "sub": "自動修補（R1）本身不通知，但同一支策略在一段期間內修補次數超過門檻時，要發一次 R2 通知「這個修補一直在發生，請追根因」，讓修復機器人不會變成掩蓋 bug 的工具。門檻與期間待定。",
++   "sub": "自動修補（R1）本身不通知，但同一支策略 7 天內自動補寫達 2 次，就發一次 R3 通知「這個修補一直在發生，請追根因」（附次數與交易編號），之後 7 天內不重發（使用者 2026-10-01 核可門檻）。讓修復機器人不會變成掩蓋 bug 的工具。",
+    "title": "自動修補重複發生時升格通知"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-notify.error_id",
+    "complete": false,
+    "dots": {
+@@ -2224,7 +2224,7 @@
+        "aspect": null,
+        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+        "state": "pending",
+-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
+       }
+      ]
+     },
+@@ -2235,7 +2235,7 @@
+        "aspect": null,
+        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+        "state": "pending",
+-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
+       }
+      ]
+     },
+@@ -2246,7 +2246,7 @@
+        "aspect": null,
+        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+        "state": "pending",
+-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
+       }
+      ]
+     },
+@@ -2257,7 +2257,7 @@
+        "aspect": null,
+        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+        "state": "pending",
+-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
+       }
+      ]
+     }
+@@ -2266,7 +2266,7 @@
+    "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-stop.graceful",
+    "complete": false,
+    "dots": {
+@@ -2328,7 +2328,7 @@
+    "title": "收到停止訊號時等當輪做完再結束"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-recovery.interrupted_order",
+    "complete": false,
+    "dots": {
+@@ -2495,7 +2495,7 @@
+    "title": "R2｜移動停損換單失敗，部位可能沒有交易所端保護"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-SEY.PROTECTION_MOVE_DEFERRED",
+    "complete": false,
+    "dots": {
+@@ -2519,9 +2519,9 @@
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+        "state": "pending",
+-       "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++       "text": "2026-10-01 f-14（ed-seykota #81）已在開發主幹實作：每 10 分鐘重試，連續第 3 次失敗寫一筆升格事件並通知一次；還沒上正式機，上線後改已做。"
+       }
+      ]
+     }
+@@ -4532,7 +4532,7 @@
+    "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+    "complete": false,
+    "dots": {
+@@ -4567,7 +4567,7 @@
+    "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-BTC.STATE_FILE_CORRUPT",
+    "complete": false,
+    "dots": {
+@@ -4600,6 +4600,76 @@
+    ],
+    "sub": "ERR-053 · BTC.STATE_FILE_CORRUPT",
+    "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
++   "complete": false,
++   "dots": {
++    "btc-competition": "none",
++    "momentum": "pending",
++    "mycrypto": "none",
++    "seykota": "none"
++   },
++   "has_recent": false,
++   "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；動能策略升級共用庫並部署後才會發，上正式機後改已做。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-054 · MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
++   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
++   "complete": false,
++   "dots": {
++    "btc-competition": "none",
++    "momentum": "none",
++    "mycrypto": "none",
++    "seykota": "pending"
++   },
++   "has_recent": false,
++   "id": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；趨勢策略升級共用庫並部署後才會發，上正式機後改已做。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++       "state": "pending",
++       "text": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-055 · SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
++   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
+   }
+  ],
+  "phase_counts": {
+@@ -4607,16 +4677,16 @@
+   "8-btc-competition": 8,
+   "8-momentum": 3,
+   "8-mycrypto": 20,
+-  "8-seykota": 19,
++  "8-seykota": 18,
+   "binance-funding-sync": 2,
+   "error-ids": 4,
+-  "f-12": 16,
++  "f-12": 23,
+   "h4-trade-correction": 0,
+   "hotfix-btc-order-resend": 0,
+   "hotfix-seykota-order-resend": 0,
+   "hotfix-seykota-stop-resolution": 0,
+   "naming-rollout": 0,
+-  "repair-recurrence": 4,
++  "repair-recurrence": 2,
+   "unrecorded-fill": 4,
+   "v2-W2": 0,
+   "v2-W3": 0,
+@@ -4658,7 +4728,7 @@
+   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
+   "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
+   "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
+-  "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
++  "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
+   "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+   "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
+   "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+@@ -4679,28 +4749,34 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+-   "note": "競賽每日調整被中斷、重啟後把已成交的單照交易所補記並通知（f-12，ERR-052）。",
++   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
++   "note": "自動補寫 7 天內達 2 次就通知一次、追根因（g2，ERR-054）。",
+    "project": null,
+-   "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
++   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
+   },
+   {
+-   "anchor": "rule-BTC.STATE_FILE_CORRUPT",
+-   "note": "競賽狀態檔讀不出來就安全暫停、不再當成第一次執行（f-12，ERR-053）。",
++   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
++   "note": "同上，趨勢策略（g2，ERR-055）。",
+    "project": null,
+-   "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
++   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
+   },
+   {
+-   "anchor": "cap-stop.graceful",
+-   "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。",
++   "anchor": "cap-repair_bot.recurrence_escalation",
++   "note": "門檻定案（7 天內 2 次、通知後 7 天不重發），共用庫已實作、未上正式機。",
+    "project": null,
+-   "title": "收到停止訊號時等當輪做完再結束"
++   "title": "自動修補重複發生時升格通知"
+   },
+   {
+-   "anchor": "cap-recovery.interrupted_order",
+-   "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。",
++   "anchor": "rule-SEY.PROTECTION_MOVE_DEFERRED",
++   "note": "f-14 已實作每 10 分鐘重試、連續 3 次通知（開發主幹，未上正式機）；錯誤清單文字同步。",
+    "project": null,
+-   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
++   "title": "R2｜移動停損時舊停損單取消不掉，保留舊停損、這輪不移動"
++  },
++  {
++   "anchor": "cap-notify.error_id",
++   "note": "共用庫已實作【編號】標題第一行與第二則 AI 指令（未發版）；維運通知自己的告警與發兩則未做。",
++   "project": null,
++   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+   }
+  ],
+  "totals": {
+@@ -4712,7 +4788,7 @@
+   "momentum": {
+    "done": 35,
+    "n/a": 10,
+-   "pending": 11
++   "pending": 13
+   },
+   "mycrypto": {
+    "done": 14,
+@@ -4722,7 +4798,7 @@
+   "seykota": {
+    "done": 43,
+    "n/a": 8,
+-   "pending": 27
++   "pending": 29
+   }
+  }
+ }
+diff --git a/schemas/fleet-ops-export-v2.schema.json b/schemas/fleet-ops-export-v2.schema.json
+index 29b8fce..ae6daf2 100644
+--- a/schemas/fleet-ops-export-v2.schema.json
++++ b/schemas/fleet-ops-export-v2.schema.json
+@@ -77,7 +77,12 @@
+           "text": {
+             "type": "string",
+             "minLength": 1,
+-            "description": "Complete plain-language message body including, when the catalog has one, the AI root-cause prompt with this event's identifiers; the reader adds only the strategy label and times."
++            "description": "Main plain-language message. Line 1 is exactly '【ERR-xxx】' plus the catalog title (or '【未編號】<code>' for an uncatalogued code), line 2 the tier header; the reader adds only the strategy label and times. The AI root-cause prompt is the separate ai_text."
++          },
++          "ai_text": {
++            "type": "string",
++            "minLength": 1,
++            "description": "Optional second message: the catalog's AI root-cause prompt with this event's identifiers, first line '【ERR-xxx】給 AI 的追查指令（整段貼給 Claude）'. Absent when the catalog entry has no prompt. A reader that does not know this field still sends a complete main message."
+           }
+         }
+       }
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index cf78457..e9e3f24 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -86,6 +86,7 @@ from .google_ledger_client import (
+ from .ledger_integrity import (
+     LEDGER_PROJECTION_SCHEMA_VERSION,
+     LedgerIntegrityError,
++    LedgerUnreadableError,
+     LedgerProvenance,
+     ProjectionClassification,
+     ProjectionComparison,
+@@ -293,6 +294,7 @@ __all__ = [
+     "submit_projection_v2",
+     "LEDGER_PROJECTION_SCHEMA_VERSION",
+     "LedgerIntegrityError",
++    "LedgerUnreadableError",
+     "LedgerProvenance",
+     "ProjectionClassification",
+     "ProjectionComparison",
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 839a8e0..af2f1bf 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -36,7 +36,7 @@
+     "btc-competition": "btc-bull-market-competition",
+     "fleet": "(cross-repo: same condition implemented in every strategy)"
+   },
+-  "error_ids_issued": 53,
++  "error_ids_issued": 55,
+   "entries": [
+     {
+       "error_id": "ERR-001",
+@@ -149,14 +149,14 @@
+       },
+       "verdict": "JUDGEMENT",
+       "risk_tier": "R2",
+-      "auto_action": "保留舊停損（部位仍有保護，只是停損價還是舊的），不掛新單；下一根 K 棒自動再試移動（ed-seykota PR #74 已實作）。目前每次發生都只在主機日誌記一筆緊急（ERROR）紀錄；第 8 關接上共用事件日誌時，改為連續 escalate_after 次都移不動才升格：開請求、通知。",
+-      "human_action": "到交易所確認舊停損單還在；查明為什麼取消一直失敗（網路、交易所、API 權限），必要時手動把停損移到新價位。",
++      "auto_action": "保留舊停損（部位仍有保護，只是停損價還是舊的），不掛新單；每 10 分鐘自動再試移動（連續失敗次數記在狀態檔，重啟後不歸零；ed-seykota PR #74、#81）。每次失敗寫一筆事件日誌（R2，不通知）；連續第 3 次失敗（約 20～30 分鐘）寫一筆升格事件並由 ops_export 通知一次，之後繼續重試但不再重發。移動成功後清除計數。",
++      "human_action": "收到通知後，到交易所確認舊停損單還在；查明為什麼取消一直失敗（網路、交易所、API 權限），必要時手動把停損移到新價位。",
+       "resume": "n/a",
+       "lands_in_phase": 8,
+-      "rationale": "2026-09-24 h11 在 Binance 測試網查證：掛單清單沒有延遲，所以取消卡住只會是撤單或查詢請求一直失敗。舊單最後一次查到時還在（或根本沒送出取消），部位仍受舊停損保護，不必停機；Binance 也不允許同方向再掛第二張全部平倉停損（-4130），所以不能先掛新單再清舊單，只能等下一輪再試。",
++      "rationale": "2026-09-24 h11 在 Binance 測試網查證：掛單清單沒有延遲，所以取消卡住只會是撤單或查詢請求一直失敗。舊單最後一次查到時還在（或根本沒送出取消），部位仍受舊停損保護，不必停機；Binance 也不允許同方向再掛第二張全部平倉停損（-4130），所以不能先掛新單再清舊單，只能等下一輪再試。 2026-10-01 f-14：改為每 10 分鐘重試（原本要等下一根 4 小時 K 棒），並在連續第 3 次失敗時通知一次；升格那一筆事件在趨勢策略端標為 R3（急迫顯示），目錄等級維持 R2（自動重試、連續失敗才通知），前兩次失敗不會通知。",
+       "operator_message": {
+         "what": "移動停損要先取消舊停損單，但 60 秒內取消不掉，舊單還掛在交易所上。",
+-        "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，下一根 K 棒自動再試。目前每次發生都只在主機日誌記一筆緊急紀錄，還不會送到你的手機——趨勢策略的通知要到第 8 關接上共用事件日誌才會送出；屆時規劃改成連續 3 次都移不動才通知你。",
++        "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，每 10 分鐘自動再試。連續第 3 次都取消不掉時會通知你一次（約 20～30 分鐘後），之後繼續重試但不再重發。",
+         "steps": [
+           "到交易所 App 的委託清單確認訊息裡那張舊停損單還在。",
+           "如果擔心舊停損價太遠，可以手動把停損改到訊息裡的新停損價。",
+@@ -574,7 +574,7 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:299"
++        "trade-alerts/src/trade_alerts/repair_runner.py:369"
+       ],
+       "current": {
+         "latch": null,
+@@ -604,7 +604,7 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:364"
++        "trade-alerts/src/trade_alerts/repair_runner.py:434"
+       ],
+       "current": {
+         "latch": null,
+@@ -636,8 +636,8 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:332",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:346"
++        "trade-alerts/src/trade_alerts/repair_runner.py:402",
++        "trade-alerts/src/trade_alerts/repair_runner.py:416"
+       ],
+       "current": {
+         "latch": null,
+@@ -1040,7 +1040,7 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:299"
++        "trade-alerts/src/trade_alerts/repair_runner.py:369"
+       ],
+       "current": {
+         "latch": null,
+@@ -1070,8 +1070,8 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:332",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:346"
++        "trade-alerts/src/trade_alerts/repair_runner.py:402",
++        "trade-alerts/src/trade_alerts/repair_runner.py:416"
+       ],
+       "current": {
+         "latch": null,
+@@ -1102,7 +1102,7 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:364"
++        "trade-alerts/src/trade_alerts/repair_runner.py:434"
+       ],
+       "current": {
+         "latch": null,
+@@ -1133,7 +1133,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "seykota",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:440"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:651"
+       ],
+       "current": {
+         "latch": null,
+@@ -1163,7 +1163,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "seykota",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:725"
+       ],
+       "current": {
+         "latch": null,
+@@ -1195,7 +1195,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "momentum",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:440"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:651"
+       ],
+       "current": {
+         "latch": null,
+@@ -1225,7 +1225,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "momentum",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:725"
+       ],
+       "current": {
+         "latch": null,
+@@ -1257,7 +1257,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "btc-competition",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:484"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:695"
+       ],
+       "current": {
+         "latch": null,
+@@ -1287,7 +1287,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "btc-competition",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:725"
+       ],
+       "current": {
+         "latch": null,
+@@ -1319,7 +1319,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "mycrypto",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:725"
+       ],
+       "current": {
+         "latch": null,
+@@ -1703,6 +1703,68 @@
+         ],
+         "ai_prompt": "請在 btc-bull-market-competition 追查狀態檔損毀：讀 btc-competition-resume preview 的證據（path、problem、damaged_copy），檢查損毀備份檔的內容與大小、state/ 目錄的磁碟空間與檔案系統錯誤（dmesg、df）、journalctl 在狀態檔最後一次正常寫入前後的紀錄，以及有沒有人手動編輯過；state 現在是原子寫入（src/btc_competition/state.py），所以被殺不應造成損毀，請判斷真正原因並提出治本修正。"
+       }
++    },
++    {
++      "error_id": "ERR-054",
++      "code": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
++      "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
++      "project": "momentum",
++      "sources": [
++        "scripts/repair_bot.py:163",
++        "trade-alerts/src/trade_alerts/repair_runner.py:276"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不動帳本、不暫停。修復機器人每輪結束時數最近 7 天內這支策略的「VERIFIED_CLOSE_AUTO_REPAIRED」事件；達 2 次就寫一筆事件日誌並由 ops_export 通知一次（附次數與交易編號）。這則通知發出後 7 天內不再重發；7 天後若 7 天窗口內仍有 2 次以上，會再發一次。",
++      "human_action": "帳本已經被自動補對，不用再動帳本；要做的是追出為什麼平倉一直沒被記進帳本（有 bug 在持續漏記），並確認修正。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-10-01 使用者核可（g2）：自動補寫（R1）本身不通知，但若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 永遠不會被發現。門檻 7 天內 2 次、通知後 7 天內不重發，是為了讓一次偶發事件不吵人、但同一個問題連續發生時一定被看見。因為發的是「請追根因」而不是「帳本壞了」，帳本已經對，所以是 R3 事件通知而不是請求（不開請求、不鎖機）。",
++      "operator_message": {
++        "what": "動能策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。",
++        "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
++        "steps": [
++          "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
++        ],
++        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查平倉一直漏記的原因：讀 audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、還是交易所路徑沒走到記帳），提出治本修正與回歸測試。"
++      }
++    },
++    {
++      "error_id": "ERR-055",
++      "code": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
++      "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
++      "project": "seykota",
++      "sources": [
++        "scripts/repair_bot.py:186",
++        "trade-alerts/src/trade_alerts/repair_runner.py:276"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不動帳本、不暫停。修復機器人每輪結束時數最近 7 天內這支策略的「VERIFIED_CLOSE_AUTO_REPAIRED」事件；達 2 次就寫一筆事件日誌並由 ops_export 通知一次（附次數與交易編號）。這則通知發出後 7 天內不再重發；7 天後若 7 天窗口內仍有 2 次以上，會再發一次。",
++      "human_action": "帳本已經被自動補對，不用再動帳本；要做的是追出為什麼平倉一直沒被記進帳本（有 bug 在持續漏記），並確認修正。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-10-01 使用者核可（g2）：自動補寫（R1）本身不通知，但若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 永遠不會被發現。門檻 7 天內 2 次、通知後 7 天內不重發，是為了讓一次偶發事件不吵人、但同一個問題連續發生時一定被看見。因為發的是「請追根因」而不是「帳本壞了」，帳本已經對，所以是 R3 事件通知而不是請求（不開請求、不鎖機）。",
++      "operator_message": {
++        "what": "趨勢策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。",
++        "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
++        "steps": [
++          "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
++        ],
++        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查平倉一直漏記的原因：讀 audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、還是交易所路徑沒走到記帳），提出治本修正與回歸測試。"
++      }
+     }
+   ],
+   "retired_codes": [
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 93d76e8..0413921 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1,7 +1,7 @@
+ {
+   "registry_version": "fleet-rollout-registry/v1",
+   "catalog_version": "fleet-error-catalog/v2",
+-  "updated_at": "2026-10-01",
++  "updated_at": "2026-10-02",
+   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
+   "projects": {
+     "momentum": "動能策略",
+@@ -23,7 +23,7 @@
+     "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+     "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
+     "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
+-    "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
++    "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
+     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+     "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
+@@ -535,17 +535,17 @@
+     {
+       "id": "repair_bot.recurrence_escalation",
+       "title": "自動修補重複發生時升格通知",
+-      "description": "自動修補（R1）本身不通知，但同一支策略在一段期間內修補次數超過門檻時，要發一次 R2 通知「這個修補一直在發生，請追根因」，讓修復機器人不會變成掩蓋 bug 的工具。門檻與期間待定。",
++      "description": "自動修補（R1）本身不通知，但同一支策略 7 天內自動補寫達 2 次，就發一次 R3 通知「這個修補一直在發生，請追根因」（附次數與交易編號），之後 7 天內不重發（使用者 2026-10-01 核可門檻）。讓修復機器人不會變成掩蓋 bug 的工具。",
+       "status": {
+         "momentum": {
+           "state": "pending",
+-          "phase": "repair-recurrence",
+-          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
++          "phase": "f-12",
++          "reason": "2026-10-02 已在共用庫（trade-alerts 開發中的 v0.25.0）實作：修復機器人每輪數最近 7 天自動補寫次數，達 2 次通知一次、之後 7 天內不重發；動能策略已接共用修復執行器，升級共用庫後自動具備。還沒發版、沒上任何主機，上正式機後改已做。"
+         },
+         "seykota": {
+           "state": "pending",
+-          "phase": "repair-recurrence",
+-          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
++          "phase": "f-12",
++          "reason": "2026-10-02 已在共用庫（trade-alerts 開發中的 v0.25.0）實作：修復機器人每輪數最近 7 天自動補寫次數，達 2 次通知一次、之後 7 天內不重發；趨勢策略已接共用修復執行器，升級共用庫後自動具備。還沒發版、沒上任何主機，上正式機後改已做。"
+         },
+         "mycrypto": {
+           "state": "pending",
+@@ -567,22 +567,22 @@
+         "momentum": {
+           "state": "pending",
+           "phase": "error-ids",
+-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
+         },
+         "seykota": {
+           "state": "pending",
+           "phase": "error-ids",
+-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
+         },
+         "mycrypto": {
+           "state": "pending",
+           "phase": "error-ids",
+-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
+         },
+         "btc-competition": {
+           "state": "pending",
+           "phase": "error-ids",
+-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
++          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
+         }
+       }
+     },
+@@ -702,8 +702,8 @@
+       "emits_event": {
+         "seykota": {
+           "state": "pending",
+-          "phase": "8-seykota",
+-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "phase": "f-12",
++          "reason": "2026-10-01 f-14（ed-seykota #81）已在開發主幹實作：每 10 分鐘重試，連續第 3 次失敗寫一筆升格事件並通知一次；還沒上正式機，上線後改已做。"
+         }
+       }
+     },
+@@ -1653,32 +1653,72 @@
+           "reason": "同上：暫停時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
+         }
+       }
++    },
++    {
++      "code": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
++      "behaviour": {
++        "momentum": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；動能策略升級共用庫並部署後才會發，上正式機後改已做。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
++        }
++      }
++    },
++    {
++      "code": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
++      "behaviour": {
++        "seykota": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；趨勢策略升級共用庫並部署後才會發，上正式機後改已做。"
++        }
++      },
++      "emits_event": {
++        "seykota": {
++          "state": "pending",
++          "phase": "f-12",
++          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
+     {
+       "kind": "rule",
+-      "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
++      "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+       "type": "added",
+-      "note": "競賽每日調整被中斷、重啟後把已成交的單照交易所補記並通知（f-12，ERR-052）。"
++      "note": "自動補寫 7 天內達 2 次就通知一次、追根因（g2，ERR-054）。"
+     },
+     {
+       "kind": "rule",
+-      "id": "BTC.STATE_FILE_CORRUPT",
++      "id": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+       "type": "added",
+-      "note": "競賽狀態檔讀不出來就安全暫停、不再當成第一次執行（f-12，ERR-053）。"
++      "note": "同上，趨勢策略（g2，ERR-055）。"
+     },
+     {
+       "kind": "cap",
+-      "id": "stop.graceful",
++      "id": "repair_bot.recurrence_escalation",
++      "type": "updated",
++      "note": "門檻定案（7 天內 2 次、通知後 7 天不重發），共用庫已實作、未上正式機。"
++    },
++    {
++      "kind": "rule",
++      "id": "SEY.PROTECTION_MOVE_DEFERRED",
+       "type": "updated",
+-      "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。"
++      "note": "f-14 已實作每 10 分鐘重試、連續 3 次通知（開發主幹，未上正式機）；錯誤清單文字同步。"
+     },
+     {
+       "kind": "cap",
+-      "id": "recovery.interrupted_order",
++      "id": "notify.error_id",
+       "type": "updated",
+-      "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。"
++      "note": "共用庫已實作【編號】標題第一行與第二則 AI 指令（未發版）；維運通知自己的告警與發兩則未做。"
+     }
+   ]
+-}
++}
+\ No newline at end of file
+diff --git a/src/trade_alerts/channels.py b/src/trade_alerts/channels.py
+index a69eefd..a798ccc 100644
+--- a/src/trade_alerts/channels.py
++++ b/src/trade_alerts/channels.py
+@@ -7,6 +7,38 @@ import requests
+ 
+ from .core import RetryPolicy, request_with_retry
+ 
++#: LINE accepts at most this many message objects in one push.
++LINE_MAX_MESSAGES = 5
++TRUNCATION_MARK = "\n…（內容過長，後面已省略）"
++
++
++def split_text(text: str, limit: int) -> list[str]:
++    """Cut ``text`` into pieces of at most ``limit`` characters with
++    ``"".join(pieces) == text`` -- nothing dropped, nothing reordered, no
++    piece empty (except for empty input).  Each cut prefers the position just
++    after the last line break inside the window, unless that would leave a
++    whitespace-only piece, in which case it cuts at ``limit``.  A piece that is
++    only whitespace can still occur at the very end; ``sendable`` drops those,
++    because the APIs reject them and nothing visible is lost."""
++    if limit < 1:
++        raise ValueError("limit must be positive")
++    pieces: list[str] = []
++    rest = text
++    while len(rest) > limit:
++        cut = rest[:limit].rfind("\n") + 1
++        if cut <= 0 or not rest[:cut].strip():
++            cut = limit
++        pieces.append(rest[:cut])
++        rest = rest[cut:]
++    pieces.append(rest)
++    return pieces
++
++
++def sendable(pieces: list[str], original: str) -> list[str]:
++    """The pieces an API will accept (not whitespace-only); the original text
++    when nothing is left, so an empty message fails exactly as it always did."""
++    return [piece for piece in pieces if piece.strip()] or [original]
++
+ 
+ @dataclass
+ class TelegramChannel:
+@@ -14,23 +46,28 @@ class TelegramChannel:
+     chat_id: str
+     policy: RetryPolicy = RetryPolicy()
+     name: str = "telegram"
++    max_text_length: int = 4096
+ 
+     def send(self, text: str, *, timeout: float | None = None) -> None:
+         if not self.bot_token or not self.chat_id:
+             raise ValueError("Telegram credentials are incomplete")
+         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+-        payload = {"chat_id": self.chat_id, "text": text, "disable_web_page_preview": True}
+         effective = self.policy if timeout is None else RetryPolicy(self.policy.attempts, self.policy.backoff_seconds, timeout)
+ 
+-        def call(request_timeout: float) -> Any:
+-            response = requests.post(url, json=payload, timeout=request_timeout)
+-            response.raise_for_status()
+-            data = response.json()
+-            if not data.get("ok", False):
+-                raise RuntimeError(f"Telegram API error: {data}")
+-            return data
++        # Telegram rejects a message over 4096 characters outright; send the
++        # rest as further messages instead of losing it.
++        for piece in sendable(split_text(text, self.max_text_length), text):
++            payload = {"chat_id": self.chat_id, "text": piece, "disable_web_page_preview": True}
+ 
+-        request_with_retry(call, effective)
++            def call(request_timeout: float, payload: dict = payload) -> Any:
++                response = requests.post(url, json=payload, timeout=request_timeout)
++                response.raise_for_status()
++                data = response.json()
++                if not data.get("ok", False):
++                    raise RuntimeError(f"Telegram API error: {data}")
++                return data
++
++            request_with_retry(call, effective)
+ 
+ 
+ @dataclass
+@@ -49,7 +86,15 @@ class LineMessagingChannel:
+             "Authorization": f"Bearer {self.channel_access_token}",
+             "Content-Type": "application/json",
+         }
+-        payload = {"to": self.recipient_id, "messages": [{"type": "text", "text": text[: self.max_text_length]}]}
++        # Over the limit the old code silently cut the text off (the tail of a
++        # notice is what mattered most).  Split it across message objects of one
++        # push; only beyond LINE_MAX_MESSAGES pieces is anything dropped, and
++        # then the last piece says so.
++        pieces = sendable(split_text(text, self.max_text_length), text)
++        if len(pieces) > LINE_MAX_MESSAGES:
++            pieces = pieces[:LINE_MAX_MESSAGES]
++            pieces[-1] = pieces[-1][: self.max_text_length - len(TRUNCATION_MARK)] + TRUNCATION_MARK
++        payload = {"to": self.recipient_id, "messages": [{"type": "text", "text": piece} for piece in pieces]}
+         effective = self.policy if timeout is None else RetryPolicy(self.policy.attempts, self.policy.backoff_seconds, timeout)
+ 
+         def call(request_timeout: float) -> Any:
+diff --git a/src/trade_alerts/ledger_integrity.py b/src/trade_alerts/ledger_integrity.py
+index 5cd050b..074eea6 100644
+--- a/src/trade_alerts/ledger_integrity.py
++++ b/src/trade_alerts/ledger_integrity.py
+@@ -29,6 +29,16 @@ class LedgerIntegrityError(ValueError):
+     """Raised before an invalid or ambiguous ledger projection can be sent."""
+ 
+ 
++class LedgerUnreadableError(LedgerIntegrityError):
++    """The ledger itself cannot be read right now (missing, or a damaged line).
++
++    Unlike an ambiguous or mismatching fact, this says nothing about the queued
++    intent: a process killed mid-append leaves a half line that a person can
++    repair, after which the same intent rebuilds fine.  ``dispatch_next_projection``
++    therefore pauses on it instead of recording a terminal ``REJECTED``.
++    """
++
++
+ class ProjectionClassification(StrEnum):
+     MATCHED = "MATCHED"
+     PENDING_SYNC = "PENDING_SYNC"
+diff --git a/src/trade_alerts/notice_replay.py b/src/trade_alerts/notice_replay.py
+new file mode 100644
+index 0000000..d7f827c
+--- /dev/null
++++ b/src/trade_alerts/notice_replay.py
+@@ -0,0 +1,102 @@
++"""Idempotent re-announcement of facts that were written but never announced.
++
++Every notice in this fleet is produced from ``fleet_event_log``, and several
++handlers write the durable fact *first* (a ledger correction, an open error
++request) and the fleet event *second*.  A process killed between the two leaves
++a fact nobody was told about, and the next round sees the fact already in place
++and stays silent -- the human never learns that a duplicate send was corrected,
++or that an automatic repair gave up.  The helpers here find those facts and
++write the missing event, marked ``details.replayed = true``.
++
++Everything is keyed by something the first write already stored (an evidence
++file path, a request id), so running it every round is a no-op once the event
++exists.
++"""
++from __future__ import annotations
++
++import json
++from pathlib import Path
++from typing import Any, Iterable, Mapping
++
++from .error_request_queue import outstanding_error_requests
++from .fleet_event_log import append_fleet_event, read_fleet_events
++
++
++def events_for(fleet_events: Iterable[Mapping[str, Any]], project: str, codes: Iterable[str]) -> list[Mapping[str, Any]]:
++    wanted = set(codes)
++    return [e for e in fleet_events if e.get("project") == project and e.get("code") in wanted]
++
++
++def announced_request_ids(fleet_events: Iterable[Mapping[str, Any]], project: str, codes: Iterable[str]) -> set[str]:
++    """``details.request_id`` of every event that already announced a request."""
++    ids: set[str] = set()
++    for event in events_for(fleet_events, project, codes):
++        details = event.get("details") if isinstance(event.get("details"), Mapping) else {}
++        if details.get("request_id"):
++            ids.add(str(details["request_id"]))
++    return ids
++
++
++def replay_unannounced_requests(
++    *,
++    fleet_event_log: str | Path,
++    request_queue: str | Path,
++    project: str,
++    code: str,
++    risk_tier: str,
++    notice_text: Any,
++    extra_details: Mapping[str, Any] | None = None,
++) -> list[dict[str, Any]]:
++    """Write the fleet event for every open request of ``code`` that has none.
++
++    ``notice_text(request)`` renders the technical text from the request itself
++    (its summary and details are all that survived the kill).  ``extra_details``
++    is merged into the event (an R2 escalation must carry ``escalated=True`` for
++    the exporter to treat it as notifying).  Returns the events written.
++    """
++    fleet_events = read_fleet_events(fleet_event_log)
++    announced = announced_request_ids(fleet_events, project, [code])
++    written: list[dict[str, Any]] = []
++    for request in outstanding_error_requests(request_queue):
++        if request.get("project") != project or request.get("code") != code:
++            continue
++        request_id = str(request.get("request_id") or "")
++        if not request_id or request_id in announced:
++            continue
++        details = dict(request.get("details") or {})
++        details.update(dict(extra_details or {}), request_id=request_id, replayed=True, notice_text=notice_text(request))
++        written.append(append_fleet_event(
++            fleet_event_log, project=project, code=code, risk_tier=risk_tier,
++            summary=str(request.get("summary") or ""), evidence=dict(request.get("evidence") or {}),
++            details=details,
++        ))
++        announced.add(request_id)
++    return written
++
++
++def read_evidence_files(directory: str | Path) -> list[tuple[str, dict[str, Any]]]:
++    """``(path, content)`` of every readable JSON evidence file, oldest name first.
++
++    An unreadable file is skipped: evidence files are written atomically, so a
++    bad one is not ours, and a replay must never fail a round.
++    """
++    root = Path(directory)
++    if not root.is_dir():
++        return []
++    out: list[tuple[str, dict[str, Any]]] = []
++    for path in sorted(root.glob("*.json")):
++        try:
++            content = json.loads(path.read_text(encoding="utf-8"))
++        except (OSError, ValueError):
++            continue
++        if isinstance(content, dict):
++            out.append((str(path), content))
++    return out
++
++
++__all__ = [
++    "announced_request_ids",
++    "events_for",
++    "read_evidence_files",
++    "replay_unannounced_requests",
++]
+diff --git a/src/trade_alerts/ops_export.py b/src/trade_alerts/ops_export.py
+index 0540e21..13f94c1 100644
+--- a/src/trade_alerts/ops_export.py
++++ b/src/trade_alerts/ops_export.py
+@@ -13,7 +13,9 @@ relay side can fabricate an item to send.
+ The file is a full snapshot rewritten every time, not an append log, so a
+ reader never has to reconcile partial writes: ``notices`` are the events of the
+ last ``window_days`` that need a human, identified by ``event_id`` so the reader
+-can send each exactly once, and ``open_requests`` is everything still open.
++can send each exactly once (``text`` is the main message and the optional
++``ai_text`` the second, paste-to-AI message -- a reader that only knows ``text``
++still sends a complete, if shorter, notice), and ``open_requests`` is everything still open.
+ 
+ Which events need a human follows fleet-error-catalog/v2: every ``R3`` event,
+ and an ``R2`` event only once the automatic retries gave up
+@@ -87,22 +89,55 @@ def needs_human(event: Mapping[str, Any], risk_tier: str | None) -> bool:
+     return risk_tier == "R2" and details.get("escalated") is True
+ 
+ 
+-def _ai_block(event: Mapping[str, Any], ai_prompt: str) -> list[str]:
+-    """The catalog's prompt plus this occurrence's own identifiers, so it can be
+-    pasted to an AI as-is without the operator digging anything up."""
++def notice_title(entry: Mapping[str, Any] | None, code: str) -> str:
++    """First line of every notice: ``【ERR-007】`` plus the catalog title,
++    character for character.  The title is read from the catalog entry, never
++    retyped, so a message can only differ from the risk register by the
++    catalog changing.  An event with no catalog entry (a strategy emitting a
++    code nobody catalogued) is marked ``【未編號】`` rather than given an
++    invented number."""
++    entry = entry or {}
++    error_id = entry.get("error_id")
++    title = entry.get("title")
++    if isinstance(error_id, str) and error_id and isinstance(title, str) and title:
++        return f"【{error_id}】{title}"
++    return f"【未編號】{code}"
++
++
++def render_ai_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None, code: str | None = None) -> str | None:
++    """The second message of a notice: only what to paste to an AI.
++
++    The catalog's prompt plus this occurrence's own identifiers, so it can be
++    copied as one block without digging anything up.  Its first line carries the
++    same ``【ERR-xxx】`` as the main message so the two read as one notice.
++    ``None`` when the catalog entry has no prompt.
++    """
++    message = (entry or {}).get("operator_message")
++    ai_prompt = message.get("ai_prompt") if isinstance(message, Mapping) else None
++    if not (isinstance(ai_prompt, str) and ai_prompt.strip()):
++        return None
+     evidence = event.get("evidence") if isinstance(event.get("evidence"), Mapping) else {}
+-    return ["", "給 AI 的追查指令（整段貼給 Claude）：", ai_prompt.strip(),
+-            f"錯誤碼：{event.get('project')}/{event.get('code')}　事件編號：{event.get('event_id')}",
+-            "事件資料：" + json.dumps(dict(evidence), ensure_ascii=False, sort_keys=True)]
++    code = code if code is not None else str(event.get("code") or "")
++    first = notice_title(entry, code).split("】", 1)[0] + "】" if entry else "【未編號】"
++    return "\n".join([
++        f"{first}給 AI 的追查指令（整段貼給 Claude）",
++        ai_prompt.strip(),
++        f"錯誤碼：{event.get('project')}/{event.get('code')}　事件編號：{event.get('event_id')}",
++        "事件資料：" + json.dumps(dict(evidence), ensure_ascii=False, sort_keys=True),
++    ])
+ 
+ 
+ def render_notice_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None, risk_tier: str) -> str:
+-    """Plain-language message for one event: tier header, catalog title, the
+-    entry's ``operator_message`` when it has one, the technical detail the
+-    strategy attached (``details.notice_text``, else the event summary), and the
+-    entry's AI root-cause prompt with this event's identifiers."""
++    """Plain-language main message for one event.
++
++    Line 1 is ``【ERR-xxx】<catalog title>`` (see ``notice_title``), line 2 the
++    tier header, then the entry's ``operator_message`` when it has one and the
++    technical detail the strategy attached (``details.notice_text``, else the
++    event summary).  The AI root-cause prompt is the *second* message
++    (``render_ai_text``), not part of this one.
++    """
+     code = str(event.get("code") or "")
+-    lines = [_TIER_HEADERS.get(risk_tier, risk_tier), str((entry or {}).get("title") or code)]
++    lines = [notice_title(entry, code), _TIER_HEADERS.get(risk_tier, risk_tier)]
+ 
+     message = (entry or {}).get("operator_message")
+     if isinstance(message, Mapping):
+@@ -116,10 +151,6 @@ def render_notice_text(event: Mapping[str, Any], entry: Mapping[str, Any] | None
+         technical = event.get("summary")
+     if isinstance(technical, str) and technical.strip():
+         lines += ["", "技術細節：", technical.strip()]
+-
+-    ai_prompt = message.get("ai_prompt") if isinstance(message, Mapping) else None
+-    if isinstance(ai_prompt, str) and ai_prompt.strip():
+-        lines += _ai_block(event, ai_prompt)
+     return "\n".join(lines)
+ 
+ 
+@@ -163,14 +194,18 @@ def build_ops_export(
+         tier = _resolve_tier(event, entry)
+         if not needs_human(event, tier):
+             continue
+-        notices.append({
++        notice = {
+             "event_id": str(event.get("event_id") or ""),
+             "recorded_at": event.get("recorded_at"),
+             "code": catalog_code(project, bare_code),
+             "risk_tier": tier,
+             "critical": tier == "R3",
+             "text": render_notice_text(event, entry, tier),
+-        })
++        }
++        ai_text = render_ai_text(event, entry, bare_code)
++        if ai_text is not None:
++            notice["ai_text"] = ai_text
++        notices.append(notice)
+     notices.sort(key=lambda notice: (str(notice["recorded_at"] or ""), notice["event_id"]))
+ 
+     open_requests: list[dict[str, Any]] = []
+diff --git a/src/trade_alerts/projection_outbox.py b/src/trade_alerts/projection_outbox.py
+index b97e86f..6e17823 100644
+--- a/src/trade_alerts/projection_outbox.py
++++ b/src/trade_alerts/projection_outbox.py
+@@ -17,7 +17,7 @@ from pathlib import Path
+ from typing import Any, Callable, Literal, Mapping
+ from uuid import uuid4
+ 
+-from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance
++from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance, LedgerUnreadableError
+ 
+ ProjectionAction = Literal["append_open_v2", "update_close_v2", "correct_close_v2"]
+ ProjectionOutcomeStatus = Literal["CONFIRMED", "REJECTED", "TRANSPORT_FAILED"]
+@@ -79,6 +79,10 @@ class ProjectionDispatchResult:
+ 
+     intent: ProjectionIntent | None
+     dispatch: ProjectionDispatch | None
++    #: Set when the ledger could not be read (``LedgerUnreadableError``): nothing
++    #: was recorded, the intent stays outstanding, and the caller should stop
++    #: and report instead of trying the next intent.
++    paused_reason: str | None = None
+ 
+ 
+ @dataclass(frozen=True)
+@@ -223,7 +227,8 @@ def dispatch_next_projection(
+     """Attempt only the oldest outstanding intent once.
+ 
+     ``rebuild`` must read the strategy's authoritative ledger and construct a
+-    fresh request id/timestamp/signature. ``submit`` is transport only. Neither
++    fresh request id/timestamp/signature. A ``LedgerUnreadableError`` from it
++    pauses the intent (nothing is recorded) rather than rejecting it. ``submit`` is transport only. Neither
+     callback receives a secret from this module, and this dispatcher never loops
+     or falls back to legacy synchronization.
+     """
+@@ -235,6 +240,10 @@ def dispatch_next_projection(
+         try:
+             rebuilt = rebuild(intent)
+             _validate_rebuilt(intent, rebuilt)
++        except LedgerUnreadableError as exc:
++            # A damaged ledger is a repairable, temporary state: do not burn the
++            # intent (a terminal REJECTED needs a manual re-queue to recover).
++            return ProjectionDispatchResult(intent, None, paused_reason=str(exc) or "ledger unreadable")
+         except Exception:
+             return ProjectionDispatchResult(intent, record_projection_dispatch(path, intent=intent, status="REJECTED", error_code="rehydration_invalid"))
+         try:
+diff --git a/src/trade_alerts/repair_runner.py b/src/trade_alerts/repair_runner.py
+index 5def976..cd00814 100644
+--- a/src/trade_alerts/repair_runner.py
++++ b/src/trade_alerts/repair_runner.py
+@@ -49,14 +49,15 @@ import logging
+ import os
+ import tempfile
+ from dataclasses import dataclass
+-from datetime import datetime, timezone
++from datetime import datetime, timedelta, timezone
+ from pathlib import Path
+ from typing import Any, Callable, Mapping
+ 
+ from .atomic_ledger_append import append_lines_atomically, stage_lines
+ from .error_request_queue import open_error_request, outstanding_error_requests, record_request_outcome
+-from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for
++from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for, utc_now_iso
+ from .ledger_reconcile import atomic_write, norm_symbol_plain, read_json, read_ledger
++from .notice_replay import replay_unannounced_requests
+ from .ops_export import build_ops_export, write_ops_export
+ from .verified_close_backfill import (
+     HALT,
+@@ -73,7 +74,14 @@ LOGGER = logging.getLogger("trade_alerts.repair_runner")
+ CODE_AUTO_REPAIRED = "VERIFIED_CLOSE_AUTO_REPAIRED"
+ CODE_REPAIR_FAILED = "VERIFIED_CLOSE_REPAIR_FAILED"
+ CODE_REPAIR_BLOCKED = "VERIFIED_CLOSE_REPAIR_BLOCKED"
+-RUNNER_CODES = (CODE_AUTO_REPAIRED, CODE_REPAIR_FAILED, CODE_REPAIR_BLOCKED)
++CODE_REPAIR_RECURRING = "VERIFIED_CLOSE_REPAIR_RECURRING"
++RUNNER_CODES = (CODE_AUTO_REPAIRED, CODE_REPAIR_FAILED, CODE_REPAIR_BLOCKED, CODE_REPAIR_RECURRING)
++#: g2 (2026-10-01): an automatic repair is silent, so a bug that keeps losing
++#: the same record would be patched over for ever.  This many automatic repairs
++#: within the window tell the operator once; the notice then stays quiet for a
++#: full window.
++RECURRING_THRESHOLD = 2
++RECURRING_WINDOW_DAYS = 7
+ 
+ _TRUE = {"1", "true", "yes", "on"}
+ 
+@@ -138,6 +146,7 @@ def run_repair_round(
+     paused: bool | None = None,
+     catalog: Mapping[str, Any] | None = None,
+     environ: Mapping[str, str] | None = None,
++    now: datetime | None = None,
+ ) -> dict[str, Any]:
+     """One repair round; returns what it did, for the caller to print.
+ 
+@@ -154,11 +163,11 @@ def run_repair_round(
+     result: dict[str, Any] = {
+         "project": adapter.project, "paused": paused, "candidates": [], "repaired": [], "failed": [],
+         "escalated": [], "blocked": [], "still_open": [], "awaiting_human": [], "deferred": [],
+-        "closed_requests": [], "ops_export_written": False,
++        "closed_requests": [], "replayed": [], "recurring": None, "ops_export_written": False,
+     }
+     try:
+         if not paused:
+-            _Round(adapter, paths, tiers, escalate_after, result).run()
++            _Round(adapter, paths, tiers, escalate_after, result, now=now).run()
+     finally:
+         result["ops_export_written"] = _refresh_ops_export(adapter.project, paths, catalog)
+     return result
+@@ -180,8 +189,9 @@ def _refresh_ops_export(project: str, paths: RepairPaths, catalog: Mapping[str,
+ class _Round:
+     def __init__(
+         self, adapter: RepairAdapter, paths: RepairPaths, tiers: dict[str, str], escalate_after: int,
+-        result: dict[str, Any],
++        result: dict[str, Any], *, now: datetime | None = None,
+     ) -> None:
++        self.now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+         self.adapter = adapter
+         self.project = adapter.project
+         self.paths = paths
+@@ -191,6 +201,7 @@ class _Round:
+         self.fleet_events: list[dict[str, Any]] = []
+ 
+     def run(self) -> None:
++        self._replay_unannounced()
+         ledger_events = read_ledger(self.paths.ledger)
+         self.fleet_events = [
+             event for event in read_fleet_events(self.paths.fleet_event_log) if event.get("project") == self.project
+@@ -212,6 +223,65 @@ class _Round:
+                 self.result["deferred"].append(trade_id)
+                 continue
+             write_attempted = self._handle(trade_id, ledger_events, request)
++        self._check_recurring()
++
++    def _replay_unannounced(self) -> None:
++        """A kill between opening a request and writing its fleet event leaves a
++        request nobody was told about; the candidate is "already escalated" so no
++        later round would announce it.  Write the missing event now."""
++        for code, headline, extra in ((CODE_REPAIR_FAILED, "自動補寫連續失敗，已升格需要你處理", {"escalated": True}),
++                                      (CODE_REPAIR_BLOCKED, "自動補寫已停手，這筆不會再自動重試", {})):
++            try:
++                written = replay_unannounced_requests(
++                    fleet_event_log=self.paths.fleet_event_log, request_queue=self.paths.request_queue,
++                    project=self.project, code=code, risk_tier=self.tiers[code],
++                    notice_text=lambda request, headline=headline: _replayed_notice(request, headline),
++                    extra_details=extra,
++                )
++            except Exception as exc:  # noqa: BLE001 -- a replay must never fail the round
++                LOGGER.warning("repair_replay_failed code=%s error=%s: %s", code, type(exc).__name__, exc)
++                self.result["replayed"].append({"code": code, "error": f"{type(exc).__name__}: {exc}"})
++                continue
++            self.result["replayed"] += [{"code": code, "request_id": e["details"]["request_id"],
++                                         "fleet_event_id": e["event_id"]} for e in written]
++
++    def _check_recurring(self) -> None:
++        """g2: tell the operator once when automatic repairs keep happening.
++
++        Evaluated every round, not only after a write, so a kill between the
++        repair and this check cannot lose it.  Counts this strategy's
++        ``VERIFIED_CLOSE_AUTO_REPAIRED`` events inside the window; stays quiet
++        while a recurring notice of its own is itself inside the window.
++        """
++        cutoff = self.now - timedelta(days=RECURRING_WINDOW_DAYS)
++        repairs, last_notice = [], None
++        for event in read_fleet_events(self.paths.fleet_event_log):
++            if event.get("project") != self.project:
++                continue
++            recorded = _parse_time(event.get("recorded_at"))
++            if recorded is None or recorded < cutoff:
++                continue
++            if event.get("code") == CODE_AUTO_REPAIRED:
++                repairs.append(event)
++            elif event.get("code") == CODE_REPAIR_RECURRING:
++                last_notice = event
++        if len(repairs) < RECURRING_THRESHOLD or last_notice is not None:
++            return
++        trade_ids = [str((e.get("evidence") or {}).get("trade_id")) for e in repairs]
++        notice = "\n".join([
++            f"最近 {RECURRING_WINDOW_DAYS} 天內，這支策略已經被自動補寫漏記的平倉 {len(repairs)} 次。",
++            "自動補寫只是把帳本補對，但一直需要補，代表有 bug 在持續漏記平倉，請追根因。",
++            *[f"- trade_id: {trade_id}" for trade_id in trade_ids],
++        ])
++        event = append_fleet_event(
++            self.paths.fleet_event_log, project=self.project, code=CODE_REPAIR_RECURRING,
++            risk_tier=self.tiers[CODE_REPAIR_RECURRING], recorded_at=utc_now_iso(self.now),
++            summary=f"{len(repairs)} automatic verified-close repairs in {RECURRING_WINDOW_DAYS} days",
++            evidence={"window_days": RECURRING_WINDOW_DAYS, "count": len(repairs), "trade_ids": trade_ids},
++            details={"threshold": RECURRING_THRESHOLD, "repair_event_ids": [e.get("event_id") for e in repairs],
++                     "notice_text": notice},
++        )
++        self.result["recurring"] = {"count": len(repairs), "trade_ids": trade_ids, "fleet_event_id": event["event_id"]}
+ 
+     # -- one candidate ------------------------------------------------------ #
+     def _handle(
+@@ -402,6 +472,16 @@ class _Round:
+         })
+ 
+ 
++def _parse_time(value: Any) -> datetime | None:
++    if not isinstance(value, str) or not value:
++        return None
++    try:
++        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
++    except ValueError:
++        return None
++    return (parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
++
++
+ def _symbol_of(ledger_events: list[dict[str, Any]], trade_id: str) -> str | None:
+     for event in ledger_events:
+         if event.get("event_type") == "trade_open" and str(event.get("trade_id")) == trade_id:
+@@ -421,6 +501,14 @@ def _failures_since_last_escalation(fleet_events: list[dict[str, Any]], trade_id
+     return count
+ 
+ 
++def _replayed_notice(request: Mapping[str, Any], headline: str) -> str:
++    evidence = request.get("evidence") if isinstance(request.get("evidence"), Mapping) else {}
++    details = request.get("details") if isinstance(request.get("details"), Mapping) else {}
++    reasons = [str(r) for r in details.get("reasons") or []] or [str(request.get("summary") or "")]
++    return "（補發：上一輪開了請求後被中斷，沒來得及通知。）\n" + _notice_text(
++        {"trade_id": evidence.get("trade_id"), "symbol": evidence.get("symbol")}, reasons, headline)
++
++
+ def _notice_text(identity: dict[str, Any], reasons: list[str], headline: str) -> str:
+     lines = [
+         headline,
+diff --git a/src/trade_alerts/unrecorded_fill.py b/src/trade_alerts/unrecorded_fill.py
+index 0bfcd5b..0df1b63 100644
+--- a/src/trade_alerts/unrecorded_fill.py
++++ b/src/trade_alerts/unrecorded_fill.py
+@@ -43,6 +43,7 @@ order: the adapter's exchange calls are read-only lookups.
+ """
+ from __future__ import annotations
+ 
++import json
+ import logging
+ from dataclasses import dataclass
+ from datetime import datetime, timezone
+@@ -50,7 +51,7 @@ from pathlib import Path
+ from typing import Any, Callable, Iterable, Mapping
+ 
+ from .error_request_queue import open_error_request, outstanding_error_requests, record_request_outcome
+-from .fleet_event_log import append_fleet_event, load_error_catalog, risk_tier_for
++from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for
+ from .ledger_reconcile import (
+     atomic_write,
+     is_paper_event,
+@@ -60,6 +61,7 @@ from .ledger_reconcile import (
+     read_ledger,
+     recorded_order_ids,
+ )
++from .notice_replay import events_for, read_evidence_files, replay_unannounced_requests
+ from .ops_export import build_ops_export, write_ops_export
+ from .trade_correction import TRADE_CORRECTION_EVENT, build_trade_correction
+ 
+@@ -87,6 +89,7 @@ TRADE_SLACK_MS = 10 * 60 * 1000
+ #: An order that cannot be looked up is retried silently for this long, then
+ #: reported: a network blip must not page anyone, a lasting one must.
+ LOOKUP_GRACE_MS = 2 * 60 * 60 * 1000
++REPLAY_STATE_NAME = "replay-first-seen.json"
+ 
+ 
+ @dataclass(frozen=True)
+@@ -135,6 +138,11 @@ class UnrecordedFillAdapter:
+     #: partner of a duplicate send, so it is skipped; any other failure (network,
+     #: rate limit) still makes the lookup retry.  ``None``: every failure retries.
+     order_not_found: Callable[[BaseException], bool] | None = None
++    #: ``replay_trade_correction(correction_event)`` re-queues what a killed
++    #: ``after_trade_correction`` skipped (the Google projection, the LINE
++    #: public event).  It must be idempotent: the round calls it only for a
++    #: correction whose announcement was missing, but a retry may repeat it.
++    replay_trade_correction: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+ 
+     def __post_init__(self) -> None:
+         if self.style not in ("trade", "spot"):
+@@ -181,7 +189,7 @@ def run_unrecorded_fill_round(
+     moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+     result: dict[str, Any] = {
+         "project": adapter.project, "unrecorded_orders": [], "corrected": [], "unresolved": [],
+-        "awaiting_human": [], "deferred": [], "withdrawn": [], "ops_export_written": None,
++        "awaiting_human": [], "deferred": [], "withdrawn": [], "replayed": [], "ops_export_written": None,
+     }
+     try:
+         _Round(adapter, paths, tiers, moment, result).run()
+@@ -235,6 +243,64 @@ def unrecorded_orders(ledger_status: Mapping[str, Any], ledger_events: list[dict
+     return sorted(orders.values(), key=lambda o: (o["time_ms"] or 0, o["order_id"]))
+ 
+ 
++def _correction_matches(ledger_events: list[dict[str, Any]], content: Mapping[str, Any],
++                        ids: list[str]) -> list[dict[str, Any]]:
++    """Ledger corrections this evidence file produced: same trade, the order
++    set contained, and the same corrected figures (the evidence is written
++    before the ledger line, so its content is the only link there is)."""
++    corrected = (content.get("correction") or {}).get("corrected")
++    if not isinstance(corrected, dict) or not corrected or not content.get("trade_id"):
++        return []   # nothing verifiable to match on: never guess
++    return [e for e in ledger_events
++            if e.get("event_type") == TRADE_CORRECTION_EVENT
++            and str(e.get("trade_id")) == str(content.get("trade_id"))
++            and set(ids) <= {str(o) for o in e.get("exchange_order_ids") or []}
++            and e.get("corrected") == corrected]
++
++
++def _first_seen(path: str, directory: str, moment_ms: int) -> tuple[int, str | None]:
++    """Durable first time a replay of this evidence file was held back, kept in
++    ``<evidence_dir>/replay-first-seen.json`` (no ``order_ids`` key, so it is
++    never read as evidence).  The deadline runs from here, not from the evidence
++    file's mtime, which anything can touch.
++
++    Returns ``(first_seen_ms, problem)``.  Anything but a dict of ints is a
++    damaged file and starts afresh; a value from a clock that ran ahead is reset
++    to now.  When the new value cannot be stored the deadline cannot be
++    trusted to survive, so the answer is "already expired" with the reason in
++    ``problem``: announcing early beats never announcing."""
++    state_path = Path(directory) / REPLAY_STATE_NAME
++    try:
++        state = json.loads(state_path.read_text(encoding="utf-8"))
++    except (OSError, ValueError):
++        state = {}
++    if not isinstance(state, dict):
++        state = {}
++    seen = state.get(path)
++    if isinstance(seen, int) and not isinstance(seen, bool) and seen <= moment_ms:
++        return seen, None
++    state[path] = moment_ms
++    try:
++        atomic_write(state_path, state)
++    except Exception as exc:  # noqa: BLE001
++        LOGGER.warning("unrecorded_fill_replay_state_write_failed path=%s: %s", state_path, exc)
++        return moment_ms - LOOKUP_GRACE_MS, f"期限狀態無法保存（{type(exc).__name__}: {exc}），不再等待"
++    return moment_ms, None
++
++
++def _request_notice(request: Mapping[str, Any]) -> str:
++    """The unresolved-order notice rebuilt from the request alone."""
++    details = request.get("details") if isinstance(request.get("details"), Mapping) else {}
++    fills = details.get("fills") or []
++    return "\n".join([
++        "（補發：上一輪開了請求後被中斷，沒來得及通知。）",
++        f"帳本漏記交易所成交，沒有自動更正（{details.get('reason_code')}）。",
++        f"symbol: {details.get('symbol')}  訂單: {', '.join(map(str, details.get('order_ids') or []))}",
++        *[f"- {f.get('side')} {f.get('quantity')} @ {f.get('price')}（time_ms {f.get('time_ms')}）" for f in fills],
++        f"原因：{request.get('summary')}",
++    ])
++
++
+ class _Round:
+     def __init__(self, adapter: UnrecordedFillAdapter, paths: UnrecordedFillPaths, tiers: dict[str, str],
+                  moment: datetime, result: dict[str, Any]) -> None:
+@@ -248,6 +314,7 @@ class _Round:
+ 
+     def run(self) -> None:
+         ledger_events = read_ledger(self.paths.ledger)
++        self._replay_unannounced(ledger_events)
+         accounted = recorded_order_ids(ledger_events)
+         open_requests = self._withdraw_accounted_requests(accounted)
+         orders = unrecorded_orders(read_json(self.paths.ledger_status) or {}, ledger_events,
+@@ -267,6 +334,150 @@ class _Round:
+             handled.update(outcome.get("order_ids", [oid]))
+             write_attempted = write_attempted or outcome.get("wrote", False)
+ 
++    # -- facts written but never announced (a kill between the two writes) ---- #
++    def _replay_unannounced(self, ledger_events: list[dict[str, Any]]) -> None:
++        """Announce what a killed round wrote but did not announce.
++
++        An auto-correction writes its evidence file, then the ledger, then the
++        fleet event; an unresolved order writes its request, then the event.
++        Dying in between leaves the fact in place and the human uninformed,
++        and nothing later looks at it again -- the ledger now accounts for the
++        order, so it never reappears as unrecorded.
++        """
++        try:
++            written = replay_unannounced_requests(
++                fleet_event_log=self.paths.fleet_event_log, request_queue=self.paths.request_queue,
++                project=self.project, code=CODE_UNRESOLVED, risk_tier=self.tiers[CODE_UNRESOLVED],
++                notice_text=_request_notice,
++            )
++            self.result["replayed"] += [{"code": CODE_UNRESOLVED, "request_id": e["details"]["request_id"],
++                                         "fleet_event_id": e["event_id"]} for e in written]
++            if self.adapter.client_ids:
++                self._replay_corrections(ledger_events)
++        except Exception as exc:  # noqa: BLE001 -- a replay must never fail the round
++            LOGGER.warning("unrecorded_fill_replay_failed error=%s: %s", type(exc).__name__, exc)
++            self.result["replayed"].append({"error": f"{type(exc).__name__}: {exc}"})
++
++    def _replay_corrections(self, ledger_events: list[dict[str, Any]]) -> None:
++        fleet_events = read_fleet_events(self.paths.fleet_event_log)
++        covered_paths: set[str] = set()
++        covered_corrections: set[str] = set()   # trade style: ledger correction event ids already announced
++        covered_order_sets: set[frozenset[str]] = set()   # spot style: exact order sets already announced
++        for event in events_for(fleet_events, self.project, (CODE_CORRECTED, CODE_UNRESOLVED)):
++            details = event.get("details") if isinstance(event.get("details"), Mapping) else {}
++            if details.get("evidence_path"):
++                covered_paths.add(str(details["evidence_path"]))
++            if event.get("code") == CODE_CORRECTED:
++                if details.get("correction_event_id"):
++                    covered_corrections.add(str(details["correction_event_id"]))
++                covered_order_sets.add(frozenset(str(o) for o in (event.get("evidence") or {}).get("order_ids") or []))
++        accounted = recorded_order_ids(ledger_events)
++        for path, content in read_evidence_files(self.paths.evidence_dir):
++            ids = [str(o) for o in content.get("order_ids") or []]
++            if not ids or not content.get("duplicate_of") or path in covered_paths:
++                continue
++            if not set(ids) <= accounted:
++                continue  # never written: the normal path handles the order again
++            if self.adapter.style == "trade":
++                # Identity, not overlap: two corrections may share recorded orders,
++                # one's order set may contain another's.  Match on the evidence's
++                # own trade and corrected figures, then take a match that is not
++                # yet announced; with none left there is nothing to announce.
++                matches = _correction_matches(ledger_events, content, ids)
++                if not matches:
++                    # Accounted for, yet no ledger correction can be tied to this
++                    # evidence (incomplete payload, or a person's manual fix):
++                    # say so instead of guessing which one it was.
++                    LOGGER.warning("unrecorded_fill_replay_unmatched evidence=%s", path)
++                    self.result["replayed"].append({"error": "no ledger correction matches the evidence", "evidence_path": path})
++                    continue
++                correction = next((c for c in matches if str(c.get("event_id")) not in covered_corrections), None)
++                if correction is None:
++                    continue
++                if self._replay_trade_correction(path, content, ids, correction):
++                    covered_corrections.add(str(correction.get("event_id")))
++            else:
++                if frozenset(ids) in covered_order_sets:
++                    continue
++                self._replay_spot_correction(path, content, ids)
++                covered_order_sets.add(frozenset(ids))
++
++    def _replay_trade_correction(self, path: str, content: dict[str, Any], ids: list[str],
++                                 correction: dict[str, Any]) -> bool:
++        """Returns whether the correction is now announced (False: retry next round)."""
++        fields = content.get("correction") or {}
++        if not fields:
++            return True  # nothing to announce
++        # Side effects first (idempotent): the announcement is what marks this
++        # correction done, so it must be the last thing written.  A failing hook
++        # holds the announcement back for a grace period rather than losing the
++        # projection for good; after that the notice goes out with the error.
++        hook_error = self._replay_projection(correction, ids)
++        if hook_error is not None:
++            seen, state_problem = _first_seen(path, self.paths.evidence_dir, self.moment_ms)
++            if state_problem:
++                hook_error = f"{hook_error}；{state_problem}"
++            age = self.moment_ms - seen
++            if age < LOOKUP_GRACE_MS:
++                self.result["deferred"].append({"order_id": ids[0], "reason": f"replay hook failed: {hook_error}"})
++                return False
++        previous, corrected = fields.get("previous") or {}, fields.get("corrected") or {}
++        trade_id, dup = content.get("trade_id"), content.get("duplicate_of")
++        notice = "\n".join([
++            "（補發：上一輪寫完帳本後被中斷，沒來得及通知。）",
++            "策略自己重複送單，帳本漏記的成交已照交易所自動更正（只追加、不改舊紀錄）。",
++            f"trade_id: {trade_id}",
++            f"重複的訂單: {', '.join(ids)}（與帳本已記的 {dup} 同一個自訂編號 {content.get('client_order_id')}）",
++            f"數量 {previous.get('exit_volume')} → {corrected.get('exit_volume')}；"
++            f"淨損益 {previous.get('net_pnl')} → {corrected.get('net_pnl')}",
++            f"帳本更正事件: {correction.get('event_id')}",
++            *([f"注意：Google 表／LINE 查詢的補排失敗（{hook_error}），帳本已正確，請檢查 Google 表對帳。"] if hook_error else []),
++        ])
++        event = append_fleet_event(
++            self.paths.fleet_event_log, project=self.project, code=CODE_CORRECTED, risk_tier=self.tiers[CODE_CORRECTED],
++            summary=f"duplicate send {', '.join(ids)} of {dup} corrected in trade_id={trade_id} (replayed)",
++            evidence={"order_ids": ids, "trade_id": trade_id},
++            details={"correction_event_id": correction.get("event_id"), "duplicate_of": dup,
++                     "client_order_id": content.get("client_order_id"), "evidence_path": path,
++                     "replayed": True, "notice_text": notice,
++                     **({"projection_error": hook_error} if hook_error else {})},
++            measurements={"previous_net_pnl": previous.get("net_pnl"), "corrected_net_pnl": corrected.get("net_pnl"),
++                          "previous_exit_volume": previous.get("exit_volume"),
++                          "corrected_exit_volume": corrected.get("exit_volume")},
++        )
++        self.result["replayed"].append({"code": CODE_CORRECTED, "order_ids": ids, "fleet_event_id": event["event_id"]})
++        return True
++
++    def _replay_spot_correction(self, path: str, content: dict[str, Any], ids: list[str]) -> None:
++        dup = content.get("duplicate_of")
++        notice = "\n".join([
++            "（補發：上一輪寫完帳本後被中斷，沒來得及通知。）",
++            "策略自己重複送單，帳本漏記的現貨成交已照交易所自動補記（只追加）。",
++            f"重複的訂單: {', '.join(ids)}（與帳本已記的 {dup} 同一個自訂編號 {content.get('client_order_id')}）",
++        ])
++        event = append_fleet_event(
++            self.paths.fleet_event_log, project=self.project, code=CODE_CORRECTED, risk_tier=self.tiers[CODE_CORRECTED],
++            summary=f"duplicate send {', '.join(ids)} of {dup} recorded from exchange fills (replayed)",
++            evidence={"order_ids": ids},
++            details={"duplicate_of": dup, "client_order_id": content.get("client_order_id"),
++                     "evidence_path": path, "replayed": True, "notice_text": notice},
++        )
++        self.result["replayed"].append({"code": CODE_CORRECTED, "order_ids": ids, "fleet_event_id": event["event_id"]})
++
++    def _replay_projection(self, correction: dict[str, Any], ids: list[str]) -> str | None:
++        """Queue the Google projection / LINE query a killed correction skipped.
++        The adapter's hook is idempotent (same intent key returns the same intent).
++        Returns an error text when it failed, else None."""
++        hook = self.adapter.replay_trade_correction
++        if hook is None:
++            return None
++        try:
++            outcome = dict(hook(correction) or {})
++        except Exception as exc:  # noqa: BLE001 -- the ledger stands; the sheet check reports a gap
++            return f"{type(exc).__name__}: {exc}"
++        self.result["replayed"].append({"code": "PROJECTION", "order_ids": ids, **outcome})
++        return None
++
+     # -- one unrecorded order ------------------------------------------------ #
+     def _handle(self, order: dict[str, Any], orders: list[dict[str, Any]], ledger_events: list[dict[str, Any]],
+                 *, allow_write: bool) -> dict[str, Any]:
+diff --git a/tests/test_channels.py b/tests/test_channels.py
+index 21b4684..95005ef 100644
+--- a/tests/test_channels.py
++++ b/tests/test_channels.py
+@@ -29,3 +29,75 @@ def test_line_payload_and_bearer_header():
+         assert request.headers["Authorization"] == "Bearer channel-secret"
+         assert '"to": "U123"' in body
+         assert "channel-secret" not in body
++
++
++import json
++
++import pytest
++
++from trade_alerts.channels import LINE_MAX_MESSAGES, TRUNCATION_MARK, split_text
++
++
++def _line_messages(text: str, **kwargs) -> list[str]:
++    with responses.RequestsMock() as mock:
++        mock.add(responses.POST, "https://api.line.me/v2/bot/message/push", status=200)
++        LineMessagingChannel("t", "U1", policy=RetryPolicy(attempts=1), **kwargs).send(text)
++        return [m["text"] for m in json.loads(mock.calls[0].request.body)["messages"]]
++
++
++def test_a_short_text_is_one_unchanged_line_message():
++    assert _line_messages("hello") == ["hello"]
++
++
++def test_a_long_text_is_split_at_line_breaks_not_cut_off():
++    lines = [f"line {i:03d} " + "x" * 90 for i in range(120)]   # ~12k characters
++    sent = _line_messages("\n".join(lines))
++    assert len(sent) == 3 and all(len(piece) <= 5000 for piece in sent)
++    assert "".join(sent) == "\n".join(lines)                    # nothing lost, nothing reordered
++    assert all(piece.startswith("line ") for piece in sent)      # cut between lines, not inside one
++
++
++def test_text_beyond_five_messages_says_it_was_cut():
++    sent = _line_messages("a" * (5000 * 6 + 10))
++    assert len(sent) == LINE_MAX_MESSAGES and sent[-1].endswith(TRUNCATION_MARK) and len(sent[-1]) <= 5000
++
++
++def test_telegram_sends_the_rest_as_further_messages():
++    with responses.RequestsMock() as mock:
++        mock.add(responses.POST, "https://api.telegram.org/botsecret/sendMessage", json={"ok": True, "result": {}})
++        mock.add(responses.POST, "https://api.telegram.org/botsecret/sendMessage", json={"ok": True, "result": {}})
++        TelegramChannel("secret", "chat", policy=RetryPolicy(attempts=1)).send("a" * 4096 + "\n" + "b" * 10)
++        bodies = [json.loads(call.request.body)["text"] for call in mock.calls]
++    assert bodies == ["a" * 4096, "\n" + "b" * 10]
++
++
++@pytest.mark.parametrize("text,limit", [
++    ("abc", 5), ("ab\ncd\nef", 5), ("abcdefgh", 3), ("\n\nAAAAAA", 5), ("a\n\n\nb", 3), ("abc\n", 3), ("\n", 5),
++    ("x\n\ny\n\n", 2), ("aaaa\n\nbbbb", 4), ("\n" + "A" * 4097, 4096), ("A" * 4096 + "\n", 4096),
++])
++def test_split_text_loses_nothing_and_never_yields_an_empty_piece(text, limit):
++    pieces = split_text(text, limit)
++    assert "".join(pieces) == text
++    assert all(0 < len(p) <= limit for p in pieces)
++
++
++def test_split_text_prefers_line_breaks():
++    assert split_text("ab\ncd\nef", 5) == ["ab\n", "cd\nef"]
++
++
++@pytest.mark.parametrize("text", ["\n" + "A" * 4097, "A" * 4096 + "\n", "\n\n" + "B" * 8200])
++def test_telegram_never_sends_an_empty_or_blank_message_and_keeps_the_text(text):
++    with responses.RequestsMock() as mock:
++        for _ in range(4):
++            mock.add(responses.POST, "https://api.telegram.org/botsecret/sendMessage", json={"ok": True, "result": {}})
++        TelegramChannel("secret", "chat", policy=RetryPolicy(attempts=1)).send(text)
++        bodies = [json.loads(c.request.body)["text"] for c in mock.calls]
++        mock.assert_all_requests_are_fired = False
++    assert bodies and all(b.strip() and len(b) <= 4096 for b in bodies)
++    assert "".join(bodies).strip() == text.strip()
++
++
++@pytest.mark.parametrize("text", ["\n" + "A" * 5001, "A" * 5000 + "\n"])
++def test_line_never_sends_a_blank_message(text):
++    sent = _line_messages(text)
++    assert sent and all(m.strip() for m in sent) and "".join(sent).strip() == text.strip()
+diff --git a/tests/test_ops_export.py b/tests/test_ops_export.py
+index 12367de..342255c 100644
+--- a/tests/test_ops_export.py
++++ b/tests/test_ops_export.py
+@@ -12,6 +12,7 @@ from trade_alerts.ops_export import (
+     OPS_EXPORT_VERSION,
+     build_ops_export,
+     needs_human,
++    render_ai_text,
+     render_notice_text,
+     write_ops_export,
+ )
+@@ -76,7 +77,7 @@ def test_r2_stays_silent_until_it_escalates(paths):
+     [notice] = _build(paths)["notices"]
+     assert notice["event_id"] == escalated["event_id"]
+     assert notice["risk_tier"] == "R2" and notice["critical"] is False
+-    assert notice["text"].startswith("⚠️ 自動處理失敗，需要你處理")
++    assert notice["text"].split("\n")[:2] == ["【未編號】VERIFIED_CLOSE_PROPOSED", "⚠️ 自動處理失敗，需要你處理"]
+ 
+ 
+ def test_escalation_flag_must_be_literally_true(paths):
+@@ -105,14 +106,19 @@ def test_r3_notice_carries_header_plain_language_technical_detail_and_ai_block(p
+     assert notice["code"] == "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"
+     assert notice["risk_tier"] == "R3" and notice["critical"] is True
+     text = notice["text"]
+-    assert text.startswith("🔴 需要人工處理\n自動修復停手")
++    entry = BY_CODE["MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"]
++    assert text.split("\n")[:2] == [f"【{entry['error_id']}】{entry['title']}", "🔴 需要人工處理"]
++    assert entry["operator_message"]["ai_prompt"] not in text and "事件資料：" not in text  # the prompt is message two
+     assert "發生什麼事：" in text and "解決方向：" in text and "處理步驟：\n1. " in text
+     assert "技術細節：\nincident_id: inc-1\ntrade_id: T1" in text
+     assert "ledger write failed" not in text  # notice_text wins over the summary
+-    ai_prompt = BY_CODE["MOM.VERIFIED_CLOSE_REPAIR_BLOCKED"]["operator_message"]["ai_prompt"]
+-    assert "給 AI 的追查指令（整段貼給 Claude）：\n" + ai_prompt in text
+-    assert f"錯誤碼：momentum/VERIFIED_CLOSE_REPAIR_BLOCKED　事件編號：{event['event_id']}" in text
+-    assert text.endswith('事件資料：{"incident_id": "inc-1", "trade_id": "T1"}')
++    assert text.endswith("incident_id: inc-1\ntrade_id: T1")
++    ai_prompt = entry["operator_message"]["ai_prompt"]
++    assert notice["ai_text"].split("\n") == [
++        f"【{entry['error_id']}】給 AI 的追查指令（整段貼給 Claude）", ai_prompt,
++        f"錯誤碼：momentum/VERIFIED_CLOSE_REPAIR_BLOCKED　事件編號：{event['event_id']}",
++        '事件資料：{"incident_id": "inc-1", "trade_id": "T1"}',
++    ]
+ 
+ 
+ def test_summary_is_the_technical_detail_when_no_notice_text(paths):
+@@ -148,7 +154,8 @@ def test_uncatalogued_event_with_a_recorded_tier_still_notifies_under_its_code(p
+     log, _queue = paths
+     _event(log, code="SOMETHING_NEW", risk_tier="R3", summary="brand new condition")
+     [notice] = _build(paths)["notices"]
+-    assert notice["text"] == "🔴 需要人工處理\nSOMETHING_NEW\n\n技術細節：\nbrand new condition"
++    assert notice["text"] == "【未編號】SOMETHING_NEW\n🔴 需要人工處理\n\n技術細節：\nbrand new condition"
++    assert "ai_text" not in notice
+ 
+ 
+ def test_uncatalogued_event_without_a_tier_is_skipped(paths):
+@@ -217,7 +224,7 @@ def test_malformed_event_log_raises_instead_of_exporting_a_partial_view(paths):
+ 
+ 
+ def test_render_notice_text_without_entry_or_detail():
+-    assert render_notice_text({"code": "X"}, None, "R3") == "🔴 需要人工處理\nX"
++    assert render_notice_text({"code": "X"}, None, "R3") == "【未編號】X\n🔴 需要人工處理"
+ 
+ 
+ def test_write_is_atomic_world_readable_and_round_trips(paths, tmp_path):
+@@ -248,3 +255,23 @@ def test_export_matches_its_json_schema(paths):
+     jsonschema.Draft7Validator.check_schema(schema)
+     errors = list(jsonschema.Draft7Validator(schema).iter_errors(export))
+     assert not errors, [f"{list(e.path)}: {e.message}" for e in errors]
++
++
++def test_every_catalogued_notice_starts_with_its_error_id_and_the_exact_catalog_title():
++    """e3 (2026-10-01): the first line of every message is 【ERR-xxx】 plus the
++    risk register's title, character for character -- for every catalog entry,
++    in the main message and the AI message alike."""
++    for entry in load_error_catalog()["entries"]:
++        bare = entry["code"].split(".", 1)[1]
++        event = {"project": entry["project"], "code": bare, "event_id": "e1", "evidence": {"k": "v"}}
++        expected = f"【{entry['error_id']}】{entry['title']}"
++        assert render_notice_text(event, entry, "R3").split("\n")[0] == expected, entry["code"]
++        ai = render_ai_text(event, entry, bare)
++        if ai is not None:
++            assert ai.split("\n")[0] == f"【{entry['error_id']}】給 AI 的追查指令（整段貼給 Claude）", entry["code"]
++
++
++def test_the_ai_message_is_absent_when_the_catalog_has_no_prompt():
++    entry = {"error_id": "ERR-999", "title": "x", "operator_message": {"what": "a", "direction": "b", "steps": ["c"]}}
++    assert render_ai_text({"code": "X", "project": "momentum", "event_id": "e"}, entry, "X") is None
++    assert render_ai_text({"code": "X", "project": "momentum", "event_id": "e"}, None, "X") is None
+diff --git a/tests/test_projection_outbox.py b/tests/test_projection_outbox.py
+index 836132f..42a98da 100644
+--- a/tests/test_projection_outbox.py
++++ b/tests/test_projection_outbox.py
+@@ -135,3 +135,49 @@ def test_rejected_receiver_response_is_terminal_and_never_falls_back(tmp_path: P
+     assert result.dispatch.error_code == "provenance_invalid"
+     assert legacy_called is False
+     assert outstanding_projection_intents(path) == ()
++
++
++def test_unreadable_ledger_pauses_without_consuming_the_intent(tmp_path: Path) -> None:
++    from trade_alerts import LedgerUnreadableError
++
++    path = tmp_path / "projection-outbox.jsonl"
++    intent = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
++    submitted = False
++
++    def damaged(queued):
++        raise LedgerUnreadableError("ledger line 7 is malformed")
++
++    def submit(payload, proof):  # pragma: no cover - must not run
++        nonlocal submitted
++        submitted = True
++        return Submission("CONFIRMED", receiver_row=2)
++
++    before = path.read_text(encoding="utf-8")
++    result = dispatch_next_projection(path, rebuild=damaged, submit=submit)
++
++    assert result.intent == intent
++    assert result.dispatch is None
++    assert result.paused_reason == "ledger line 7 is malformed"
++    assert submitted is False
++    assert path.read_text(encoding="utf-8") == before
++    assert outstanding_projection_intents(path) == (intent,)
++
++    # once the ledger is repaired the same intent goes through
++    fixed = dispatch_next_projection(path, rebuild=lambda queued: rebuilt(queued), submit=lambda payload, proof: Submission("CONFIRMED", receiver_row=2))
++    assert fixed.dispatch is not None and fixed.dispatch.status == "CONFIRMED"
++    assert fixed.paused_reason is None
++    assert outstanding_projection_intents(path) == ()
++
++
++def test_other_rebuild_errors_are_still_terminal(tmp_path: Path) -> None:
++    from trade_alerts import LedgerIntegrityError
++
++    path = tmp_path / "projection-outbox.jsonl"
++    enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
++
++    def ambiguous(queued):
++        raise LedgerIntegrityError("ambiguous local trade_close events for trade_id")
++
++    result = dispatch_next_projection(path, rebuild=ambiguous, submit=lambda payload, proof: Submission("CONFIRMED", receiver_row=2))
++    assert result.dispatch is not None and result.dispatch.status == "REJECTED"
++    assert result.paused_reason is None
+diff --git a/tests/test_repair_runner.py b/tests/test_repair_runner.py
+index 108cd9d..6d46641 100644
+--- a/tests/test_repair_runner.py
++++ b/tests/test_repair_runner.py
+@@ -512,7 +512,7 @@ def test_the_runner_codes_are_catalogued_the_same_for_every_strategy_that_runs_i
+         for key in ("verdict", "risk_tier", "resume"):
+             assert mom[key] == sey[key], (code, key)
+     tiers = {code: catalog_entry(catalog, "momentum", code)["risk_tier"] for code in RUNNER_CODES}
+-    assert tiers == {REPAIRED: "R1", FAILED: "R2", BLOCKED: "R3"}
++    assert tiers == {REPAIRED: "R1", FAILED: "R2", BLOCKED: "R3", "VERIFIED_CLOSE_REPAIR_RECURRING": "R3"}
+ 
+ 
+ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
+@@ -535,6 +535,177 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
+                             if name.startswith("CODE_") and value == bare)
+             assert f"code={constant}" in call, source
+             cited += 1
+-    # 3 runner codes x 2 strategies; FAILED is emitted from two call sites.
++    # 4 runner codes x 2 strategies; FAILED is emitted from two call sites.
+     # g1: UNRECORDED_FILL_CORRECTED for 3 strategies, UNRESOLVED for all 4.
+-    assert cited == 8 + 7
++    assert cited == 10 + 7
++
++
++# --------------------------------------------------------------------------- #
++# f-12: a kill between opening a request and writing its fleet event
++# --------------------------------------------------------------------------- #
++class _Killed(BaseException):
++    """Stands in for SIGKILL: not an Exception, so no handler swallows it."""
++
++
++def _kill_on(monkeypatch, code):
++    from trade_alerts import repair_runner
++
++    real = repair_runner.append_fleet_event
++
++    def maybe_die(path, **kwargs):
++        if kwargs.get("code") == code and (kwargs.get("details") or {}).get("request_id"):
++            raise _Killed()
++        return real(path, **kwargs)
++
++    monkeypatch.setattr(repair_runner, "append_fleet_event", maybe_die)
++    return lambda: monkeypatch.setattr(repair_runner, "append_fleet_event", real)
++
++
++def test_an_escalation_killed_before_its_notice_is_announced_next_round(host, monkeypatch):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE]})
++    _round(exchange, host)
++    _round(exchange, host)
++    restore = _kill_on(monkeypatch, FAILED)
++    with pytest.raises(_Killed):
++        _round(exchange, host)  # third failure: request opened, then killed
++    [request] = outstanding_error_requests(host.request_queue)
++    assert _export(host)["notices"] == []
++    restore()
++
++    result = _round(exchange, host)
++    assert [r["request_id"] for r in result["replayed"]] == [request["request_id"]]
++    replayed = [e for e in _events(host, FAILED) if e["details"].get("replayed")]
++    assert len(replayed) == 1 and replayed[0]["details"]["escalated"] is True and replayed[0]["risk_tier"] == "R2"
++    [notice] = _export(host)["notices"]
++    assert notice["code"] == "MOM.VERIFIED_CLOSE_REPAIR_FAILED" and "補發" in notice["text"]
++    assert "not this trade's close" in notice["text"]
++    assert _round(exchange, host)["replayed"] == [] and len(_export(host)["notices"]) == 1
++
++
++def test_a_stop_killed_before_its_notice_is_announced_next_round(host, monkeypatch):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]]})
++    exchange.staging_error = OSError("read-only file system")
++    restore = _kill_on(monkeypatch, BLOCKED)
++    with pytest.raises(_Killed):
++        _round(exchange, host)
++    restore()
++    open_now = outstanding_error_requests(host.request_queue)
++    assert [r["code"] for r in open_now] == [BLOCKED] and _export(host)["notices"] == []
++
++    result = _round(exchange, host)
++    assert [r["code"] for r in result["replayed"]] == [BLOCKED]
++    [notice] = _export(host)["notices"]
++    assert notice["risk_tier"] == "R3" and "補發" in notice["text"]
++
++
++def test_a_normally_announced_request_is_never_replayed(host):
++    _seed(host, _open())
++    exchange = _Exchange(host.ledger, {"T1": [WRONG_SIDE]})
++    for _ in range(3):
++        _round(exchange, host)
++    assert _round(exchange, host)["replayed"] == []
++    assert len(_events(host, FAILED)) == 3
++
++
++# --------------------------------------------------------------------------- #
++# g2: automatic repairs that keep happening are announced once
++# --------------------------------------------------------------------------- #
++RECURRING = "VERIFIED_CLOSE_REPAIR_RECURRING"
++
++
++def test_a_single_automatic_repair_stays_silent(host):
++    _seed(host, _open())
++    result = _round(_Exchange(host.ledger, {"T1": [[_fill()]]}), host)
++    assert result["recurring"] is None and _events(host, RECURRING) == [] and _export(host)["notices"] == []
++
++
++def test_the_second_automatic_repair_in_a_week_tells_the_operator_once(host):
++    _seed(host, _open("T1", "AAA_USDT"), _open("T2", "BBB_USDT"))
++    exchange = _Exchange(host.ledger, {"T1": [[_fill()]], "T2": [[_fill()]]})
++
++    assert _round(exchange, host)["recurring"] is None
++    second = _round(exchange, host)
++
++    assert second["recurring"]["count"] == 2 and second["recurring"]["trade_ids"] == ["T1", "T2"]
++    [event] = _events(host, RECURRING)
++    assert (event["risk_tier"], event["evidence"]["count"]) == ("R3", 2)
++    assert event["evidence"]["trade_ids"] == ["T1", "T2"] and event["evidence"]["window_days"] == 7
++    assert outstanding_error_requests(host.request_queue) == []   # a notice, not a request
++    [notice] = _export(host)["notices"]
++    assert notice["code"] == "MOM.VERIFIED_CLOSE_REPAIR_RECURRING" and notice["risk_tier"] == "R3"
++    assert "trade_id: T1" in notice["text"] and "trade_id: T2" in notice["text"]
++    assert "給 AI 的追查指令" in notice["text"]
++
++    third = _round(exchange, host)           # nothing new to repair, and the week is not over
++    assert third["recurring"] is None and len(_events(host, RECURRING)) == 1
++
++
++def test_a_third_repair_inside_the_quiet_week_is_not_announced_again(host):
++    _seed(host, _open("T1", "AAA_USDT"), _open("T2", "BBB_USDT"), _open("T3", "CCC_USDT"))
++    exchange = _Exchange(host.ledger, {t: [[_fill()]] for t in ("T1", "T2", "T3")})
++    for _ in range(3):
++        _round(exchange, host)
++    assert len(_events(host, REPAIRED)) == 3 and len(_events(host, RECURRING)) == 1
++
++
++def test_the_notice_comes_again_after_a_quiet_week_if_it_is_still_happening(host):
++    from datetime import datetime, timedelta, timezone
++    from trade_alerts.fleet_event_log import append_fleet_event, utc_now_iso
++
++    now = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
++    stamp = lambda days: utc_now_iso(now - timedelta(days=days))
++    for trade_id, days in (("T1", 6.5), ("T2", 6.0)):
++        append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
++                           evidence={"trade_id": trade_id}, recorded_at=stamp(days))
++    append_fleet_event(host.fleet_event_log, project="momentum", code=RECURRING, risk_tier="R3",
++                       recorded_at=stamp(7.2))       # last announced 7.2 days ago: outside the quiet week
++    _seed(host)
++    result = _round(_Exchange(host.ledger, {}), host, now=now)
++    assert result["recurring"]["count"] == 2
++
++
++def test_the_notice_waits_while_its_own_week_has_not_passed(host):
++    from datetime import datetime, timedelta, timezone
++    from trade_alerts.fleet_event_log import append_fleet_event, utc_now_iso
++
++    now = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
++    stamp = lambda days: utc_now_iso(now - timedelta(days=days))
++    for trade_id, days in (("T1", 5), ("T2", 4)):
++        append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
++                           evidence={"trade_id": trade_id}, recorded_at=stamp(days))
++    append_fleet_event(host.fleet_event_log, project="momentum", code=RECURRING, risk_tier="R3", recorded_at=stamp(3))
++    _seed(host)
++    assert _round(_Exchange(host.ledger, {}), host, now=now)["recurring"] is None
++
++
++def test_repairs_older_than_a_week_and_other_strategies_do_not_count(host):
++    from datetime import datetime, timedelta, timezone
++    from trade_alerts.fleet_event_log import append_fleet_event, utc_now_iso
++
++    now = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
++    append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
++                       evidence={"trade_id": "OLD"}, recorded_at=utc_now_iso(now - timedelta(days=8)))
++    append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
++                       evidence={"trade_id": "NEW"}, recorded_at=utc_now_iso(now - timedelta(days=1)))
++    append_fleet_event(host.fleet_event_log, project="seykota", code=REPAIRED, risk_tier="R1",
++                       evidence={"trade_id": "OTHER"}, recorded_at=utc_now_iso(now - timedelta(days=1)))
++    _seed(host)
++    assert _round(_Exchange(host.ledger, {}), host, now=now)["recurring"] is None
++
++
++def test_the_quiet_week_holds_under_an_injected_clock_across_rounds(host):
++    from datetime import datetime, timedelta, timezone
++    from trade_alerts.fleet_event_log import append_fleet_event, utc_now_iso
++
++    now = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
++    for trade_id in ("T1", "T2"):
++        append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
++                           evidence={"trade_id": trade_id}, recorded_at=utc_now_iso(now - timedelta(days=1)))
++    _seed(host)
++    exchange = _Exchange(host.ledger, {})
++    assert _round(exchange, host, now=now)["recurring"]["count"] == 2
++    assert _round(exchange, host, now=now)["recurring"] is None            # same clock: still quiet
++    assert [e["recorded_at"] for e in _events(host, RECURRING)] == [utc_now_iso(now)]
++    assert _round(exchange, host, now=now + timedelta(days=7))["recurring"] is None   # repairs aged out of the window
+diff --git a/tests/test_unrecorded_fill.py b/tests/test_unrecorded_fill.py
+index e1aae95..c9023ee 100644
+--- a/tests/test_unrecorded_fill.py
++++ b/tests/test_unrecorded_fill.py
+@@ -410,3 +410,312 @@ def test_a_network_failure_on_a_recorded_order_still_retries_even_with_the_hook(
+ 
+     assert result["corrected"] == []                          # not "not found": do not guess
+     assert "LOOKUP_FAILED" in {u["reason_code"] for u in result["unresolved"]}
++
++
++# --- f-12: a kill between the durable write and its announcement --------------
++
++class _Killed(BaseException):
++    """Stands in for SIGKILL: not an Exception, so no handler can swallow it."""
++
++
++def _kill_before_announcing(monkeypatch):
++    from trade_alerts import unrecorded_fill
++
++    def dies(*_a, **_k):
++        raise _Killed()
++
++    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", dies)
++
++
++def test_a_correction_killed_before_its_notice_is_announced_next_round(tmp_path, monkeypatch):
++    from trade_alerts import unrecorded_fill
++
++    paths = _setup(tmp_path)
++    replayed_for: list[str] = []
++    adapter = _trade_adapter(paths, Exchange(_client_ids()),
++                             replay_trade_correction=lambda c: (replayed_for.append(c["event_id"]) or {"queued": c["event_id"]}))
++    real = unrecorded_fill.append_fleet_event
++    _kill_before_announcing(monkeypatch)
++    with pytest.raises(_Killed):
++        _round(adapter, paths)
++    assert _codes(paths) == []  # the ledger has the correction, nobody was told
++    assert any(e.get("event_type") == TRADE_CORRECTION_EVENT for e in read_ledger(paths.ledger))
++    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
++
++    result = _round(adapter, paths)
++    [event] = read_fleet_events(paths.fleet_event_log)
++    assert event["code"] == CODE_CORRECTED and event["risk_tier"] == "R3"
++    assert event["details"]["replayed"] is True and event["details"]["correction_event_id"] == "corr-1"
++    assert "補發" in event["details"]["notice_text"] and "-13.233" in event["details"]["notice_text"]
++    assert set(event["evidence"]["order_ids"]) == {DUPLICATE, EXIT}
++    assert replayed_for == ["corr-1"]
++    assert [r["code"] for r in result["replayed"]] == ["PROJECTION", CODE_CORRECTED]
++    assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "SEY." + CODE_CORRECTED
++
++    again = _round(adapter, paths)  # idempotent: nothing more to announce
++    assert again["replayed"] == [] and replayed_for == ["corr-1"] and _codes(paths) == [CODE_CORRECTED]
++
++
++def test_a_normally_announced_correction_is_never_replayed(tmp_path):
++    paths = _setup(tmp_path)
++    adapter = _trade_adapter(paths, Exchange(_client_ids()), replay_trade_correction=lambda c: pytest.fail("replayed"))
++    _round(adapter, paths)
++    assert _round(adapter, paths)["replayed"] == [] and _codes(paths) == [CODE_CORRECTED]
++
++
++def test_an_evidence_file_whose_write_never_happened_is_not_announced(tmp_path):
++    paths = _setup(tmp_path)
++    Path(paths.evidence_dir).mkdir()
++    Path(paths.evidence_dir, "x.json").write_text(json.dumps(
++        {"order_ids": [DUPLICATE, EXIT], "duplicate_of": ORIGINAL, "client_order_id": "c", "trade_id": TRADE_B,
++         "correction": {"previous": {}, "corrected": {}}}), encoding="utf-8")
++    result = _round(_trade_adapter(paths, Exchange(_client_ids(DUPLICATE=None))), paths)
++    assert result["replayed"] == []  # ledger does not account for the orders: the normal path runs instead
++
++
++def test_an_unresolved_request_killed_before_its_notice_is_announced_next_round(tmp_path, monkeypatch):
++    from trade_alerts import unrecorded_fill
++
++    paths = _setup(tmp_path)
++    adapter = _trade_adapter(paths, Exchange(_client_ids(DUPLICATE="app-manual-order")), owns=lambda cid: False)
++    real = unrecorded_fill.append_fleet_event
++    _kill_before_announcing(monkeypatch)
++    with pytest.raises(_Killed):
++        _round(adapter, paths)
++    assert _codes(paths) == [] and len(outstanding_error_requests(paths.request_queue)) >= 1
++    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
++
++    result = _round(adapter, paths)
++    events = [e for e in read_fleet_events(paths.fleet_event_log) if e["details"].get("replayed")]
++    assert events and all(e["code"] == CODE_UNRESOLVED and e["risk_tier"] == "R3" for e in events)
++    assert "補發" in events[0]["details"]["notice_text"]
++    assert {e["details"]["request_id"] for e in events} == {r["request_id"] for r in outstanding_error_requests(paths.request_queue)}
++    assert result["replayed"]
++    again = _round(adapter, paths)
++    assert [r for r in again["replayed"] if r.get("code") == CODE_UNRESOLVED] == []
++
++
++def test_a_spot_recording_killed_before_its_notice_is_announced_next_round(tmp_path, monkeypatch):
++    from trade_alerts import unrecorded_fill
++
++    paths, state = _spot_setup(tmp_path)
++    client = {"501": "btc-a", "502": "btc-a"}
++
++    def append_spot_fills(symbol, order_id, fills):
++        with open(paths.ledger, "a", encoding="utf-8") as fh:
++            fh.write(json.dumps({"event_type": "spot_fill", "event_id": f"x{order_id}", "order_id": order_id,
++                                 "symbol": symbol}) + "\n")
++        return {"event_ids": [f"x{order_id}"]}
++
++    adapter = UnrecordedFillAdapter(
++        project="btc-competition", style="spot", client_ids=True, evidence_source="fixture",
++        client_order_id=lambda _s, oid: client.get(oid),
++        fetch_fills=lambda _s, ids: [f for f in state["fills"] if str(f["order_id"]) in ids],
++        append_spot_fills=append_spot_fills,
++    )
++    real = unrecorded_fill.append_fleet_event
++    _kill_before_announcing(monkeypatch)
++    with pytest.raises(_Killed):
++        run_unrecorded_fill_round(adapter, paths, catalog=CATALOG, now=NOW)
++    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
++    run_unrecorded_fill_round(adapter, paths, catalog=CATALOG, now=NOW)
++    [event] = read_fleet_events(paths.fleet_event_log)
++    assert event["code"] == CODE_CORRECTED and event["details"]["replayed"] is True
++    assert event["evidence"]["order_ids"] == ["502"]
++
++
++# --- review of #99: replay ordering and identity --------------------------------
++
++def _killed_correction(tmp_path, monkeypatch, hook):
++    """A correction in the ledger with no notice yet, plus its adapter."""
++    from trade_alerts import unrecorded_fill
++
++    paths = _setup(tmp_path)
++    adapter = _trade_adapter(paths, Exchange(_client_ids()), replay_trade_correction=hook)
++    real = unrecorded_fill.append_fleet_event
++    _kill_before_announcing(monkeypatch)
++    with pytest.raises(_Killed):
++        _round(adapter, paths)
++    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
++    return paths, adapter, real
++
++
++def test_a_kill_between_the_replayed_notice_and_the_hook_cannot_lose_the_hook(tmp_path, monkeypatch):
++    from trade_alerts import unrecorded_fill
++
++    calls: list[str] = []
++    paths, adapter, real = _killed_correction(tmp_path, monkeypatch, lambda c: (calls.append(c["event_id"]) or {}))
++    # the replay's own announcement dies: the hook has already run, the notice is not written
++    _kill_before_announcing(monkeypatch)
++    with pytest.raises(_Killed):
++        _round(adapter, paths)
++    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
++    assert calls == ["corr-1"] and _codes(paths) == []
++    _round(adapter, paths)                               # restart: hook again (idempotent), notice written
++    assert calls == ["corr-1", "corr-1"] and _codes(paths) == [CODE_CORRECTED]
++    _round(adapter, paths)
++    assert calls == ["corr-1", "corr-1"]                 # done: not called again
++
++
++def test_a_failing_hook_holds_the_notice_back_then_retries_then_announces_with_the_error(tmp_path, monkeypatch):
++    import os, time
++
++    state = {"fail": True, "calls": 0}
++
++    def hook(c):
++        state["calls"] += 1
++        if state["fail"]:
++            raise ConnectionError("outbox busy")
++        return {"queued": c["event_id"]}
++
++    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
++    first = _round(adapter, paths)
++    assert _codes(paths) == [] and first["deferred"] and "outbox busy" in first["deferred"][0]["reason"]
++    state["fail"] = False
++    _round(adapter, paths)                               # transient failure over: hook ok, notice written
++    [event] = read_fleet_events(paths.fleet_event_log)
++    assert "projection_error" not in event["details"] and state["calls"] == 2
++
++
++def test_a_hook_that_keeps_failing_still_announces_after_the_grace_period(tmp_path, monkeypatch):
++    from datetime import timedelta
++
++    def hook(_c):
++        raise ConnectionError("down")
++
++    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
++    first = _round(adapter, paths, now=NOW)
++    assert _codes(paths) == [] and first["deferred"]
++    _round(adapter, paths, now=NOW + timedelta(hours=1))
++    assert _codes(paths) == []                                   # still inside the 2 h grace
++    _round(adapter, paths, now=NOW + timedelta(hours=2, minutes=1))
++    [event] = read_fleet_events(paths.fleet_event_log)
++    assert "ConnectionError" in event["details"]["projection_error"]
++    assert "ConnectionError" in event["details"]["notice_text"]   # what the operator actually reads
++    export = json.loads(Path(paths.ops_export).read_text())
++    assert "補排失敗" in export["notices"][0]["text"]
++
++
++def test_touching_or_postdating_the_evidence_file_cannot_extend_the_deadline(tmp_path, monkeypatch):
++    import os
++    from datetime import timedelta
++
++    def hook(_c):
++        raise ConnectionError("down")
++
++    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
++    _round(adapter, paths, now=NOW)                               # first held back at NOW
++    future = (NOW + timedelta(days=30)).timestamp()
++    for f in Path(paths.evidence_dir).glob("[!r]*.json"):
++        os.utime(f, (future, future))                             # touched / set to the future
++    _round(adapter, paths, now=NOW + timedelta(hours=3))
++    assert _codes(paths) == [CODE_CORRECTED]
++
++
++def test_a_damaged_first_seen_file_or_a_clock_that_ran_ahead_restarts_the_clock_not_the_notice(tmp_path, monkeypatch):
++    from datetime import timedelta
++
++    def hook(_c):
++        raise ConnectionError("down")
++
++    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
++    _round(adapter, paths, now=NOW + timedelta(days=5))           # recorded "first seen" is in the future
++    _round(adapter, paths, now=NOW)
++    assert _codes(paths) == []
++    _round(adapter, paths, now=NOW + timedelta(hours=3))
++    assert _codes(paths) == [CODE_CORRECTED]
++
++
++def _add_correction(paths, *, event_id, trade_id, order_ids, corrected):
++    ev = Path(paths.evidence_dir)
++    first = json.loads(next(p for p in sorted(ev.glob("*.json")) if p.name != "replay-first-seen.json").read_text())
++    content = dict(first, order_ids=list(order_ids), trade_id=trade_id,
++                   correction={"previous": first["correction"]["previous"], "corrected": corrected})
++    ev.joinpath(f"{event_id}.json").write_text(json.dumps(content), encoding="utf-8")
++    with open(paths.ledger, "a", encoding="utf-8") as fh:
++        fh.write(json.dumps({"event_type": TRADE_CORRECTION_EVENT, "event_id": event_id, "trade_id": trade_id,
++                             "exchange_order_ids": list(order_ids), "corrected": corrected,
++                             "event_epoch_ms": 1790200001000}) + "\n")
++
++
++def _announced(paths):
++    return [e["details"]["correction_event_id"] for e in read_fleet_events(paths.fleet_event_log)]
++
++
++def test_a_new_correction_sharing_orders_with_an_announced_one_is_still_announced(tmp_path):
++    paths = _setup(tmp_path)
++    adapter = _trade_adapter(paths, Exchange(_client_ids()))
++    _round(adapter, paths)                                # corr-1 announced normally
++    _add_correction(paths, event_id="corr-2", trade_id="OTHER", order_ids=[EXIT, "999"], corrected={"net_pnl": 1.0})
++    result = _round(adapter, paths)
++    assert _announced(paths) == ["corr-1", "corr-2"] and [r["code"] for r in result["replayed"]] == [CODE_CORRECTED]
++
++
++def test_a_new_correction_whose_orders_are_a_subset_of_an_announced_one_is_announced(tmp_path):
++    paths = _setup(tmp_path)
++    adapter = _trade_adapter(paths, Exchange(_client_ids()))
++    _round(adapter, paths)                                # corr-1 covers all of ORDERS_B for trade B
++    _add_correction(paths, event_id="corr-2", trade_id="T2", order_ids=[DUPLICATE, EXIT], corrected={"net_pnl": 2.0})
++    _round(adapter, paths)
++    assert _announced(paths) == ["corr-1", "corr-2"]      # the old superset must not be picked for the new evidence
++
++
++def test_same_orders_different_trade_or_figures_are_different_corrections(tmp_path):
++    paths = _setup(tmp_path)
++    adapter = _trade_adapter(paths, Exchange(_client_ids()))
++    _round(adapter, paths)
++    _add_correction(paths, event_id="corr-2", trade_id=TRADE_B, order_ids=[DUPLICATE, EXIT], corrected={"net_pnl": 3.0})
++    _add_correction(paths, event_id="corr-3", trade_id="T3", order_ids=[DUPLICATE, EXIT], corrected={"net_pnl": 3.0})
++    _round(adapter, paths)
++    assert sorted(_announced(paths)) == ["corr-1", "corr-2", "corr-3"]
++    _round(adapter, paths)
++    assert len(_announced(paths)) == 3                    # and nothing is announced twice
++
++
++# --- review of #99, round 3: state-file hardening and no guessing -----------------
++
++def _failing_hook(_c):
++    raise ConnectionError("down")
++
++
++@pytest.mark.parametrize("junk", ["[]", "null", '"damaged"', "123", "{not json", '{"x": true}'])
++def test_a_first_seen_file_of_any_shape_never_blocks_the_notice(tmp_path, monkeypatch, junk):
++    from datetime import timedelta
++
++    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, _failing_hook)
++    Path(paths.evidence_dir, "replay-first-seen.json").write_text(junk, encoding="utf-8")
++    _round(adapter, paths, now=NOW)
++    assert _codes(paths) == []                                   # restarted clock, still held back
++    _round(adapter, paths, now=NOW + timedelta(hours=2, minutes=1))
++    assert _codes(paths) == [CODE_CORRECTED]
++
++
++def test_a_first_seen_file_that_cannot_be_written_announces_instead_of_waiting_for_ever(tmp_path, monkeypatch):
++    from trade_alerts import unrecorded_fill
++
++    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, _failing_hook)
++
++    def refuse(*_a, **_k):
++        raise PermissionError("read-only")
++
++    monkeypatch.setattr(unrecorded_fill, "atomic_write", refuse)
++    _round(adapter, paths, now=NOW)
++    [event] = read_fleet_events(paths.fleet_event_log)
++    assert "PermissionError" in event["details"]["projection_error"] and "不再等待" in event["details"]["notice_text"]
++
++
++def test_a_manual_fix_or_incomplete_evidence_is_reported_not_guessed(tmp_path):
++    paths = _setup(tmp_path)
++    adapter = _trade_adapter(paths, Exchange(_client_ids()))
++    _round(adapter, paths)
++    ev = Path(paths.evidence_dir)
++    first = json.loads(next(p for p in sorted(ev.glob("*.json"))).read_text())
++    # two unannounced candidates, evidence without corrected figures
++    for eid, pnl in (("corr-old", 1.0), ("corr-new", 2.0)):
++        with open(paths.ledger, "a", encoding="utf-8") as fh:
++            fh.write(json.dumps({"event_type": TRADE_CORRECTION_EVENT, "event_id": eid, "trade_id": "T1",
++                                 "exchange_order_ids": [DUPLICATE, EXIT, "77"], "corrected": {"net_pnl": pnl}}) + "\n")
++    ev.joinpath("x.json").write_text(json.dumps(dict(first, trade_id="T1", correction={"previous": {}})), encoding="utf-8")
++    result = _round(adapter, paths)
++    assert _announced(paths) == ["corr-1"]                       # nothing picked for the incomplete evidence
++    assert any(r.get("evidence_path", "").endswith("x.json") and "error" in r for r in result["replayed"])
