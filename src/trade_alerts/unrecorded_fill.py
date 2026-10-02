@@ -43,6 +43,7 @@ order: the adapter's exchange calls are read-only lookups.
 """
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -88,6 +89,7 @@ TRADE_SLACK_MS = 10 * 60 * 1000
 #: An order that cannot be looked up is retried silently for this long, then
 #: reported: a network blip must not page anyone, a lasting one must.
 LOOKUP_GRACE_MS = 2 * 60 * 60 * 1000
+REPLAY_STATE_NAME = "replay-first-seen.json"
 
 
 @dataclass(frozen=True)
@@ -241,9 +243,37 @@ def unrecorded_orders(ledger_status: Mapping[str, Any], ledger_events: list[dict
     return sorted(orders.values(), key=lambda o: (o["time_ms"] or 0, o["order_id"]))
 
 
-def _correction_for(ledger_events: list[dict[str, Any]], ids: list[str]) -> dict[str, Any] | None:
-    return next((e for e in ledger_events if e.get("event_type") == TRADE_CORRECTION_EVENT
-                 and set(ids) <= {str(o) for o in e.get("exchange_order_ids") or []}), None)
+def _correction_matches(ledger_events: list[dict[str, Any]], content: Mapping[str, Any],
+                        ids: list[str]) -> list[dict[str, Any]]:
+    """Ledger corrections this evidence file produced: same trade, the order
+    set contained, and the same corrected figures (the evidence is written
+    before the ledger line, so its content is the only link there is)."""
+    corrected = (content.get("correction") or {}).get("corrected")
+    return [e for e in ledger_events
+            if e.get("event_type") == TRADE_CORRECTION_EVENT
+            and str(e.get("trade_id")) == str(content.get("trade_id"))
+            and set(ids) <= {str(o) for o in e.get("exchange_order_ids") or []}
+            and (corrected is None or e.get("corrected") == corrected)]
+
+
+def _first_seen(path: str, directory: str, moment_ms: int) -> int:
+    """Durable first time a replay of this evidence file was held back, kept in
+    ``<evidence_dir>/replay-first-seen.json`` (no ``order_ids`` key, so it is
+    never read as evidence).  The deadline runs from here, not from the evidence
+    file's mtime, which anything can touch."""
+    state_path = Path(directory) / REPLAY_STATE_NAME
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        state = {}
+    seen = state.get(path)
+    if not isinstance(seen, int) or seen > moment_ms:     # absent, damaged, or from a clock that ran ahead
+        state[path] = seen = moment_ms
+        try:
+            atomic_write(state_path, state)
+        except Exception as exc:  # noqa: BLE001 -- cannot persist: this round only
+            LOGGER.warning("unrecorded_fill_replay_state_write_failed path=%s: %s", state_path, exc)
+    return seen
 
 
 def _request_notice(request: Mapping[str, Any]) -> str:
@@ -337,9 +367,13 @@ class _Round:
             if not set(ids) <= accounted:
                 continue  # never written: the normal path handles the order again
             if self.adapter.style == "trade":
-                correction = _correction_for(ledger_events, ids)
-                # Identity, not overlap: two corrections may share recorded orders.
-                if correction is None or str(correction.get("event_id")) in covered_corrections:
+                # Identity, not overlap: two corrections may share recorded orders,
+                # one's order set may contain another's.  Match on the evidence's
+                # own trade and corrected figures, then take a match that is not
+                # yet announced; with none left there is nothing to announce.
+                correction = next((c for c in _correction_matches(ledger_events, content, ids)
+                                   if str(c.get("event_id")) not in covered_corrections), None)
+                if correction is None:
                     continue
                 if self._replay_trade_correction(path, content, ids, correction):
                     covered_corrections.add(str(correction.get("event_id")))
@@ -361,7 +395,7 @@ class _Round:
         # projection for good; after that the notice goes out with the error.
         hook_error = self._replay_projection(correction, ids)
         if hook_error is not None:
-            age = self.moment_ms - int(Path(path).stat().st_mtime * 1000)
+            age = self.moment_ms - _first_seen(path, self.paths.evidence_dir, self.moment_ms)
             if age < LOOKUP_GRACE_MS:
                 self.result["deferred"].append({"order_id": ids[0], "reason": f"replay hook failed: {hook_error}"})
                 return False
@@ -375,6 +409,7 @@ class _Round:
             f"數量 {previous.get('exit_volume')} → {corrected.get('exit_volume')}；"
             f"淨損益 {previous.get('net_pnl')} → {corrected.get('net_pnl')}",
             f"帳本更正事件: {correction.get('event_id')}",
+            *([f"注意：Google 表／LINE 查詢的補排失敗（{hook_error}），帳本已正確，請檢查 Google 表對帳。"] if hook_error else []),
         ])
         event = append_fleet_event(
             self.paths.fleet_event_log, project=self.project, code=CODE_CORRECTED, risk_tier=self.tiers[CODE_CORRECTED],

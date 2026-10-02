@@ -578,32 +578,95 @@ def test_a_failing_hook_holds_the_notice_back_then_retries_then_announces_with_t
 
 
 def test_a_hook_that_keeps_failing_still_announces_after_the_grace_period(tmp_path, monkeypatch):
-    import os
+    from datetime import timedelta
 
     def hook(_c):
         raise ConnectionError("down")
 
     paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
-    old = NOW.timestamp() - 3 * 3600
-    for f in Path(paths.evidence_dir).glob("*.json"):
-        os.utime(f, (old, old))
-    _round(adapter, paths, now=NOW)
+    first = _round(adapter, paths, now=NOW)
+    assert _codes(paths) == [] and first["deferred"]
+    _round(adapter, paths, now=NOW + timedelta(hours=1))
+    assert _codes(paths) == []                                   # still inside the 2 h grace
+    _round(adapter, paths, now=NOW + timedelta(hours=2, minutes=1))
     [event] = read_fleet_events(paths.fleet_event_log)
     assert "ConnectionError" in event["details"]["projection_error"]
+    assert "ConnectionError" in event["details"]["notice_text"]   # what the operator actually reads
+    export = json.loads(Path(paths.ops_export).read_text())
+    assert "補排失敗" in export["notices"][0]["text"]
+
+
+def test_touching_or_postdating_the_evidence_file_cannot_extend_the_deadline(tmp_path, monkeypatch):
+    import os
+    from datetime import timedelta
+
+    def hook(_c):
+        raise ConnectionError("down")
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
+    _round(adapter, paths, now=NOW)                               # first held back at NOW
+    future = (NOW + timedelta(days=30)).timestamp()
+    for f in Path(paths.evidence_dir).glob("[!r]*.json"):
+        os.utime(f, (future, future))                             # touched / set to the future
+    _round(adapter, paths, now=NOW + timedelta(hours=3))
+    assert _codes(paths) == [CODE_CORRECTED]
+
+
+def test_a_damaged_first_seen_file_or_a_clock_that_ran_ahead_restarts_the_clock_not_the_notice(tmp_path, monkeypatch):
+    from datetime import timedelta
+
+    def hook(_c):
+        raise ConnectionError("down")
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
+    _round(adapter, paths, now=NOW + timedelta(days=5))           # recorded "first seen" is in the future
+    _round(adapter, paths, now=NOW)
+    assert _codes(paths) == []
+    _round(adapter, paths, now=NOW + timedelta(hours=3))
+    assert _codes(paths) == [CODE_CORRECTED]
+
+
+def _add_correction(paths, *, event_id, trade_id, order_ids, corrected):
+    ev = Path(paths.evidence_dir)
+    first = json.loads(next(p for p in sorted(ev.glob("*.json")) if p.name != "replay-first-seen.json").read_text())
+    content = dict(first, order_ids=list(order_ids), trade_id=trade_id,
+                   correction={"previous": first["correction"]["previous"], "corrected": corrected})
+    ev.joinpath(f"{event_id}.json").write_text(json.dumps(content), encoding="utf-8")
+    with open(paths.ledger, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"event_type": TRADE_CORRECTION_EVENT, "event_id": event_id, "trade_id": trade_id,
+                             "exchange_order_ids": list(order_ids), "corrected": corrected,
+                             "event_epoch_ms": 1790200001000}) + "\n")
+
+
+def _announced(paths):
+    return [e["details"]["correction_event_id"] for e in read_fleet_events(paths.fleet_event_log)]
 
 
 def test_a_new_correction_sharing_orders_with_an_announced_one_is_still_announced(tmp_path):
     paths = _setup(tmp_path)
     adapter = _trade_adapter(paths, Exchange(_client_ids()))
     _round(adapter, paths)                                # corr-1 announced normally
-    ev = Path(paths.evidence_dir)
-    first = json.loads(next(ev.glob("*.json")).read_text())
-    # a second, different correction that shares order ids with the first
-    second = dict(first, order_ids=[EXIT, "999"], trade_id="OTHER")
-    ev.joinpath("second.json").write_text(json.dumps(second), encoding="utf-8")
-    with open(paths.ledger, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps({"event_type": TRADE_CORRECTION_EVENT, "event_id": "corr-2",
-                             "exchange_order_ids": [EXIT, "999"], "event_epoch_ms": 1790200001000}) + "\n")
+    _add_correction(paths, event_id="corr-2", trade_id="OTHER", order_ids=[EXIT, "999"], corrected={"net_pnl": 1.0})
     result = _round(adapter, paths)
-    ids = [e["details"]["correction_event_id"] for e in read_fleet_events(paths.fleet_event_log)]
-    assert ids == ["corr-1", "corr-2"] and [r["code"] for r in result["replayed"]] == [CODE_CORRECTED]
+    assert _announced(paths) == ["corr-1", "corr-2"] and [r["code"] for r in result["replayed"]] == [CODE_CORRECTED]
+
+
+def test_a_new_correction_whose_orders_are_a_subset_of_an_announced_one_is_announced(tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()))
+    _round(adapter, paths)                                # corr-1 covers all of ORDERS_B for trade B
+    _add_correction(paths, event_id="corr-2", trade_id="T2", order_ids=[DUPLICATE, EXIT], corrected={"net_pnl": 2.0})
+    _round(adapter, paths)
+    assert _announced(paths) == ["corr-1", "corr-2"]      # the old superset must not be picked for the new evidence
+
+
+def test_same_orders_different_trade_or_figures_are_different_corrections(tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()))
+    _round(adapter, paths)
+    _add_correction(paths, event_id="corr-2", trade_id=TRADE_B, order_ids=[DUPLICATE, EXIT], corrected={"net_pnl": 3.0})
+    _add_correction(paths, event_id="corr-3", trade_id="T3", order_ids=[DUPLICATE, EXIT], corrected={"net_pnl": 3.0})
+    _round(adapter, paths)
+    assert sorted(_announced(paths)) == ["corr-1", "corr-2", "corr-3"]
+    _round(adapter, paths)
+    assert len(_announced(paths)) == 3                    # and nothing is announced twice

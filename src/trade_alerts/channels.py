@@ -13,30 +13,31 @@ TRUNCATION_MARK = "\n…（內容過長，後面已省略）"
 
 
 def split_text(text: str, limit: int) -> list[str]:
-    """Cut ``text`` into pieces of at most ``limit`` characters, at line breaks
-    where possible, so nothing is dropped.  A single line longer than ``limit``
-    is cut at ``limit``.  Empty text gives one empty piece."""
+    """Cut ``text`` into pieces of at most ``limit`` characters with
+    ``"".join(pieces) == text`` -- nothing dropped, nothing reordered, no
+    piece empty (except for empty input).  Each cut prefers the position just
+    after the last line break inside the window, unless that would leave a
+    whitespace-only piece, in which case it cuts at ``limit``.  A piece that is
+    only whitespace can still occur at the very end; ``sendable`` drops those,
+    because the APIs reject them and nothing visible is lost."""
     if limit < 1:
         raise ValueError("limit must be positive")
-    if len(text) <= limit:
-        return [text]
     pieces: list[str] = []
-    current: str | None = None     # None: nothing accumulated (distinct from an empty line)
-    for line in text.split("\n"):
-        while len(line) > limit:
-            if current is not None:
-                pieces.append(current)
-                current = None
-            pieces.append(line[:limit])
-            line = line[limit:]
-        candidate = line if current is None else f"{current}\n{line}"
-        if len(candidate) <= limit:
-            current = candidate
-        else:
-            pieces.append(current if current is not None else "")
-            current = line
-    pieces.append(current if current is not None else "")
+    rest = text
+    while len(rest) > limit:
+        cut = rest[:limit].rfind("\n") + 1
+        if cut <= 0 or not rest[:cut].strip():
+            cut = limit
+        pieces.append(rest[:cut])
+        rest = rest[cut:]
+    pieces.append(rest)
     return pieces
+
+
+def sendable(pieces: list[str], original: str) -> list[str]:
+    """The pieces an API will accept (not whitespace-only); the original text
+    when nothing is left, so an empty message fails exactly as it always did."""
+    return [piece for piece in pieces if piece.strip()] or [original]
 
 
 @dataclass
@@ -55,7 +56,7 @@ class TelegramChannel:
 
         # Telegram rejects a message over 4096 characters outright; send the
         # rest as further messages instead of losing it.
-        for piece in split_text(text, self.max_text_length):
+        for piece in sendable(split_text(text, self.max_text_length), text):
             payload = {"chat_id": self.chat_id, "text": piece, "disable_web_page_preview": True}
 
             def call(request_timeout: float, payload: dict = payload) -> Any:
@@ -89,7 +90,7 @@ class LineMessagingChannel:
         # notice is what mattered most).  Split it across message objects of one
         # push; only beyond LINE_MAX_MESSAGES pieces is anything dropped, and
         # then the last piece says so.
-        pieces = split_text(text, self.max_text_length)
+        pieces = sendable(split_text(text, self.max_text_length), text)
         if len(pieces) > LINE_MAX_MESSAGES:
             pieces = pieces[:LINE_MAX_MESSAGES]
             pieces[-1] = pieces[-1][: self.max_text_length - len(TRUNCATION_MARK)] + TRUNCATION_MARK
