@@ -86,6 +86,7 @@ from .google_ledger_client import (
 from .ledger_integrity import (
     LEDGER_PROJECTION_SCHEMA_VERSION,
     LedgerIntegrityError,
+    LedgerUnreadableError,
     LedgerProvenance,
     ProjectionClassification,
     ProjectionComparison,
@@ -293,6 +294,7 @@ __all__ = [
     "submit_projection_v2",
     "LEDGER_PROJECTION_SCHEMA_VERSION",
     "LedgerIntegrityError",
+    "LedgerUnreadableError",
     "LedgerProvenance",
     "ProjectionClassification",
     "ProjectionComparison",

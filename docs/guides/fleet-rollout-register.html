@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>52</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>54</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>25</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">52 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">54 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -209,7 +209,7 @@
   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
   <div id="glossaryHost"></div>
   <div class="foot">
-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-01 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-02 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 3e3b6f7</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 43be152</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 1efbdc0</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 9559897</code>。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
   </div>
@@ -2142,7 +2142,7 @@
    "title": "帳本少記交易所成交時，升格通知並以交易所為準更正"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-repair_bot.recurrence_escalation",
    "complete": false,
    "dots": {
@@ -2160,9 +2160,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
+       "text": "2026-10-02 已在共用庫（trade-alerts 開發中的 v0.25.0）實作：修復機器人每輪數最近 7 天自動補寫次數，達 2 次通知一次、之後 7 天內不重發；趨勢策略已接共用修復執行器，升級共用庫後自動具備。還沒發版、沒上任何主機，上正式機後改已做。"
       }
      ]
     },
@@ -2171,9 +2171,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
+       "text": "2026-10-02 已在共用庫（trade-alerts 開發中的 v0.25.0）實作：修復機器人每輪數最近 7 天自動補寫次數，達 2 次通知一次、之後 7 天內不重發；動能策略已接共用修復執行器，升級共用庫後自動具備。還沒發版、沒上任何主機，上正式機後改已做。"
       }
      ]
     },
@@ -2182,7 +2182,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+       "phase": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
        "state": "pending",
        "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
       }
@@ -2193,18 +2193,18 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+       "phase": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
        "state": "pending",
        "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
       }
      ]
     }
    ],
-   "sub": "自動修補（R1）本身不通知，但同一支策略在一段期間內修補次數超過門檻時，要發一次 R2 通知「這個修補一直在發生，請追根因」，讓修復機器人不會變成掩蓋 bug 的工具。門檻與期間待定。",
+   "sub": "自動修補（R1）本身不通知，但同一支策略 7 天內自動補寫達 2 次，就發一次 R3 通知「這個修補一直在發生，請追根因」（附次數與交易編號），之後 7 天內不重發（使用者 2026-10-01 核可門檻）。讓修復機器人不會變成掩蓋 bug 的工具。",
    "title": "自動修補重複發生時升格通知"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-notify.error_id",
    "complete": false,
    "dots": {
@@ -2224,7 +2224,7 @@
        "aspect": null,
        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
        "state": "pending",
-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
       }
      ]
     },
@@ -2235,7 +2235,7 @@
        "aspect": null,
        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
        "state": "pending",
-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
       }
      ]
     },
@@ -2246,7 +2246,7 @@
        "aspect": null,
        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
        "state": "pending",
-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
       }
      ]
     },
@@ -2257,7 +2257,7 @@
        "aspect": null,
        "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
        "state": "pending",
-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
       }
      ]
     }
@@ -2266,7 +2266,7 @@
    "title": "通知一定附錯誤編號，標題與風險登記冊一致"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-stop.graceful",
    "complete": false,
    "dots": {
@@ -2328,7 +2328,7 @@
    "title": "收到停止訊號時等當輪做完再結束"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-recovery.interrupted_order",
    "complete": false,
    "dots": {
@@ -2495,7 +2495,7 @@
    "title": "R2｜移動停損換單失敗，部位可能沒有交易所端保護"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "rule-SEY.PROTECTION_MOVE_DEFERRED",
    "complete": false,
    "dots": {
@@ -2519,9 +2519,9 @@
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
        "state": "pending",
-       "text": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+       "text": "2026-10-01 f-14（ed-seykota #81）已在開發主幹實作：每 10 分鐘重試，連續第 3 次失敗寫一筆升格事件並通知一次；還沒上正式機，上線後改已做。"
       }
      ]
     }
@@ -4532,7 +4532,7 @@
    "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
    "complete": false,
    "dots": {
@@ -4567,7 +4567,7 @@
    "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-BTC.STATE_FILE_CORRUPT",
    "complete": false,
    "dots": {
@@ -4600,6 +4600,76 @@
    ],
    "sub": "ERR-053 · BTC.STATE_FILE_CORRUPT",
    "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "pending",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+       "state": "pending",
+       "text": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；動能策略升級共用庫並部署後才會發，上正式機後改已做。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+       "state": "pending",
+       "text": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+      }
+     ]
+    }
+   ],
+   "sub": "ERR-054 · MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+       "state": "pending",
+       "text": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；趨勢策略升級共用庫並部署後才會發，上正式機後改已做。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+       "state": "pending",
+       "text": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+      }
+     ]
+    }
+   ],
+   "sub": "ERR-055 · SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
   }
  ],
  "phase_counts": {
@@ -4607,16 +4677,16 @@
   "8-btc-competition": 8,
   "8-momentum": 3,
   "8-mycrypto": 20,
-  "8-seykota": 19,
+  "8-seykota": 18,
   "binance-funding-sync": 2,
   "error-ids": 4,
-  "f-12": 16,
+  "f-12": 23,
   "h4-trade-correction": 0,
   "hotfix-btc-order-resend": 0,
   "hotfix-seykota-order-resend": 0,
   "hotfix-seykota-stop-resolution": 0,
   "naming-rollout": 0,
-  "repair-recurrence": 4,
+  "repair-recurrence": 2,
   "unrecorded-fill": 4,
   "v2-W2": 0,
   "v2-W3": 0,
@@ -4658,7 +4728,7 @@
   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
   "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
   "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
-  "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+  "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
   "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
   "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
   "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
@@ -4679,28 +4749,34 @@
  },
  "recent_summary": [
   {
-   "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
-   "note": "競賽每日調整被中斷、重啟後把已成交的單照交易所補記並通知（f-12，ERR-052）。",
+   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "note": "自動補寫 7 天內達 2 次就通知一次、追根因（g2，ERR-054）。",
    "project": null,
-   "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
+   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
   },
   {
-   "anchor": "rule-BTC.STATE_FILE_CORRUPT",
-   "note": "競賽狀態檔讀不出來就安全暫停、不再當成第一次執行（f-12，ERR-053）。",
+   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "note": "同上，趨勢策略（g2，ERR-055）。",
    "project": null,
-   "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
+   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
   },
   {
-   "anchor": "cap-stop.graceful",
-   "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。",
+   "anchor": "cap-repair_bot.recurrence_escalation",
+   "note": "門檻定案（7 天內 2 次、通知後 7 天不重發），共用庫已實作、未上正式機。",
    "project": null,
-   "title": "收到停止訊號時等當輪做完再結束"
+   "title": "自動修補重複發生時升格通知"
   },
   {
-   "anchor": "cap-recovery.interrupted_order",
-   "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。",
+   "anchor": "rule-SEY.PROTECTION_MOVE_DEFERRED",
+   "note": "f-14 已實作每 10 分鐘重試、連續 3 次通知（開發主幹，未上正式機）；錯誤清單文字同步。",
    "project": null,
-   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
+   "title": "R2｜移動停損時舊停損單取消不掉，保留舊停損、這輪不移動"
+  },
+  {
+   "anchor": "cap-notify.error_id",
+   "note": "共用庫已實作【編號】標題第一行與第二則 AI 指令（未發版）；維運通知自己的告警與發兩則未做。",
+   "project": null,
+   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
   }
  ],
  "totals": {
@@ -4712,7 +4788,7 @@
   "momentum": {
    "done": 35,
    "n/a": 10,
-   "pending": 11
+   "pending": 13
   },
   "mycrypto": {
    "done": 14,
@@ -4722,7 +4798,7 @@
   "seykota": {
    "done": 43,
    "n/a": 8,
-   "pending": 27
+   "pending": 29
   }
  }
 }

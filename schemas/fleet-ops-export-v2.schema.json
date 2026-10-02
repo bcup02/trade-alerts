@@ -77,7 +77,12 @@
           "text": {
             "type": "string",
             "minLength": 1,
-            "description": "Complete plain-language message body including, when the catalog has one, the AI root-cause prompt with this event's identifiers; the reader adds only the strategy label and times."
+            "description": "Main plain-language message. Line 1 is exactly '【ERR-xxx】' plus the catalog title (or '【未編號】<code>' for an uncatalogued code), line 2 the tier header; the reader adds only the strategy label and times. The AI root-cause prompt is the separate ai_text."
+          },
+          "ai_text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional second message: the catalog's AI root-cause prompt with this event's identifiers, first line '【ERR-xxx】給 AI 的追查指令（整段貼給 Claude）'. Absent when the catalog entry has no prompt. A reader that does not know this field still sends a complete main message."
           }
         }
       }

@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 53,
+  "error_ids_issued": 55,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -149,14 +149,14 @@
       },
       "verdict": "JUDGEMENT",
       "risk_tier": "R2",
-      "auto_action": "保留舊停損（部位仍有保護，只是停損價還是舊的），不掛新單；下一根 K 棒自動再試移動（ed-seykota PR #74 已實作）。目前每次發生都只在主機日誌記一筆緊急（ERROR）紀錄；第 8 關接上共用事件日誌時，改為連續 escalate_after 次都移不動才升格：開請求、通知。",
-      "human_action": "到交易所確認舊停損單還在；查明為什麼取消一直失敗（網路、交易所、API 權限），必要時手動把停損移到新價位。",
+      "auto_action": "保留舊停損（部位仍有保護，只是停損價還是舊的），不掛新單；每 10 分鐘自動再試移動（連續失敗次數記在狀態檔，重啟後不歸零；ed-seykota PR #74、#81）。每次失敗寫一筆事件日誌（R2，不通知）；連續第 3 次失敗（約 20～30 分鐘）寫一筆升格事件並由 ops_export 通知一次，之後繼續重試但不再重發。移動成功後清除計數。",
+      "human_action": "收到通知後，到交易所確認舊停損單還在；查明為什麼取消一直失敗（網路、交易所、API 權限），必要時手動把停損移到新價位。",
       "resume": "n/a",
       "lands_in_phase": 8,
-      "rationale": "2026-09-24 h11 在 Binance 測試網查證：掛單清單沒有延遲，所以取消卡住只會是撤單或查詢請求一直失敗。舊單最後一次查到時還在（或根本沒送出取消），部位仍受舊停損保護，不必停機；Binance 也不允許同方向再掛第二張全部平倉停損（-4130），所以不能先掛新單再清舊單，只能等下一輪再試。",
+      "rationale": "2026-09-24 h11 在 Binance 測試網查證：掛單清單沒有延遲，所以取消卡住只會是撤單或查詢請求一直失敗。舊單最後一次查到時還在（或根本沒送出取消），部位仍受舊停損保護，不必停機；Binance 也不允許同方向再掛第二張全部平倉停損（-4130），所以不能先掛新單再清舊單，只能等下一輪再試。 2026-10-01 f-14：改為每 10 分鐘重試（原本要等下一根 4 小時 K 棒），並在連續第 3 次失敗時通知一次；升格那一筆事件在趨勢策略端標為 R3（急迫顯示），目錄等級維持 R2（自動重試、連續失敗才通知），前兩次失敗不會通知。",
       "operator_message": {
         "what": "移動停損要先取消舊停損單，但 60 秒內取消不掉，舊單還掛在交易所上。",
-        "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，下一根 K 棒自動再試。目前每次發生都只在主機日誌記一筆緊急紀錄，還不會送到你的手機——趨勢策略的通知要到第 8 關接上共用事件日誌才會送出；屆時規劃改成連續 3 次都移不動才通知你。",
+        "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，每 10 分鐘自動再試。連續第 3 次都取消不掉時會通知你一次（約 20～30 分鐘後），之後繼續重試但不再重發。",
         "steps": [
           "到交易所 App 的委託清單確認訊息裡那張舊停損單還在。",
           "如果擔心舊停損價太遠，可以手動把停損改到訊息裡的新停損價。",
@@ -574,7 +574,7 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:299"
+        "trade-alerts/src/trade_alerts/repair_runner.py:369"
       ],
       "current": {
         "latch": null,
@@ -604,7 +604,7 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:364"
+        "trade-alerts/src/trade_alerts/repair_runner.py:434"
       ],
       "current": {
         "latch": null,
@@ -636,8 +636,8 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:332",
-        "trade-alerts/src/trade_alerts/repair_runner.py:346"
+        "trade-alerts/src/trade_alerts/repair_runner.py:402",
+        "trade-alerts/src/trade_alerts/repair_runner.py:416"
       ],
       "current": {
         "latch": null,
@@ -1040,7 +1040,7 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:299"
+        "trade-alerts/src/trade_alerts/repair_runner.py:369"
       ],
       "current": {
         "latch": null,
@@ -1070,8 +1070,8 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:332",
-        "trade-alerts/src/trade_alerts/repair_runner.py:346"
+        "trade-alerts/src/trade_alerts/repair_runner.py:402",
+        "trade-alerts/src/trade_alerts/repair_runner.py:416"
       ],
       "current": {
         "latch": null,
@@ -1102,7 +1102,7 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:364"
+        "trade-alerts/src/trade_alerts/repair_runner.py:434"
       ],
       "current": {
         "latch": null,
@@ -1133,7 +1133,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "seykota",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:440"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:567"
       ],
       "current": {
         "latch": null,
@@ -1163,7 +1163,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "seykota",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:641"
       ],
       "current": {
         "latch": null,
@@ -1195,7 +1195,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:440"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:567"
       ],
       "current": {
         "latch": null,
@@ -1225,7 +1225,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:641"
       ],
       "current": {
         "latch": null,
@@ -1257,7 +1257,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "btc-competition",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:484"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:611"
       ],
       "current": {
         "latch": null,
@@ -1287,7 +1287,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "btc-competition",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:641"
       ],
       "current": {
         "latch": null,
@@ -1319,7 +1319,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "mycrypto",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:514"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:641"
       ],
       "current": {
         "latch": null,
@@ -1702,6 +1702,68 @@
           "把下方指令貼給 Claude 追查為什麼狀態檔壞掉。"
         ],
         "ai_prompt": "請在 btc-bull-market-competition 追查狀態檔損毀：讀 btc-competition-resume preview 的證據（path、problem、damaged_copy），檢查損毀備份檔的內容與大小、state/ 目錄的磁碟空間與檔案系統錯誤（dmesg、df）、journalctl 在狀態檔最後一次正常寫入前後的紀錄，以及有沒有人手動編輯過；state 現在是原子寫入（src/btc_competition/state.py），所以被殺不應造成損毀，請判斷真正原因並提出治本修正。"
+      }
+    },
+    {
+      "error_id": "ERR-054",
+      "code": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
+      "project": "momentum",
+      "sources": [
+        "scripts/repair_bot.py:163",
+        "trade-alerts/src/trade_alerts/repair_runner.py:276"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不動帳本、不暫停。修復機器人每輪結束時數最近 7 天內這支策略的「VERIFIED_CLOSE_AUTO_REPAIRED」事件；達 2 次就寫一筆事件日誌並由 ops_export 通知一次（附次數與交易編號）。這則通知發出後 7 天內不再重發；7 天後若 7 天窗口內仍有 2 次以上，會再發一次。",
+      "human_action": "帳本已經被自動補對，不用再動帳本；要做的是追出為什麼平倉一直沒被記進帳本（有 bug 在持續漏記），並確認修正。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-01 使用者核可（g2）：自動補寫（R1）本身不通知，但若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 永遠不會被發現。門檻 7 天內 2 次、通知後 7 天內不重發，是為了讓一次偶發事件不吵人、但同一個問題連續發生時一定被看見。因為發的是「請追根因」而不是「帳本壞了」，帳本已經對，所以是 R3 事件通知而不是請求（不開請求、不鎖機）。",
+      "operator_message": {
+        "what": "動能策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。",
+        "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
+        "steps": [
+          "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
+        ],
+        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查平倉一直漏記的原因：讀 audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、還是交易所路徑沒走到記帳），提出治本修正與回歸測試。"
+      }
+    },
+    {
+      "error_id": "ERR-055",
+      "code": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
+      "project": "seykota",
+      "sources": [
+        "scripts/repair_bot.py:186",
+        "trade-alerts/src/trade_alerts/repair_runner.py:276"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不動帳本、不暫停。修復機器人每輪結束時數最近 7 天內這支策略的「VERIFIED_CLOSE_AUTO_REPAIRED」事件；達 2 次就寫一筆事件日誌並由 ops_export 通知一次（附次數與交易編號）。這則通知發出後 7 天內不再重發；7 天後若 7 天窗口內仍有 2 次以上，會再發一次。",
+      "human_action": "帳本已經被自動補對，不用再動帳本；要做的是追出為什麼平倉一直沒被記進帳本（有 bug 在持續漏記），並確認修正。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-01 使用者核可（g2）：自動補寫（R1）本身不通知，但若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 永遠不會被發現。門檻 7 天內 2 次、通知後 7 天內不重發，是為了讓一次偶發事件不吵人、但同一個問題連續發生時一定被看見。因為發的是「請追根因」而不是「帳本壞了」，帳本已經對，所以是 R3 事件通知而不是請求（不開請求、不鎖機）。",
+      "operator_message": {
+        "what": "趨勢策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。",
+        "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
+        "steps": [
+          "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查平倉一直漏記的原因：讀 audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、還是交易所路徑沒走到記帳），提出治本修正與回歸測試。"
       }
     }
   ],

@@ -410,3 +410,115 @@ def test_a_network_failure_on_a_recorded_order_still_retries_even_with_the_hook(
 
     assert result["corrected"] == []                          # not "not found": do not guess
     assert "LOOKUP_FAILED" in {u["reason_code"] for u in result["unresolved"]}
+
+
+# --- f-12: a kill between the durable write and its announcement --------------
+
+class _Killed(BaseException):
+    """Stands in for SIGKILL: not an Exception, so no handler can swallow it."""
+
+
+def _kill_before_announcing(monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    def dies(*_a, **_k):
+        raise _Killed()
+
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", dies)
+
+
+def test_a_correction_killed_before_its_notice_is_announced_next_round(tmp_path, monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    paths = _setup(tmp_path)
+    replayed_for: list[str] = []
+    adapter = _trade_adapter(paths, Exchange(_client_ids()),
+                             replay_trade_correction=lambda c: (replayed_for.append(c["event_id"]) or {"queued": c["event_id"]}))
+    real = unrecorded_fill.append_fleet_event
+    _kill_before_announcing(monkeypatch)
+    with pytest.raises(_Killed):
+        _round(adapter, paths)
+    assert _codes(paths) == []  # the ledger has the correction, nobody was told
+    assert any(e.get("event_type") == TRADE_CORRECTION_EVENT for e in read_ledger(paths.ledger))
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
+
+    result = _round(adapter, paths)
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert event["code"] == CODE_CORRECTED and event["risk_tier"] == "R3"
+    assert event["details"]["replayed"] is True and event["details"]["correction_event_id"] == "corr-1"
+    assert "補發" in event["details"]["notice_text"] and "-13.233" in event["details"]["notice_text"]
+    assert set(event["evidence"]["order_ids"]) == {DUPLICATE, EXIT}
+    assert replayed_for == ["corr-1"]
+    assert [r["code"] for r in result["replayed"]] == [CODE_CORRECTED, "PROJECTION"]
+    assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "SEY." + CODE_CORRECTED
+
+    again = _round(adapter, paths)  # idempotent: nothing more to announce
+    assert again["replayed"] == [] and replayed_for == ["corr-1"] and _codes(paths) == [CODE_CORRECTED]
+
+
+def test_a_normally_announced_correction_is_never_replayed(tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()), replay_trade_correction=lambda c: pytest.fail("replayed"))
+    _round(adapter, paths)
+    assert _round(adapter, paths)["replayed"] == [] and _codes(paths) == [CODE_CORRECTED]
+
+
+def test_an_evidence_file_whose_write_never_happened_is_not_announced(tmp_path):
+    paths = _setup(tmp_path)
+    Path(paths.evidence_dir).mkdir()
+    Path(paths.evidence_dir, "x.json").write_text(json.dumps(
+        {"order_ids": [DUPLICATE, EXIT], "duplicate_of": ORIGINAL, "client_order_id": "c", "trade_id": TRADE_B,
+         "correction": {"previous": {}, "corrected": {}}}), encoding="utf-8")
+    result = _round(_trade_adapter(paths, Exchange(_client_ids(DUPLICATE=None))), paths)
+    assert result["replayed"] == []  # ledger does not account for the orders: the normal path runs instead
+
+
+def test_an_unresolved_request_killed_before_its_notice_is_announced_next_round(tmp_path, monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids(DUPLICATE="app-manual-order")), owns=lambda cid: False)
+    real = unrecorded_fill.append_fleet_event
+    _kill_before_announcing(monkeypatch)
+    with pytest.raises(_Killed):
+        _round(adapter, paths)
+    assert _codes(paths) == [] and len(outstanding_error_requests(paths.request_queue)) >= 1
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
+
+    result = _round(adapter, paths)
+    events = [e for e in read_fleet_events(paths.fleet_event_log) if e["details"].get("replayed")]
+    assert events and all(e["code"] == CODE_UNRESOLVED and e["risk_tier"] == "R3" for e in events)
+    assert "補發" in events[0]["details"]["notice_text"]
+    assert {e["details"]["request_id"] for e in events} == {r["request_id"] for r in outstanding_error_requests(paths.request_queue)}
+    assert result["replayed"]
+    again = _round(adapter, paths)
+    assert [r for r in again["replayed"] if r.get("code") == CODE_UNRESOLVED] == []
+
+
+def test_a_spot_recording_killed_before_its_notice_is_announced_next_round(tmp_path, monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    paths, state = _spot_setup(tmp_path)
+    client = {"501": "btc-a", "502": "btc-a"}
+
+    def append_spot_fills(symbol, order_id, fills):
+        with open(paths.ledger, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"event_type": "spot_fill", "event_id": f"x{order_id}", "order_id": order_id,
+                                 "symbol": symbol}) + "\n")
+        return {"event_ids": [f"x{order_id}"]}
+
+    adapter = UnrecordedFillAdapter(
+        project="btc-competition", style="spot", client_ids=True, evidence_source="fixture",
+        client_order_id=lambda _s, oid: client.get(oid),
+        fetch_fills=lambda _s, ids: [f for f in state["fills"] if str(f["order_id"]) in ids],
+        append_spot_fills=append_spot_fills,
+    )
+    real = unrecorded_fill.append_fleet_event
+    _kill_before_announcing(monkeypatch)
+    with pytest.raises(_Killed):
+        run_unrecorded_fill_round(adapter, paths, catalog=CATALOG, now=NOW)
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
+    run_unrecorded_fill_round(adapter, paths, catalog=CATALOG, now=NOW)
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert event["code"] == CODE_CORRECTED and event["details"]["replayed"] is True
+    assert event["evidence"]["order_ids"] == ["502"]

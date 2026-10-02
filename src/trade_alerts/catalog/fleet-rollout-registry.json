@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-01",
+  "updated_at": "2026-10-02",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -23,7 +23,7 @@
     "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
     "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
     "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
-    "repair-recurrence": "尚未排定：自動修補（R1）重複發生時升格通知，避免修復機器人默默蓋掉一直存在的 bug",
+    "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
     "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
@@ -535,17 +535,17 @@
     {
       "id": "repair_bot.recurrence_escalation",
       "title": "自動修補重複發生時升格通知",
-      "description": "自動修補（R1）本身不通知，但同一支策略在一段期間內修補次數超過門檻時，要發一次 R2 通知「這個修補一直在發生，請追根因」，讓修復機器人不會變成掩蓋 bug 的工具。門檻與期間待定。",
+      "description": "自動修補（R1）本身不通知，但同一支策略 7 天內自動補寫達 2 次，就發一次 R3 通知「這個修補一直在發生，請追根因」（附次數與交易編號），之後 7 天內不重發（使用者 2026-10-01 核可門檻）。讓修復機器人不會變成掩蓋 bug 的工具。",
       "status": {
         "momentum": {
           "state": "pending",
-          "phase": "repair-recurrence",
-          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
+          "phase": "f-12",
+          "reason": "2026-10-02 已在共用庫（trade-alerts 開發中的 v0.25.0）實作：修復機器人每輪數最近 7 天自動補寫次數，達 2 次通知一次、之後 7 天內不重發；動能策略已接共用修復執行器，升級共用庫後自動具備。還沒發版、沒上任何主機，上正式機後改已做。"
         },
         "seykota": {
           "state": "pending",
-          "phase": "repair-recurrence",
-          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。"
+          "phase": "f-12",
+          "reason": "2026-10-02 已在共用庫（trade-alerts 開發中的 v0.25.0）實作：修復機器人每輪數最近 7 天自動補寫次數，達 2 次通知一次、之後 7 天內不重發；趨勢策略已接共用修復執行器，升級共用庫後自動具備。還沒發版、沒上任何主機，上正式機後改已做。"
         },
         "mycrypto": {
           "state": "pending",
@@ -567,22 +567,22 @@
         "momentum": {
           "state": "pending",
           "phase": "error-ids",
-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
         },
         "seykota": {
           "state": "pending",
           "phase": "error-ids",
-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
         },
         "mycrypto": {
           "state": "pending",
           "phase": "error-ids",
-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
         },
         "btc-competition": {
           "state": "pending",
           "phase": "error-ids",
-          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。"
+          "reason": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：共用庫（v0.25.0，未發版）已實作策略白話警報——第一行＝【ERR-編號】＋目錄標題（測試逐條檢查全部目錄條目），給 AI 的指令獨立成第二則（同樣帶編號）；還沒做：維運通知自己的對帳狀態告警要對應到目錄條目、維運通知要改成發兩則，兩者都在維運通知這邊。"
         }
       }
     },
@@ -702,8 +702,8 @@
       "emits_event": {
         "seykota": {
           "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "phase": "f-12",
+          "reason": "2026-10-01 f-14（ed-seykota #81）已在開發主幹實作：每 10 分鐘重試，連續第 3 次失敗寫一筆升格事件並通知一次；還沒上正式機，上線後改已做。"
         }
       }
     },
@@ -1653,32 +1653,72 @@
           "reason": "同上：暫停時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
         }
       }
+    },
+    {
+      "code": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；動能策略升級共用庫並部署後才會發，上正式機後改已做。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+        }
+      }
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；趨勢策略升級共用庫並部署後才會發，上正式機後改已做。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "f-12",
+          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
       "kind": "rule",
-      "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+      "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
       "type": "added",
-      "note": "競賽每日調整被中斷、重啟後把已成交的單照交易所補記並通知（f-12，ERR-052）。"
+      "note": "自動補寫 7 天內達 2 次就通知一次、追根因（g2，ERR-054）。"
     },
     {
       "kind": "rule",
-      "id": "BTC.STATE_FILE_CORRUPT",
+      "id": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
       "type": "added",
-      "note": "競賽狀態檔讀不出來就安全暫停、不再當成第一次執行（f-12，ERR-053）。"
+      "note": "同上，趨勢策略（g2，ERR-055）。"
     },
     {
       "kind": "cap",
-      "id": "stop.graceful",
+      "id": "repair_bot.recurrence_escalation",
       "type": "updated",
-      "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。"
+      "note": "門檻定案（7 天內 2 次、通知後 7 天不重發），共用庫已實作、未上正式機。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.PROTECTION_MOVE_DEFERRED",
+      "type": "updated",
+      "note": "f-14 已實作每 10 分鐘重試、連續 3 次通知（開發主幹，未上正式機）；錯誤清單文字同步。"
     },
     {
       "kind": "cap",
-      "id": "recovery.interrupted_order",
+      "id": "notify.error_id",
       "type": "updated",
-      "note": "四支的理由都改寫為「已在開發主幹實作、未上正式機」。"
+      "note": "共用庫已實作【編號】標題第一行與第二則 AI 指令（未發版）；維運通知自己的告警與發兩則未做。"
     }
   ]
 }

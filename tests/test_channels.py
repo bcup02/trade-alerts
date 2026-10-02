@@ -29,3 +29,51 @@ def test_line_payload_and_bearer_header():
         assert request.headers["Authorization"] == "Bearer channel-secret"
         assert '"to": "U123"' in body
         assert "channel-secret" not in body
+
+
+import json
+
+import pytest
+
+from trade_alerts.channels import LINE_MAX_MESSAGES, TRUNCATION_MARK, split_text
+
+
+def _line_messages(text: str, **kwargs) -> list[str]:
+    with responses.RequestsMock() as mock:
+        mock.add(responses.POST, "https://api.line.me/v2/bot/message/push", status=200)
+        LineMessagingChannel("t", "U1", policy=RetryPolicy(attempts=1), **kwargs).send(text)
+        return [m["text"] for m in json.loads(mock.calls[0].request.body)["messages"]]
+
+
+def test_a_short_text_is_one_unchanged_line_message():
+    assert _line_messages("hello") == ["hello"]
+
+
+def test_a_long_text_is_split_at_line_breaks_not_cut_off():
+    lines = [f"line {i:03d} " + "x" * 90 for i in range(120)]   # ~12k characters
+    sent = _line_messages("\n".join(lines))
+    assert len(sent) == 3 and all(len(piece) <= 5000 for piece in sent)
+    assert "\n".join(sent) == "\n".join(lines)                  # nothing lost, nothing reordered
+    assert all(piece.startswith("line ") for piece in sent)      # cut between lines, not inside one
+
+
+def test_text_beyond_five_messages_says_it_was_cut():
+    sent = _line_messages("a" * (5000 * 6 + 10))
+    assert len(sent) == LINE_MAX_MESSAGES and sent[-1].endswith(TRUNCATION_MARK) and len(sent[-1]) <= 5000
+
+
+def test_telegram_sends_the_rest_as_further_messages():
+    with responses.RequestsMock() as mock:
+        mock.add(responses.POST, "https://api.telegram.org/botsecret/sendMessage", json={"ok": True, "result": {}})
+        mock.add(responses.POST, "https://api.telegram.org/botsecret/sendMessage", json={"ok": True, "result": {}})
+        TelegramChannel("secret", "chat", policy=RetryPolicy(attempts=1)).send("a" * 4096 + "\n" + "b" * 10)
+        bodies = [json.loads(call.request.body)["text"] for call in mock.calls]
+    assert bodies == ["a" * 4096, "b" * 10]
+
+
+@pytest.mark.parametrize("text,limit,expected", [
+    ("", 5, [""]), ("abc", 5, ["abc"]), ("ab\ncd\nef", 5, ["ab\ncd", "ef"]), ("abcdefgh", 3, ["abc", "def", "gh"]),
+])
+def test_split_text(text, limit, expected):
+    assert split_text(text, limit) == expected
+    assert "".join(p.replace("\n", "") for p in expected) == text.replace("\n", "")

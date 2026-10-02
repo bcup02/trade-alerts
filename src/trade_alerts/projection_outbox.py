@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Mapping
 from uuid import uuid4
 
-from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance
+from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance, LedgerUnreadableError
 
 ProjectionAction = Literal["append_open_v2", "update_close_v2", "correct_close_v2"]
 ProjectionOutcomeStatus = Literal["CONFIRMED", "REJECTED", "TRANSPORT_FAILED"]
@@ -79,6 +79,10 @@ class ProjectionDispatchResult:
 
     intent: ProjectionIntent | None
     dispatch: ProjectionDispatch | None
+    #: Set when the ledger could not be read (``LedgerUnreadableError``): nothing
+    #: was recorded, the intent stays outstanding, and the caller should stop
+    #: and report instead of trying the next intent.
+    paused_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -223,7 +227,8 @@ def dispatch_next_projection(
     """Attempt only the oldest outstanding intent once.
 
     ``rebuild`` must read the strategy's authoritative ledger and construct a
-    fresh request id/timestamp/signature. ``submit`` is transport only. Neither
+    fresh request id/timestamp/signature. A ``LedgerUnreadableError`` from it
+    pauses the intent (nothing is recorded) rather than rejecting it. ``submit`` is transport only. Neither
     callback receives a secret from this module, and this dispatcher never loops
     or falls back to legacy synchronization.
     """
@@ -235,6 +240,10 @@ def dispatch_next_projection(
         try:
             rebuilt = rebuild(intent)
             _validate_rebuilt(intent, rebuilt)
+        except LedgerUnreadableError as exc:
+            # A damaged ledger is a repairable, temporary state: do not burn the
+            # intent (a terminal REJECTED needs a manual re-queue to recover).
+            return ProjectionDispatchResult(intent, None, paused_reason=str(exc) or "ledger unreadable")
         except Exception:
             return ProjectionDispatchResult(intent, record_projection_dispatch(path, intent=intent, status="REJECTED", error_code="rehydration_invalid"))
         try:

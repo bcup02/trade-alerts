@@ -29,6 +29,16 @@ class LedgerIntegrityError(ValueError):
     """Raised before an invalid or ambiguous ledger projection can be sent."""
 
 
+class LedgerUnreadableError(LedgerIntegrityError):
+    """The ledger itself cannot be read right now (missing, or a damaged line).
+
+    Unlike an ambiguous or mismatching fact, this says nothing about the queued
+    intent: a process killed mid-append leaves a half line that a person can
+    repair, after which the same intent rebuilds fine.  ``dispatch_next_projection``
+    therefore pauses on it instead of recording a terminal ``REJECTED``.
+    """
+
+
 class ProjectionClassification(StrEnum):
     MATCHED = "MATCHED"
     PENDING_SYNC = "PENDING_SYNC"

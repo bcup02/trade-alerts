@@ -135,3 +135,49 @@ def test_rejected_receiver_response_is_terminal_and_never_falls_back(tmp_path: P
     assert result.dispatch.error_code == "provenance_invalid"
     assert legacy_called is False
     assert outstanding_projection_intents(path) == ()
+
+
+def test_unreadable_ledger_pauses_without_consuming_the_intent(tmp_path: Path) -> None:
+    from trade_alerts import LedgerUnreadableError
+
+    path = tmp_path / "projection-outbox.jsonl"
+    intent = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    submitted = False
+
+    def damaged(queued):
+        raise LedgerUnreadableError("ledger line 7 is malformed")
+
+    def submit(payload, proof):  # pragma: no cover - must not run
+        nonlocal submitted
+        submitted = True
+        return Submission("CONFIRMED", receiver_row=2)
+
+    before = path.read_text(encoding="utf-8")
+    result = dispatch_next_projection(path, rebuild=damaged, submit=submit)
+
+    assert result.intent == intent
+    assert result.dispatch is None
+    assert result.paused_reason == "ledger line 7 is malformed"
+    assert submitted is False
+    assert path.read_text(encoding="utf-8") == before
+    assert outstanding_projection_intents(path) == (intent,)
+
+    # once the ledger is repaired the same intent goes through
+    fixed = dispatch_next_projection(path, rebuild=lambda queued: rebuilt(queued), submit=lambda payload, proof: Submission("CONFIRMED", receiver_row=2))
+    assert fixed.dispatch is not None and fixed.dispatch.status == "CONFIRMED"
+    assert fixed.paused_reason is None
+    assert outstanding_projection_intents(path) == ()
+
+
+def test_other_rebuild_errors_are_still_terminal(tmp_path: Path) -> None:
+    from trade_alerts import LedgerIntegrityError
+
+    path = tmp_path / "projection-outbox.jsonl"
+    enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+
+    def ambiguous(queued):
+        raise LedgerIntegrityError("ambiguous local trade_close events for trade_id")
+
+    result = dispatch_next_projection(path, rebuild=ambiguous, submit=lambda payload, proof: Submission("CONFIRMED", receiver_row=2))
+    assert result.dispatch is not None and result.dispatch.status == "REJECTED"
+    assert result.paused_reason is None

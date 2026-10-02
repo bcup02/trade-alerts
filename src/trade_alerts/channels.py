@@ -7,6 +7,37 @@ import requests
 
 from .core import RetryPolicy, request_with_retry
 
+#: LINE accepts at most this many message objects in one push.
+LINE_MAX_MESSAGES = 5
+TRUNCATION_MARK = "\n…（內容過長，後面已省略）"
+
+
+def split_text(text: str, limit: int) -> list[str]:
+    """Cut ``text`` into pieces of at most ``limit`` characters, at line breaks
+    where possible, so nothing is dropped.  A single line longer than ``limit``
+    is cut at ``limit``.  Empty text gives one empty piece."""
+    if limit < 1:
+        raise ValueError("limit must be positive")
+    if len(text) <= limit:
+        return [text]
+    pieces: list[str] = []
+    current = ""
+    for line in text.split("\n"):
+        while len(line) > limit:
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.append(line[:limit])
+            line = line[limit:]
+        candidate = f"{current}\n{line}" if current else line
+        if len(candidate) <= limit:
+            current = candidate
+        else:
+            pieces.append(current)
+            current = line
+    pieces.append(current)
+    return pieces
+
 
 @dataclass
 class TelegramChannel:
@@ -14,23 +45,28 @@ class TelegramChannel:
     chat_id: str
     policy: RetryPolicy = RetryPolicy()
     name: str = "telegram"
+    max_text_length: int = 4096
 
     def send(self, text: str, *, timeout: float | None = None) -> None:
         if not self.bot_token or not self.chat_id:
             raise ValueError("Telegram credentials are incomplete")
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-        payload = {"chat_id": self.chat_id, "text": text, "disable_web_page_preview": True}
         effective = self.policy if timeout is None else RetryPolicy(self.policy.attempts, self.policy.backoff_seconds, timeout)
 
-        def call(request_timeout: float) -> Any:
-            response = requests.post(url, json=payload, timeout=request_timeout)
-            response.raise_for_status()
-            data = response.json()
-            if not data.get("ok", False):
-                raise RuntimeError(f"Telegram API error: {data}")
-            return data
+        # Telegram rejects a message over 4096 characters outright; send the
+        # rest as further messages instead of losing it.
+        for piece in split_text(text, self.max_text_length):
+            payload = {"chat_id": self.chat_id, "text": piece, "disable_web_page_preview": True}
 
-        request_with_retry(call, effective)
+            def call(request_timeout: float, payload: dict = payload) -> Any:
+                response = requests.post(url, json=payload, timeout=request_timeout)
+                response.raise_for_status()
+                data = response.json()
+                if not data.get("ok", False):
+                    raise RuntimeError(f"Telegram API error: {data}")
+                return data
+
+            request_with_retry(call, effective)
 
 
 @dataclass
@@ -49,7 +85,15 @@ class LineMessagingChannel:
             "Authorization": f"Bearer {self.channel_access_token}",
             "Content-Type": "application/json",
         }
-        payload = {"to": self.recipient_id, "messages": [{"type": "text", "text": text[: self.max_text_length]}]}
+        # Over the limit the old code silently cut the text off (the tail of a
+        # notice is what mattered most).  Split it across message objects of one
+        # push; only beyond LINE_MAX_MESSAGES pieces is anything dropped, and
+        # then the last piece says so.
+        pieces = split_text(text, self.max_text_length)
+        if len(pieces) > LINE_MAX_MESSAGES:
+            pieces = pieces[:LINE_MAX_MESSAGES]
+            pieces[-1] = pieces[-1][: self.max_text_length - len(TRUNCATION_MARK)] + TRUNCATION_MARK
+        payload = {"to": self.recipient_id, "messages": [{"type": "text", "text": piece} for piece in pieces]}
         effective = self.policy if timeout is None else RetryPolicy(self.policy.attempts, self.policy.backoff_seconds, timeout)
 
         def call(request_timeout: float) -> Any:
