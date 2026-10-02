@@ -21,21 +21,21 @@ def split_text(text: str, limit: int) -> list[str]:
     if len(text) <= limit:
         return [text]
     pieces: list[str] = []
-    current = ""
+    current: str | None = None     # None: nothing accumulated (distinct from an empty line)
     for line in text.split("\n"):
         while len(line) > limit:
-            if current:
+            if current is not None:
                 pieces.append(current)
-                current = ""
+                current = None
             pieces.append(line[:limit])
             line = line[limit:]
-        candidate = f"{current}\n{line}" if current else line
+        candidate = line if current is None else f"{current}\n{line}"
         if len(candidate) <= limit:
             current = candidate
         else:
-            pieces.append(current)
+            pieces.append(current if current is not None else "")
             current = line
-    pieces.append(current)
+    pieces.append(current if current is not None else "")
     return pieces
 
 

@@ -693,3 +693,19 @@ def test_repairs_older_than_a_week_and_other_strategies_do_not_count(host):
                        evidence={"trade_id": "OTHER"}, recorded_at=utc_now_iso(now - timedelta(days=1)))
     _seed(host)
     assert _round(_Exchange(host.ledger, {}), host, now=now)["recurring"] is None
+
+
+def test_the_quiet_week_holds_under_an_injected_clock_across_rounds(host):
+    from datetime import datetime, timedelta, timezone
+    from trade_alerts.fleet_event_log import append_fleet_event, utc_now_iso
+
+    now = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
+    for trade_id in ("T1", "T2"):
+        append_fleet_event(host.fleet_event_log, project="momentum", code=REPAIRED, risk_tier="R1",
+                           evidence={"trade_id": trade_id}, recorded_at=utc_now_iso(now - timedelta(days=1)))
+    _seed(host)
+    exchange = _Exchange(host.ledger, {})
+    assert _round(exchange, host, now=now)["recurring"]["count"] == 2
+    assert _round(exchange, host, now=now)["recurring"] is None            # same clock: still quiet
+    assert [e["recorded_at"] for e in _events(host, RECURRING)] == [utc_now_iso(now)]
+    assert _round(exchange, host, now=now + timedelta(days=7))["recurring"] is None   # repairs aged out of the window

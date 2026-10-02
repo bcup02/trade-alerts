@@ -241,6 +241,11 @@ def unrecorded_orders(ledger_status: Mapping[str, Any], ledger_events: list[dict
     return sorted(orders.values(), key=lambda o: (o["time_ms"] or 0, o["order_id"]))
 
 
+def _correction_for(ledger_events: list[dict[str, Any]], ids: list[str]) -> dict[str, Any] | None:
+    return next((e for e in ledger_events if e.get("event_type") == TRADE_CORRECTION_EVENT
+                 and set(ids) <= {str(o) for o in e.get("exchange_order_ids") or []}), None)
+
+
 def _request_notice(request: Mapping[str, Any]) -> str:
     """The unresolved-order notice rebuilt from the request alone."""
     details = request.get("details") if isinstance(request.get("details"), Mapping) else {}
@@ -314,33 +319,52 @@ class _Round:
     def _replay_corrections(self, ledger_events: list[dict[str, Any]]) -> None:
         fleet_events = read_fleet_events(self.paths.fleet_event_log)
         covered_paths: set[str] = set()
-        covered_orders: set[str] = set()
+        covered_corrections: set[str] = set()   # trade style: ledger correction event ids already announced
+        covered_order_sets: set[frozenset[str]] = set()   # spot style: exact order sets already announced
         for event in events_for(fleet_events, self.project, (CODE_CORRECTED, CODE_UNRESOLVED)):
             details = event.get("details") if isinstance(event.get("details"), Mapping) else {}
             if details.get("evidence_path"):
                 covered_paths.add(str(details["evidence_path"]))
             if event.get("code") == CODE_CORRECTED:
-                covered_orders.update(str(o) for o in (event.get("evidence") or {}).get("order_ids") or [])
+                if details.get("correction_event_id"):
+                    covered_corrections.add(str(details["correction_event_id"]))
+                covered_order_sets.add(frozenset(str(o) for o in (event.get("evidence") or {}).get("order_ids") or []))
         accounted = recorded_order_ids(ledger_events)
         for path, content in read_evidence_files(self.paths.evidence_dir):
             ids = [str(o) for o in content.get("order_ids") or []]
-            if not ids or not content.get("duplicate_of") or path in covered_paths or covered_orders & set(ids):
+            if not ids or not content.get("duplicate_of") or path in covered_paths:
                 continue
             if not set(ids) <= accounted:
                 continue  # never written: the normal path handles the order again
             if self.adapter.style == "trade":
-                self._replay_trade_correction(path, content, ids, ledger_events)
+                correction = _correction_for(ledger_events, ids)
+                # Identity, not overlap: two corrections may share recorded orders.
+                if correction is None or str(correction.get("event_id")) in covered_corrections:
+                    continue
+                if self._replay_trade_correction(path, content, ids, correction):
+                    covered_corrections.add(str(correction.get("event_id")))
             else:
+                if frozenset(ids) in covered_order_sets:
+                    continue
                 self._replay_spot_correction(path, content, ids)
-            covered_orders.update(ids)
+                covered_order_sets.add(frozenset(ids))
 
     def _replay_trade_correction(self, path: str, content: dict[str, Any], ids: list[str],
-                                 ledger_events: list[dict[str, Any]]) -> None:
-        correction = next((e for e in ledger_events if e.get("event_type") == TRADE_CORRECTION_EVENT
-                           and set(ids) <= {str(o) for o in e.get("exchange_order_ids") or []}), None)
+                                 correction: dict[str, Any]) -> bool:
+        """Returns whether the correction is now announced (False: retry next round)."""
         fields = content.get("correction") or {}
-        if correction is None or not fields:
-            return  # accounted for some other way (a person's manual correction): nothing to announce
+        if not fields:
+            return True  # nothing to announce
+        # Side effects first (idempotent): the announcement is what marks this
+        # correction done, so it must be the last thing written.  A failing hook
+        # holds the announcement back for a grace period rather than losing the
+        # projection for good; after that the notice goes out with the error.
+        hook_error = self._replay_projection(correction, ids)
+        if hook_error is not None:
+            age = self.moment_ms - int(Path(path).stat().st_mtime * 1000)
+            if age < LOOKUP_GRACE_MS:
+                self.result["deferred"].append({"order_id": ids[0], "reason": f"replay hook failed: {hook_error}"})
+                return False
         previous, corrected = fields.get("previous") or {}, fields.get("corrected") or {}
         trade_id, dup = content.get("trade_id"), content.get("duplicate_of")
         notice = "\n".join([
@@ -358,13 +382,14 @@ class _Round:
             evidence={"order_ids": ids, "trade_id": trade_id},
             details={"correction_event_id": correction.get("event_id"), "duplicate_of": dup,
                      "client_order_id": content.get("client_order_id"), "evidence_path": path,
-                     "replayed": True, "notice_text": notice},
+                     "replayed": True, "notice_text": notice,
+                     **({"projection_error": hook_error} if hook_error else {})},
             measurements={"previous_net_pnl": previous.get("net_pnl"), "corrected_net_pnl": corrected.get("net_pnl"),
                           "previous_exit_volume": previous.get("exit_volume"),
                           "corrected_exit_volume": corrected.get("exit_volume")},
         )
         self.result["replayed"].append({"code": CODE_CORRECTED, "order_ids": ids, "fleet_event_id": event["event_id"]})
-        self._replay_projection(correction, ids)
+        return True
 
     def _replay_spot_correction(self, path: str, content: dict[str, Any], ids: list[str]) -> None:
         dup = content.get("duplicate_of")
@@ -382,17 +407,19 @@ class _Round:
         )
         self.result["replayed"].append({"code": CODE_CORRECTED, "order_ids": ids, "fleet_event_id": event["event_id"]})
 
-    def _replay_projection(self, correction: dict[str, Any], ids: list[str]) -> None:
+    def _replay_projection(self, correction: dict[str, Any], ids: list[str]) -> str | None:
         """Queue the Google projection / LINE query a killed correction skipped.
-        The adapter's hook is idempotent (same intent key returns the same intent)."""
+        The adapter's hook is idempotent (same intent key returns the same intent).
+        Returns an error text when it failed, else None."""
         hook = self.adapter.replay_trade_correction
         if hook is None:
-            return
+            return None
         try:
             outcome = dict(hook(correction) or {})
         except Exception as exc:  # noqa: BLE001 -- the ledger stands; the sheet check reports a gap
-            outcome = {"error": f"{type(exc).__name__}: {exc}"}
+            return f"{type(exc).__name__}: {exc}"
         self.result["replayed"].append({"code": "PROJECTION", "order_ids": ids, **outcome})
+        return None
 
     # -- one unrecorded order ------------------------------------------------ #
     def _handle(self, order: dict[str, Any], orders: list[dict[str, Any]], ledger_events: list[dict[str, Any]],

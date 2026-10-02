@@ -449,7 +449,7 @@ def test_a_correction_killed_before_its_notice_is_announced_next_round(tmp_path,
     assert "補發" in event["details"]["notice_text"] and "-13.233" in event["details"]["notice_text"]
     assert set(event["evidence"]["order_ids"]) == {DUPLICATE, EXIT}
     assert replayed_for == ["corr-1"]
-    assert [r["code"] for r in result["replayed"]] == [CODE_CORRECTED, "PROJECTION"]
+    assert [r["code"] for r in result["replayed"]] == ["PROJECTION", CODE_CORRECTED]
     assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "SEY." + CODE_CORRECTED
 
     again = _round(adapter, paths)  # idempotent: nothing more to announce
@@ -522,3 +522,88 @@ def test_a_spot_recording_killed_before_its_notice_is_announced_next_round(tmp_p
     [event] = read_fleet_events(paths.fleet_event_log)
     assert event["code"] == CODE_CORRECTED and event["details"]["replayed"] is True
     assert event["evidence"]["order_ids"] == ["502"]
+
+
+# --- review of #99: replay ordering and identity --------------------------------
+
+def _killed_correction(tmp_path, monkeypatch, hook):
+    """A correction in the ledger with no notice yet, plus its adapter."""
+    from trade_alerts import unrecorded_fill
+
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()), replay_trade_correction=hook)
+    real = unrecorded_fill.append_fleet_event
+    _kill_before_announcing(monkeypatch)
+    with pytest.raises(_Killed):
+        _round(adapter, paths)
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
+    return paths, adapter, real
+
+
+def test_a_kill_between_the_replayed_notice_and_the_hook_cannot_lose_the_hook(tmp_path, monkeypatch):
+    from trade_alerts import unrecorded_fill
+
+    calls: list[str] = []
+    paths, adapter, real = _killed_correction(tmp_path, monkeypatch, lambda c: (calls.append(c["event_id"]) or {}))
+    # the replay's own announcement dies: the hook has already run, the notice is not written
+    _kill_before_announcing(monkeypatch)
+    with pytest.raises(_Killed):
+        _round(adapter, paths)
+    monkeypatch.setattr(unrecorded_fill, "append_fleet_event", real)
+    assert calls == ["corr-1"] and _codes(paths) == []
+    _round(adapter, paths)                               # restart: hook again (idempotent), notice written
+    assert calls == ["corr-1", "corr-1"] and _codes(paths) == [CODE_CORRECTED]
+    _round(adapter, paths)
+    assert calls == ["corr-1", "corr-1"]                 # done: not called again
+
+
+def test_a_failing_hook_holds_the_notice_back_then_retries_then_announces_with_the_error(tmp_path, monkeypatch):
+    import os, time
+
+    state = {"fail": True, "calls": 0}
+
+    def hook(c):
+        state["calls"] += 1
+        if state["fail"]:
+            raise ConnectionError("outbox busy")
+        return {"queued": c["event_id"]}
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
+    first = _round(adapter, paths)
+    assert _codes(paths) == [] and first["deferred"] and "outbox busy" in first["deferred"][0]["reason"]
+    state["fail"] = False
+    _round(adapter, paths)                               # transient failure over: hook ok, notice written
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert "projection_error" not in event["details"] and state["calls"] == 2
+
+
+def test_a_hook_that_keeps_failing_still_announces_after_the_grace_period(tmp_path, monkeypatch):
+    import os
+
+    def hook(_c):
+        raise ConnectionError("down")
+
+    paths, adapter, _ = _killed_correction(tmp_path, monkeypatch, hook)
+    old = NOW.timestamp() - 3 * 3600
+    for f in Path(paths.evidence_dir).glob("*.json"):
+        os.utime(f, (old, old))
+    _round(adapter, paths, now=NOW)
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert "ConnectionError" in event["details"]["projection_error"]
+
+
+def test_a_new_correction_sharing_orders_with_an_announced_one_is_still_announced(tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _trade_adapter(paths, Exchange(_client_ids()))
+    _round(adapter, paths)                                # corr-1 announced normally
+    ev = Path(paths.evidence_dir)
+    first = json.loads(next(ev.glob("*.json")).read_text())
+    # a second, different correction that shares order ids with the first
+    second = dict(first, order_ids=[EXIT, "999"], trade_id="OTHER")
+    ev.joinpath("second.json").write_text(json.dumps(second), encoding="utf-8")
+    with open(paths.ledger, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"event_type": TRADE_CORRECTION_EVENT, "event_id": "corr-2",
+                             "exchange_order_ids": [EXIT, "999"], "event_epoch_ms": 1790200001000}) + "\n")
+    result = _round(adapter, paths)
+    ids = [e["details"]["correction_event_id"] for e in read_fleet_events(paths.fleet_event_log)]
+    assert ids == ["corr-1", "corr-2"] and [r["code"] for r in result["replayed"]] == [CODE_CORRECTED]

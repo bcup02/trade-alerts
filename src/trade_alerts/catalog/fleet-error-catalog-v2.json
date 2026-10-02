@@ -1133,7 +1133,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "seykota",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:567"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:594"
       ],
       "current": {
         "latch": null,
@@ -1163,7 +1163,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "seykota",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:641"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:668"
       ],
       "current": {
         "latch": null,
@@ -1195,7 +1195,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:567"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:594"
       ],
       "current": {
         "latch": null,
@@ -1225,7 +1225,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:641"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:668"
       ],
       "current": {
         "latch": null,
@@ -1257,7 +1257,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "btc-competition",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:611"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:638"
       ],
       "current": {
         "latch": null,
@@ -1287,7 +1287,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "btc-competition",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:641"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:668"
       ],
       "current": {
         "latch": null,
@@ -1319,7 +1319,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "mycrypto",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:641"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:668"
       ],
       "current": {
         "latch": null,

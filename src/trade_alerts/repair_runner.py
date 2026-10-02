@@ -55,7 +55,7 @@ from typing import Any, Callable, Mapping
 
 from .atomic_ledger_append import append_lines_atomically, stage_lines
 from .error_request_queue import open_error_request, outstanding_error_requests, record_request_outcome
-from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for
+from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for, utc_now_iso
 from .ledger_reconcile import atomic_write, norm_symbol_plain, read_json, read_ledger
 from .notice_replay import replay_unannounced_requests
 from .ops_export import build_ops_export, write_ops_export
@@ -275,7 +275,7 @@ class _Round:
         ])
         event = append_fleet_event(
             self.paths.fleet_event_log, project=self.project, code=CODE_REPAIR_RECURRING,
-            risk_tier=self.tiers[CODE_REPAIR_RECURRING],
+            risk_tier=self.tiers[CODE_REPAIR_RECURRING], recorded_at=utc_now_iso(self.now),
             summary=f"{len(repairs)} automatic verified-close repairs in {RECURRING_WINDOW_DAYS} days",
             evidence={"window_days": RECURRING_WINDOW_DAYS, "count": len(repairs), "trade_ids": trade_ids},
             details={"threshold": RECURRING_THRESHOLD, "repair_event_ids": [e.get("event_id") for e in repairs],

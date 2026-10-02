@@ -77,3 +77,15 @@ def test_telegram_sends_the_rest_as_further_messages():
 def test_split_text(text, limit, expected):
     assert split_text(text, limit) == expected
     assert "".join(p.replace("\n", "") for p in expected) == text.replace("\n", "")
+
+
+@pytest.mark.parametrize("text,limit", [
+    ("\n\nAAAAAA", 5), ("a\n\n\nb", 3), ("abc\n", 3), ("\n", 5), ("x\n\ny\n\n", 2), ("aaaa\n\nbbbb", 4),
+])
+def test_split_text_keeps_blank_lines(text, limit):
+    pieces = split_text(text, limit)
+    assert all(len(p) <= limit for p in pieces)
+    # whole lines are rejoined with the newline the split removed; only a hard cut inside a line adds one
+    assert "".join(pieces).count("\n") + (len(pieces) - 1) >= text.count("\n")
+    assert split_text("\n\nAAAAAA", 5)[0] == "\n"
+    assert "\n".join(split_text("a\n\n\nb", 3)) == "a\n\n\nb"
