@@ -28,7 +28,8 @@
     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
     "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
     "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
-    "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知"
+    "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
+    "f-16": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）"
   },
   "sources": {
     "momentum": {
@@ -1687,6 +1688,51 @@
           "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
         }
       }
+    },
+    {
+      "code": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-16",
+          "reason": "2026-10-02 共用庫 v0.25.1 已實作，動能、趨勢已釘 v0.26.0 並部署開發機；還沒上正式機，上線後改已做。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "f-16",
+          "reason": "2026-10-02 共用庫 v0.25.1 已實作，動能、趨勢已釘 v0.26.0 並部署開發機；還沒上正式機，上線後改已做。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "加密策略沒有 Google 表同步佇列（沒有 v2 投影，開發機表也是空的、正式機直接對帳），不會有找不到開倉列的平倉。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-16",
+          "reason": "競賽策略還釘舊版共用庫（v0.24.2），沒有停放功能；升級共用庫時一併具備。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "8-momentum",
+          "reason": "停放目前只記在 Google 同步紀錄（REJECTED／orphan_close_no_open_row），沒有寫進共用事件日誌；R1 本來就不通知，等第 8 關補寫事件日誌。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "同上：只記在 Google 同步紀錄，還沒寫進共用事件日誌。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "加密策略沒有 Google 表同步佇列（沒有 v2 投影，開發機表也是空的、正式機直接對帳），不會有找不到開倉列的平倉。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "8-btc-competition",
+          "reason": "同上，且要先升級共用庫。"
+        }
+      }
     }
   ],
   "recent_changes": [
@@ -1701,6 +1747,12 @@
       "id": "repair_bot.recurrence_escalation",
       "type": "updated",
       "note": "動能、趨勢已在開發主幹釘 v0.25.0（g2 隨共用庫具備）；未部署。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+      "type": "added",
+      "note": "新增 ERR-056：Google 表同步佇列停放了一筆找不到開倉列的平倉（R1，自動、不通知；缺口仍由對帳標出）。"
     }
   ]
 }
