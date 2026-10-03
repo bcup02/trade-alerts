@@ -1,0 +1,379 @@
+diff --git a/docs/fleet-error-catalog.md b/docs/fleet-error-catalog.md
+index b54f4f6..c6ce795 100644
+--- a/docs/fleet-error-catalog.md
++++ b/docs/fleet-error-catalog.md
+@@ -139,6 +139,7 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄
+ | `MOM.UNRECORDED_FILL_CORRECTED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+ | `MOM.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上） | JUDGEMENT | R3 | P8（v2） |
+ | `MOM.POSITION_ADOPTED_AFTER_INTERRUPTION` | 未發出（f-12 動能 PR 接上；重啟後接管帳本沒記完的部位，ERR-050） | JUDGEMENT | R3 | P8（v2） |
++| `FLEET.PROJECTION_ORPHAN_CLOSE_PARKED` | 無通知（共用庫 v0.25.1；Google 表同步佇列停放找不到開倉列的平倉，ERR-056） | MECHANICAL | R1 | P8（v2） |
+ 
+ momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
+ 中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index e19e8c1..15c9980 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -100,9 +100,9 @@
+   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>55 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    四支策略目前所有已知的「出問題」情況，共 <b>56 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>37 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>38 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -1671,6 +1671,33 @@
+    "tier": "R3",
+    "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
+    "what": "趨勢策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。"
++  },
++  {
++   "ai_prompt": null,
++   "behaviour": {
++    "state": "pending"
++   },
++   "bot": "fleet",
++   "bot_label": "全機隊",
++   "code": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
++   "direction": "不需要做決定：佇列已經繼續走，帳本是標準答案。這筆在 Google 表上會缺一列，對帳會持續標出，直到你補上開倉列或把它列入忽略清單。",
++   "emits_event": {
++    "state": "pending"
++   },
++   "error_id": "ERR-056",
++   "notes": [
++    "行為未做 — 趨勢策略：2026-10-02 共用庫 v0.25.1 已實作，動能、趨勢已釘 v0.26.0 並部署開發機；還沒上正式機，上線後改已做。（預定：f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0））",
++    "行為未做 — 動能策略：2026-10-02 共用庫 v0.25.1 已實作，動能、趨勢已釘 v0.26.0 並部署開發機；還沒上正式機，上線後改已做。（預定：f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0））",
++    "行為未做 — 競賽策略：競賽策略開發主幹釘共用庫 v0.25.0、正式機釘 v0.23.0，都沒有停放功能（v0.25.1 起才有）；升級共用庫時一併具備。（預定：f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0））",
++    "寫進事件日誌未做 — 趨勢策略：同上：只記在 Google 同步紀錄，還沒寫進共用事件日誌。（預定：第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」）",
++    "寫進事件日誌未做 — 動能策略：停放目前只記在 Google 同步紀錄（REJECTED／orphan_close_no_open_row），沒有寫進共用事件日誌；R1 本來就不通知，等第 8 關補寫事件日誌。（預定：第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知）",
++    "寫進事件日誌未做 — 競賽策略：同上，且要先升級共用庫。（預定：第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試）"
++   ],
++   "open": true,
++   "steps": [],
++   "tier": "R1",
++   "title": "Google 表同步佇列停放了一筆找不到開倉列的平倉",
++   "what": "有一筆平倉在 Google 表找不到對應的開倉列，同步佇列重試 12 次後把它停放，免得擋住後面的紀錄。"
+   }
+  ],
+  "tiers": [
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index ff74d48..ebb2c4a 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,7 +177,7 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>54</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-pending" href="#group-pending"><b>55</b><span>項未完成——還有策略沒做到</span></a>
+     <a class="c-done" href="#group-done"><b>25</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+@@ -193,7 +193,7 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">54 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">55 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+@@ -4670,17 +4670,104 @@
+    ],
+    "sub": "ERR-055 · SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+    "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
++  },
++  {
++   "added_recent": true,
++   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
++   "complete": false,
++   "dots": {
++    "btc-competition": "pending",
++    "momentum": "pending",
++    "mycrypto": "na",
++    "seykota": "pending"
++   },
++   "has_recent": false,
++   "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "趨勢策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
++       "state": "pending",
++       "text": "2026-10-02 共用庫 v0.25.1 已實作，動能、趨勢已釘 v0.26.0 並部署開發機；還沒上正式機，上線後改已做。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
++       "state": "pending",
++       "text": "同上：只記在 Google 同步紀錄，還沒寫進共用事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
++       "state": "pending",
++       "text": "2026-10-02 共用庫 v0.25.1 已實作，動能、趨勢已釘 v0.26.0 並部署開發機；還沒上正式機，上線後改已做。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
++       "state": "pending",
++       "text": "停放目前只記在 Google 同步紀錄（REJECTED／orphan_close_no_open_row），沒有寫進共用事件日誌；R1 本來就不通知，等第 8 關補寫事件日誌。"
++      }
++     ]
++    },
++    {
++     "label": "加密策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": null,
++       "state": "n/a",
++       "text": "加密策略沒有 Google 表同步佇列（沒有 v2 投影，開發機表也是空的、正式機直接對帳），不會有找不到開倉列的平倉。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": null,
++       "state": "n/a",
++       "text": "加密策略沒有 Google 表同步佇列（沒有 v2 投影，開發機表也是空的、正式機直接對帳），不會有找不到開倉列的平倉。"
++      }
++     ]
++    },
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
++       "state": "pending",
++       "text": "競賽策略開發主幹釘共用庫 v0.25.0、正式機釘 v0.23.0，都沒有停放功能（v0.25.1 起才有）；升級共用庫時一併具備。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
++       "state": "pending",
++       "text": "同上，且要先升級共用庫。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-056 · FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
++   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+   }
+  ],
+  "phase_counts": {
+   "7e": 4,
+-  "8-btc-competition": 8,
+-  "8-momentum": 3,
++  "8-btc-competition": 9,
++  "8-momentum": 4,
+   "8-mycrypto": 20,
+-  "8-seykota": 18,
++  "8-seykota": 19,
+   "binance-funding-sync": 2,
+   "error-ids": 4,
+   "f-12": 23,
++  "f-16": 3,
+   "h4-trade-correction": 0,
+   "hotfix-btc-order-resend": 0,
+   "hotfix-seykota-order-resend": 0,
+@@ -4712,7 +4799,8 @@
+   "hotfix-btc-order-resend",
+   "h4-trade-correction",
+   "hotfix-seykota-stop-resolution",
+-  "f-12"
++  "f-12",
++  "f-16"
+  ],
+  "phases": {
+   "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+@@ -4723,6 +4811,7 @@
+   "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
+   "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+   "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++  "f-16": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
+   "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
+   "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
+@@ -4759,28 +4848,34 @@
+    "note": "動能、趨勢已在開發主幹釘 v0.25.0（g2 隨共用庫具備）；未部署。",
+    "project": null,
+    "title": "自動修補重複發生時升格通知"
++  },
++  {
++   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
++   "note": "新增 ERR-056：Google 表同步佇列停放了一筆找不到開倉列的平倉（R1，自動、不通知；缺口仍由對帳標出）。",
++   "project": null,
++   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+   }
+  ],
+  "totals": {
+   "btc-competition": {
+    "done": 24,
+    "n/a": 15,
+-   "pending": 17
++   "pending": 19
+   },
+   "momentum": {
+    "done": 35,
+    "n/a": 10,
+-   "pending": 13
++   "pending": 15
+   },
+   "mycrypto": {
+    "done": 14,
+-   "n/a": 11,
++   "n/a": 13,
+    "pending": 29
+   },
+   "seykota": {
+    "done": 43,
+    "n/a": 8,
+-   "pending": 29
++   "pending": 31
+   }
+  }
+ }
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index af2f1bf..f19d4cd 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -36,7 +36,7 @@
+     "btc-competition": "btc-bull-market-competition",
+     "fleet": "(cross-repo: same condition implemented in every strategy)"
+   },
+-  "error_ids_issued": 55,
++  "error_ids_issued": 56,
+   "entries": [
+     {
+       "error_id": "ERR-001",
+@@ -1765,6 +1765,36 @@
+         ],
+         "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查平倉一直漏記的原因：讀 audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、還是交易所路徑沒走到記帳），提出治本修正與回歸測試。"
+       }
++    },
++    {
++      "error_id": "ERR-056",
++      "code": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
++      "title": "Google 表同步佇列停放了一筆找不到開倉列的平倉",
++      "project": "fleet",
++      "sources": [
++        "src/trade_alerts/projection_outbox.py:33",
++        "src/trade_alerts/projection_outbox.py:267"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "MECHANICAL",
++      "risk_tier": "R1",
++      "auto_action": "某筆平倉（或帳本更正）送給 Google 表接收端，連續 12 次都回「找不到這筆交易的開倉列」，就把它記成 REJECTED（原因 orphan_close_no_open_row）停放，排在它後面的紀錄照常送出。不動帳本、不暫停。帳本跟 Google 表的差異仍由對帳照樣標出（ERR-044）。",
++      "human_action": "無需立刻處理。想讓對帳恢復一致，才需要處理這筆差異：先確認該筆交易確實存在，再二選一——補上開倉列，或把它列入忽略清單 audit/google-reconcile-ignore.json（只影響對帳的比較，會逐筆列在讀數的 ignored 欄）。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-10-02 f-16：開發機動能有一筆平倉找不到開倉列，在佇列最前面卡了好幾天，後面所有紀錄都送不出去。重試不會讓開倉列憑空出現，所以反覆重試沒有意義；人來看也只會做同一件事（讓佇列繼續走）。停放本身沒有第二個選項，所以是 R1。缺口沒有被藏起來：對帳的 Google 表軸仍會標出差異並依 ERR-044 升級，忽略清單裡的交易也會逐筆列在讀數的 ignored 欄。",
++      "operator_message": {
++        "what": "有一筆平倉在 Google 表找不到對應的開倉列，同步佇列重試 12 次後把它停放，免得擋住後面的紀錄。",
++        "direction": "不需要做決定：佇列已經繼續走，帳本是標準答案。這筆在 Google 表上會缺一列，對帳會持續標出，直到你補上開倉列或把它列入忽略清單。",
++        "steps": [
++          "不需要任何動作。",
++          "想讓對帳恢復一致：確認這筆交易真的存在，再補開倉列或列入忽略清單。"
++        ]
++      }
+     }
+   ],
+   "retired_codes": [
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 830c6d0..a84b825 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -28,7 +28,8 @@
+     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
+     "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
+     "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
+-    "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知"
++    "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
++    "f-16": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）"
+   },
+   "sources": {
+     "momentum": {
+@@ -1687,6 +1688,51 @@
+           "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+         }
+       }
++    },
++    {
++      "code": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
++      "behaviour": {
++        "momentum": {
++          "state": "pending",
++          "phase": "f-16",
++          "reason": "2026-10-02 共用庫 v0.25.1 已實作，動能、趨勢已釘 v0.26.0 並部署開發機；還沒上正式機，上線後改已做。"
++        },
++        "seykota": {
++          "state": "pending",
++          "phase": "f-16",
++          "reason": "2026-10-02 共用庫 v0.25.1 已實作，動能、趨勢已釘 v0.26.0 並部署開發機；還沒上正式機，上線後改已做。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "加密策略沒有 Google 表同步佇列（沒有 v2 投影，開發機表也是空的、正式機直接對帳），不會有找不到開倉列的平倉。"
++        },
++        "btc-competition": {
++          "state": "pending",
++          "phase": "f-16",
++          "reason": "競賽策略開發主幹釘共用庫 v0.25.0、正式機釘 v0.23.0，都沒有停放功能（v0.25.1 起才有）；升級共用庫時一併具備。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "8-momentum",
++          "reason": "停放目前只記在 Google 同步紀錄（REJECTED／orphan_close_no_open_row），沒有寫進共用事件日誌；R1 本來就不通知，等第 8 關補寫事件日誌。"
++        },
++        "seykota": {
++          "state": "pending",
++          "phase": "8-seykota",
++          "reason": "同上：只記在 Google 同步紀錄，還沒寫進共用事件日誌。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "加密策略沒有 Google 表同步佇列（沒有 v2 投影，開發機表也是空的、正式機直接對帳），不會有找不到開倉列的平倉。"
++        },
++        "btc-competition": {
++          "state": "pending",
++          "phase": "8-btc-competition",
++          "reason": "同上，且要先升級共用庫。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
+@@ -1701,6 +1747,12 @@
+       "id": "repair_bot.recurrence_escalation",
+       "type": "updated",
+       "note": "動能、趨勢已在開發主幹釘 v0.25.0（g2 隨共用庫具備）；未部署。"
++    },
++    {
++      "kind": "rule",
++      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
++      "type": "added",
++      "note": "新增 ERR-056：Google 表同步佇列停放了一筆找不到開倉列的平倉（R1，自動、不通知；缺口仍由對帳標出）。"
+     }
+   ]
+ }
+\ No newline at end of file
