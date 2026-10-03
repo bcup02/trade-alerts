@@ -1783,7 +1783,7 @@
       "verdict": "MECHANICAL",
       "risk_tier": "R1",
       "auto_action": "某筆平倉（或帳本更正）送給 Google 表接收端，連續 12 次都回「找不到這筆交易的開倉列」，就把它記成 REJECTED（原因 orphan_close_no_open_row）停放，排在它後面的紀錄照常送出。不動帳本、不暫停。帳本跟 Google 表的差異仍由對帳照樣標出（ERR-044）。",
-      "human_action": "無需立刻處理。想讓對帳恢復一致，才需要補那一列開倉：確認該筆交易確實存在後，把它列入忽略清單 audit/google-reconcile-ignore.json（只影響對帳的比較，會逐筆列出），或補上開倉列。",
+      "human_action": "無需立刻處理。想讓對帳恢復一致，才需要處理這筆差異：先確認該筆交易確實存在，再二選一——補上開倉列，或把它列入忽略清單 audit/google-reconcile-ignore.json（只影響對帳的比較，會逐筆列在讀數的 ignored 欄）。",
       "resume": "n/a",
       "lands_in_phase": 8,
       "rationale": "2026-10-02 f-16：開發機動能有一筆平倉找不到開倉列，在佇列最前面卡了好幾天，後面所有紀錄都送不出去。重試不會讓開倉列憑空出現，所以反覆重試沒有意義；人來看也只會做同一件事（讓佇列繼續走）。停放本身沒有第二個選項，所以是 R1。缺口沒有被藏起來：對帳的 Google 表軸仍會標出差異並依 ERR-044 升級，忽略清單裡的交易也會逐筆列在讀數的 ignored 欄。",
