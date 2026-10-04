@@ -193,6 +193,12 @@ pgrep -af '/opt/(mexc-4h-momentum-trailing-stop|ed-seykota-systematic-trend-foll
 2. 目的端對應目錄先清空再複製（`rsync -a --delete`），不留目的端原有的舊檔。
 3. 兩端各自產生「完整檔案清單＋每個檔案 sha256」（`find … -type f | sort` 後逐檔雜湊），**兩份清單要完全相同**
    （檔名集合一樣、內容一樣、沒有任何一邊多出來的檔案），才算複製完成。
+4. **擁有者用「名稱」對應，不能用數字**（2026-10-04 唯讀比對兩台主機發現）：兩台的服務帳號數字編號不同
+   （例如 `seykota` 在 trading-main 是 uid 993，在 A1 是 995；trading-main 的 993 在 A1 是 `btc-competition`）。
+   所以 `rsync` **不可加 `--numeric-ids`**，用 root 跑 `rsync -a` 與 `tar -x` 時預設就是依名稱對應。
+   複製完成後，在目的端對每個路徑跑 `find <路徑> -printf '%u:%g %m %p\n' | sort`，
+   與來源端同樣指令的輸出逐行比對，**使用者名稱、群組名稱、權限三項都要完全相同**；
+   只看 sha256 不夠（內容相同、擁有者錯了，服務會讀不到自己的狀態檔，或被別的帳號讀到）。
 
 ## 7. 切換步驟
 
