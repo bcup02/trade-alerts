@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-02",
+  "updated_at": "2026-10-04",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -35,22 +35,22 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "43be152f9a68a757e43310f2d67820a1d874fc92"
+      "commit": "ce510838b2b60eb6ffce594bf6ef1611ecc88bae"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "3e3b6f78e9db33d3a3a80d25c43811f30d432bad"
+      "commit": "ed50b1d8c8bffde52e88b95272e4a4af5cb6aadf"
     },
     "mycrypto": {
       "repo": "AI-for-column/my-crypto-bot",
       "branch": "operations",
-      "commit": "1efbdc01c80a6d0444152d6098e9cb3a95618265"
+      "commit": "b5a605f47bb8e68d5312b62645698289336f7af9"
     },
     "btc-competition": {
       "repo": "AI-for-column/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "9559897c64cb0c93efa188dd184a604a942badd9"
+      "commit": "ac991321928266e3fedea709ac56ad0c7733696a"
     }
   },
   "capabilities": [
@@ -539,14 +539,12 @@
       "description": "自動修補（R1）本身不通知，但同一支策略 7 天內自動補寫達 2 次，就發一次 R3 通知「這個修補一直在發生，請追根因」（附次數與交易編號），之後 7 天內不重發（使用者 2026-10-01 核可門檻）。讓修復機器人不會變成掩蓋 bug 的工具。",
       "status": {
         "momentum": {
-          "state": "pending",
-          "phase": "f-12",
-          "reason": "2026-10-02 共用庫 v0.25.0 已實作（修復機器人每輪數最近 7 天自動補寫次數，達 2 次通知一次、之後 7 天內不重發），動能策略已在開發主幹釘 v0.25.0（mexc-4h-momentum-trailing-stop#110）；還沒上任何主機，上正式機後改已做。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py 每輪呼叫共用修復執行器（共用庫 trade_alerts/repair_runner.py 第 248 行 _check_recurring：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次，窗口內已有通知就不重發；使用者 2026-10-01 核可門檻）；共用庫 v0.25.0 起具備，A1 上實際安裝的是 0.26.0。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ce51083；/opt 內 src、scripts、deploy 與根目錄 .py 共 72 檔與該 commit 逐檔雜湊相同）。限制：尚未觸發過（正式機沒有發生自動補寫），邏輯只在共用庫測試與開發機驗證。"
         },
         "seykota": {
-          "state": "pending",
-          "phase": "f-12",
-          "reason": "2026-10-02 共用庫 v0.25.0 已實作（同上），趨勢策略已在開發主幹釘 v0.25.0（ed-seykota-systematic-trend-following#83）；還沒上任何主機，上正式機後改已做。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py 每輪呼叫共用修復執行器（共用庫 trade_alerts/repair_runner.py 第 248 行 _check_recurring：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次，窗口內已有通知就不重發；使用者 2026-10-01 核可門檻）；共用庫 v0.25.0 起具備，A1 上實際安裝的是 0.26.0。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。限制：尚未觸發過（正式機沒有發生自動補寫），邏輯只在共用庫測試與開發機驗證。"
         },
         "mycrypto": {
           "state": "pending",
@@ -593,24 +591,20 @@
       "description": "系統自動更新、部署或手動停止都會送停止訊號。策略要把正在進行的「下單→帳本→停損→存狀態」做完才結束，不能在中途被殺留下半套狀態。",
       "status": {
         "momentum": {
-          "state": "pending",
-          "phase": "f-12",
-          "reason": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作；還沒上正式機，上線後改已做。"
+          "state": "done",
+          "evidence": "src/graceful_stop.py:54 install_signal_handlers 把 SIGTERM／SIGINT 轉成旗標；src/main.py:147 啟動時安裝，src/main.py:308 輪詢迴圈每輪檢查旗標，當輪做完才停；deploy/mexc-momentum-bot.service:21 TimeoutStopSec=300。PR #108（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ce51083；/opt 內 src、scripts、deploy 與根目錄 .py 共 72 檔與該 commit 逐檔雜湊相同）。同日 17:50 重開機時日誌 graceful_stop_done reason=SIGTERM、乾淨停止，起來後第一輪 skipped_duplicate、沒有重複下單。"
         },
         "seykota": {
-          "state": "pending",
-          "phase": "f-12",
-          "reason": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作；還沒上正式機，上線後改已做。"
+          "state": "done",
+          "evidence": "src/seykota_bot/graceful_stop.py:54 install_signal_handlers；src/seykota_bot/cli.py:19 啟動時安裝；src/seykota_bot/bot.py:2343 停止時記 graceful_stop_done；deploy/seykota-bot.service:20 TimeoutStopSec=300。PR #79（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。同日 17:50 重開機時日誌 graceful_stop_done reason=SIGTERM、乾淨停止，重啟後狀態 FLAT、20:00 台北 K 棒（08:00 UTC 那根）已處理。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "f-12",
-          "reason": "2026-10-01 已在開發主幹的 f-12 加密 PR 實作（當輪做完才停、停止時不開新倉也不寫 Google 表、TimeoutStopSec=180、部署腳本等 oneshot）；還沒上正式機，上線後改已做。"
+          "state": "done",
+          "evidence": "graceful_stop.py:54 install_signal_handlers；mexc_futures_bot.py:1902 啟動時安裝；deploy/my-crypto-bot.service:20 TimeoutStopSec=180。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。同日 17:50 重開機時服務乾淨結束（systemd 回報 Deactivated successfully），重啟後讀回持倉與交易所停損單都在；這支停止時沒有專屬的結束日誌，所以只確認乾淨結束，沒有逐步確認「當輪做完才停」。"
         },
         "btc-competition": {
-          "state": "pending",
-          "phase": "f-12",
-          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（SIGTERM 只設旗標、送完手上那張單再停、其餘留 pending 下次接著做；TimeoutStopSec=600、TimeoutStartSec=1800；部署腳本等 oneshot）；還沒上正式機，上線後改已做。"
+          "state": "done",
+          "evidence": "src/btc_competition/graceful_stop.py:54 install_signal_handlers；src/btc_competition/runner.py:720 每日調整啟動時安裝；deploy/btc-competition-bot.service:18 TimeoutStopSec=600。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。限制：競賽沒有常駐程序，A1 上還沒有在每日調整進行中被停止過，「送完手上那張單再停」只在開發機 DEMO 驗證，正式機沒有實測。"
         }
       }
     },
@@ -620,24 +614,20 @@
       "description": "停止訊號擋不住的情況（強制終止、當機、斷電）之後，重啟要能用送單前寫好的紀錄找回原本的交易編號，補齊帳本，而不是產生第二個編號讓帳本與 Google 表對不上。",
       "status": {
         "momentum": {
-          "state": "pending",
-          "phase": "f-12",
-          "reason": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作（order_attempt 沿用 trade_id；撤停損後被殺重新掛停損；孤兒接管通知）；還沒上正式機，上線後改已做。"
+          "state": "done",
+          "evidence": "src/strategy.py:947 _append_position_recovered 補寫接管事件；src/strategy.py:1503 _record_position_adoption 接管時留紀錄並通知；src/strategy.py:1625 接管時沿用被中斷那次進場的 trade_id 並先存狀態再寫帳本。PR #108（f-12）、#112（f-16）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ce51083；/opt 內 src、scripts、deploy 與根目錄 .py 共 72 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO 用強制終止模擬被殺（2026-10-02、10-03，三種情形都補寫 position_recovered、開倉列排隊並送到 Google 表）；A1 正式機還沒發生過被中斷的進場，重開機落在空檔，這一格在正式機沒有實際觸發過。"
         },
         "seykota": {
-          "state": "pending",
-          "phase": "f-12",
-          "reason": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作（entry_intent 沿用 trade_id、被中斷的停損原價重掛、孤兒接管通知）；還沒上正式機，上線後改已做。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:83 ENTRY_INTENT_KEY；src/seykota_bot/bot.py:1239 _record_entry_intent 送單前先記進場意圖；src/seykota_bot/bot.py:1353 重啟後依 entry_intent 補掛原價停損（沿用同一個編號，交易所拒絕重複編號）。PR #79（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO 強制終止實測（2026-10-02 開 XRP 小部位後 SIGKILL，30 秒內自動重啟、接管部位、帳本單一 trade_id、補掛停損）；A1 正式機還沒發生過被中斷的進場，沒有實際觸發過。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "f-12",
-          "reason": "2026-10-01 已在開發主幹的 f-12 加密 PR 實作（開倉進行中紀錄沿用 trade_id、每輪核對交易所停損單、重複平倉防護）；還沒上正式機，上線後改已做。加密沒有通知管道，接管只寫稽核日誌。"
+          "state": "done",
+          "evidence": "mexc_futures_bot.py:951 ENTRY_PENDING；mexc_futures_bot.py:1528 開倉前先存 entry_pending 狀態（含 trade_id、external_id）；mexc_futures_bot.py:1141 _adopt_pending_entry 重啟後接管開到一半的部位並沿用 trade_id、補掛停損。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。限制：加密沒有通知管道，接管只寫稽核日誌；A1 正式機沒有發生過被中斷的進場。這支要搬到 Binance（進度頁 x 系列），這份 MEXC 版程式碼之後會重寫。"
         },
         "btc-competition": {
-          "state": "pending",
-          "phase": "f-12",
-          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt；被殺後由 unrecorded-fill 作業補記並以交易所 order_id 去重；補排隊遺漏的 Google 投影；狀態檔損毀改安全暫停）；還沒上正式機，上線後改已做。"
+          "state": "done",
+          "evidence": "src/btc_competition/trade_ledger.py:140 order_attempt；src/btc_competition/runner.py:276 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:84 重啟後的補記輪讀沒結清的 order_attempt，依交易所回答補寫成交或標記結清。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO；A1 正式機沒有發生過被中斷的調整。"
         }
       }
     }
@@ -1738,21 +1728,73 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "notify.error_id",
-      "type": "updated",
-      "note": "維運通知端（發兩則、自己的告警帶編號）已實作於開發主幹，與共用庫 v0.25.0 合起來完整；未部署。"
+      "id": "stop.graceful",
+      "project": "momentum",
+      "type": "completed",
+      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
+    },
+    {
+      "kind": "cap",
+      "id": "stop.graceful",
+      "project": "seykota",
+      "type": "completed",
+      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
+    },
+    {
+      "kind": "cap",
+      "id": "stop.graceful",
+      "project": "mycrypto",
+      "type": "completed",
+      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
+    },
+    {
+      "kind": "cap",
+      "id": "stop.graceful",
+      "project": "btc-competition",
+      "type": "completed",
+      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
+    },
+    {
+      "kind": "cap",
+      "id": "recovery.interrupted_order",
+      "project": "momentum",
+      "type": "completed",
+      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
+    },
+    {
+      "kind": "cap",
+      "id": "recovery.interrupted_order",
+      "project": "seykota",
+      "type": "completed",
+      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
+    },
+    {
+      "kind": "cap",
+      "id": "recovery.interrupted_order",
+      "project": "mycrypto",
+      "type": "completed",
+      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
+    },
+    {
+      "kind": "cap",
+      "id": "recovery.interrupted_order",
+      "project": "btc-competition",
+      "type": "completed",
+      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
     },
     {
       "kind": "cap",
       "id": "repair_bot.recurrence_escalation",
-      "type": "updated",
-      "note": "動能、趨勢已在開發主幹釘 v0.25.0（g2 隨共用庫具備）；未部署。"
+      "project": "momentum",
+      "type": "completed",
+      "note": "自動修補重複發生通知已隨 A1 正式機（新）上線，還沒觸發過。"
     },
     {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
-      "type": "added",
-      "note": "新增 ERR-056：Google 表同步佇列停放了一筆找不到開倉列的平倉（R1，自動、不通知；缺口仍由對帳標出）。"
+      "kind": "cap",
+      "id": "repair_bot.recurrence_escalation",
+      "project": "seykota",
+      "type": "completed",
+      "note": "自動修補重複發生通知已隨 A1 正式機（新）上線，還沒觸發過。"
     }
   ]
 }
