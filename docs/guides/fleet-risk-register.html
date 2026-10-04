@@ -102,7 +102,7 @@
   <p class="lede">
     四支策略目前所有已知的「出問題」情況，共 <b>56 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>38 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>37 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -147,7 +147,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:436 _clear_automatic_safe_halt 確認已平倉後自動解除",
+    "evidence": "src/seykota_bot/bot.py:495 _clear_automatic_safe_halt 確認已平倉後自動解除",
     "state": "done"
    },
    "bot": "seykota",
@@ -172,7 +172,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次「停損掛單失敗、緊急市價平倉也失敗」的根本原因：讀 src/seykota_bot/bot.py 開倉後掛保護單與緊急平倉的流程，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是下單規則、API 權限、餘額還是網路問題，說明交易所上現在的部位狀態該怎麼確認，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:767 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
+    "evidence": "src/seykota_bot/bot.py:886 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
     "state": "done"
    },
    "bot": "seykota",
@@ -234,7 +234,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損時取消舊停損單一直失敗的原因：讀 src/seykota_bot/bot.py 的 _resolve_stop_cancel 與 _replace_protective_stop，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是網路、交易所故障、限流還是 API 權限問題，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:844 移動停損先以 :779 _resolve_stop_cancel（60 秒上限）取消舊停損；確定舊單仍在（open）時 :848 保留舊停損、記 PROTECTIVE_STOP_MOVE_DEFERRED、這輪不移動，下一根 K 棒再試；結果不明才 :853 PROTECTION_REPLACE_FAILED。PR #74（h11），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。通知目前只寫主機日誌；連續 3 次才通知屬第 8 關。",
+    "evidence": "src/seykota_bot/bot.py:976 移動停損先以 :898 _resolve_stop_cancel（60 秒上限）取消舊停損；確定舊單仍在（open）時 :984 保留舊停損、記 PROTECTIVE_STOP_MOVE_DEFERRED、這輪不移動，之後由 :1061 _retry_deferred_stop_move 每 10 分鐘（:91 _STOP_MOVE_RETRY_INTERVAL_SECONDS）自動重試（f-14，PR #81）；結果不明才 :991 PROTECTION_REPLACE_FAILED。PR #74（h11），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）；f-14 隨 2026-10-04 台北 17:18–17:22 的 A1 正式機（新）部署上線（operations ed50b1d）。",
     "state": "done"
    },
    "bot": "seykota",
@@ -242,15 +242,12 @@
    "code": "SEY.PROTECTION_MOVE_DEFERRED",
    "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，每 10 分鐘自動再試。連續第 3 次都取消不掉時會通知你一次（約 20～30 分鐘後），之後繼續重試但不再重發。",
    "emits_event": {
-    "phase": "f-12",
-    "reason": "2026-10-01 f-14（ed-seykota #81）已在開發主幹實作：每 10 分鐘重試，連續第 3 次失敗寫一筆升格事件並通知一次；還沒上正式機，上線後改已做。",
-    "state": "pending"
+    "evidence": "src/seykota_bot/bot.py:1029 _note_stop_move_failure 每次失敗寫一筆 PROTECTION_MOVE_DEFERRED 事件（:1050），連續第 3 次（:92 _STOP_MOVE_ESCALATE_AFTER）以 R3 升格並附 notice_text、只升格一次（失敗次數存在 pending_operations，重啟後照算）；PR #81（f-14，審閱 PASS）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d，/opt 檔案與該 commit 逐檔雜湊相同）。限制：正式機沒有發生過舊停損取消不掉的情形，升格路徑只在開發機與測試驗證。",
+    "state": "done"
    },
    "error_id": "ERR-004",
-   "notes": [
-    "寫進事件日誌未做 — 2026-10-01 f-14（ed-seykota #81）已在開發主幹實作：每 10 分鐘重試，連續第 3 次失敗寫一筆升格事件並通知一次；還沒上正式機，上線後改已做。（預定：A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知）"
-   ],
-   "open": true,
+   "notes": [],
+   "open": false,
    "steps": [
     "到交易所 App 的委託清單確認訊息裡那張舊停損單還在。",
     "如果擔心舊停損價太遠，可以手動把停損改到訊息裡的新停損價。",
@@ -294,7 +291,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼系統無法唯一確認這個倉位的原生保護單：讀 src/seykota_bot/bot.py 的保護單核對邏輯（_verified_exchange_protective_stop 一帶），對照交易所目前的委託清單，判斷是保護單不存在、有多張、還是欄位對不上，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:1011 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
+    "evidence": "src/seykota_bot/bot.py:1436 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
     "state": "done"
    },
    "bot": "seykota",
@@ -324,7 +321,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼策略對自己的部位失去把握。先看暫停證據（seykota-resume preview）：若有 client_order_id／submitted_at，代表市價單送出後 60 秒在交易所查不到——讀 src/seykota_bot/bot.py 的 _resolve_market_order，用這個 client id 向交易所查單（GET /fapi/v1/order 帶 origClientOrderId）確認它到底有沒有成交、成交幾張，對照帳本與實際部位；否則是交易所回報的部位無法唯一辨識——讀 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了。兩種情況都要提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:1163 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :695 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）",
+    "evidence": "src/seykota_bot/bot.py:1684 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :811 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）",
     "state": "done"
    },
    "bot": "seykota",
@@ -355,7 +352,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:53 連續 3 次失敗才暫停（Phase 4d）",
+    "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）",
     "state": "done"
    },
    "bot": "seykota",
@@ -447,7 +444,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這個未分類的執行期例外：從 seykota-bot 的 journal 找出連續失敗的例外訊息與堆疊，定位 src/seykota_bot/ 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:53 連續 3 次失敗才暫停（Phase 4d）",
+    "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）",
     "state": "done"
    },
    "bot": "seykota",
@@ -476,7 +473,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:1309 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）",
+    "evidence": "src/seykota_bot/bot.py:1872 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）",
     "state": "done"
    },
    "bot": "seykota",
@@ -501,7 +498,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:1390 只記錄出場（Phase 3）",
+    "evidence": "src/seykota_bot/bot.py:1964 只記錄出場（Phase 3）",
     "state": "done"
    },
    "bot": "seykota",
@@ -526,7 +523,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:1470 資金不足跳過進場、只記錄（Phase 3）",
+    "evidence": "src/seykota_bot/bot.py:2044 資金不足跳過進場、只記錄（Phase 3）",
     "state": "done"
    },
    "bot": "seykota",
@@ -551,7 +548,7 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼移動停損單無法驗證：讀 src/strategy.py 的 _ensure_native_trailing_stop 與相關核對函式，對照交易所目前的委託清單與 state/state.json，判斷是單不存在、有多張、還是單號與 state 不一致，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/strategy.py:1076 暫停並等人以 safe_halt_resume 解除",
+    "evidence": "src/strategy.py:1365 暫停並等人以 safe_halt_resume 解除",
     "state": "done"
    },
    "bot": "momentum",
@@ -581,7 +578,7 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 協助確認一次 state 修復是否正確：讀 src/safe_halt_state_repair.py 的修復紀錄與 audit/ 下對應的證據，比對 audit/trading_ledger.jsonl 與交易所歷史成交，列出不一致的地方；並追查當初為什麼需要手動修 state。",
    "behaviour": {
-    "evidence": "src/safe_halt_state_repair.py:148 修完主動暫停，等人解除",
+    "evidence": "src/safe_halt_state_repair.py:174 修完主動暫停，等人解除",
     "state": "done"
    },
    "bot": "momentum",
@@ -635,7 +632,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+    "evidence": "scripts/repair_bot.py:176 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
     "state": "done"
    },
    "bot": "momentum",
@@ -643,7 +640,7 @@
    "code": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
    "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+    "evidence": "scripts/repair_bot.py:176 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
     "state": "done"
    },
    "error_id": "ERR-018",
@@ -657,7 +654,7 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+    "evidence": "scripts/repair_bot.py:176 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
     "state": "done"
    },
    "bot": "momentum",
@@ -665,7 +662,7 @@
    "code": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
    "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+    "evidence": "scripts/repair_bot.py:176 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
     "state": "done"
    },
    "error_id": "ERR-019",
@@ -683,7 +680,7 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:163 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+    "evidence": "scripts/repair_bot.py:176 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
     "state": "done"
    },
    "bot": "momentum",
@@ -691,7 +688,7 @@
    "code": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
    "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:163 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+    "evidence": "scripts/repair_bot.py:176 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
     "state": "done"
    },
    "error_id": "ERR-020",
@@ -708,7 +705,7 @@
   {
    "ai_prompt": "請在 btc-bull-market-competition 追查為什麼本地帳本出現負的或不可能的餘額：讀 src/btc_competition/runner.py 的 _holdings_unverified 與 executor.fetch_balances，比對本地 state/帳本與交易所實際餘額，找出差異從哪一筆交易開始，提出讓本地與交易所一致的修正步驟（先給我確認再執行）與治本修正。",
    "behaviour": {
-    "evidence": "src/btc_competition/runner.py:407 暫停並等人以 btc-competition-resume 解除",
+    "evidence": "src/btc_competition/runner.py:457 暫停並等人以 btc-competition-resume 解除",
     "state": "done"
    },
    "bot": "btc-competition",
@@ -770,7 +767,7 @@
   {
    "ai_prompt": "請在 btc-bull-market-competition 追查一張結果不明的單：先看暫停證據（btc-competition-resume preview）裡的 symbol、side、base_qty、client_order_id、submitted_at，用這個 client id 向 Binance 現貨查單（GET /api/v3/order 帶 origClientOrderId，唯讀）確認有沒有成交、成交量與均價與手續費；對照本地帳本（audit/trading_ledger.jsonl）——若已成交而帳本沒有對應的 spot_fill，提出補記的做法（先給我確認再執行）。再讀 src/btc_competition/executor.py 的 _resolve 與當時的日誌，判斷 60 秒都查不到的原因（網路、交易所延遲、還是 client id 對不上），提出治本修正。",
    "behaviour": {
-    "evidence": "src/btc_competition/executor.py:307 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:243 收到後本輪停止送單，src/btc_competition/runner.py:339 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:394 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。",
+    "evidence": "src/btc_competition/executor.py:307 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:287 收到後本輪停止送單，src/btc_competition/runner.py:384 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:444 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。",
     "state": "done"
    },
    "bot": "btc-competition",
@@ -850,7 +847,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "mexc_futures_bot.py:713 只記錄差額，不影響交易（Phase 4e 定案）",
+    "evidence": "mexc_futures_bot.py:734 只記錄差額，不影響交易（Phase 4e 定案）",
     "state": "done"
    },
    "bot": "mycrypto",
@@ -858,7 +855,7 @@
    "code": "MYC.RECONCILE_DELTA_EXCEEDED",
    "direction": "這個落差就是手續費：交易所回報的是扣手續費前的數字，本地記的是扣完的淨額。不是異常，只記錄備查。",
    "emits_event": {
-    "evidence": "mexc_futures_bot.py:713 append_fleet_event（R0）",
+    "evidence": "mexc_futures_bot.py:734 append_fleet_event（R0）",
     "state": "done"
    },
    "error_id": "ERR-026",
@@ -903,7 +900,7 @@
   {
    "ai_prompt": "請在 my-crypto-bot 追查為什麼開倉後的停損單被交易所拒絕：讀 mexc_futures_bot.py 掛保護單的流程與交易所回傳的錯誤碼，判斷是價格／數量規則、槓桿設定還是 API 參數問題，並提出治本修正。",
    "behaviour": {
-    "evidence": "mexc_futures_bot.py:1304 只通知、不自動下單（現行行為即符合 v2）",
+    "evidence": "mexc_futures_bot.py:1620 只通知、不自動下單（現行行為即符合 v2）",
     "state": "done"
    },
    "bot": "mycrypto",
@@ -963,7 +960,7 @@
   {
    "ai_prompt": "請在 my-crypto-bot 追查掛停損單時拋出的例外：讀 mexc_futures_bot.py 掛保護單的流程，對照 my-crypto 的日誌找出例外訊息與堆疊，判斷原因並提出治本修正。",
    "behaviour": {
-    "evidence": "mexc_futures_bot.py:1317 只通知、不自動下單（現行行為即符合 v2）",
+    "evidence": "mexc_futures_bot.py:1633 只通知、不自動下單（現行行為即符合 v2）",
     "state": "done"
    },
    "bot": "mycrypto",
@@ -1054,7 +1051,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:186 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+    "evidence": "scripts/repair_bot.py:209 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
     "state": "done"
    },
    "bot": "seykota",
@@ -1062,7 +1059,7 @@
    "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
    "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:186 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+    "evidence": "scripts/repair_bot.py:209 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
     "state": "done"
    },
    "error_id": "ERR-033",
@@ -1076,7 +1073,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:186 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+    "evidence": "scripts/repair_bot.py:209 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
     "state": "done"
    },
    "bot": "seykota",
@@ -1084,7 +1081,7 @@
    "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
    "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:186 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+    "evidence": "scripts/repair_bot.py:209 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
     "state": "done"
    },
    "error_id": "ERR-034",
@@ -1101,7 +1098,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:186 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+    "evidence": "scripts/repair_bot.py:209 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
     "state": "done"
    },
    "bot": "seykota",
@@ -1109,7 +1106,7 @@
    "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
    "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:186 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
+    "evidence": "scripts/repair_bot.py:209 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。",
     "state": "done"
    },
    "error_id": "ERR-035",
@@ -1127,7 +1124,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:186 修復機器人每輪先跑修復輪，:189 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；:89 只認得 sk-＋32 位十六進位的自有編號（owns_client_order_id），確定是自己重複送單且已平倉才自動追加帳本更正。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。",
+    "evidence": "scripts/repair_bot.py:209 修復機器人每輪先跑修復輪，:212 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；:90 只認得 sk-＋32 位十六進位的自有編號（owns_client_order_id），確定是自己重複送單且已平倉才自動追加帳本更正。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。",
     "state": "done"
    },
    "bot": "seykota",
@@ -1135,7 +1132,7 @@
    "code": "SEY.UNRECORDED_FILL_CORRECTED",
    "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:189 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。",
+    "evidence": "scripts/repair_bot.py:212 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。",
     "state": "done"
    },
    "error_id": "ERR-036",
@@ -1152,7 +1149,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:186 修復機器人每輪先跑修復輪，:189 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；:89 只認得 sk-＋32 位十六進位的自有編號（owns_client_order_id），確定是自己重複送單且已平倉才自動追加帳本更正。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。",
+    "evidence": "scripts/repair_bot.py:209 修復機器人每輪先跑修復輪，:212 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；:90 只認得 sk-＋32 位十六進位的自有編號（owns_client_order_id），確定是自己重複送單且已平倉才自動追加帳本更正。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。",
     "state": "done"
    },
    "bot": "seykota",
@@ -1160,7 +1157,7 @@
    "code": "SEY.UNRECORDED_FILL_UNRESOLVED",
    "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:189 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。",
+    "evidence": "scripts/repair_bot.py:212 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。",
     "state": "done"
    },
    "error_id": "ERR-037",
@@ -1179,7 +1176,7 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
+    "evidence": "scripts/repair_bot.py:176 修復機器人每輪先跑修復輪，scripts/repair_bot.py:179 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:163 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:617 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
     "state": "done"
    },
    "bot": "momentum",
@@ -1187,7 +1184,7 @@
    "code": "MOM.UNRECORDED_FILL_CORRECTED",
    "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
+    "evidence": "scripts/repair_bot.py:179 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
     "state": "done"
    },
    "error_id": "ERR-038",
@@ -1204,7 +1201,7 @@
   {
    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。",
    "behaviour": {
-    "evidence": "scripts/repair_bot.py:163 修復機器人每輪先跑修復輪，scripts/repair_bot.py:166 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:154 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:615 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
+    "evidence": "scripts/repair_bot.py:176 修復機器人每輪先跑修復輪，scripts/repair_bot.py:179 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:163 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:617 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
     "state": "done"
    },
    "bot": "momentum",
@@ -1212,7 +1209,7 @@
    "code": "MOM.UNRECORDED_FILL_UNRESOLVED",
    "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
    "emits_event": {
-    "evidence": "scripts/repair_bot.py:166 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
+    "evidence": "scripts/repair_bot.py:179 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。",
     "state": "done"
    },
    "error_id": "ERR-039",
@@ -1231,7 +1228,7 @@
   {
    "ai_prompt": "請在 btc-bull-market-competition 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。",
    "behaviour": {
-    "evidence": "src/btc_competition/unrecorded_fill.py:237 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+    "evidence": "src/btc_competition/unrecorded_fill.py:254 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
     "state": "done"
    },
    "bot": "btc-competition",
@@ -1239,7 +1236,7 @@
    "code": "BTC.UNRECORDED_FILL_CORRECTED",
    "direction": "帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。",
    "emits_event": {
-    "evidence": "src/btc_competition/unrecorded_fill.py:237 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+    "evidence": "src/btc_competition/unrecorded_fill.py:254 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
     "state": "done"
    },
    "error_id": "ERR-040",
@@ -1256,7 +1253,7 @@
   {
    "ai_prompt": "請在 btc-bull-market-competition 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。",
    "behaviour": {
-    "evidence": "src/btc_competition/unrecorded_fill.py:237 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+    "evidence": "src/btc_competition/unrecorded_fill.py:254 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
     "state": "done"
    },
    "bot": "btc-competition",
@@ -1264,7 +1261,7 @@
    "code": "BTC.UNRECORDED_FILL_UNRESOLVED",
    "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
    "emits_event": {
-    "evidence": "src/btc_competition/unrecorded_fill.py:237 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+    "evidence": "src/btc_competition/unrecorded_fill.py:254 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
     "state": "done"
    },
    "error_id": "ERR-041",
