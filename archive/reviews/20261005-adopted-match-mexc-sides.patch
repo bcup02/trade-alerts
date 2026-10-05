@@ -1,0 +1,140 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 1ac38d3..b333aaf 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -848,3 +848,15 @@ trade-alerts：v0.27.1（對帳：共用比對函式只拿濾掉紙上列的帳
+ 版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
+ 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.27.2（對帳：接手成交配對也認 MEXC 期貨的成交方向代碼；程式碼變更）
++變更摘要：1. match_fills_to_adopted_events 原本只認成交方向 buy／sell；動能（MEXC）的成交方向是 open_long／close_long／open_short／close_short，改釘後也配不到（已實測：同樣的接手倉位，open_long 成交 DIVERGED、buy 成交 RECONCILED）。
++          2. 現在每種帳本事件接受的成交方向：多單進場＝buy／open_long、多單平倉＝sell／close_long、空單進場＝sell／open_short、空單平倉＝buy／close_short；MEXC 代碼只認自己那個動作（close_short 雖然也是買，不能解釋多單進場）。
++          3. 其餘配對條件（交易對、數量、價格、時間窗、每列最多一筆、LIVE／DEMO、非乾跑）不變；新增 7 個測試（含錯誤動作代碼不配對、經共用比對端到端 RECONCILED）。
++向後相容：buy／sell 行為不變；只是多接受 MEXC 代碼，不認識的方向值仍然不配對（保守）。
++受影響消費專案：動能（釘此版後生效，next）；趨勢（Binance，用 buy／sell，不受影響）；競賽、加密不適用。
++部署入口：各專案既有部署腳本（開發機 → 正式機）。
++版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
++交易安全：未啟用真倉、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index 372658c..e2e6573 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.27.1"
++version = "0.27.2"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index e1c8fc2..17400d3 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -339,4 +339,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.27.1"
++__version__ = "0.27.2"
+diff --git a/src/trade_alerts/ledger_reconcile.py b/src/trade_alerts/ledger_reconcile.py
+index 3878056..a704b0c 100644
+--- a/src/trade_alerts/ledger_reconcile.py
++++ b/src/trade_alerts/ledger_reconcile.py
+@@ -257,6 +257,18 @@ def recorded_order_ids(real_events: list[dict[str, Any]]) -> set[str]:
+ ADOPTED_FILL_WINDOW_MS = 12 * 60 * 60 * 1000
+ _ADOPTED_REAL_MODES = frozenset({"LIVE", "DEMO"})
+ 
++#: Fill ``side`` labels that agree with a ledger event, keyed by (position side,
++#: is-entry).  Binance-style fills carry the order side (buy/sell); MEXC futures
++#: fills carry the action *and* direction (open_long, close_long, open_short,
++#: close_short).  A MEXC label is accepted only for exactly its own action, so
++#: ``close_short`` (a buy) never explains the entry of a long.
++_ADOPTED_FILL_SIDES: dict[tuple[str, bool], frozenset[str]] = {
++    ("long", True): frozenset({"buy", "open_long"}),
++    ("long", False): frozenset({"sell", "close_long"}),
++    ("short", True): frozenset({"sell", "open_short"}),
++    ("short", False): frozenset({"buy", "close_short"}),
++}
++
+ 
+ def _is_boolean(value: Any) -> bool:
+     """``True``/``False`` and numpy's ``bool_``: neither is ever a time, a price or a size."""
+@@ -321,7 +333,7 @@ def match_fills_to_adopted_events(
+     stayed ``DIVERGED`` for days although the ledger had both rows).
+ 
+     A fill is explained only when *everything* lines up: same symbol, the side
+-    the event implies (entry of a long = buy, close of a long = sell; reversed
++    the event implies (entry of a long = buy or MEXC open_long, close of a long = sell or close_long; reversed
+     for a short), the same quantity and price, and the fill happened no later
+     than the event and at most ``window_ms`` before it.  Each event explains at
+     most one fill, so a duplicated send of the same order still leaves its
+@@ -347,10 +359,10 @@ def match_fills_to_adopted_events(
+         event_ms = _positive_ms(e.get("event_epoch_ms"))
+         if side not in ("long", "short") or qty is None or price is None or event_ms is None:
+             continue
+-        fill_side = ("buy" if side == "long" else "sell") if entry else ("sell" if side == "long" else "buy")
++        fill_sides = _ADOPTED_FILL_SIDES[(side, entry)]
+         candidates.append({
+             "event": e, "symbol": norm_symbol(e.get("symbol")), "qty": qty, "price": price,
+-            "side": fill_side, "ms": event_ms,
++            "sides": fill_sides, "ms": event_ms,
+         })
+     candidates.sort(key=lambda c: c["ms"])
+     matched: dict[int, dict[str, Any]] = {}
+@@ -362,7 +374,7 @@ def match_fills_to_adopted_events(
+             fill_ms = _positive_ms(f.get("time_ms"))
+             if fill_ms is None or not (0 <= c["ms"] - fill_ms <= window_ms):
+                 continue
+-            if norm_symbol(f.get("symbol")) != c["symbol"] or str(f.get("side") or "").lower() != c["side"]:
++            if norm_symbol(f.get("symbol")) != c["symbol"] or str(f.get("side") or "").lower() not in c["sides"]:
+                 continue
+             fill_qty, fill_price = _finite_positive(f.get("quantity")), _finite_positive(f.get("price"))
+             if fill_qty is None or fill_price is None:
+diff --git a/tests/test_ledger_reconcile.py b/tests/test_ledger_reconcile.py
+index 89620e4..be17494 100644
+--- a/tests/test_ledger_reconcile.py
++++ b/tests/test_ledger_reconcile.py
+@@ -895,3 +895,38 @@ def test_a_row_the_caller_calls_paper_never_explains_a_real_fill():
+ def test_the_same_row_counts_when_the_caller_calls_it_real():
+     verdict = _shadow_compare(_seykota_style_paper)
+     assert [m["order_id"] for m in verdict["evidence"]["fills_matched_to_adopted_events"]] == [1001]
++
++
++# --- t12: MEXC-style fill sides (open_long / close_long / open_short / close_short) ---
++@pytest.mark.parametrize("position_side, entry_label, exit_label", [
++    ("long", "open_long", "close_long"),
++    ("short", "open_short", "close_short"),
++])
++def test_mexc_style_sides_explain_the_matching_action_only(position_side, entry_label, exit_label):
++    fills = [_adopt_fill(3001, entry_label, 100.0, 1.0, _ADOPT_T0),
++             _adopt_fill(3002, exit_label, 99.0, 1.0, _ADOPT_T0 + 60_000)]
++    events = [_recovered(price=100.0, qty=1.0, side=position_side),
++              _native_close(price=99.0, qty=1.0, side=position_side)]
++    assert sorted(lr.match_fills_to_adopted_events(fills, events, norm_symbol=norm_symbol_plain)) == [0, 1]
++
++
++@pytest.mark.parametrize("position_side, wrong_for_entry, wrong_for_exit", [
++    ("long", "close_short", "open_short"),    # same buy / sell direction, wrong action
++    ("short", "close_long", "open_long"),
++    ("long", "close_long", "open_long"),      # right direction word, wrong action
++    ("short", "close_short", "open_short"),
++])
++def test_a_mexc_label_for_the_wrong_action_never_matches(position_side, wrong_for_entry, wrong_for_exit):
++    fills = [_adopt_fill(3001, wrong_for_entry, 100.0, 1.0, _ADOPT_T0),
++             _adopt_fill(3002, wrong_for_exit, 99.0, 1.0, _ADOPT_T0 + 60_000)]
++    events = [_recovered(price=100.0, qty=1.0, side=position_side),
++              _native_close(price=99.0, qty=1.0, side=position_side)]
++    assert lr.match_fills_to_adopted_events(fills, events, norm_symbol=norm_symbol_plain) == {}
++
++
++def test_mexc_label_works_end_to_end_through_the_shared_compare():
++    fills = [_adopt_fill(1001, "open_long", 84593.6, 0.002, _ADOPT_T0),
++             _adopt_fill(1002, "close_long", 84586.0, 0.002, _ADOPT_T0 + 104_000)]
++    verdict = _adopt_compare(fills, [_recovered(), _native_close()])
++    assert verdict["value"] == "RECONCILED"
++    assert [m["order_id"] for m in verdict["evidence"]["fills_matched_to_adopted_events"]] == [1001, 1002]
