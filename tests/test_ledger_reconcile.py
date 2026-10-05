@@ -710,7 +710,7 @@ def test_the_exit_of_a_short_is_a_buy():
 
 
 # --- reviewer finding on #117: a missing/zero/garbled time must fail closed ---
-_BAD_TIMES = [None, 0, "", "abc", -5, float("nan")]
+_BAD_TIMES = [None, 0, "", "abc", -5, float("nan"), float("inf"), float("-inf"), True, False, 0.5, 10 ** 400]
 
 
 @pytest.mark.parametrize("bad", _BAD_TIMES)
@@ -727,19 +727,58 @@ def test_a_fill_without_a_usable_time_is_never_matched(bad):
     assert matched == {}
 
 
-# A garbled *string* time already makes the older ``> fa_ms`` comparisons raise
-# TypeError (the strategy wrappers turn that into an UNKNOWN verdict); that is
-# existing, fail-closed behaviour and is not changed here, so the end-to-end
-# cases use the values that reach the new matching code: None, 0 and "".
-@pytest.mark.parametrize("bad", [None, 0, ""])
-def test_two_missing_times_do_not_line_up_end_to_end(bad):
-    """The reviewer's reproduction: ledger row and fill both lack a time, everything
-    else is identical.  The real fill must stay in unmatched_exchange_fills."""
+def _adopt_state_with_position(fills):
+    """Position already agrees with the ledger (0.002 BTC), so the verdict can
+    only be driven by the fill -- the reviewer's reproduction."""
+    state = _adopt_state(fills)
+    state["positions"] = [{"symbol": "BTCUSDT", "quantity": 0.002}]
+    return state
+
+
+def _compare_with_position(fills, events):
+    return exchange_ledger_compare(
+        _adopt_state_with_position(fills), events, is_paper=_seykota_style_paper, norm_symbol=norm_symbol_plain,
+        open_event_types=frozenset({"trade_open", "position_recovered"}), include_pending_markers=False, now=NOW,
+    )
+
+
+@pytest.mark.parametrize("bad", _BAD_TIMES)
+def test_an_unusable_fill_time_keeps_the_fill_unmatched_end_to_end(bad):
+    """NaN / +inf / bool / 0.5 / overflow on the *fill* must neither match nor
+    silently disappear in the grace filter: the fill stays in unmatched and the
+    verdict is not RECONCILED."""
     fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), "time_ms": bad}
-    verdict = _adopt_compare([fill], [_recovered(event_epoch_ms=bad)])
+    verdict = _compare_with_position([fill], [_recovered()])
     assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
     assert "fills_matched_to_adopted_events" not in verdict["evidence"]
     assert verdict["value"] == "DIVERGED"
+
+
+@pytest.mark.parametrize("bad", _BAD_TIMES)
+def test_an_unusable_time_on_both_sides_never_lines_up_end_to_end(bad):
+    """The reviewer's reproduction, now for every unusable value: ledger row and
+    fill both carry the same bad time, everything else identical."""
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), "time_ms": bad}
+    if bad == "abc":
+        # A garbled *string* on the ledger side already makes the older raw
+        # ``> cutoff`` comparisons raise TypeError; the strategy wrappers turn
+        # that into an UNKNOWN verdict.  That is existing, stricter-than-needed
+        # fail-closed behaviour (the whole comparison aborts), kept on purpose.
+        with pytest.raises(TypeError):
+            _compare_with_position([fill], [_recovered(event_epoch_ms=bad)])
+        return
+    verdict = _compare_with_position([fill], [_recovered(event_epoch_ms=bad)])
+    assert verdict["value"] != "RECONCILED"
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
+    assert "fills_matched_to_adopted_events" not in verdict["evidence"]
+
+
+def test_a_numeric_string_time_is_read_as_a_number():
+    from trade_alerts.ledger_reconcile import _positive_ms
+
+    assert _positive_ms("1788263700000") == 1788263700000
+    assert _positive_ms(1788263700000.0) == 1788263700000
+    assert _positive_ms(1) == 1 and _positive_ms(True) is None
 
 
 def test_the_window_edge_is_inclusive_and_one_millisecond_more_is_not():

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
 import tempfile
@@ -258,15 +259,29 @@ _ADOPTED_REAL_MODES = frozenset({"LIVE", "DEMO"})
 
 
 def _positive_ms(value: Any) -> int | None:
-    """An epoch-millisecond timestamp, or ``None`` when it is missing, zero,
-    negative, not a number, or not finite.  ``to_float`` turns every one of
-    those into ``0.0``, which would make "no usable time" look like the Unix
-    epoch -- and two missing times would then "line up" with each other.  The
-    adopted-fill matching must fail closed instead (reviewer finding on #117)."""
-    ms = to_float(value)
-    if ms != ms or ms in (float("inf"), float("-inf")) or ms <= 0:
+    """An epoch-millisecond timestamp, or ``None`` when there is no usable one.
+
+    Unusable: missing, a bool (``True`` would read as 1 ms), not a number,
+    not finite (NaN, +-inf), too large to convert, or below 1 ms (so ``0``,
+    negatives and a fraction like ``0.5`` that would truncate to 0).  A usable
+    value is a finite number >= 1; a numeric string is accepted as a number.
+    ``to_float`` turns every unusable case into ``0.0``, which would make "no
+    time" look like the Unix epoch -- and two missing times would then "line up"
+    with each other -- so the adopted-fill matching and the unmatched-fill
+    filter must both go through this and fail closed (reviewer findings on #117).
+    """
+    if isinstance(value, bool):
         return None
-    return int(ms)
+    try:
+        ms = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(ms) or ms < 1:
+        return None
+    try:
+        return int(ms)
+    except (OverflowError, ValueError):
+        return None
 
 
 def match_fills_to_adopted_events(
@@ -485,10 +500,13 @@ def exchange_ledger_compare(
         if abs(lq - eq) > 1e-6:
             position_diffs.append({"symbol": sym, "ledger_qty": lq, "exchange_qty": eq})
 
+    # A fill whose time cannot be read is kept (never silently dropped): the
+    # grace window only skips fills that are *known* to be too recent to be
+    # recorded yet.  (NaN / +inf used to fall out of the old raw comparison.)
     not_by_order_id = [
         f for f in exchange_state.get("fills") or []
         if str(f.get("order_id")) not in recorded_ids
-        and (f.get("time_ms") or 0) < fa_ms - _FILL_GRACE_MS
+        and (_positive_ms(f.get("time_ms")) is None or _positive_ms(f.get("time_ms")) < fa_ms - _FILL_GRACE_MS)
     ]
     explained = match_fills_to_adopted_events(not_by_order_id, ledger_events, norm_symbol=norm_symbol)
     unmatched_exchange_fills = [
