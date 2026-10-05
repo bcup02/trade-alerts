@@ -1,0 +1,120 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 913a3fc..570c459 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -873,3 +873,15 @@ trade-alerts：v0.27.3（對帳：同一次開倉的接手紀錄與開倉紀錄
+ 版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
+ 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.27.4（對帳：帳本對 Google 表的數值比較，NaN／無限大不再被當成「一樣」；程式碼變更）
++變更摘要：1. _value_mismatch（出場價、淨損益、毛損益三個比較）原本寫成「差值 > 容忍度才算差異」：遇到 NaN 比較結果是 False，Google 表欄位是 "nan"（或帳本值是 NaN）會讀成「一樣」、不列差異。#117 審閱者指出此缺口，另案處理（進度頁 t10）。
++          2. 改成肯定式「not 差值 <= 容忍度」：NaN、無限大一律列為 VALUE_MISMATCH（兩邊都是 NaN 也是——證明不了相等就不算相等）；有限數的容忍度邊界不變。
++          3. 新增 12 個測試（拿掉修正有 7 個會失敗）；既有測試零改動。
++向後相容：數值都是有限數時輸出完全不變；只有 NaN／無限大這種壞資料從「判一致」變成「判不一致」（更保守）。
++受影響消費專案：動能、趨勢、加密（共用 sheet_ledger_compare，釘此版後生效）；競賽有自己的 reconcile_google.py，其檔頭說明不採用共用的 sheet_ledger_compare（只讀了檔頭，沒有逐行核對；競賽現在釘 v0.25.0）。
++部署入口：各專案既有部署腳本（開發機 → 正式機）。
++版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
++交易安全：未啟用真倉、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index 7815163..4f0fdfe 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.27.3"
++version = "0.27.4"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 38bbabf..4ed1364 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -339,4 +339,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.27.3"
++__version__ = "0.27.4"
+diff --git a/src/trade_alerts/ledger_reconcile.py b/src/trade_alerts/ledger_reconcile.py
+index 83a90df..989879b 100644
+--- a/src/trade_alerts/ledger_reconcile.py
++++ b/src/trade_alerts/ledger_reconcile.py
+@@ -832,13 +832,15 @@ def _value_mismatch(close_event: dict[str, Any], values: list[Any], *,
+     s_exit = to_number(sheet_cell(values, "exit_price"))
+     if l_exit is not None and s_exit is not None:
+         denom = abs(l_exit) or 1.0
+-        if abs(l_exit - s_exit) / denom > price_tol_pct:
++        # Written as a positive test: ``x > tol`` is False for NaN, so a ``"nan"`` cell
++        # (or an infinite one) used to read as "the same" (reviewer note on #117).
++        if not abs(l_exit - s_exit) / denom <= price_tol_pct:
+             diffs["exit_price"] = {"ledger": l_exit, "sheet": s_exit}
+ 
+     for field in ("net_pnl", "gross_pnl"):
+         lv = to_number(close_event.get(field))
+         sv = to_number(sheet_cell(values, field))
+-        if lv is not None and sv is not None and abs(lv - sv) > pnl_tol:
++        if lv is not None and sv is not None and not abs(lv - sv) <= pnl_tol:
+             diffs[field] = {"ledger": lv, "sheet": sv}
+ 
+     l_oid = _str_id(close_event.get("order_id"))
+diff --git a/tests/test_ledger_reconcile.py b/tests/test_ledger_reconcile.py
+index 90c474c..ab1c3b3 100644
+--- a/tests/test_ledger_reconcile.py
++++ b/tests/test_ledger_reconcile.py
+@@ -1075,3 +1075,50 @@ def test_a_missing_identifier_is_not_a_contradiction(rec_over, open_over):
+     events = [_recovered(**rec_over), _trade_open_row(**open_over)]
+     verdict = _both_types_compare([_held_btc(0.002)], events)
+     assert verdict["evidence"]["position_diffs"] == []
++
++
++# --- t10 (#117 reviewer note): a NaN / infinite sheet or ledger figure is a value mismatch, not "the same" ---
++def _sheet_compare_exit(ledger_exit, ledger_pnl, sheet_exit, sheet_pnl):
++    close = {"event_type": "trade_close", "exit_price": ledger_exit, "net_pnl": ledger_pnl, "gross_pnl": ledger_pnl,
++             "order_id": "x2", "execution_mode": "LIVE", "source": "native_trailing_stop"}
++    trades = _trade("t1", closed=True, close_event=close, closed_ms=2)
++    rows = [_row(14, trade_id="t1", exit_time="2026-09-01", exit_price=sheet_exit, net_pnl=sheet_pnl,
++                 exit_order_id="x2")]
++    rows[0]["values"][lr.SHEET_COLUMN_INDEX["gross_pnl"]] = sheet_pnl
++    return sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
++
++
++def test_matching_sheet_figures_still_reconcile():
++    doc = _sheet_compare_exit(1.0, 0.5, "1.0", "0.5")
++    assert doc["value"] == "RECONCILED"
++
++
++@pytest.mark.parametrize("sheet_exit, sheet_pnl, field", [
++    ("nan", "0.5", "exit_price"), ("NaN", "0.5", "exit_price"), ("inf", "0.5", "exit_price"),
++    ("1.0", "nan", "net_pnl"), ("1.0", "-inf", "net_pnl"),
++])
++def test_a_nan_or_infinite_sheet_figure_is_a_value_mismatch(sheet_exit, sheet_pnl, field):
++    doc = _sheet_compare_exit(1.0, 0.5, sheet_exit, sheet_pnl)
++    assert doc["value"] == "DIVERGED"
++    assert doc["discrepancies"][0]["kind"] == "VALUE_MISMATCH"
++    assert field in doc["discrepancies"][0]["detail"]["diffs"]
++    if field == "net_pnl":
++        assert "gross_pnl" in doc["discrepancies"][0]["detail"]["diffs"]   # the other pnl column is checked the same way
++
++
++@pytest.mark.parametrize("ledger_exit, ledger_pnl", [(float("nan"), 0.5), (1.0, float("nan")),
++                                                     (float("inf"), 0.5), (1.0, float("-inf"))])
++def test_a_nan_or_infinite_ledger_figure_is_a_value_mismatch(ledger_exit, ledger_pnl):
++    doc = _sheet_compare_exit(ledger_exit, ledger_pnl, "1.0", "0.5")
++    assert doc["value"] == "DIVERGED"
++    assert doc["discrepancies"][0]["kind"] == "VALUE_MISMATCH"
++
++
++def test_both_sides_nan_is_still_not_proven_equal():
++    doc = _sheet_compare_exit(float("nan"), 0.5, "nan", "0.5")
++    assert doc["value"] == "DIVERGED"
++
++
++def test_a_small_real_difference_inside_the_tolerance_is_still_fine():
++    doc = _sheet_compare_exit(100.0, 0.5, "100.05", "0.505")   # 0.05 % price, 0.005 pnl: inside the defaults
++    assert doc["value"] == "RECONCILED"
