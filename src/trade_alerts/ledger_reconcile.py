@@ -257,6 +257,18 @@ ADOPTED_FILL_WINDOW_MS = 12 * 60 * 60 * 1000
 _ADOPTED_REAL_MODES = frozenset({"LIVE", "DEMO"})
 
 
+def _positive_ms(value: Any) -> int | None:
+    """An epoch-millisecond timestamp, or ``None`` when it is missing, zero,
+    negative, not a number, or not finite.  ``to_float`` turns every one of
+    those into ``0.0``, which would make "no usable time" look like the Unix
+    epoch -- and two missing times would then "line up" with each other.  The
+    adopted-fill matching must fail closed instead (reviewer finding on #117)."""
+    ms = to_float(value)
+    if ms != ms or ms in (float("inf"), float("-inf")) or ms <= 0:
+        return None
+    return int(ms)
+
+
 def match_fills_to_adopted_events(
     fills: list[dict[str, Any]],
     ledger_events: list[dict[str, Any]],
@@ -296,12 +308,13 @@ def match_fills_to_adopted_events(
         else:
             continue
         side = str(e.get("side") or "").lower()
-        if side not in ("long", "short") or qty <= 0 or price <= 0:
+        event_ms = _positive_ms(e.get("event_epoch_ms"))
+        if side not in ("long", "short") or qty <= 0 or price <= 0 or event_ms is None:
             continue
         fill_side = ("buy" if side == "long" else "sell") if entry else ("sell" if side == "long" else "buy")
         candidates.append({
             "event": e, "symbol": norm_symbol(e.get("symbol")), "qty": qty, "price": price,
-            "side": fill_side, "ms": int(to_float(e.get("event_epoch_ms"))),
+            "side": fill_side, "ms": event_ms,
         })
     candidates.sort(key=lambda c: c["ms"])
     matched: dict[int, dict[str, Any]] = {}
@@ -310,8 +323,8 @@ def match_fills_to_adopted_events(
         for i, f in enumerate(fills):
             if i in matched:
                 continue
-            fill_ms = int(to_float(f.get("time_ms")))
-            if not (0 <= c["ms"] - fill_ms <= window_ms):
+            fill_ms = _positive_ms(f.get("time_ms"))
+            if fill_ms is None or not (0 <= c["ms"] - fill_ms <= window_ms):
                 continue
             if norm_symbol(f.get("symbol")) != c["symbol"] or str(f.get("side") or "").lower() != c["side"]:
                 continue
@@ -319,7 +332,7 @@ def match_fills_to_adopted_events(
                 continue
             if abs(to_float(f.get("price")) - c["price"]) > max(1e-9, abs(c["price"]) * 1e-9):
                 continue
-            if best is None or fill_ms < int(to_float(fills[best].get("time_ms"))):
+            if best is None or fill_ms < (_positive_ms(fills[best].get("time_ms")) or fill_ms):
                 best = i
         if best is not None:
             e = c["event"]

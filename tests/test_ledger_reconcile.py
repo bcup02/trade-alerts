@@ -707,3 +707,46 @@ def test_the_exit_of_a_short_is_a_buy():
     fills = [_adopt_fill(2001, "sell", 100.0, 1.0, _ADOPT_T0), _adopt_fill(2002, "buy", 99.0, 1.0, _ADOPT_T0 + 60_000)]
     events = [_recovered(price=100.0, qty=1.0, side="short"), _native_close(price=99.0, qty=1.0, side="short")]
     assert sorted(lr.match_fills_to_adopted_events(fills, events, norm_symbol=norm_symbol_plain)) == [0, 1]
+
+
+# --- reviewer finding on #117: a missing/zero/garbled time must fail closed ---
+_BAD_TIMES = [None, 0, "", "abc", -5, float("nan")]
+
+
+@pytest.mark.parametrize("bad", _BAD_TIMES)
+def test_a_ledger_row_without_a_usable_time_explains_nothing(bad):
+    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
+    matched = lr.match_fills_to_adopted_events([fill], [_recovered(event_epoch_ms=bad)], norm_symbol=norm_symbol_plain)
+    assert matched == {}
+
+
+@pytest.mark.parametrize("bad", _BAD_TIMES)
+def test_a_fill_without_a_usable_time_is_never_matched(bad):
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), "time_ms": bad}
+    matched = lr.match_fills_to_adopted_events([fill], [_recovered()], norm_symbol=norm_symbol_plain)
+    assert matched == {}
+
+
+# A garbled *string* time already makes the older ``> fa_ms`` comparisons raise
+# TypeError (the strategy wrappers turn that into an UNKNOWN verdict); that is
+# existing, fail-closed behaviour and is not changed here, so the end-to-end
+# cases use the values that reach the new matching code: None, 0 and "".
+@pytest.mark.parametrize("bad", [None, 0, ""])
+def test_two_missing_times_do_not_line_up_end_to_end(bad):
+    """The reviewer's reproduction: ledger row and fill both lack a time, everything
+    else is identical.  The real fill must stay in unmatched_exchange_fills."""
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), "time_ms": bad}
+    verdict = _adopt_compare([fill], [_recovered(event_epoch_ms=bad)])
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
+    assert "fills_matched_to_adopted_events" not in verdict["evidence"]
+    assert verdict["value"] == "DIVERGED"
+
+
+def test_the_window_edge_is_inclusive_and_one_millisecond_more_is_not():
+    from trade_alerts.ledger_reconcile import ADOPTED_FILL_WINDOW_MS
+
+    event_ms = _ADOPT_T0 + ADOPTED_FILL_WINDOW_MS
+    on_edge = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
+    just_past = _adopt_fill(1002, "buy", 84593.6, 0.002, _ADOPT_T0 - 1)
+    assert lr.match_fills_to_adopted_events([on_edge], [_recovered(ms=event_ms)], norm_symbol=norm_symbol_plain) != {}
+    assert lr.match_fills_to_adopted_events([just_past], [_recovered(ms=event_ms)], norm_symbol=norm_symbol_plain) == {}
