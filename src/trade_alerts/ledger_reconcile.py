@@ -532,7 +532,9 @@ def exchange_ledger_compare(
         if str(f.get("order_id")) not in recorded_ids
         and (_positive_ms(f.get("time_ms")) is None or _positive_ms(f.get("time_ms")) < fa_ms - _FILL_GRACE_MS)
     ]
-    explained = match_fills_to_adopted_events(not_by_order_id, ledger_events, norm_symbol=norm_symbol)
+    # ``real`` (not ``ledger_events``): a row the caller classifies as paper must
+    # never explain a real exchange fill.
+    explained = match_fills_to_adopted_events(not_by_order_id, real, norm_symbol=norm_symbol)
     unmatched_exchange_fills = [
         {"order_id": f.get("order_id"), "trade_id": f.get("trade_id"), "symbol": f.get("symbol"),
          "time_ms": f.get("time_ms"), "quantity": f.get("quantity"), "price": f.get("price"),
