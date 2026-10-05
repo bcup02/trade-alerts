@@ -1,0 +1,527 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 4f25c20..a342454 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -822,3 +822,17 @@ trade-alerts：v0.26.0（f-16：「帳本↔Google 表」對帳的操作者忽
+ 版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
+ 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.27.0（對帳：接手倉位與原生停損平倉的成交不再被誤判成「帳本沒記」；程式碼變更）
++變更摘要：1. ledger_reconcile 新增 match_fills_to_adopted_events：帳本裡沒有 order_id 的 position_recovered（接手倉位）與 trade_close（原生停損對帳後平倉），
++             只在「同交易對、方向正確（多單進場＝買、平倉＝賣，空單相反）、數量與價格完全一致、成交不晚於帳本列且最多早 12 小時」時，才算解釋了那筆成交。
++          2. 每個帳本列最多解釋一筆成交，重複送單的第二張單仍會留在 unmatched_exchange_fills；乾跑來源或沒有 LIVE／DEMO 執行模式的列不採用。
++          3. exchange_ledger_compare 把被解釋的成交從 unmatched_exchange_fills 拿掉，並在 evidence 多一個 fills_matched_to_adopted_events（逐筆列出）；沒有這種成交時輸出與以前相同。
++          4. 起因：2026-10-03 開發機趨勢策略接手一筆倉位，兩筆真實成交（帳本其實有記）因為帳本列沒有 order_id，一直顯示 DIVERGED。
++向後相容：既有 API 不變；evidence 只多一個選用欄位。
++受影響消費專案：動能（共用比對，釘此版後生效）；趨勢策略自己的 compare.py 要另外接上同一個函式；競賽（現貨、沒有接手倉位）、加密（舊共用庫）不適用。
++部署入口：各專案既有部署腳本（開發機 → 正式機）。
++版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
++交易安全：未啟用真倉、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index 7d7e8e4..83fa041 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.26.0"
++version = "0.27.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 695d3b0..7cdcd49 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -339,4 +339,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.26.0"
++__version__ = "0.27.0"
+diff --git a/src/trade_alerts/ledger_reconcile.py b/src/trade_alerts/ledger_reconcile.py
+index b8fa1fd..0e8005d 100644
+--- a/src/trade_alerts/ledger_reconcile.py
++++ b/src/trade_alerts/ledger_reconcile.py
+@@ -36,6 +36,7 @@ from __future__ import annotations
+ 
+ import json
+ import logging
++import math
+ import os
+ import re
+ import tempfile
+@@ -251,6 +252,134 @@ def recorded_order_ids(real_events: list[dict[str, Any]]) -> set[str]:
+     return ids | correction_order_ids(real_events)
+ 
+ 
++#: How long after an exchange fill the ledger may first have recorded the
++#: adopted position (or the reconciled native-stop close) that fill belongs to.
++ADOPTED_FILL_WINDOW_MS = 12 * 60 * 60 * 1000
++_ADOPTED_REAL_MODES = frozenset({"LIVE", "DEMO"})
++
++
++def _is_boolean(value: Any) -> bool:
++    """``True``/``False`` and numpy's ``bool_``: neither is ever a time, a price or a size."""
++    return isinstance(value, bool) or type(value).__name__ in ("bool", "bool_")
++
++
++def _finite_positive(value: Any) -> float | None:
++    """A finite number > 0 (numeric strings count as numbers), else ``None``.
++
++    Every comparison that decides "these two figures agree" must be written as a
++    *positive* test on a value that went through here: ``abs(a - b) > tol`` is
++    False for NaN, so a NaN price or size used to read as "the same" (reviewer
++    finding F3 on #117)."""
++    if _is_boolean(value):
++        return None
++    try:
++        number = float(value)
++    except (TypeError, ValueError, OverflowError):
++        return None
++    return number if math.isfinite(number) and number > 0 else None
++
++
++def _positive_ms(value: Any) -> int | None:
++    """An epoch-millisecond timestamp, or ``None`` when there is no usable one.
++
++    Unusable: missing, a bool (``True`` would read as 1 ms), not a number,
++    not finite (NaN, +-inf), too large to convert, or below 1 ms (so ``0``,
++    negatives and a fraction like ``0.5`` that would truncate to 0).  A usable
++    value is a finite number >= 1; a numeric string is accepted as a number.
++    ``to_float`` turns every unusable case into ``0.0``, which would make "no
++    time" look like the Unix epoch -- and two missing times would then "line up"
++    with each other -- so the adopted-fill matching and the unmatched-fill
++    filter must both go through this and fail closed (reviewer findings on #117).
++    """
++    if _is_boolean(value):
++        return None
++    try:
++        ms = float(value)
++    except (TypeError, ValueError, OverflowError):
++        return None
++    if not math.isfinite(ms) or ms < 1:
++        return None
++    try:
++        return int(ms)
++    except (OverflowError, ValueError):
++        return None
++
++
++def match_fills_to_adopted_events(
++    fills: list[dict[str, Any]],
++    ledger_events: list[dict[str, Any]],
++    *,
++    norm_symbol: Callable[[Any], str],
++    window_ms: int = ADOPTED_FILL_WINDOW_MS,
++) -> dict[int, dict[str, Any]]:
++    """Which exchange fills a ledger event that has **no ``order_id``** explains.
++
++    A position the strategy adopted after a restart (``position_recovered``) and
++    the close of a native stop it reconciled afterwards (``trade_close``) are
++    recorded without the exchange order id, so the order-id comparison cannot
++    see that the fills behind them are accounted for (2026-10-03: two demo fills
++    stayed ``DIVERGED`` for days although the ledger had both rows).
++
++    A fill is explained only when *everything* lines up: same symbol, the side
++    the event implies (entry of a long = buy, close of a long = sell; reversed
++    for a short), the same quantity and price, and the fill happened no later
++    than the event and at most ``window_ms`` before it.  Each event explains at
++    most one fill, so a duplicated send of the same order still leaves its
++    second fill unmatched.  Events from dry-run sources or without a LIVE/DEMO
++    ``execution_mode`` are never used.  Returns ``{index into fills: info}``.
++    """
++    candidates: list[dict[str, Any]] = []
++    for e in ledger_events:
++        if e.get("order_id") is not None and str(e.get("order_id")).strip():
++            continue
++        if str(e.get("source") or "") in DRY_RUN_SOURCES:
++            continue
++        if str(e.get("execution_mode") or "").upper() not in _ADOPTED_REAL_MODES:
++            continue
++        et = e.get("event_type")
++        if et == "position_recovered":
++            qty, price, entry = _finite_positive(e.get("volume")), _finite_positive(e.get("entry_price")), True
++        elif et == "trade_close":
++            qty, price, entry = _finite_positive(e.get("exit_volume")), _finite_positive(e.get("exit_price")), False
++        else:
++            continue
++        side = str(e.get("side") or "").lower()
++        event_ms = _positive_ms(e.get("event_epoch_ms"))
++        if side not in ("long", "short") or qty is None or price is None or event_ms is None:
++            continue
++        fill_side = ("buy" if side == "long" else "sell") if entry else ("sell" if side == "long" else "buy")
++        candidates.append({
++            "event": e, "symbol": norm_symbol(e.get("symbol")), "qty": qty, "price": price,
++            "side": fill_side, "ms": event_ms,
++        })
++    candidates.sort(key=lambda c: c["ms"])
++    matched: dict[int, dict[str, Any]] = {}
++    for c in candidates:
++        best: int | None = None
++        for i, f in enumerate(fills):
++            if i in matched:
++                continue
++            fill_ms = _positive_ms(f.get("time_ms"))
++            if fill_ms is None or not (0 <= c["ms"] - fill_ms <= window_ms):
++                continue
++            if norm_symbol(f.get("symbol")) != c["symbol"] or str(f.get("side") or "").lower() != c["side"]:
++                continue
++            fill_qty, fill_price = _finite_positive(f.get("quantity")), _finite_positive(f.get("price"))
++            if fill_qty is None or fill_price is None:
++                continue
++            if not abs(fill_qty - c["qty"]) <= 1e-9:
++                continue
++            if not abs(fill_price - c["price"]) <= max(1e-9, c["price"] * 1e-9):
++                continue
++            if best is None or fill_ms < (_positive_ms(fills[best].get("time_ms")) or fill_ms):
++                best = i
++        if best is not None:
++            e = c["event"]
++            matched[best] = {"event_type": e.get("event_type"), "trade_id": e.get("trade_id"),
++                             "event_id": e.get("event_id")}
++    return matched
++
++
+ def _paper_only_trade_ids(
+     all_events: list[dict[str, Any]], *, is_paper: Callable[[dict[str, Any]], bool]
+ ) -> set[str]:
+@@ -337,7 +466,7 @@ def _ledger_positions(
+             pos[sym] = pos.get(sym, 0.0) - to_float(e.get("exit_volume") or e.get("entry_volume"))
+         elif et in CLOSE_MARKERS:
+             pos[sym] = 0.0
+-    return {s: q for s, q in pos.items() if abs(q) > 1e-9}
++    return {s: q for s, q in pos.items() if not abs(q) <= 1e-9}  # NaN is kept: it must not read as flat
+ 
+ 
+ def exchange_ledger_compare(
+@@ -392,16 +521,28 @@ def exchange_ledger_compare(
+     for sym in sorted(set(ledger_pos) | set(ex_pos)):
+         lq = ledger_pos.get(sym, 0.0)
+         eq = ex_pos.get(sym, 0.0)
+-        if abs(lq - eq) > 1e-6:
++        if not abs(lq - eq) <= 1e-6:  # NaN on either side is a mismatch
+             position_diffs.append({"symbol": sym, "ledger_qty": lq, "exchange_qty": eq})
+ 
++    # A fill whose time cannot be read is kept (never silently dropped): the
++    # grace window only skips fills that are *known* to be too recent to be
++    # recorded yet.  (NaN / +inf used to fall out of the old raw comparison.)
++    not_by_order_id = [
++        f for f in exchange_state.get("fills") or []
++        if str(f.get("order_id")) not in recorded_ids
++        and (_positive_ms(f.get("time_ms")) is None or _positive_ms(f.get("time_ms")) < fa_ms - _FILL_GRACE_MS)
++    ]
++    explained = match_fills_to_adopted_events(not_by_order_id, ledger_events, norm_symbol=norm_symbol)
+     unmatched_exchange_fills = [
+         {"order_id": f.get("order_id"), "trade_id": f.get("trade_id"), "symbol": f.get("symbol"),
+          "time_ms": f.get("time_ms"), "quantity": f.get("quantity"), "price": f.get("price"),
+          "side": f.get("side")}
+-        for f in exchange_state.get("fills") or []
+-        if str(f.get("order_id")) not in recorded_ids
+-        and (f.get("time_ms") or 0) < fa_ms - _FILL_GRACE_MS
++        for i, f in enumerate(not_by_order_id) if i not in explained
++    ]
++    fills_matched_to_adopted_events = [
++        {"order_id": not_by_order_id[i].get("order_id"), "trade_id": not_by_order_id[i].get("trade_id"),
++         "ledger_trade_id": info.get("trade_id"), "ledger_event_type": info.get("event_type")}
++        for i, info in sorted(explained.items())
+     ]
+ 
+     events_after = sum(1 for e in real if (e.get("event_epoch_ms") or 0) > fa_ms)
+@@ -416,6 +557,8 @@ def exchange_ledger_compare(
+         "unmatched_exchange_fills": unmatched_exchange_fills,
+         "ledger_events_after_snapshot": events_after,
+     }
++    if fills_matched_to_adopted_events:
++        evidence["fills_matched_to_adopted_events"] = fills_matched_to_adopted_events
+     if include_pending_markers:
+         evidence["pending_reconciliations"] = pending_recs
+     if exchange_state.get("symbols_queried") is not None:
+diff --git a/tests/test_ledger_reconcile.py b/tests/test_ledger_reconcile.py
+index 55b178d..d87a1ac 100644
+--- a/tests/test_ledger_reconcile.py
++++ b/tests/test_ledger_reconcile.py
+@@ -588,3 +588,279 @@ def test_an_empty_or_missing_list_leaves_the_document_exactly_as_before():
+     assert json.dumps(without, sort_keys=True) == json.dumps(empty, sort_keys=True)
+     assert sorted(without) == ["checked_at", "discrepancies", "last_reconciled_at", "note", "scope", "sheet_name", "summary", "value"]
+     assert sorted(without["summary"]) == ["actionable", "by_kind", "discrepancies", "local_trades", "sheet_rows"]
++
++
++# --------------------------------------------------------------------------- #
++# adopted positions / reconciled native-stop closes carry no order_id
++# (2026-10-03 trend-strategy demo incident: two real fills stayed DIVERGED)
++# --------------------------------------------------------------------------- #
++_ADOPT_T0 = FETCHED_MS - 3_600_000  # an hour before the snapshot
++
++
++def _seykota_style_paper(e):
++    """Mirrors the trend strategy: a LIVE/DEMO close with a real exit price is real."""
++    if str(e.get("source") or "") in {"dry_run", "dry_run_signal", "dry_run_simulated"}:
++        return True
++    if e.get("event_type") in ("trade_open", "trade_close") and e.get("order_id") is None:
++        return not (e.get("event_type") == "trade_close"
++                    and str(e.get("execution_mode") or "").upper() in ("LIVE", "DEMO")
++                    and to_float(e.get("exit_price")) > 0)
++    return False
++
++
++def _adopt_state(fills):
++    return {"schema_version": RECONCILE_SOURCE_SCHEMA, "fetched_at": FETCHED_AT,
++            "fetch_status": {"complete": True, "errors": []}, "positions": [], "fills": fills}
++
++
++def _adopt_fill(order_id, side, price, qty, ms):
++    return {"order_id": order_id, "trade_id": order_id + 1, "symbol": "BTCUSDT", "side": side,
++            "price": price, "quantity": qty, "time_ms": ms}
++
++
++def _recovered(price=84593.6, qty=0.002, ms=None, **over):
++    event = {"event_type": "position_recovered", "symbol": "BTCUSDT", "side": "long", "volume": qty,
++             "entry_price": price, "order_id": None, "execution_mode": "DEMO",
++             "source": "exchange_position_sync", "trade_id": "BTCUSDT-adopted-1", "event_id": "r1",
++             "event_epoch_ms": ms if ms is not None else _ADOPT_T0 + 17_000}
++    event.update(over)
++    return event
++
++
++def _native_close(price=84586.0, qty=0.002, ms=None, **over):
++    event = {"event_type": "trade_close", "symbol": "BTCUSDT", "side": "long", "exit_volume": qty,
++             "exit_price": price, "order_id": None, "execution_mode": "DEMO",
++             "source": "native_stop_reconciled", "trade_id": "BTCUSDT-adopted-1", "event_id": "c1",
++             "event_epoch_ms": ms if ms is not None else _ADOPT_T0 + 133_000}
++    event.update(over)
++    return event
++
++
++def _adopt_compare(fills, events):
++    return exchange_ledger_compare(
++        _adopt_state(fills), events, is_paper=_seykota_style_paper, norm_symbol=norm_symbol_plain,
++        open_event_types=frozenset({"trade_open", "position_recovered"}), include_pending_markers=False,
++        now=NOW,
++    )
++
++
++def _incident_fills():
++    return [_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0),
++            _adopt_fill(1002, "sell", 84586.0, 0.002, _ADOPT_T0 + 104_000)]
++
++
++def test_fills_behind_an_adopted_position_and_its_native_close_are_accounted_for():
++    verdict = _adopt_compare(_incident_fills(), [_recovered(), _native_close()])
++    assert verdict["value"] == "RECONCILED"
++    assert verdict["evidence"]["unmatched_exchange_fills"] == []
++    matched = verdict["evidence"]["fills_matched_to_adopted_events"]
++    assert [m["order_id"] for m in matched] == [1001, 1002]
++    assert {m["ledger_trade_id"] for m in matched} == {"BTCUSDT-adopted-1"}
++
++
++def test_without_the_ledger_rows_the_same_fills_still_diverge():
++    verdict = _adopt_compare(_incident_fills(), [_recovered(order_id=None, event_type="trade_open",
++                                                            source="dry_run_signal")])
++    # a dry-run row is not real, so there is no real ledger at all
++    assert verdict["value"] == "UNKNOWN"
++    verdict = _adopt_compare(_incident_fills(), [_recovered(ms=_ADOPT_T0 + 17_000, event_type="trade_open",
++                                                            order_id=7)])
++    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001, 1002]
++
++
++def test_a_duplicated_send_is_not_hidden_by_one_adopted_event():
++    fills = [_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0),
++             _adopt_fill(1003, "buy", 84593.6, 0.002, _ADOPT_T0 + 1_000)]  # same price and size, second order
++    verdict = _adopt_compare(fills, [_recovered()])
++    unmatched = verdict["evidence"]["unmatched_exchange_fills"]
++    assert [f["order_id"] for f in unmatched] == [1003]  # only one fill is explained by the one event
++    assert verdict["value"] == "DIVERGED"
++
++
++@pytest.mark.parametrize("fill_over", [
++    {"price": 84593.7},                      # price differs
++    {"quantity": 0.003},                     # size differs
++    {"side": "sell"},                        # wrong side for the entry of a long
++    {"symbol": "ETHUSDT"},                   # other symbol
++    {"time_ms": _ADOPT_T0 + 1_000_000},      # fill happened after the ledger row
++    {"time_ms": _ADOPT_T0 - 13 * 3_600_000},  # fill far too long before the ledger row
++])
++def test_a_fill_that_does_not_line_up_exactly_stays_unmatched(fill_over):
++    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), **fill_over}
++    verdict = _adopt_compare([fill], [_recovered()])
++    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
++
++
++@pytest.mark.parametrize("event_over", [
++    {"order_id": 555},                       # has an order id: the order-id comparison owns it
++    {"execution_mode": "DRY_RUN"},           # not a real-money or demo row
++    {"source": "dry_run_signal"},
++    {"side": "short"},                       # an entry of a short would be a sell
++])
++def test_ledger_rows_that_are_not_adopted_real_rows_explain_nothing(event_over):
++    fills = [_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)]
++    matched = lr.match_fills_to_adopted_events(fills, [_recovered(**event_over)], norm_symbol=norm_symbol_plain)
++    assert matched == {}
++
++
++def test_the_exit_of_a_short_is_a_buy():
++    fills = [_adopt_fill(2001, "sell", 100.0, 1.0, _ADOPT_T0), _adopt_fill(2002, "buy", 99.0, 1.0, _ADOPT_T0 + 60_000)]
++    events = [_recovered(price=100.0, qty=1.0, side="short"), _native_close(price=99.0, qty=1.0, side="short")]
++    assert sorted(lr.match_fills_to_adopted_events(fills, events, norm_symbol=norm_symbol_plain)) == [0, 1]
++
++
++# --- reviewer finding on #117: a missing/zero/garbled time must fail closed ---
++_BAD_TIMES = [None, 0, "", "abc", -5, float("nan"), float("inf"), float("-inf"), True, False, 0.5, 10 ** 400]
++
++
++@pytest.mark.parametrize("bad", _BAD_TIMES)
++def test_a_ledger_row_without_a_usable_time_explains_nothing(bad):
++    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
++    matched = lr.match_fills_to_adopted_events([fill], [_recovered(event_epoch_ms=bad)], norm_symbol=norm_symbol_plain)
++    assert matched == {}
++
++
++@pytest.mark.parametrize("bad", _BAD_TIMES)
++def test_a_fill_without_a_usable_time_is_never_matched(bad):
++    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), "time_ms": bad}
++    matched = lr.match_fills_to_adopted_events([fill], [_recovered()], norm_symbol=norm_symbol_plain)
++    assert matched == {}
++
++
++def _adopt_state_with_position(fills):
++    """Position already agrees with the ledger (0.002 BTC), so the verdict can
++    only be driven by the fill -- the reviewer's reproduction."""
++    state = _adopt_state(fills)
++    state["positions"] = [{"symbol": "BTCUSDT", "quantity": 0.002}]
++    return state
++
++
++def _compare_with_position(fills, events):
++    return exchange_ledger_compare(
++        _adopt_state_with_position(fills), events, is_paper=_seykota_style_paper, norm_symbol=norm_symbol_plain,
++        open_event_types=frozenset({"trade_open", "position_recovered"}), include_pending_markers=False, now=NOW,
++    )
++
++
++@pytest.mark.parametrize("bad", _BAD_TIMES)
++def test_an_unusable_fill_time_keeps_the_fill_unmatched_end_to_end(bad):
++    """NaN / +inf / bool / 0.5 / overflow on the *fill* must neither match nor
++    silently disappear in the grace filter: the fill stays in unmatched and the
++    verdict is not RECONCILED."""
++    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), "time_ms": bad}
++    verdict = _compare_with_position([fill], [_recovered()])
++    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
++    assert "fills_matched_to_adopted_events" not in verdict["evidence"]
++    assert verdict["value"] == "DIVERGED"
++
++
++@pytest.mark.parametrize("bad", _BAD_TIMES)
++def test_an_unusable_time_on_both_sides_never_lines_up_end_to_end(bad):
++    """The reviewer's reproduction, now for every unusable value: ledger row and
++    fill both carry the same bad time, everything else identical."""
++    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), "time_ms": bad}
++    if bad == "abc":
++        # A garbled *string* on the ledger side already makes the older raw
++        # ``> cutoff`` comparisons raise TypeError; the strategy wrappers turn
++        # that into an UNKNOWN verdict.  That is existing, stricter-than-needed
++        # fail-closed behaviour (the whole comparison aborts), kept on purpose.
++        with pytest.raises(TypeError):
++            _compare_with_position([fill], [_recovered(event_epoch_ms=bad)])
++        return
++    verdict = _compare_with_position([fill], [_recovered(event_epoch_ms=bad)])
++    assert verdict["value"] != "RECONCILED"
++    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
++    assert "fills_matched_to_adopted_events" not in verdict["evidence"]
++
++
++def test_a_numeric_string_time_is_read_as_a_number():
++    from trade_alerts.ledger_reconcile import _positive_ms
++
++    assert _positive_ms("1788263700000") == 1788263700000
++    assert _positive_ms(1788263700000.0) == 1788263700000
++    assert _positive_ms(1) == 1 and _positive_ms(True) is None
++
++
++def test_the_window_edge_is_inclusive_and_one_millisecond_more_is_not():
++    from trade_alerts.ledger_reconcile import ADOPTED_FILL_WINDOW_MS
++
++    event_ms = _ADOPT_T0 + ADOPTED_FILL_WINDOW_MS
++    on_edge = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
++    just_past = _adopt_fill(1002, "buy", 84593.6, 0.002, _ADOPT_T0 - 1)
++    assert lr.match_fills_to_adopted_events([on_edge], [_recovered(ms=event_ms)], norm_symbol=norm_symbol_plain) != {}
++    assert lr.match_fills_to_adopted_events([just_past], [_recovered(ms=event_ms)], norm_symbol=norm_symbol_plain) == {}
++
++
++# --- reviewer finding F3 on #117: NaN price/size must never read as "equal" ---
++class bool_:  # stands in for numpy.bool_ (same type name, no numpy dependency)
++    def __float__(self):
++        return 1.0
++
++
++_BAD_FIGURES = [float("nan"), "nan", float("inf"), float("-inf"), "inf", 0, -1, None, "", True, False,
++                "abc", bool_()]
++
++
++@pytest.mark.parametrize("bad", _BAD_FIGURES)
++@pytest.mark.parametrize("field", ["price", "quantity"])
++def test_a_fill_with_an_unusable_price_or_size_is_never_matched(bad, field):
++    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), field: bad}
++    assert lr.match_fills_to_adopted_events([fill], [_recovered()], norm_symbol=norm_symbol_plain) == {}
++
++
++@pytest.mark.parametrize("bad", _BAD_FIGURES)
++@pytest.mark.parametrize("field", ["volume", "entry_price"])
++def test_a_ledger_row_with_an_unusable_price_or_size_explains_nothing(bad, field):
++    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
++    event = _recovered(**{field: bad})
++    assert lr.match_fills_to_adopted_events([fill], [event], norm_symbol=norm_symbol_plain) == {}
++
++
++@pytest.mark.parametrize("bad", _BAD_FIGURES)
++@pytest.mark.parametrize("field", ["price", "quantity"])
++def test_an_unusable_fill_price_or_size_stays_unmatched_end_to_end(bad, field):
++    """The reviewer's reproduction: valid times, ledger row normal, position already
++    agrees -- only the fill's price or size is NaN / "nan" / inf.  It must not
++    become RECONCILED."""
++    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), field: bad}
++    verdict = _compare_with_position([fill], [_recovered()])
++    assert verdict["value"] == "DIVERGED"
++    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
++    assert "fills_matched_to_adopted_events" not in verdict["evidence"]
++
++
++@pytest.mark.parametrize("bad", _BAD_FIGURES)
++@pytest.mark.parametrize("field", ["volume", "entry_price"])
++def test_an_unusable_ledger_price_or_size_stays_unmatched_end_to_end(bad, field):
++    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
++    verdict = _compare_with_position([fill], [_recovered(**{field: bad})])
++    assert verdict["value"] != "RECONCILED"
++    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
++
++
++@pytest.mark.parametrize("bad", ["nan", float("nan")])
++def test_a_nan_ledger_position_is_a_mismatch_not_flat(bad):
++    """Same family: ``abs(a - b) > tol`` and ``abs(q) > 1e-9`` are both False for NaN, which
++    used to drop a NaN ledger position and read the account as flat/agreeing."""
++    state = _adopt_state([])  # exchange holds nothing
++    verdict = exchange_ledger_compare(
++        state, [_recovered(volume=bad)], is_paper=_seykota_style_paper, norm_symbol=norm_symbol_plain,
++        open_event_types=frozenset({"trade_open", "position_recovered"}), include_pending_markers=False, now=NOW,
++    )
++    assert verdict["value"] == "DIVERGED"
++    assert verdict["evidence"]["position_diffs"]
++
++
++def test_numpy_style_booleans_are_not_times():
++    assert lr._positive_ms(bool_()) is None
++    assert lr._finite_positive(bool_()) is None
++    assert lr._finite_positive("84593.6") == 84593.6
++
++
++def test_the_usual_figures_still_match_with_the_positive_comparisons():
++    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
++    assert lr.match_fills_to_adopted_events([fill], [_recovered()], norm_symbol=norm_symbol_plain) != {}
++    within = {**fill, "price": 84593.6 + 1e-6}  # inside the 1e-9 relative tolerance (~8.5e-5 here)
++    assert lr.match_fills_to_adopted_events([within], [_recovered()], norm_symbol=norm_symbol_plain) != {}
++    other = {**fill, "price": 84593.6 + 1.0}
++    assert lr.match_fills_to_adopted_events([other], [_recovered()], norm_symbol=norm_symbol_plain) == {}
