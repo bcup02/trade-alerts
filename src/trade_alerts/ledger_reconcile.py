@@ -257,6 +257,18 @@ def recorded_order_ids(real_events: list[dict[str, Any]]) -> set[str]:
 ADOPTED_FILL_WINDOW_MS = 12 * 60 * 60 * 1000
 _ADOPTED_REAL_MODES = frozenset({"LIVE", "DEMO"})
 
+#: Fill ``side`` labels that agree with a ledger event, keyed by (position side,
+#: is-entry).  Binance-style fills carry the order side (buy/sell); MEXC futures
+#: fills carry the action *and* direction (open_long, close_long, open_short,
+#: close_short).  A MEXC label is accepted only for exactly its own action, so
+#: ``close_short`` (a buy) never explains the entry of a long.
+_ADOPTED_FILL_SIDES: dict[tuple[str, bool], frozenset[str]] = {
+    ("long", True): frozenset({"buy", "open_long"}),
+    ("long", False): frozenset({"sell", "close_long"}),
+    ("short", True): frozenset({"sell", "open_short"}),
+    ("short", False): frozenset({"buy", "close_short"}),
+}
+
 
 def _is_boolean(value: Any) -> bool:
     """``True``/``False`` and numpy's ``bool_``: neither is ever a time, a price or a size."""
@@ -321,7 +333,7 @@ def match_fills_to_adopted_events(
     stayed ``DIVERGED`` for days although the ledger had both rows).
 
     A fill is explained only when *everything* lines up: same symbol, the side
-    the event implies (entry of a long = buy, close of a long = sell; reversed
+    the event implies (entry of a long = buy or MEXC open_long, close of a long = sell or close_long; reversed
     for a short), the same quantity and price, and the fill happened no later
     than the event and at most ``window_ms`` before it.  Each event explains at
     most one fill, so a duplicated send of the same order still leaves its
@@ -347,10 +359,10 @@ def match_fills_to_adopted_events(
         event_ms = _positive_ms(e.get("event_epoch_ms"))
         if side not in ("long", "short") or qty is None or price is None or event_ms is None:
             continue
-        fill_side = ("buy" if side == "long" else "sell") if entry else ("sell" if side == "long" else "buy")
+        fill_sides = _ADOPTED_FILL_SIDES[(side, entry)]
         candidates.append({
             "event": e, "symbol": norm_symbol(e.get("symbol")), "qty": qty, "price": price,
-            "side": fill_side, "ms": event_ms,
+            "sides": fill_sides, "ms": event_ms,
         })
     candidates.sort(key=lambda c: c["ms"])
     matched: dict[int, dict[str, Any]] = {}
@@ -362,7 +374,7 @@ def match_fills_to_adopted_events(
             fill_ms = _positive_ms(f.get("time_ms"))
             if fill_ms is None or not (0 <= c["ms"] - fill_ms <= window_ms):
                 continue
-            if norm_symbol(f.get("symbol")) != c["symbol"] or str(f.get("side") or "").lower() != c["side"]:
+            if norm_symbol(f.get("symbol")) != c["symbol"] or str(f.get("side") or "").lower() not in c["sides"]:
                 continue
             fill_qty, fill_price = _finite_positive(f.get("quantity")), _finite_positive(f.get("price"))
             if fill_qty is None or fill_price is None:

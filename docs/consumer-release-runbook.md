@@ -848,3 +848,15 @@ trade-alerts：v0.27.1（對帳：共用比對函式只拿濾掉紙上列的帳�
 版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.27.2（對帳：接手成交配對也認 MEXC 期貨的成交方向代碼；程式碼變更）
+變更摘要：1. match_fills_to_adopted_events 原本只認成交方向 buy／sell；動能（MEXC）的成交方向是 open_long／close_long／open_short／close_short，改釘後也配不到（已實測：同樣的接手倉位，open_long 成交 DIVERGED、buy 成交 RECONCILED）。
+          2. 現在每種帳本事件接受的成交方向：多單進場＝buy／open_long、多單平倉＝sell／close_long、空單進場＝sell／open_short、空單平倉＝buy／close_short；MEXC 代碼只認自己那個動作（close_short 雖然也是買，不能解釋多單進場）。
+          3. 其餘配對條件（交易對、數量、價格、時間窗、每列最多一筆、LIVE／DEMO、非乾跑）不變；新增 7 個測試（含錯誤動作代碼不配對、經共用比對端到端 RECONCILED）。
+向後相容：buy／sell 行為不變；只是多接受 MEXC 代碼，不認識的方向值仍然不配對（保守）。
+受影響消費專案：動能（釘此版後生效，next）；趨勢（Binance，用 buy／sell，不受影響）；競賽、加密不適用。
+部署入口：各專案既有部署腳本（開發機 → 正式機）。
+版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
+交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+```
