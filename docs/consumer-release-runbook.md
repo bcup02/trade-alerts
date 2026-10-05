@@ -860,3 +860,15 @@ trade-alerts：v0.27.2（對帳：接手成交配對也認 MEXC 期貨的成交�
 版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.27.3（對帳：同一交易的接手紀錄與開倉紀錄不重複計入帳本部位；程式碼變更）
+變更摘要：1. 動能中斷進場被接手時，帳本會對同一個 trade_id 寫一列 position_recovered 和一列 trade_open（同一次開倉的兩筆紀錄）。把兩者都當開倉時，帳本部位會算成兩倍（動能 #118 審閱 F1，已重現：recovered 3.0＋trade_open 3.0 對交易所 3.0 → 帳本 6.0）。
+          2. _ledger_positions：同一個 trade_id 已有（快照時間點以前的）trade_open 時，不計入該筆 position_recovered；只收合「同 trade_id 的一對」——不同 trade_id、沒有 trade_id 的 recovered 照算，同一交易的多筆 trade_open（加碼）也都照算。快照之後才寫入的 trade_open 不會讓 recovered 消失。
+          3. 新增 7 個測試（含拿掉修正會失敗的雙紀錄仍持倉／平倉後、加碼不被收合、沒有 trade_id 不假設重複、真缺倉仍 DIVERGED、快照夾在兩次寫入之間）。
+向後相容：只開 trade_open（open_event_types 預設）的呼叫端完全不變；只有 position_recovered 單獨出現的交易不變；趨勢（中斷進場只寫 trade_open）、加密不受影響。
+受影響消費專案：動能（#118 改釘此版後才開始把 position_recovered 算開倉）。
+部署入口：各專案既有部署腳本（開發機 → 正式機）。
+版本驗證／服務驗證／部署時間：待各消費專案釘版部署後補記。
+交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+```

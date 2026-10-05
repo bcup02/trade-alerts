@@ -930,3 +930,72 @@ def test_mexc_label_works_end_to_end_through_the_shared_compare():
     verdict = _adopt_compare(fills, [_recovered(), _native_close()])
     assert verdict["value"] == "RECONCILED"
     assert [m["order_id"] for m in verdict["evidence"]["fills_matched_to_adopted_events"]] == [1001, 1002]
+
+
+# --- F1 on momentum #118: an adopted interrupted entry is TWO records of ONE opening ---
+def _both_types_compare(positions, events):
+    state = {**_adopt_state([]), "positions": positions}
+    return exchange_ledger_compare(
+        state, events, is_paper=_seykota_style_paper, norm_symbol=norm_symbol_plain,
+        open_event_types=frozenset({"trade_open", "position_recovered"}), include_pending_markers=False, now=NOW,
+    )
+
+
+def _held_btc(qty):
+    return {"symbol": "BTCUSDT", "side": "long", "quantity": qty}
+
+
+def _trade_open_row(trade_id="BTCUSDT-adopted-1", qty=0.002, ms=None, **over):
+    event = {"event_type": "trade_open", "symbol": "BTCUSDT", "side": "long", "volume": qty,
+             "price": 84593.6, "order_id": "7001", "execution_mode": "DEMO", "source": "exchange_fill",
+             "trade_id": trade_id, "event_id": "o1", "recovered_from_attempt_event_id": "a1",
+             "event_epoch_ms": ms if ms is not None else _ADOPT_T0 + 18_000}
+    event.update(over)
+    return event
+
+
+def test_recovered_plus_trade_open_of_one_trade_counts_once_while_open():
+    events = [_recovered(order_id="7001"), _trade_open_row()]
+    verdict = _both_types_compare([_held_btc(0.002)], events)
+    assert verdict["evidence"]["position_diffs"] == []
+
+
+def test_recovered_plus_trade_open_of_one_trade_counts_once_after_the_close():
+    close = _native_close(order_id="7002")
+    events = [_recovered(order_id="7001"), _trade_open_row(), close]
+    verdict = _both_types_compare([], events)
+    assert verdict["evidence"]["position_diffs"] == []
+
+
+def test_two_separate_trade_opens_still_both_count():
+    """Adds are not duplicates: only a recovered row that shares a trade_id with a trade_open is collapsed."""
+    events = [_trade_open_row(trade_id="t1", qty=0.002, event_id="o1", order_id="7001"),
+              _trade_open_row(trade_id="t1", qty=0.003, event_id="o2", order_id="7002", ms=_ADOPT_T0 + 30_000)]
+    verdict = _both_types_compare([_held_btc(0.005)], events)
+    assert verdict["evidence"]["position_diffs"] == []
+
+
+def test_a_recovered_row_of_another_trade_still_counts():
+    events = [_recovered(order_id="7001", trade_id="adopt-A"), _trade_open_row(trade_id="own-B", qty=0.003)]
+    verdict = _both_types_compare([_held_btc(0.005)], events)
+    assert verdict["evidence"]["position_diffs"] == []
+
+
+def test_a_recovered_row_without_a_trade_id_is_never_assumed_to_be_a_duplicate():
+    events = [_recovered(order_id="7001", trade_id=None), _trade_open_row(trade_id="own-B", qty=0.002)]
+    verdict = _both_types_compare([_held_btc(0.002)], events)
+    assert [(d["ledger_qty"], d["exchange_qty"]) for d in verdict["evidence"]["position_diffs"]] == [(0.004, 0.002)]
+
+
+def test_the_collapse_does_not_hide_a_real_missing_position():
+    events = [_recovered(order_id="7001"), _trade_open_row()]
+    verdict = _both_types_compare([], events)
+    assert [(d["ledger_qty"], d["exchange_qty"]) for d in verdict["evidence"]["position_diffs"]] == [(0.002, 0.0)]
+    assert verdict["value"] == "DIVERGED"
+
+
+def test_a_trade_open_newer_than_the_snapshot_does_not_erase_the_recovered_row():
+    """The snapshot sits between the two writes: only what is at or before the snapshot counts."""
+    events = [_recovered(order_id="7001"), _trade_open_row(ms=FETCHED_MS + 60_000)]
+    verdict = _both_types_compare([_held_btc(0.002)], events)
+    assert verdict["evidence"]["position_diffs"] == []

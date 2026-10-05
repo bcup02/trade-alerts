@@ -257,6 +257,9 @@ def recorded_order_ids(real_events: list[dict[str, Any]]) -> set[str]:
 ADOPTED_FILL_WINDOW_MS = 12 * 60 * 60 * 1000
 _ADOPTED_REAL_MODES = frozenset({"LIVE", "DEMO"})
 
+#: The ledger event that records an adopted position (an exchange position the strategy took over).
+_ADOPTION_OPEN_TYPE = "position_recovered"
+
 #: Fill ``side`` labels that agree with a ledger event, keyed by (position side,
 #: is-entry).  Binance-style fills carry the order side (buy/sell); MEXC futures
 #: fills carry the action *and* direction (open_long, close_long, open_short,
@@ -464,6 +467,19 @@ def _ledger_positions(
     exchange snapshot time) are counted -- a close recorded *after* the snapshot
     cannot be expected to show in it yet, so it is left for the PENDING path
     rather than read as a divergence."""
+    # An interrupted entry the strategy adopted is written as a ``position_recovered``
+    # *and* a ``trade_open`` under the same ``trade_id`` -- two records of ONE opening.
+    # Count the ``trade_open`` (the entry fact) and skip the adoption record of such a
+    # trade, or the ledger reads double (reviewer finding F1 on momentum #118).  Only a
+    # proven same-``trade_id`` pair is collapsed: separate ``trade_open`` rows (adds) all
+    # count, and a recovered row with no ``trade_id`` is never assumed to be a duplicate.
+    opened_by_trade_open: set[str] = set()
+    if _ADOPTION_OPEN_TYPE in open_event_types:
+        for e in real_events:
+            tid = e.get("trade_id")
+            if (e.get("event_epoch_ms") or 0) <= cutoff_ms and isinstance(tid, str) and tid \
+                    and e.get("event_type") in open_event_types and e.get("event_type") != _ADOPTION_OPEN_TYPE:
+                opened_by_trade_open.add(tid)
     pos: dict[str, float] = {}
     for e in real_events:
         if (e.get("event_epoch_ms") or 0) > cutoff_ms:
@@ -472,6 +488,8 @@ def _ledger_positions(
         if not sym:
             continue
         et = e.get("event_type")
+        if et == _ADOPTION_OPEN_TYPE and et in open_event_types and e.get("trade_id") in opened_by_trade_open:
+            continue
         if et in open_event_types:
             pos[sym] = pos.get(sym, 0.0) + to_float(e.get("volume"))
         elif et == "trade_close":
