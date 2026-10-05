@@ -2432,7 +2432,7 @@
        "aspect": null,
        "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
        "state": "pending",
-       "text": "加密策略同樣會寫沒有訂單編號的接手紀錄（mexc_futures_bot.py 兩處 position_recovered，entry_order_id 為 None），對帳卻是舊版共用庫 v0.15.0，沒有這個配對；換 Binance 時（x3）一併升級共用庫後具備。"
+       "text": "加密策略同樣會寫沒有訂單編號的接手紀錄（development 7a59081 的 mexc_futures_bot.py 兩處 position_recovered，entry_order_id 為 None；operations 分支沒有另外查），對帳卻是舊版共用庫 v0.15.0，沒有這個配對。目標：換 Binance 時（x3）升級共用庫並接上，升級後仍要整合與端到端驗證，配對才算具備。"
       }
      ]
     },
@@ -2443,7 +2443,7 @@
        "aspect": null,
        "phase": null,
        "state": "n/a",
-       "text": "競賽策略是現貨再平衡，原始碼裡搜尋不到接手交易所持倉的寫法（adopt、position_recovered 都沒有），帳本的成交列都是自己下單的紀錄，沒有這種對不上的情況。"
+       "text": "競賽策略是現貨再平衡；2026-10-05 對 btc-bull-market-competition development ac99132 的 src 目錄做關鍵字搜尋（adopt、position_recovered），沒有找到接手交易所持倉的寫法，所以目前列為不適用。尚未逐行盤點全部帳本寫入路徑；之後若新增接手持倉的寫法要重審這一格。"
       }
      ]
     }
