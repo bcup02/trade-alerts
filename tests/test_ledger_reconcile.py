@@ -1048,3 +1048,30 @@ def test_pairs_are_one_to_one():
     assert verdict["evidence"]["position_diffs"] == []
     verdict = _both_types_compare([_held_btc(0.002)], events)
     assert [(d["ledger_qty"], d["exchange_qty"]) for d in verdict["evidence"]["position_diffs"]] == [(0.004, 0.002)]
+
+
+# --- F3 on #123: a link only counts when no identifier both rows carry disagrees ---
+def test_same_attempt_but_different_orders_is_not_collapsed():
+    events = [_recovered(order_id="7001", recovered_from_attempt_event_id="a1"),
+              _trade_open_row(order_id="7002", recovered_from_attempt_event_id="a1")]
+    verdict = _both_types_compare([_held_btc(0.002)], events)
+    assert [(d["ledger_qty"], d["exchange_qty"]) for d in verdict["evidence"]["position_diffs"]] == [(0.004, 0.002)]
+    assert verdict["value"] == "DIVERGED"
+
+
+def test_same_order_but_different_attempts_is_not_collapsed():
+    events = [_recovered(order_id="7001", recovered_from_attempt_event_id="a1"),
+              _trade_open_row(order_id="7001", recovered_from_attempt_event_id="a2")]
+    verdict = _both_types_compare([_held_btc(0.002)], events)
+    assert [(d["ledger_qty"], d["exchange_qty"]) for d in verdict["evidence"]["position_diffs"]] == [(0.004, 0.002)]
+
+
+@pytest.mark.parametrize("rec_over, open_over", [
+    ({"order_id": None, "recovered_from_attempt_event_id": "a1"}, {"order_id": "7001", "recovered_from_attempt_event_id": "a1"}),
+    ({"order_id": "7001", "recovered_from_attempt_event_id": None}, {"order_id": "7001", "recovered_from_attempt_event_id": "a1"}),
+    ({"order_id": "7001", "recovered_from_attempt_event_id": "a1"}, {"order_id": "7001", "recovered_from_attempt_event_id": None}),
+])
+def test_a_missing_identifier_is_not_a_contradiction(rec_over, open_over):
+    events = [_recovered(**rec_over), _trade_open_row(**open_over)]
+    verdict = _both_types_compare([_held_btc(0.002)], events)
+    assert verdict["evidence"]["position_diffs"] == []

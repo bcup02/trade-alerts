@@ -481,8 +481,9 @@ def _adoption_twin_positions(
     a ``trade_open`` for one opening; counting both reads the position double (reviewer
     finding F1 on momentum #118).  A recovered row is collapsed into a ``trade_open``
     only when the pair is PROVABLY the same opening -- the same ``trade_id``, the same
-    symbol, the same size, and a shared link: the same ``recovered_from_attempt_event_id``
-    or the same ``order_id`` (both non-empty).  Same ``trade_id`` alone is not enough: an
+    symbol, the same size, a shared link (the same ``recovered_from_attempt_event_id`` or the
+    same ``order_id``, both non-empty) and NO contradiction: an identifier that both rows
+    carry must agree (finding F3: same attempt but different orders are two orders).  Same ``trade_id`` alone is not enough: an
     add to an adopted trade shares it (finding F1 on #123).  Pairs are one-to-one, only
     rows at or before the snapshot are considered, and anything that cannot be proved
     stays counted (it can only read as a divergence, never hide one)."""
@@ -512,7 +513,10 @@ def _adoption_twin_positions(
             if o_vol is None or not abs(o_vol - r_vol) <= 1e-9:
                 continue
             o_attempt, o_order = _id_text(o.get("recovered_from_attempt_event_id")), _id_text(o.get("order_id"))
-            if (r_attempt is not None and r_attempt == o_attempt) or (r_order is not None and r_order == o_order):
+            pairs = ((r_attempt, o_attempt), (r_order, o_order))
+            if any(a is not None and b is not None and a != b for a, b in pairs):
+                continue  # an identifier both rows carry disagrees: two different entries (finding F3)
+            if any(a is not None and a == b for a, b in pairs):
                 used.add(j)
                 skip.add(i)
                 break

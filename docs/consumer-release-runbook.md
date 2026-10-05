@@ -866,7 +866,7 @@ trade-alerts：v0.27.3（對帳：同一次開倉的接手紀錄與開倉紀錄�
 變更摘要：1. 動能中斷進場被接手時，帳本會對同一個 trade_id 寫一列 position_recovered 和一列 trade_open（同一次開倉的兩筆紀錄，兩列帶相同的 recovered_from_attempt_event_id 與 order_id）。把兩者都當開倉時帳本部位會算成兩倍（動能 #118 審閱 F1，已重現：recovered 3.0＋trade_open 3.0 對交易所 3.0 → 帳本 6.0）。
           2. 新增 _adoption_twin_positions：一列 position_recovered 只有在「同 trade_id、同交易對、數量相同（容忍 1e-9）、且有共同連結（兩列都非空的 recovered_from_attempt_event_id 相同，或 order_id 相同）」的 trade_open 存在時，才被視為同一次開倉的第二筆紀錄而不計入；一對一、只看快照時間點以前的列。審閱第二輪 F1：只憑同 trade_id 會把接手後同交易的真正加碼吞掉，所以 trade_id 只當候選條件。
           3. 證明不了的一律照算（只會讀成差異，不會藏住差異）；trade_id 不是非空字串或整數（None、list、dict、浮點、bool）一律不參與收合，也不會丟例外（審閱第二輪 F2）。
-          4. 新增 18 個測試（含接手後加碼不被吞、list／dict／bool／浮點 trade_id、只靠 attempt id 連結、無連結不收合、數量不同不收合、一對一、雙紀錄仍持倉與平倉後、真缺倉仍 DIVERGED、快照夾在兩次寫入之間）。
+          4. 新增 23 個測試（含接手後加碼不被吞、list／dict／bool／浮點 trade_id、只靠 attempt id 連結、無連結不收合、數量不同不收合、一對一、雙紀錄仍持倉與平倉後、真缺倉仍 DIVERGED、快照夾在兩次寫入之間、attempt 相同 order 不同／order 相同 attempt 不同不收合、缺一個識別值不算矛盾）。
 向後相容：open_event_types 不含 position_recovered（預設）的呼叫端完全不變；只有 position_recovered 單獨出現的交易不變；趨勢（中斷進場只寫 trade_open）、加密不受影響（本版只核函式契約）。
 受影響消費專案：動能（#118 改釘此版後才開始把 position_recovered 算開倉）。
 部署入口：各專案既有部署腳本（開發機 → 正式機）。
