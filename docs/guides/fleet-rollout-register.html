@@ -3324,7 +3324,7 @@
     }
    ],
    "sub": "ERR-025 · BTC.RUNTIME_CYCLE_FAILED",
-   "title": "R2｜runner 未分類例外：當天自動重試（15 分鐘一次、共 3 次），都失敗才通知"
+   "title": "R2｜runner 未分類例外：還沒送單的失敗當天自動重試（15 分鐘一次、最多 3 次）；用盡、無法安全重試、或已嘗試送單才通知"
   },
   {
    "added_recent": false,
@@ -4909,7 +4909,7 @@
    "anchor": "rule-BTC.RUNTIME_CYCLE_FAILED",
    "note": "由 R0 改 R2：還沒送單的失敗當天自動重試（15 分鐘一次、共 3 次），第 3 次失敗或送單之後才失敗才通知；程式在開發機，A1 未部署（行為改回待辦）。",
    "project": "競賽策略",
-   "title": "R2｜runner 未分類例外：當天自動重試（15 分鐘一次、共 3 次），都失敗才通知"
+   "title": "R2｜runner 未分類例外：還沒送單的失敗當天自動重試（15 分鐘一次、最多 3 次）；用盡、無法安全重試、或已嘗試送單才通知"
   },
   {
    "anchor": "rule-FLEET.OPS_LEDGER_DIVERGED",
