@@ -147,7 +147,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:495 _clear_automatic_safe_halt 確認已平倉後自動解除",
+    "evidence": "src/seykota_bot/bot.py:506 _clear_automatic_safe_halt 確認已平倉後自動解除",
     "state": "done"
    },
    "bot": "seykota",
@@ -172,7 +172,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次「停損掛單失敗、緊急市價平倉也失敗」的根本原因：讀 src/seykota_bot/bot.py 開倉後掛保護單與緊急平倉的流程，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是下單規則、API 權限、餘額還是網路問題，說明交易所上現在的部位狀態該怎麼確認，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:886 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
+    "evidence": "src/seykota_bot/bot.py:897 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
     "state": "done"
    },
    "bot": "seykota",
@@ -234,7 +234,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損時取消舊停損單一直失敗的原因：讀 src/seykota_bot/bot.py 的 _resolve_stop_cancel 與 _replace_protective_stop，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是網路、交易所故障、限流還是 API 權限問題，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:976 移動停損先以 :898 _resolve_stop_cancel（60 秒上限）取消舊停損；確定舊單仍在（open）時 :984 保留舊停損、記 PROTECTIVE_STOP_MOVE_DEFERRED、這輪不移動，之後由 :1061 _retry_deferred_stop_move 每 10 分鐘（:91 _STOP_MOVE_RETRY_INTERVAL_SECONDS）自動重試（f-14，PR #81）；結果不明才 :991 PROTECTION_REPLACE_FAILED。PR #74（h11），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）；f-14 隨 2026-10-04 台北 17:18–17:22 的 A1 正式機（新）部署上線（operations ed50b1d）。",
+    "evidence": "src/seykota_bot/bot.py:987 移動停損先以 :909 _resolve_stop_cancel（60 秒上限）取消舊停損；確定舊單仍在（open）時 :995 保留舊停損、記 PROTECTIVE_STOP_MOVE_DEFERRED、這輪不移動，之後由 :1072 _retry_deferred_stop_move 每 10 分鐘（:91 _STOP_MOVE_RETRY_INTERVAL_SECONDS）自動重試（f-14，PR #81）；結果不明才 :1002 PROTECTION_REPLACE_FAILED。PR #74（h11），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）；f-14 隨 2026-10-04 台北 17:18–17:22 的 A1 正式機（新）部署上線（operations ed50b1d）。",
     "state": "done"
    },
    "bot": "seykota",
@@ -242,7 +242,7 @@
    "code": "SEY.PROTECTION_MOVE_DEFERRED",
    "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，每 10 分鐘自動再試。連續第 3 次都取消不掉時會通知你一次（約 20～30 分鐘後），之後繼續重試但不再重發。",
    "emits_event": {
-    "evidence": "src/seykota_bot/bot.py:1029 _note_stop_move_failure 每次失敗寫一筆 PROTECTION_MOVE_DEFERRED 事件（:1050），連續第 3 次（:92 _STOP_MOVE_ESCALATE_AFTER）以 R3 升格並附 notice_text、只升格一次（失敗次數存在 pending_operations，重啟後照算）；PR #81（f-14，審閱 PASS）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d，/opt 檔案與該 commit 逐檔雜湊相同）。限制：正式機沒有發生過舊停損取消不掉的情形，升格路徑只在開發機與測試驗證。",
+    "evidence": "src/seykota_bot/bot.py:1040 _note_stop_move_failure 每次失敗寫一筆 PROTECTION_MOVE_DEFERRED 事件（:1061），連續第 3 次（:92 _STOP_MOVE_ESCALATE_AFTER）以 R3 升格並附 notice_text、只升格一次（失敗次數存在 pending_operations，重啟後照算）；PR #81（f-14，審閱 PASS）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d，/opt 檔案與該 commit 逐檔雜湊相同）。限制：正式機沒有發生過舊停損取消不掉的情形，升格路徑只在開發機與測試驗證。",
     "state": "done"
    },
    "error_id": "ERR-004",
@@ -291,7 +291,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼系統無法唯一確認這個倉位的原生保護單：讀 src/seykota_bot/bot.py 的保護單核對邏輯（_verified_exchange_protective_stop 一帶），對照交易所目前的委託清單，判斷是保護單不存在、有多張、還是欄位對不上，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:1436 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
+    "evidence": "src/seykota_bot/bot.py:1447 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）",
     "state": "done"
    },
    "bot": "seykota",
@@ -321,7 +321,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼策略對自己的部位失去把握。先看暫停證據（seykota-resume preview）：若有 client_order_id／submitted_at，代表市價單送出後 60 秒在交易所查不到——讀 src/seykota_bot/bot.py 的 _resolve_market_order，用這個 client id 向交易所查單（GET /fapi/v1/order 帶 origClientOrderId）確認它到底有沒有成交、成交幾張，對照帳本與實際部位；否則是交易所回報的部位無法唯一辨識——讀 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了。兩種情況都要提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:1684 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :811 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）",
+    "evidence": "src/seykota_bot/bot.py:1695 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :822 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）",
     "state": "done"
    },
    "bot": "seykota",
@@ -352,7 +352,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）",
+    "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）；計數只算非暫時性失敗（解析失敗、非預期結構）：HTTP 5xx／408 與後端碼 -1000／-1001／-1006／-1007 的讀取逾時不前進也不重置連續失敗計數、下一輪重試（src/seykota_bot/bot.py:1599 _is_transient_network_error，#89）",
     "state": "done"
    },
    "bot": "seykota",
@@ -444,7 +444,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這個未分類的執行期例外：從 seykota-bot 的 journal 找出連續失敗的例外訊息與堆疊，定位 src/seykota_bot/ 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）",
+    "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）；未分類的例外才計數：K 線抓取遇暫時性網路錯誤時直接重試、不計入（src/seykota_bot/bot.py:2282，#89）",
     "state": "done"
    },
    "bot": "seykota",
@@ -473,7 +473,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:1872 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）",
+    "evidence": "src/seykota_bot/bot.py:1883 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）",
     "state": "done"
    },
    "bot": "seykota",
@@ -498,7 +498,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:1964 只記錄出場（Phase 3）",
+    "evidence": "src/seykota_bot/bot.py:1975 只記錄出場（Phase 3）",
     "state": "done"
    },
    "bot": "seykota",
@@ -523,7 +523,7 @@
   {
    "ai_prompt": null,
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:2044 資金不足跳過進場、只記錄（Phase 3）",
+    "evidence": "src/seykota_bot/bot.py:2055 資金不足跳過進場、只記錄（Phase 3）",
     "state": "done"
    },
    "bot": "seykota",
