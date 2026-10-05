@@ -30,7 +30,8 @@
     "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
     "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
     "f-16": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
-    "x3-crypto-binance": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備"
+    "x3-crypto-binance": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+    "t9-competition-retry": "t9：競賽策略失敗時當天重試（15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.5 錯誤清單已改，競賽已上開發機，等部署 A1 正式機（新）"
   },
   "sources": {
     "momentum": {
@@ -1047,15 +1048,16 @@
       "code": "BTC.RUNTIME_CYCLE_FAILED",
       "behaviour": {
         "btc-competition": {
-          "state": "done",
-          "evidence": "src/btc_competition/runner.py 寫錯誤心跳、隔天重試（Phase 3）"
+          "state": "pending",
+          "phase": "t9-competition-retry",
+          "reason": "2026-10-05 使用者決定（t9）：還沒送單的失敗當天自動重試（systemd 15 分鐘一次、共 3 次，次數記在狀態檔），第 3 次失敗或送單之後才失敗才升格通知。程式與服務設定已在競賽開發主幹並上開發機，A1 正式機（新）還沒部署，上線後改已做；正式機現在仍是「寫錯誤心跳、隔天重試」。"
         }
       },
       "emits_event": {
         "btc-competition": {
           "state": "pending",
           "phase": "8-btc-competition",
-          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。 升格事件（R2、escalated）隨 t9 一起部署。"
         }
       }
     },
@@ -1751,25 +1753,17 @@
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "reconcile.adopted_fills",
-      "project": "seykota",
-      "type": "completed",
-      "note": "趨勢策略的接手成交對帳配對已在 A1 正式機（新）上線（5958bbf），登記冊改已做。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.adopted_fills",
-      "project": "momentum",
-      "type": "completed",
-      "note": "動能策略的接手倉位算開倉與成交配對已在 A1 正式機（新）上線（97f5ebb、共用庫 v0.27.3），登記冊改已做。"
+      "kind": "rule",
+      "id": "BTC.RUNTIME_CYCLE_FAILED",
+      "project": "btc-competition",
+      "type": "updated",
+      "note": "由 R0 改 R2：還沒送單的失敗當天自動重試（15 分鐘一次、共 3 次），第 3 次失敗或送單之後才失敗才通知；程式在開發機，A1 未部署（行為改回待辦）。"
     },
     {
       "kind": "rule",
-      "id": "SEY.RECONCILE_FAILED",
-      "project": "seykota",
+      "id": "FLEET.OPS_LEDGER_DIVERGED",
       "type": "updated",
-      "note": "說明補上：後端逾時（HTTP 408、-1000／-1001／-1006／-1007）算暫時性的修正已在 2026-10-05 台北 13:43（A1 時間 JST 14:43） 部署 A1 正式機（新）。"
+      "note": "說明補上：對帳狀態 UNKNOWN 要連續 3 次對帳刷新才通知（維運通知 t8）。"
     }
   ]
 }
