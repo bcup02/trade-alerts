@@ -832,13 +832,15 @@ def _value_mismatch(close_event: dict[str, Any], values: list[Any], *,
     s_exit = to_number(sheet_cell(values, "exit_price"))
     if l_exit is not None and s_exit is not None:
         denom = abs(l_exit) or 1.0
-        if abs(l_exit - s_exit) / denom > price_tol_pct:
+        # Written as a positive test: ``x > tol`` is False for NaN, so a ``"nan"`` cell
+        # (or an infinite one) used to read as "the same" (reviewer note on #117).
+        if not abs(l_exit - s_exit) / denom <= price_tol_pct:
             diffs["exit_price"] = {"ledger": l_exit, "sheet": s_exit}
 
     for field in ("net_pnl", "gross_pnl"):
         lv = to_number(close_event.get(field))
         sv = to_number(sheet_cell(values, field))
-        if lv is not None and sv is not None and abs(lv - sv) > pnl_tol:
+        if lv is not None and sv is not None and not abs(lv - sv) <= pnl_tol:
             diffs[field] = {"ledger": lv, "sheet": sv}
 
     l_oid = _str_id(close_event.get("order_id"))
