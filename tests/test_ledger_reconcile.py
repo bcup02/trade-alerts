@@ -895,3 +895,38 @@ def test_a_row_the_caller_calls_paper_never_explains_a_real_fill():
 def test_the_same_row_counts_when_the_caller_calls_it_real():
     verdict = _shadow_compare(_seykota_style_paper)
     assert [m["order_id"] for m in verdict["evidence"]["fills_matched_to_adopted_events"]] == [1001]
+
+
+# --- t12: MEXC-style fill sides (open_long / close_long / open_short / close_short) ---
+@pytest.mark.parametrize("position_side, entry_label, exit_label", [
+    ("long", "open_long", "close_long"),
+    ("short", "open_short", "close_short"),
+])
+def test_mexc_style_sides_explain_the_matching_action_only(position_side, entry_label, exit_label):
+    fills = [_adopt_fill(3001, entry_label, 100.0, 1.0, _ADOPT_T0),
+             _adopt_fill(3002, exit_label, 99.0, 1.0, _ADOPT_T0 + 60_000)]
+    events = [_recovered(price=100.0, qty=1.0, side=position_side),
+              _native_close(price=99.0, qty=1.0, side=position_side)]
+    assert sorted(lr.match_fills_to_adopted_events(fills, events, norm_symbol=norm_symbol_plain)) == [0, 1]
+
+
+@pytest.mark.parametrize("position_side, wrong_for_entry, wrong_for_exit", [
+    ("long", "close_short", "open_short"),    # same buy / sell direction, wrong action
+    ("short", "close_long", "open_long"),
+    ("long", "close_long", "open_long"),      # right direction word, wrong action
+    ("short", "close_short", "open_short"),
+])
+def test_a_mexc_label_for_the_wrong_action_never_matches(position_side, wrong_for_entry, wrong_for_exit):
+    fills = [_adopt_fill(3001, wrong_for_entry, 100.0, 1.0, _ADOPT_T0),
+             _adopt_fill(3002, wrong_for_exit, 99.0, 1.0, _ADOPT_T0 + 60_000)]
+    events = [_recovered(price=100.0, qty=1.0, side=position_side),
+              _native_close(price=99.0, qty=1.0, side=position_side)]
+    assert lr.match_fills_to_adopted_events(fills, events, norm_symbol=norm_symbol_plain) == {}
+
+
+def test_mexc_label_works_end_to_end_through_the_shared_compare():
+    fills = [_adopt_fill(1001, "open_long", 84593.6, 0.002, _ADOPT_T0),
+             _adopt_fill(1002, "close_long", 84586.0, 0.002, _ADOPT_T0 + 104_000)]
+    verdict = _adopt_compare(fills, [_recovered(), _native_close()])
+    assert verdict["value"] == "RECONCILED"
+    assert [m["order_id"] for m in verdict["evidence"]["fills_matched_to_adopted_events"]] == [1001, 1002]
