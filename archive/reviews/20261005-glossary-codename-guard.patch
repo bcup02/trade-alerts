@@ -1,0 +1,809 @@
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index e09a06f..d6d7d5e 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -113,7 +113,7 @@
+   <div id="filters"></div>
+   <div id="register"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-10-04 盤點）。
++    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-10-05 盤點）。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
+   </div>
+ </div>
+@@ -402,7 +402,7 @@
+    ],
+    "open": true,
+    "steps": [
+-    "檢查 seykota 的執行模式設定與交易所連線目標，改成一致。",
++    "檢查趨勢策略的執行模式設定與交易所連線目標，改成一致。",
+     "改好後重啟 seykota-bot 服務。",
+     "注意：目前有已知缺陷——改好設定重啟後，暫停狀態可能仍清不掉（解除工具會拒絕這一類）。遇到時把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+    ],
+@@ -670,7 +670,7 @@
+    "open": false,
+    "steps": [
+     "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
+-    "確認修正步驟後照做（手動流程見momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
++    "確認修正步驟後照做（手動流程見動能策略操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
+     "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
+    ],
+    "tier": "R3",
+@@ -695,7 +695,7 @@
+    "notes": [],
+    "open": false,
+    "steps": [
+-    "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
++    "治標：到電腦前照動能策略操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+     "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+    ],
+    "tier": "R2",
+@@ -867,7 +867,7 @@
+    "what": "本地帳本算出來的賺賠，跟交易所回報的賺賠有落差。"
+   },
+   {
+-   "ai_prompt": "請在 my-crypto-bot 追查這個連續發生的未分類例外：從 my-crypto 的日誌找出例外訊息與堆疊，定位 mexc_futures_bot.py 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。",
++   "ai_prompt": "請在 my-crypto-bot 追查這個連續發生的未分類例外：從加密策略的日誌找出例外訊息與堆疊，定位 mexc_futures_bot.py 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。",
+    "behaviour": {
+     "phase": "8-mycrypto",
+     "reason": "目前：每次都照常重試，但沒有計數、連續失敗也不會升格。",
+@@ -889,8 +889,8 @@
+    ],
+    "open": true,
+    "steps": [
+-    "看訊息裡的錯誤內容與 my-crypto 的日誌。",
+-    "確認 my-crypto 服務仍在運作、交易所連線與設定正常。",
++    "看訊息裡的錯誤內容與加密策略的日誌。",
++    "確認加密策略服務仍在運作、交易所連線與設定正常。",
+     "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+    ],
+    "tier": "R2",
+@@ -958,7 +958,7 @@
+    "what": "剛開完倉，卻查不到這筆倉位的資訊，沒辦法掛停損單。"
+   },
+   {
+-   "ai_prompt": "請在 my-crypto-bot 追查掛停損單時拋出的例外：讀 mexc_futures_bot.py 掛保護單的流程，對照 my-crypto 的日誌找出例外訊息與堆疊，判斷原因並提出治本修正。",
++   "ai_prompt": "請在 my-crypto-bot 追查掛停損單時拋出的例外：讀 mexc_futures_bot.py 掛保護單的流程，對照加密策略的日誌找出例外訊息與堆疊，判斷原因並提出治本修正。",
+    "behaviour": {
+     "evidence": "mexc_futures_bot.py:1633 只通知、不自動下單（現行行為即符合 v2）",
+     "state": "done"
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 6b81f89..114bbbb 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -209,7 +209,7 @@
+   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+   <div id="glossaryHost"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-04 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
++    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-05 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations ed50b1d</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations ce51083</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations b5a605f</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations ac99132</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+   </div>
+@@ -1925,7 +1925,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "AI-for-column/mexc-4h-momentum-trailing-stop#94（2026-09-19 squash 合併 cf4df67，外部審閱 PASS）：docs/branch-governance.md、docs/operations-modes.md、docs/protective-pause-contract.md 等 7 份 docs 加 README、src/notifications.py／src/investor.py 的通知與 close_reason 顯示文字、src/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。刻意不動已封存的 archive/reports（比照 seykota n2 先例）。"
++       "text": "AI-for-column/mexc-4h-momentum-trailing-stop#94（2026-09-19 squash 合併 cf4df67，外部審閱 PASS）：docs/branch-governance.md、docs/operations-modes.md、docs/protective-pause-contract.md 等 7 份 docs 加 README、src/notifications.py／src/investor.py 的通知與 close_reason 顯示文字、src/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。刻意不動已封存的 archive/reports（比照趨勢策略 n2 先例）。"
+       }
+      ]
+     },
+@@ -2147,11 +2147,11 @@
+    "complete": false,
+    "dots": {
+     "btc-competition": "pending",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "pending",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "repair_bot.recurrence_escalation",
+    "kind": "cap",
+    "rows": [
+@@ -2270,12 +2270,12 @@
+    "anchor": "cap-stop.graceful",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
+-    "momentum": "recent",
+-    "mycrypto": "recent",
+-    "seykota": "recent"
++    "btc-competition": "done",
++    "momentum": "done",
++    "mycrypto": "done",
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "stop.graceful",
+    "kind": "cap",
+    "rows": [
+@@ -2332,12 +2332,12 @@
+    "anchor": "cap-recovery.interrupted_order",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
+-    "momentum": "recent",
+-    "mycrypto": "recent",
+-    "seykota": "recent"
++    "btc-competition": "done",
++    "momentum": "done",
++    "mycrypto": "done",
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "recovery.interrupted_order",
+    "kind": "cap",
+    "rows": [
+@@ -2460,7 +2460,7 @@
+    "title": "R3｜停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-SEY.PROTECTION_REPLACE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -2495,16 +2495,16 @@
+    "title": "R2｜移動停損換單失敗，部位可能沒有交易所端保護"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-SEY.PROTECTION_MOVE_DEFERRED",
+    "complete": true,
+    "dots": {
+     "btc-competition": "none",
+     "momentum": "none",
+     "mycrypto": "none",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "SEY.PROTECTION_MOVE_DEFERRED",
+    "kind": "rule",
+    "rows": [
+@@ -2635,7 +2635,7 @@
+    "title": "R3｜交易所部位資料無法唯一辨識"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-SEY.RECONCILE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -2670,7 +2670,7 @@
+    "title": "R2｜非暫時性的對帳失敗"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-SEY.EXCHANGE_TARGET_UNSAFE",
+    "complete": false,
+    "dots": {
+@@ -2880,7 +2880,7 @@
+    "title": "R0｜權益低於最低下單資金，跳過本次進場"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-MOM.PROTECTION_UNVERIFIED",
+    "complete": false,
+    "dots": {
+@@ -2950,7 +2950,7 @@
+    "title": "R3｜工具修復本地 state 後主動 latch，等人明確解除"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-MOM.RUNTIME_CYCLE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -3020,7 +3020,7 @@
+    "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+    "complete": true,
+    "dots": {
+@@ -3055,7 +3055,7 @@
+    "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+    "complete": true,
+    "dots": {
+@@ -3125,7 +3125,7 @@
+    "title": "R3｜出現負／不可能的餘額，本地帳本本身不可信"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+    "complete": false,
+    "dots": {
+@@ -3265,7 +3265,7 @@
+    "title": "R0｜runner 未分類例外（寫 ERROR heartbeat 後重新拋出，timer 隔天重試）"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-MYC.RECONCILE_DELTA_EXCEEDED",
+    "complete": true,
+    "dots": {
+@@ -3300,7 +3300,7 @@
+    "title": "R0｜本地帳本與交易所回報損益差額超過容忍值"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-MYC.RUNTIME_CYCLE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -3405,7 +3405,7 @@
+    "title": "R2｜開倉後查不到部位資訊，無法掛停損單"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-MYC.PROTECTION_PLACEMENT_ERROR",
+    "complete": false,
+    "dots": {
+@@ -3440,7 +3440,7 @@
+    "title": "R3｜掛停損單時拋出例外，部位本身已開"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-MYC.PROTECTION_REPLACE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -3510,7 +3510,7 @@
+    "title": "R2｜平倉後取消殘留停損單失敗"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+    "complete": true,
+    "dots": {
+@@ -4838,76 +4838,82 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "cap-stop.graceful",
+-   "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。",
+-   "project": "動能策略",
+-   "title": "收到停止訊號時等當輪做完再結束"
++   "anchor": "rule-SEY.PROTECTION_REPLACE_FAILED",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
++   "project": "趨勢策略",
++   "title": "R2｜移動停損換單失敗，部位可能沒有交易所端保護"
+   },
+   {
+-   "anchor": "cap-stop.graceful",
+-   "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。",
++   "anchor": "rule-SEY.RECONCILE_FAILED",
++   "note": "補上 2026-10-05 事件：交易所後端逾時（HTTP 408／-1007 等）現在算暫時性，不再計入連續失敗；只在開發機，A1 正式機（新）還沒部署。",
+    "project": "趨勢策略",
+-   "title": "收到停止訊號時等當輪做完再結束"
++   "title": "R2｜非暫時性的對帳失敗"
+   },
+   {
+-   "anchor": "cap-stop.graceful",
+-   "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。",
+-   "project": "加密策略",
+-   "title": "收到停止訊號時等當輪做完再結束"
++   "anchor": "rule-SEY.EXCHANGE_TARGET_UNSAFE",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
++   "project": "趨勢策略",
++   "title": "R3｜執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）"
+   },
+   {
+-   "anchor": "cap-stop.graceful",
+-   "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。",
+-   "project": "競賽策略",
+-   "title": "收到停止訊號時等當輪做完再結束"
++   "anchor": "rule-MOM.PROTECTION_UNVERIFIED",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
++   "project": "動能策略",
++   "title": "R3｜原生移動停損無法驗證"
+   },
+   {
+-   "anchor": "cap-recovery.interrupted_order",
+-   "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。",
++   "anchor": "rule-MOM.RUNTIME_CYCLE_FAILED",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
+    "project": "動能策略",
+-   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
++   "title": "R0｜run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）"
+   },
+   {
+-   "anchor": "cap-recovery.interrupted_order",
+-   "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。",
+-   "project": "趨勢策略",
+-   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
++   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
++   "project": "動能策略",
++   "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
+   },
+   {
+-   "anchor": "cap-recovery.interrupted_order",
+-   "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。",
+-   "project": "加密策略",
+-   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
++   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
++   "project": "動能策略",
++   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
+   },
+   {
+-   "anchor": "cap-recovery.interrupted_order",
+-   "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。",
++   "anchor": "rule-BTC.EXECUTION_BLOCKED_ZERO_FILLS",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
+    "project": "競賽策略",
+-   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
++   "title": "R2｜連續 3 天該再平衡卻零成交"
+   },
+   {
+-   "anchor": "cap-repair_bot.recurrence_escalation",
+-   "note": "自動修補重複發生通知已隨 A1 正式機（新）上線；A1 的修復機器人實際載入共用庫 0.26.0 並每 15 分鐘執行，還沒觸發過。",
+-   "project": "動能策略",
+-   "title": "自動修補重複發生時升格通知"
++   "anchor": "rule-MYC.RECONCILE_DELTA_EXCEEDED",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
++   "project": "加密策略",
++   "title": "R0｜本地帳本與交易所回報損益差額超過容忍值"
+   },
+   {
+-   "anchor": "cap-repair_bot.recurrence_escalation",
+-   "note": "自動修補重複發生通知已隨 A1 正式機（新）上線；A1 的修復機器人實際載入共用庫 0.26.0 並每 15 分鐘執行，還沒觸發過。",
+-   "project": "趨勢策略",
+-   "title": "自動修補重複發生時升格通知"
++   "anchor": "rule-MYC.RUNTIME_CYCLE_FAILED",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
++   "project": "加密策略",
++   "title": "R2｜未分類的執行期例外（catch-all）"
+   },
+   {
+-   "anchor": "rule-SEY.PROTECTION_MOVE_DEFERRED",
+-   "note": "舊停損取消不掉時，連續第 3 次失敗升格通知一次的事件，已隨 A1 正式機（新）上線。",
+-   "project": "趨勢策略",
+-   "title": "R2｜移動停損時舊停損單取消不掉，保留舊停損、這輪不移動"
++   "anchor": "rule-MYC.PROTECTION_PLACEMENT_ERROR",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
++   "project": "加密策略",
++   "title": "R3｜掛停損單時拋出例外，部位本身已開"
+   },
+   {
+-   "anchor": "rule-SEY.PROTECTION_MOVE_DEFERRED",
+-   "note": "行為說明改成 f-14 的每 10 分鐘自動重試（原本寫「下一根 K 棒再試」）。",
+-   "project": null,
+-   "title": "R2｜移動停損時舊停損單取消不掉，保留舊停損、這輪不移動"
++   "anchor": "rule-MYC.PROTECTION_REPLACE_FAILED",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
++   "project": "加密策略",
++   "title": "R2｜搬移移動停損單失敗，交易所端目前沒有停損保護"
++  },
++  {
++   "anchor": "rule-SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++   "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。",
++   "project": "趨勢策略",
++   "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
+   }
+  ],
+  "totals": {
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index f19d4cd..8775d13 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -121,7 +121,7 @@
+       "human_action": "收到升格通知時倉位仍沒有交易所端保護：到交易所補掛停損或平倉，再解除 latch。",
+       "resume": "two_stage_fingerprint",
+       "lands_in_phase": 8,
+-      "rationale": "重掛保護單的動作內容是完全確定的（同一個部位、同一個停損價），my-crypto 對同一情境本來就是「下一輪自動重試而且不停機」。v2（2026-09-18）取消 v1 的逾時等待：動作內容完全確定，多等只是延長部位裸露的時間，所以立即重掛；連續 3 次都失敗代表不是暫時狀況，才交給人。",
++      "rationale": "重掛保護單的動作內容是完全確定的（同一個部位、同一個停損價），加密策略對同一情境本來就是「下一輪自動重試而且不停機」。v2（2026-09-18）取消 v1 的逾時等待：動作內容完全確定，多等只是延長部位裸露的時間，所以立即重掛；連續 3 次都失敗代表不是暫時狀況，才交給人。",
+       "operator_message": {
+         "what": "要把移動停損換到新價位，但沒換成：舊單已經取消、新單沒掛上，或已送出取消舊單卻在 60 秒內查不到交易所狀態——這段時間倉位可能沒有保護。",
+         "direction": "系統會立刻用原本的停損價重掛一張保護單，最多試 3 次；3 次都失敗才通知你。收到通知代表倉位此刻仍沒有交易所端的停損保護，要盡快處理。",
+@@ -281,7 +281,7 @@
+       "human_action": "確認交易所連線與金鑰正常後解除 latch。",
+       "resume": "two_stage_fingerprint",
+       "lands_in_phase": 4,
+-      "rationale": "Phase 1c 已把暫時性網路錯誤從這條路徑扣掉，但剩下的（解析失敗、交易所回傳非預期結構）在實務上仍多半是一次性的——2026-09-11 的 venv 競態事故就是從這裡 latch 的。單次失敗停掉整支真倉策略的代價，高於多等一輪的代價。",
++      "rationale": "Phase 1c 已把暫時性網路錯誤從這條路徑扣掉，但剩下的（解析失敗、交易所回傳非預期結構）在實務上仍多半是一次性的——2026-09-11 的 venv 競態事故就是從這裡 latch 的。單次失敗停掉整支真倉策略的代價，高於多等一輪的代價。2026-10-05 開發機的模擬倉交易所後端逾時（HTTP 408 / -1007，另有一次 -1000），連續 3 次讀取失敗讓空倉的趨勢策略鎖成這個暫停；現在 HTTP 408 與後端碼 -1000／-1001／-1006／-1007 一律算暫時性（ed-seykota #89，只在開發機，A1 正式機（新）還沒部署）。",
+       "operator_message": {
+         "what": "跟交易所對帳反覆失敗，不是網路暫時斷線那種小問題。",
+         "direction": "系統每一輪會自動重試，連續 3 次都失敗才暫停策略並通知你。常見原因是交易所 API 故障或金鑰權限變動。",
+@@ -318,7 +318,7 @@
+         "what": "系統本來設定要連模擬帳戶，卻接到了真實帳戶（或反過來）——設定跟目標不一致。",
+         "direction": "整支策略立刻安全暫停、拒絕任何操作。一定要先把設定改對，不能直接解除。",
+         "steps": [
+-          "檢查 seykota 的執行模式設定與交易所連線目標，改成一致。",
++          "檢查趨勢策略的執行模式設定與交易所連線目標，改成一致。",
+           "改好後重啟 seykota-bot 服務。",
+           "注意：目前有已知缺陷——改好設定重啟後，暫停狀態可能仍清不掉（解除工具會拒絕這一類）。遇到時把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+         ],
+@@ -494,7 +494,7 @@
+       "human_action": "核對交易所委託後以 safe_halt_resume 解除。",
+       "resume": "two_stage_fingerprint",
+       "lands_in_phase": 4,
+-      "rationale": "與 SEY.PROTECTION_UNVERIFIED 同一條件。momentum 是全機隊唯一有完整 latch 模型（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram 中繼）的實作，Phase 4 以它為統一基準。",
++      "rationale": "與 SEY.PROTECTION_UNVERIFIED 同一條件。動能策略是全機隊唯一有完整 latch 模型（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram 中繼）的實作，Phase 4 以它為統一基準。",
+       "operator_message": {
+         "what": "交易所上的移動停損單，系統驗證不出它到底存不存在。",
+         "direction": "系統停下來，等人確認交易所上的實際委託。交易所資料是標準答案。",
+@@ -557,7 +557,7 @@
+       "human_action": "無（第四軸的 ERROR 會讓 ops-notify 自行升級）。",
+       "resume": "automatic",
+       "lands_in_phase": 3,
+-      "rationale": "momentum 對 catch-all 的處置正是 seykota 要改成的樣子，列進目錄當作對照基準。",
++      "rationale": "動能策略對 catch-all 的處置正是趨勢策略要改成的樣子，列進目錄當作對照基準。",
+       "operator_message": {
+         "what": "程式運作中出現一個沒被特別分類過的錯誤。",
+         "direction": "系統記一筆「有狀況」的標記，下一輪照常重試，不會停下來。",
+@@ -623,7 +623,7 @@
+         "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
+         "steps": [
+           "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
+-          "確認修正步驟後照做（手動流程見momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
++          "確認修正步驟後照做（手動流程見動能策略操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
+           "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
+         ],
+         "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
+@@ -655,7 +655,7 @@
+         "what": "動能策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
+         "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+         "steps": [
+-          "治標：到電腦前照momentum 操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
++          "治標：到電腦前照動能策略操作文件（docs/operations-modes.md）「對帳補列 — 驗證平倉補列」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
+           "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+         ],
+         "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
+@@ -714,7 +714,7 @@
+       "human_action": "看失敗原因（最小下單量、餘額、交易對狀態），處理後解除 latch。",
+       "resume": "two_stage_fingerprint",
+       "lands_in_phase": 8,
+-      "rationale": "交易所連三天拒絕每一張單，最常見原因是最小下單量或精度規則變了（seykota 2026-08-21 就撞過 stepSize 變更）。重試一次的代價低，而且重試本身會揭露真正的拒絕理由。",
++      "rationale": "交易所連三天拒絕每一張單，最常見原因是最小下單量或精度規則變了（趨勢策略 2026-08-21 就撞過 stepSize 變更）。重試一次的代價低，而且重試本身會揭露真正的拒絕理由。",
+       "operator_message": {
+         "what": "連續 3 天該重新調整持倉比例，卻完全成交不了任何一筆。",
+         "direction": "系統會自動重新取價、重算下單量再試一次完整的調整，最多 3 次；都失敗才通知你。",
+@@ -834,10 +834,10 @@
+       "verdict": "MECHANICAL",
+       "risk_tier": "R0",
+       "auto_action": "以交易所為權威記錄差額，不改變交易行為。",
+-      "human_action": "無，永久不會升級。2026-09-15（Phase 4e）盤查 trading-main 真實帳本（momentum 連續 17 筆、my-crypto 唯一 1 筆有效資料）發現這個差額精確等於-(entry_fee + exit_fee)——交易所回報損益本來就是手續費前的毛數字，本地net_pnl 是手續費後的淨數字，相減從定義上就只會是負的手續費，不是任何異常訊號，聚合起來也永遠是同一個已知、良性的偏差。撤回原本「聚合偏離才升級成請求」的計畫：不建聚合邏輯，每筆持續寫進 fleet_event_log 純供稽核查閱。",
++      "human_action": "無，永久不會升級。2026-09-15（Phase 4e）盤查 trading-main 真實帳本（動能策略連續 17 筆、加密策略唯一 1 筆有效資料）發現這個差額精確等於-(entry_fee + exit_fee)——交易所回報損益本來就是手續費前的毛數字，本地net_pnl 是手續費後的淨數字，相減從定義上就只會是負的手續費，不是任何異常訊號，聚合起來也永遠是同一個已知、良性的偏差。撤回原本「聚合偏離才升級成請求」的計畫：不建聚合邏輯，每筆持續寫進 fleet_event_log 純供稽核查閱。",
+       "resume": "n/a",
+       "lands_in_phase": 4,
+-      "rationale": "使用者已定調：交易所是權威資料，單筆差額的結論永遠是「以交易所為準」，包裝成錯誤不產生任何決策。這是整個專案範圍擴大的起點。Phase 3 改名（SAFE_HALT → RECONCILE_DELTA_EXCEEDED）並降 critical，因為現行名稱宣稱一個根本不存在的停機行為。 2026-09-15 補充：這個指標原本想抓的問題（本地價格記錄跟交易所現實脫節，會沿用進未來的移動停損計算）已經被同一支程式 2026-08-22 的另一個修正（`_fetch_order_info()` 改用交易所確認過的 `dealAvgPrice`/`totalFee` 入帳）從源頭堵住——這也是為什麼觀察到的差額 100% 只剩手續費、沒有任何殘留雜訊。Phase 4e 因此把 Phase 3 當時保留的「聚合偏離才升級」計畫撤回，改成單純寫入`trade_alerts.fleet_event_log`（見 §4.5），取代原本呼叫 `alerts.publish()`——後者在 my-crypto 端本來就已經是 2026-08-30 起的本地 no-op stub，這次替換純粹是把稽核紀錄放進機隊統一格式，不是關掉正在發送的通知。",
++      "rationale": "使用者已定調：交易所是權威資料，單筆差額的結論永遠是「以交易所為準」，包裝成錯誤不產生任何決策。這是整個專案範圍擴大的起點。Phase 3 改名（SAFE_HALT → RECONCILE_DELTA_EXCEEDED）並降 critical，因為現行名稱宣稱一個根本不存在的停機行為。 2026-09-15 補充：這個指標原本想抓的問題（本地價格記錄跟交易所現實脫節，會沿用進未來的移動停損計算）已經被同一支程式 2026-08-22 的另一個修正（`_fetch_order_info()` 改用交易所確認過的 `dealAvgPrice`/`totalFee` 入帳）從源頭堵住——這也是為什麼觀察到的差額 100% 只剩手續費、沒有任何殘留雜訊。Phase 4e 因此把 Phase 3 當時保留的「聚合偏離才升級」計畫撤回，改成單純寫入`trade_alerts.fleet_event_log`（見 §4.5），取代原本呼叫 `alerts.publish()`——後者在加密策略端本來就已經是 2026-08-30 起的本地 no-op stub，這次替換純粹是把稽核紀錄放進機隊統一格式，不是關掉正在發送的通知。",
+       "operator_message": {
+         "what": "本地帳本算出來的賺賠，跟交易所回報的賺賠有落差。",
+         "direction": "這個落差就是手續費：交易所回報的是扣手續費前的數字，本地記的是扣完的淨額。不是異常，只記錄備查。",
+@@ -865,16 +865,16 @@
+       "human_action": "看日誌找出例外原因並修正。",
+       "resume": "automatic",
+       "lands_in_phase": 8,
+-      "rationale": "使用者定案 my-crypto 不加 latch：這條路徑本來就靠下一輪重試自癒，加停機行為只會替一支目前沒有這個概念的 LIVE bot 新增風險。Phase 3 只改名（SAFE_HALT → RUNTIME_CYCLE_FAILED），因為它從來不 halt。",
++      "rationale": "使用者定案加密策略不加 latch：這條路徑本來就靠下一輪重試自癒，加停機行為只會替一支目前沒有這個概念的 LIVE bot 新增風險。Phase 3 只改名（SAFE_HALT → RUNTIME_CYCLE_FAILED），因為它從來不 halt。",
+       "operator_message": {
+         "what": "程式運作中出現一個沒被特別分類過的錯誤。",
+         "direction": "系統下一輪會自動重試，連續 3 次都失敗才通知你。",
+         "steps": [
+-          "看訊息裡的錯誤內容與 my-crypto 的日誌。",
+-          "確認 my-crypto 服務仍在運作、交易所連線與設定正常。",
++          "看訊息裡的錯誤內容與加密策略的日誌。",
++          "確認加密策略服務仍在運作、交易所連線與設定正常。",
+           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+         ],
+-        "ai_prompt": "請在 my-crypto-bot 追查這個連續發生的未分類例外：從 my-crypto 的日誌找出例外訊息與堆疊，定位 mexc_futures_bot.py 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。"
++        "ai_prompt": "請在 my-crypto-bot 追查這個連續發生的未分類例外：從加密策略的日誌找出例外訊息與堆疊，定位 mexc_futures_bot.py 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。"
+       }
+     },
+     {
+@@ -967,7 +967,7 @@
+           "沒有停損：手動補掛一張，或直接平倉。",
+           "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+         ],
+-        "ai_prompt": "請在 my-crypto-bot 追查掛停損單時拋出的例外：讀 mexc_futures_bot.py 掛保護單的流程，對照 my-crypto 的日誌找出例外訊息與堆疊，判斷原因並提出治本修正。"
++        "ai_prompt": "請在 my-crypto-bot 追查掛停損單時拋出的例外：讀 mexc_futures_bot.py 掛保護單的流程，對照加密策略的日誌找出例外訊息與堆疊，判斷原因並提出治本修正。"
+       }
+     },
+     {
+@@ -990,7 +990,7 @@
+       "human_action": "到交易所確認停損單，沒有就補掛或平倉。",
+       "resume": "automatic",
+       "lands_in_phase": 8,
+-      "rationale": "與 SEY.PROTECTION_REPLACE_FAILED 同一條件。my-crypto 現行實作（清掉失效 ID、下一輪重掛、不停機）本身是對的，缺的只是「連續失敗幾輪之後要有人知道」。",
++      "rationale": "與 SEY.PROTECTION_REPLACE_FAILED 同一條件。加密策略現行實作（清掉失效 ID、下一輪重掛、不停機）本身是對的，缺的只是「連續失敗幾輪之後要有人知道」。",
+       "operator_message": {
+         "what": "要把移動停損單搬到新價位卻失敗，交易所端目前沒有停損保護。",
+         "direction": "系統下一輪會自動重掛，連續 3 輪都失敗才通知你。收到通知代表倉位此刻沒有交易所端的停損保護。",
+@@ -1053,7 +1053,7 @@
+       "human_action": "無需決定。證據檔與事件日誌留有完整紀錄。",
+       "resume": "n/a",
+       "lands_in_phase": 8,
+-      "rationale": "跟 MOM.VERIFIED_CLOSE_AUTO_REPAIRED 同一個條件、同一份共用修復執行器。seykota 在 v2 之前只有修復機器人（只抓錯並提出修復建議）（只抓錯並提出修復建議），沒有自動補寫這條路徑；v2-W4 改用共用修復執行器時才開始發這個事件。seykota 會做空，平倉方向依 trade_open 的方向判斷；加碼過的交易（同一 trade_id 多筆 trade_open）合併成一個部位再比對。",
++      "rationale": "跟 MOM.VERIFIED_CLOSE_AUTO_REPAIRED 同一個條件、同一份共用修復執行器。趨勢策略在 v2 之前只有修復機器人（只抓錯並提出修復建議）（只抓錯並提出修復建議），沒有自動補寫這條路徑；v2-W4 改用共用修復執行器時才開始發這個事件。趨勢策略會做空，平倉方向依 trade_open 的方向判斷；加碼過的交易（同一 trade_id 多筆 trade_open）合併成一個部位再比對。",
+       "operator_message": {
+         "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。",
+         "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index b9cb355..2e1af46 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1,7 +1,7 @@
+ {
+   "registry_version": "fleet-rollout-registry/v1",
+   "catalog_version": "fleet-error-catalog/v2",
+-  "updated_at": "2026-10-04",
++  "updated_at": "2026-10-05",
+   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
+   "projects": {
+     "momentum": "動能策略",
+@@ -446,7 +446,7 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "AI-for-column/mexc-4h-momentum-trailing-stop#94（2026-09-19 squash 合併 cf4df67，外部審閱 PASS）：docs/branch-governance.md、docs/operations-modes.md、docs/protective-pause-contract.md 等 7 份 docs 加 README、src/notifications.py／src/investor.py 的通知與 close_reason 顯示文字、src/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。刻意不動已封存的 archive/reports（比照 seykota n2 先例）。"
++          "evidence": "AI-for-column/mexc-4h-momentum-trailing-stop#94（2026-09-19 squash 合併 cf4df67，外部審閱 PASS）：docs/branch-governance.md、docs/operations-modes.md、docs/protective-pause-contract.md 等 7 份 docs 加 README、src/notifications.py／src/investor.py 的通知與 close_reason 顯示文字、src/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。刻意不動已封存的 archive/reports（比照趨勢策略 n2 先例）。"
+         },
+         "seykota": {
+           "state": "done",
+@@ -1726,88 +1726,95 @@
+   ],
+   "recent_changes": [
+     {
+-      "kind": "cap",
+-      "id": "stop.graceful",
+-      "project": "momentum",
+-      "type": "completed",
+-      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
++      "kind": "rule",
++      "id": "SEY.PROTECTION_REPLACE_FAILED",
++      "project": "seykota",
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     },
+     {
+-      "kind": "cap",
+-      "id": "stop.graceful",
++      "kind": "rule",
++      "id": "SEY.RECONCILE_FAILED",
+       "project": "seykota",
+-      "type": "completed",
+-      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
++      "type": "updated",
++      "note": "補上 2026-10-05 事件：交易所後端逾時（HTTP 408／-1007 等）現在算暫時性，不再計入連續失敗；只在開發機，A1 正式機（新）還沒部署。"
+     },
+     {
+-      "kind": "cap",
+-      "id": "stop.graceful",
+-      "project": "mycrypto",
+-      "type": "completed",
+-      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
++      "kind": "rule",
++      "id": "SEY.EXCHANGE_TARGET_UNSAFE",
++      "project": "seykota",
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     },
+     {
+-      "kind": "cap",
+-      "id": "stop.graceful",
+-      "project": "btc-competition",
+-      "type": "completed",
+-      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
++      "kind": "rule",
++      "id": "MOM.PROTECTION_UNVERIFIED",
++      "project": "momentum",
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     },
+     {
+-      "kind": "cap",
+-      "id": "recovery.interrupted_order",
++      "kind": "rule",
++      "id": "MOM.RUNTIME_CYCLE_FAILED",
+       "project": "momentum",
+-      "type": "completed",
+-      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     },
+     {
+-      "kind": "cap",
+-      "id": "recovery.interrupted_order",
+-      "project": "seykota",
+-      "type": "completed",
+-      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
++      "kind": "rule",
++      "id": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
++      "project": "momentum",
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     },
+     {
+-      "kind": "cap",
+-      "id": "recovery.interrupted_order",
+-      "project": "mycrypto",
+-      "type": "completed",
+-      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
++      "kind": "rule",
++      "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
++      "project": "momentum",
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     },
+     {
+-      "kind": "cap",
+-      "id": "recovery.interrupted_order",
++      "kind": "rule",
++      "id": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+       "project": "btc-competition",
+-      "type": "completed",
+-      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     },
+     {
+-      "kind": "cap",
+-      "id": "repair_bot.recurrence_escalation",
+-      "project": "momentum",
+-      "type": "completed",
+-      "note": "自動修補重複發生通知已隨 A1 正式機（新）上線；A1 的修復機器人實際載入共用庫 0.26.0 並每 15 分鐘執行，還沒觸發過。"
++      "kind": "rule",
++      "id": "MYC.RECONCILE_DELTA_EXCEEDED",
++      "project": "mycrypto",
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     },
+     {
+-      "kind": "cap",
+-      "id": "repair_bot.recurrence_escalation",
+-      "project": "seykota",
+-      "type": "completed",
+-      "note": "自動修補重複發生通知已隨 A1 正式機（新）上線；A1 的修復機器人實際載入共用庫 0.26.0 並每 15 分鐘執行，還沒觸發過。"
++      "kind": "rule",
++      "id": "MYC.RUNTIME_CYCLE_FAILED",
++      "project": "mycrypto",
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     },
+     {
+       "kind": "rule",
+-      "id": "SEY.PROTECTION_MOVE_DEFERRED",
+-      "project": "seykota",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "舊停損取消不掉時，連續第 3 次失敗升格通知一次的事件，已隨 A1 正式機（新）上線。"
++      "id": "MYC.PROTECTION_PLACEMENT_ERROR",
++      "project": "mycrypto",
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     },
+     {
+       "kind": "rule",
+-      "id": "SEY.PROTECTION_MOVE_DEFERRED",
++      "id": "MYC.PROTECTION_REPLACE_FAILED",
++      "project": "mycrypto",
++      "type": "updated",
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
++    },
++    {
++      "kind": "rule",
++      "id": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
++      "project": "seykota",
+       "type": "updated",
+-      "note": "行為說明改成 f-14 的每 10 分鐘自動重試（原本寫「下一根 K 棒再試」）。"
++      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/glossary.py b/src/trade_alerts/glossary.py
+index 90d1399..da3df17 100644
+--- a/src/trade_alerts/glossary.py
++++ b/src/trade_alerts/glossary.py
+@@ -12,6 +12,7 @@ ids) are listed as they are, not renamed.
+ from __future__ import annotations
+ 
+ import json
++import re
+ from importlib import resources
+ from pathlib import Path
+ from typing import Any, Mapping
+@@ -60,3 +61,30 @@ def retired_hits(text: str, glossary: Mapping[str, Any]) -> list[tuple[str, str,
+             if term in text:
+                 hits.append((term, entry["id"], entry["zh"]))
+     return hits
++
++
++# English project codenames that must not stand in for the Chinese strategy
++# names (趨勢策略／加密策略／動能策略／競賽策略) inside Chinese prose.  Identifiers
++# are fine -- a command, unit, repo or path (``seykota-resume``, ``/opt/my-crypto-bot``)
++# or anything inside backticks -- so only a bare codename is flagged.
++_BARE_CODENAME = re.compile(
++    r"(?<![A-Za-z0-9_/\-.])(seykota|momentum|my-?crypto|btc[- ]competition)(?![A-Za-z0-9_/\-]|\.[A-Za-z0-9_])",
++    re.IGNORECASE,
++)
++_BACKTICK_SPAN = re.compile(r"`[^`]*`")
++_CJK = re.compile(r"[\u4e00-\u9fff]")
++
++
++def bare_codename_hits(text: str) -> list[str]:
++    """Bare English strategy codenames used inside Chinese prose (outside backticks).
++
++    Only lines that contain Chinese are looked at: an English-only line is a
++    code sample or an identifier list, not wording a reader sees.
++    """
++    found: list[str] = []
++    for line in text.splitlines():
++        if not _CJK.search(line):
++            continue
++        for match in _BARE_CODENAME.finditer(_BACKTICK_SPAN.sub("", line)):
++            found.append(match.group(1))
++    return found
+diff --git a/tests/test_fleet_glossary.py b/tests/test_fleet_glossary.py
+index ede4085..d6d6fca 100644
+--- a/tests/test_fleet_glossary.py
++++ b/tests/test_fleet_glossary.py
+@@ -8,7 +8,7 @@ from pathlib import Path
+ 
+ import pytest
+ 
+-from trade_alerts.glossary import glossary_problems, load_glossary, retired_hits
++from trade_alerts.glossary import bare_codename_hits, glossary_problems, load_glossary, retired_hits
+ 
+ _ROOT = Path(__file__).resolve().parents[1]
+ SCHEMA_PATH = _ROOT / "schemas" / "fleet-glossary-v1.schema.json"
+@@ -90,3 +90,36 @@ def test_a_retired_name_inside_a_canonical_name_is_rejected(glossary):
+     broken = json.loads(json.dumps(glossary))
+     broken["entries"][0]["retired"].append(broken["entries"][1]["zh"][:2])
+     assert any("inside canonical name" in p for p in glossary_problems(broken))
++
++
++def _all_catalog_and_registry_texts():
++    for name in ("fleet-error-catalog-v2.json", "fleet-rollout-registry.json"):
++        document = json.loads((CATALOG_DIR / name).read_text(encoding="utf-8"))
++        for text in _strings(document):
++            yield name, text
++
++
++def test_no_chinese_prose_uses_a_bare_english_strategy_codename():
++    """2026-10-05: notices said "Seykota｜…" and catalog prose said "my-crypto 對…"
++    instead of the glossary names.  Every string field of the catalog and the
++    registry (not just the operator message) is checked."""
++    found = sorted({f"{where}: {term!r} in {text[:50]!r}"
++                    for where, text in _all_catalog_and_registry_texts()
++                    for term in bare_codename_hits(text)})
++    assert not found, "\n".join(found)
++
++
++def test_bare_codename_detection_ignores_identifiers():
++    assert bare_codename_hits("my-crypto 的日誌") == ["my-crypto"]
++    assert bare_codename_hits("Seykota｜帳本") == ["Seykota"]
++    assert bare_codename_hits("見momentum 操作文件") == ["momentum"]
++    for ok in (
++        "執行 `seykota-resume preview` 取得確認碼",
++        "請在 ed-seykota-systematic-trend-following 追查",
++        "重啟 seykota-bot 服務",
++        "路徑 /opt/my-crypto-bot/audit 與 mexc-4h-momentum-trailing-stop",
++        "以 btc-competition-resume 解除",
++        "seykota only english line",
++        "趨勢策略的 seykota.env 設定",
++    ):
++        assert bare_codename_hits(ok) == [], ok
