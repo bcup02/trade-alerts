@@ -1075,3 +1075,50 @@ def test_a_missing_identifier_is_not_a_contradiction(rec_over, open_over):
     events = [_recovered(**rec_over), _trade_open_row(**open_over)]
     verdict = _both_types_compare([_held_btc(0.002)], events)
     assert verdict["evidence"]["position_diffs"] == []
+
+
+# --- t10 (#117 reviewer note): a NaN / infinite sheet or ledger figure is a value mismatch, not "the same" ---
+def _sheet_compare_exit(ledger_exit, ledger_pnl, sheet_exit, sheet_pnl):
+    close = {"event_type": "trade_close", "exit_price": ledger_exit, "net_pnl": ledger_pnl, "gross_pnl": ledger_pnl,
+             "order_id": "x2", "execution_mode": "LIVE", "source": "native_trailing_stop"}
+    trades = _trade("t1", closed=True, close_event=close, closed_ms=2)
+    rows = [_row(14, trade_id="t1", exit_time="2026-09-01", exit_price=sheet_exit, net_pnl=sheet_pnl,
+                 exit_order_id="x2")]
+    rows[0]["values"][lr.SHEET_COLUMN_INDEX["gross_pnl"]] = sheet_pnl
+    return sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
+
+
+def test_matching_sheet_figures_still_reconcile():
+    doc = _sheet_compare_exit(1.0, 0.5, "1.0", "0.5")
+    assert doc["value"] == "RECONCILED"
+
+
+@pytest.mark.parametrize("sheet_exit, sheet_pnl, field", [
+    ("nan", "0.5", "exit_price"), ("NaN", "0.5", "exit_price"), ("inf", "0.5", "exit_price"),
+    ("1.0", "nan", "net_pnl"), ("1.0", "-inf", "net_pnl"),
+])
+def test_a_nan_or_infinite_sheet_figure_is_a_value_mismatch(sheet_exit, sheet_pnl, field):
+    doc = _sheet_compare_exit(1.0, 0.5, sheet_exit, sheet_pnl)
+    assert doc["value"] == "DIVERGED"
+    assert doc["discrepancies"][0]["kind"] == "VALUE_MISMATCH"
+    assert field in doc["discrepancies"][0]["detail"]["diffs"]
+    if field == "net_pnl":
+        assert "gross_pnl" in doc["discrepancies"][0]["detail"]["diffs"]   # the other pnl column is checked the same way
+
+
+@pytest.mark.parametrize("ledger_exit, ledger_pnl", [(float("nan"), 0.5), (1.0, float("nan")),
+                                                     (float("inf"), 0.5), (1.0, float("-inf"))])
+def test_a_nan_or_infinite_ledger_figure_is_a_value_mismatch(ledger_exit, ledger_pnl):
+    doc = _sheet_compare_exit(ledger_exit, ledger_pnl, "1.0", "0.5")
+    assert doc["value"] == "DIVERGED"
+    assert doc["discrepancies"][0]["kind"] == "VALUE_MISMATCH"
+
+
+def test_both_sides_nan_is_still_not_proven_equal():
+    doc = _sheet_compare_exit(float("nan"), 0.5, "nan", "0.5")
+    assert doc["value"] == "DIVERGED"
+
+
+def test_a_small_real_difference_inside_the_tolerance_is_still_fine():
+    doc = _sheet_compare_exit(100.0, 0.5, "100.05", "0.505")   # 0.05 % price, 0.005 pnl: inside the defaults
+    assert doc["value"] == "RECONCILED"
