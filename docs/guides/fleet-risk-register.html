@@ -352,7 +352,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）",
+    "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）；計數只算非暫時性失敗（解析失敗、非預期結構）：HTTP 5xx／408 與後端碼 -1000／-1001／-1006／-1007 的讀取逾時不前進也不重置連續失敗計數、下一輪重試（src/seykota_bot/bot.py:1599 _is_transient_network_error，#89）",
     "state": "done"
    },
    "bot": "seykota",
@@ -444,7 +444,7 @@
   {
    "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這個未分類的執行期例外：從 seykota-bot 的 journal 找出連續失敗的例外訊息與堆疊，定位 src/seykota_bot/ 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。",
    "behaviour": {
-    "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）",
+    "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）；未分類的例外才計數：K 線抓取遇暫時性網路錯誤時直接重試、不計入（src/seykota_bot/bot.py:2282，#89）",
     "state": "done"
    },
    "bot": "seykota",

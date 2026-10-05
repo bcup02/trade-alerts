@@ -1108,7 +1108,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "src/seykota_bot/bot.py:54 _CONSECUTIVE_FAILURE_LATCH_THRESHOLD Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）"
+       "text": "src/seykota_bot/bot.py:54 _CONSECUTIVE_FAILURE_LATCH_THRESHOLD Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）；計數只算非暫時性的失敗：對帳讀取與 K 線抓取遇到暫時性網路錯誤（HTTP 5xx／408、後端碼 -1000／-1001／-1006／-1007）不計入、下一輪直接重試（src/seykota_bot/bot.py:1599、src/seykota_bot/bot.py:2282，#89）"
       }
      ]
     },
@@ -2410,7 +2410,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "src/seykota_bot/reconcile/compare.py:194 explained = match_fills_to_adopted_events(not_by_order_id, real, norm_symbol=norm_symbol_plain)（只傳濾掉紙上列的 real，共用庫 v0.27.0，#95）；2026-10-05 台北 19:56 部署 A1 正式機（新）（operations 5958bbf）：/opt 的 src/seykota_bot/reconcile/compare.py、pyproject.toml 與該 commit 的檔案雜湊相同，venv trade-alerts 0.27.0 的對帳檔與 v0.27.0 同檔（blob 0e8005d），部署後手動一輪對帳 RECONCILED、位置差異空、未記成交 0 筆。限制：A1 上趨勢策略沒有接手倉位，配對路徑只在開發機（10/3 起的兩筆成交被解釋）與測試驗證過。"
+       "text": "src/seykota_bot/reconcile/compare.py:194 explained = match_fills_to_adopted_events(not_by_order_id, real, norm_symbol=norm_symbol_plain)（只傳濾掉紙上列的 real，共用庫 v0.27.0，#95）；2026-10-05 台北 18:56（JST 19:56，UTC 10:56）部署 A1 正式機（新）（operations 5958bbf，bot 於該時間重啟）：/opt 的 src/seykota_bot/reconcile/compare.py、pyproject.toml 與該 commit 的檔案雜湊相同，venv trade-alerts 0.27.0 的對帳檔與 v0.27.0 同檔（blob 0e8005d），部署後手動一輪對帳與 JST 20:00（台北 19:00）排程一輪對帳 RECONCILED、位置差異空、未記成交 0 筆。限制：A1 上趨勢策略沒有接手倉位，配對路徑只在開發機（10/3 起的兩筆成交被解釋）與測試驗證過。"
       }
      ]
     },
@@ -2421,7 +2421,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "src/reconcile_compare.py:55 _OPEN_EVENT_TYPES = frozenset({\"trade_open\", \"position_recovered\"})（接手倉位也算開倉，#118）、src/google_reconcile.py:79 local_trades 同樣的 open_event_types；共用庫 v0.27.3（pyproject.toml:57，含 MEXC 方向代碼與同一次開倉兩列只算一次）。2026-10-05 台北 19:57 部署 A1 正式機（新）（operations 97f5ebb）：/opt 的 src/reconcile_compare.py、src/google_reconcile.py、pyproject.toml 與該 commit 的檔案雜湊相同，venv trade-alerts 0.27.3 的對帳檔與 v0.27.3 同檔（blob 83a90df），部署後手動一輪對帳與 Google 對帳都 RECONCILED。限制：A1 上動能沒有接手倉位，新路徑只在開發機與測試驗證過；動能預設紙上判斷會把沒有訂單編號的原生停損平倉當紙上，那一筆成交仍會留在清單（保守方向）。"
+       "text": "src/reconcile_compare.py:55 _OPEN_EVENT_TYPES = frozenset({\"trade_open\", \"position_recovered\"})（接手倉位也算開倉，#118）、src/google_reconcile.py:79 local_trades 同樣的 open_event_types；共用庫 v0.27.3（pyproject.toml:57，含 MEXC 方向代碼與同一次開倉兩列只算一次）。2026-10-05 台北 18:57（JST 19:57，UTC 10:57）部署 A1 正式機（新）（operations 97f5ebb，bot 於該時間重啟）：/opt 的 src/reconcile_compare.py、src/google_reconcile.py、pyproject.toml 與該 commit 的檔案雜湊相同，venv trade-alerts 0.27.3 的對帳檔與 v0.27.3 同檔（blob 83a90df），部署後手動一輪與 JST 20:00（台北 19:00）排程一輪的對帳與 Google 對帳都 RECONCILED。限制：A1 上動能沒有接手倉位，新路徑只在開發機與測試驗證過；動能預設紙上判斷會把沒有訂單編號的原生停損平倉當紙上，那一筆成交仍會留在清單（保守方向）。"
       }
      ]
     },
@@ -2717,7 +2717,7 @@
        "aspect": "行為",
        "phase": null,
        "state": "done",
-       "text": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）"
+       "text": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）；計數只算非暫時性失敗（解析失敗、非預期結構）：HTTP 5xx／408 與後端碼 -1000／-1001／-1006／-1007 的讀取逾時不前進也不重置連續失敗計數、下一輪重試（src/seykota_bot/bot.py:1599 _is_transient_network_error，#89）"
       },
       {
        "aspect": "寫進事件日誌",
@@ -2822,7 +2822,7 @@
        "aspect": "行為",
        "phase": null,
        "state": "done",
-       "text": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）"
+       "text": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）；未分類的例外才計數：K 線抓取遇暫時性網路錯誤時直接重試、不計入（src/seykota_bot/bot.py:2282，#89）"
       },
       {
        "aspect": "寫進事件日誌",
@@ -4916,7 +4916,7 @@
   },
   {
    "anchor": "rule-SEY.RECONCILE_FAILED",
-   "note": "說明補上：後端逾時（HTTP 408、-1000／-1001／-1006／-1007）算暫時性的修正已在 2026-10-05 台北 14:43 部署 A1 正式機（新）。",
+   "note": "說明補上：後端逾時（HTTP 408、-1000／-1001／-1006／-1007）算暫時性的修正已在 2026-10-05 台北 13:43（A1 時間 JST 14:43） 部署 A1 正式機（新）。",
    "project": "趨勢策略",
    "title": "R2｜非暫時性的對帳失敗"
   }
