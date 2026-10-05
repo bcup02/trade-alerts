@@ -251,6 +251,83 @@ def recorded_order_ids(real_events: list[dict[str, Any]]) -> set[str]:
     return ids | correction_order_ids(real_events)
 
 
+#: How long after an exchange fill the ledger may first have recorded the
+#: adopted position (or the reconciled native-stop close) that fill belongs to.
+ADOPTED_FILL_WINDOW_MS = 12 * 60 * 60 * 1000
+_ADOPTED_REAL_MODES = frozenset({"LIVE", "DEMO"})
+
+
+def match_fills_to_adopted_events(
+    fills: list[dict[str, Any]],
+    ledger_events: list[dict[str, Any]],
+    *,
+    norm_symbol: Callable[[Any], str],
+    window_ms: int = ADOPTED_FILL_WINDOW_MS,
+) -> dict[int, dict[str, Any]]:
+    """Which exchange fills a ledger event that has **no ``order_id``** explains.
+
+    A position the strategy adopted after a restart (``position_recovered``) and
+    the close of a native stop it reconciled afterwards (``trade_close``) are
+    recorded without the exchange order id, so the order-id comparison cannot
+    see that the fills behind them are accounted for (2026-10-03: two demo fills
+    stayed ``DIVERGED`` for days although the ledger had both rows).
+
+    A fill is explained only when *everything* lines up: same symbol, the side
+    the event implies (entry of a long = buy, close of a long = sell; reversed
+    for a short), the same quantity and price, and the fill happened no later
+    than the event and at most ``window_ms`` before it.  Each event explains at
+    most one fill, so a duplicated send of the same order still leaves its
+    second fill unmatched.  Events from dry-run sources or without a LIVE/DEMO
+    ``execution_mode`` are never used.  Returns ``{index into fills: info}``.
+    """
+    candidates: list[dict[str, Any]] = []
+    for e in ledger_events:
+        if e.get("order_id") is not None and str(e.get("order_id")).strip():
+            continue
+        if str(e.get("source") or "") in DRY_RUN_SOURCES:
+            continue
+        if str(e.get("execution_mode") or "").upper() not in _ADOPTED_REAL_MODES:
+            continue
+        et = e.get("event_type")
+        if et == "position_recovered":
+            qty, price, entry = to_float(e.get("volume")), to_float(e.get("entry_price")), True
+        elif et == "trade_close":
+            qty, price, entry = to_float(e.get("exit_volume")), to_float(e.get("exit_price")), False
+        else:
+            continue
+        side = str(e.get("side") or "").lower()
+        if side not in ("long", "short") or qty <= 0 or price <= 0:
+            continue
+        fill_side = ("buy" if side == "long" else "sell") if entry else ("sell" if side == "long" else "buy")
+        candidates.append({
+            "event": e, "symbol": norm_symbol(e.get("symbol")), "qty": qty, "price": price,
+            "side": fill_side, "ms": int(to_float(e.get("event_epoch_ms"))),
+        })
+    candidates.sort(key=lambda c: c["ms"])
+    matched: dict[int, dict[str, Any]] = {}
+    for c in candidates:
+        best: int | None = None
+        for i, f in enumerate(fills):
+            if i in matched:
+                continue
+            fill_ms = int(to_float(f.get("time_ms")))
+            if not (0 <= c["ms"] - fill_ms <= window_ms):
+                continue
+            if norm_symbol(f.get("symbol")) != c["symbol"] or str(f.get("side") or "").lower() != c["side"]:
+                continue
+            if abs(to_float(f.get("quantity")) - c["qty"]) > 1e-9:
+                continue
+            if abs(to_float(f.get("price")) - c["price"]) > max(1e-9, abs(c["price"]) * 1e-9):
+                continue
+            if best is None or fill_ms < int(to_float(fills[best].get("time_ms"))):
+                best = i
+        if best is not None:
+            e = c["event"]
+            matched[best] = {"event_type": e.get("event_type"), "trade_id": e.get("trade_id"),
+                             "event_id": e.get("event_id")}
+    return matched
+
+
 def _paper_only_trade_ids(
     all_events: list[dict[str, Any]], *, is_paper: Callable[[dict[str, Any]], bool]
 ) -> set[str]:
@@ -395,13 +472,22 @@ def exchange_ledger_compare(
         if abs(lq - eq) > 1e-6:
             position_diffs.append({"symbol": sym, "ledger_qty": lq, "exchange_qty": eq})
 
+    not_by_order_id = [
+        f for f in exchange_state.get("fills") or []
+        if str(f.get("order_id")) not in recorded_ids
+        and (f.get("time_ms") or 0) < fa_ms - _FILL_GRACE_MS
+    ]
+    explained = match_fills_to_adopted_events(not_by_order_id, ledger_events, norm_symbol=norm_symbol)
     unmatched_exchange_fills = [
         {"order_id": f.get("order_id"), "trade_id": f.get("trade_id"), "symbol": f.get("symbol"),
          "time_ms": f.get("time_ms"), "quantity": f.get("quantity"), "price": f.get("price"),
          "side": f.get("side")}
-        for f in exchange_state.get("fills") or []
-        if str(f.get("order_id")) not in recorded_ids
-        and (f.get("time_ms") or 0) < fa_ms - _FILL_GRACE_MS
+        for i, f in enumerate(not_by_order_id) if i not in explained
+    ]
+    fills_matched_to_adopted_events = [
+        {"order_id": not_by_order_id[i].get("order_id"), "trade_id": not_by_order_id[i].get("trade_id"),
+         "ledger_trade_id": info.get("trade_id"), "ledger_event_type": info.get("event_type")}
+        for i, info in sorted(explained.items())
     ]
 
     events_after = sum(1 for e in real if (e.get("event_epoch_ms") or 0) > fa_ms)
@@ -416,6 +502,8 @@ def exchange_ledger_compare(
         "unmatched_exchange_fills": unmatched_exchange_fills,
         "ledger_events_after_snapshot": events_after,
     }
+    if fills_matched_to_adopted_events:
+        evidence["fills_matched_to_adopted_events"] = fills_matched_to_adopted_events
     if include_pending_markers:
         evidence["pending_reconciliations"] = pending_recs
     if exchange_state.get("symbols_queried") is not None:
