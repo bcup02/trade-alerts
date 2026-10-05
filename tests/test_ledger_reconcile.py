@@ -864,3 +864,34 @@ def test_the_usual_figures_still_match_with_the_positive_comparisons():
     assert lr.match_fills_to_adopted_events([within], [_recovered()], norm_symbol=norm_symbol_plain) != {}
     other = {**fill, "price": 84593.6 + 1.0}
     assert lr.match_fills_to_adopted_events([other], [_recovered()], norm_symbol=norm_symbol_plain) == {}
+
+
+def _paper_shadow(e):
+    """A caller-specific paper marker the matcher itself knows nothing about."""
+    return e.get("source") == "paper_shadow" or _seykota_style_paper(e)
+
+
+def _shadow_compare(is_paper):
+    fills = [_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)]
+    real_other = _recovered(price=70000.0, event_id="r-real", trade_id="BTCUSDT-adopted-0")
+    shadow = _recovered(source="paper_shadow", event_id="r-paper")
+    return exchange_ledger_compare(
+        _adopt_state(fills), [real_other, shadow], is_paper=is_paper, norm_symbol=norm_symbol_plain,
+        open_event_types=frozenset({"trade_open", "position_recovered"}), include_pending_markers=False, now=NOW,
+    )
+
+
+def test_a_row_the_caller_calls_paper_never_explains_a_real_fill():
+    """t11: the shared compare hands the matcher only the paper-filtered rows.
+    The shadow row lines up with the fill exactly and passes every matcher check
+    (DEMO, order_id null, non-dry-run source), so only the caller's is_paper
+    keeps it out."""
+    verdict = _shadow_compare(_paper_shadow)
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
+    assert "fills_matched_to_adopted_events" not in verdict["evidence"]
+    assert verdict["value"] == "DIVERGED"
+
+
+def test_the_same_row_counts_when_the_caller_calls_it_real():
+    verdict = _shadow_compare(_seykota_style_paper)
+    assert [m["order_id"] for m in verdict["evidence"]["fills_matched_to_adopted_events"]] == [1001]
