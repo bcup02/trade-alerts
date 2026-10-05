@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from trade_alerts.glossary import glossary_problems, load_glossary, retired_hits
+from trade_alerts.glossary import bare_codename_hits, glossary_problems, load_glossary, retired_hits
 
 _ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = _ROOT / "schemas" / "fleet-glossary-v1.schema.json"
@@ -90,3 +90,36 @@ def test_a_retired_name_inside_a_canonical_name_is_rejected(glossary):
     broken = json.loads(json.dumps(glossary))
     broken["entries"][0]["retired"].append(broken["entries"][1]["zh"][:2])
     assert any("inside canonical name" in p for p in glossary_problems(broken))
+
+
+def _all_catalog_and_registry_texts():
+    for name in ("fleet-error-catalog-v2.json", "fleet-rollout-registry.json"):
+        document = json.loads((CATALOG_DIR / name).read_text(encoding="utf-8"))
+        for text in _strings(document):
+            yield name, text
+
+
+def test_no_chinese_prose_uses_a_bare_english_strategy_codename():
+    """2026-10-05: notices said "Seykota｜…" and catalog prose said "my-crypto 對…"
+    instead of the glossary names.  Every string field of the catalog and the
+    registry (not just the operator message) is checked."""
+    found = sorted({f"{where}: {term!r} in {text[:50]!r}"
+                    for where, text in _all_catalog_and_registry_texts()
+                    for term in bare_codename_hits(text)})
+    assert not found, "\n".join(found)
+
+
+def test_bare_codename_detection_ignores_identifiers():
+    assert bare_codename_hits("my-crypto 的日誌") == ["my-crypto"]
+    assert bare_codename_hits("Seykota｜帳本") == ["Seykota"]
+    assert bare_codename_hits("見momentum 操作文件") == ["momentum"]
+    for ok in (
+        "執行 `seykota-resume preview` 取得確認碼",
+        "請在 ed-seykota-systematic-trend-following 追查",
+        "重啟 seykota-bot 服務",
+        "路徑 /opt/my-crypto-bot/audit 與 mexc-4h-momentum-trailing-stop",
+        "以 btc-competition-resume 解除",
+        "seykota only english line",
+        "趨勢策略的 seykota.env 設定",
+    ):
+        assert bare_codename_hits(ok) == [], ok

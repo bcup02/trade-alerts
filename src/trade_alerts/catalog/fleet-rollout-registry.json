@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-04",
+  "updated_at": "2026-10-05",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -446,7 +446,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "AI-for-column/mexc-4h-momentum-trailing-stop#94（2026-09-19 squash 合併 cf4df67，外部審閱 PASS）：docs/branch-governance.md、docs/operations-modes.md、docs/protective-pause-contract.md 等 7 份 docs 加 README、src/notifications.py／src/investor.py 的通知與 close_reason 顯示文字、src/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。刻意不動已封存的 archive/reports（比照 seykota n2 先例）。"
+          "evidence": "AI-for-column/mexc-4h-momentum-trailing-stop#94（2026-09-19 squash 合併 cf4df67，外部審閱 PASS）：docs/branch-governance.md、docs/operations-modes.md、docs/protective-pause-contract.md 等 7 份 docs 加 README、src/notifications.py／src/investor.py 的通知與 close_reason 顯示文字、src/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。刻意不動已封存的 archive/reports（比照趨勢策略 n2 先例）。"
         },
         "seykota": {
           "state": "done",
@@ -1726,88 +1726,95 @@
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "stop.graceful",
-      "project": "momentum",
-      "type": "completed",
-      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
-    },
-    {
-      "kind": "cap",
-      "id": "stop.graceful",
-      "project": "seykota",
-      "type": "completed",
-      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
-    },
-    {
-      "kind": "cap",
-      "id": "stop.graceful",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
-    },
-    {
-      "kind": "cap",
-      "id": "stop.graceful",
-      "project": "btc-competition",
-      "type": "completed",
-      "note": "優雅停止已隨 A1 正式機（新）上線；動能、趨勢重開機時日誌記乾淨停止，加密乾淨結束，競賽的正式機實測還沒有。"
-    },
-    {
-      "kind": "cap",
-      "id": "recovery.interrupted_order",
-      "project": "momentum",
-      "type": "completed",
-      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
-    },
-    {
-      "kind": "cap",
-      "id": "recovery.interrupted_order",
-      "project": "seykota",
-      "type": "completed",
-      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
-    },
-    {
-      "kind": "cap",
-      "id": "recovery.interrupted_order",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
-    },
-    {
-      "kind": "cap",
-      "id": "recovery.interrupted_order",
-      "project": "btc-competition",
-      "type": "completed",
-      "note": "重啟後復原已隨 A1 正式機（新）上線；只在開發機實測過，正式機還沒有觸發過。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.recurrence_escalation",
-      "project": "momentum",
-      "type": "completed",
-      "note": "自動修補重複發生通知已隨 A1 正式機（新）上線；A1 的修復機器人實際載入共用庫 0.26.0 並每 15 分鐘執行，還沒觸發過。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.recurrence_escalation",
-      "project": "seykota",
-      "type": "completed",
-      "note": "自動修補重複發生通知已隨 A1 正式機（新）上線；A1 的修復機器人實際載入共用庫 0.26.0 並每 15 分鐘執行，還沒觸發過。"
-    },
-    {
       "kind": "rule",
-      "id": "SEY.PROTECTION_MOVE_DEFERRED",
+      "id": "SEY.PROTECTION_REPLACE_FAILED",
       "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "舊停損取消不掉時，連續第 3 次失敗升格通知一次的事件，已隨 A1 正式機（新）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.PROTECTION_MOVE_DEFERRED",
       "type": "updated",
-      "note": "行為說明改成 f-14 的每 10 分鐘自動重試（原本寫「下一根 K 棒再試」）。"
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.RECONCILE_FAILED",
+      "project": "seykota",
+      "type": "updated",
+      "note": "補上 2026-10-05 事件：交易所後端逾時（HTTP 408／-1007 等）現在算暫時性，不再計入連續失敗；只在開發機，A1 正式機（新）還沒部署。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.EXCHANGE_TARGET_UNSAFE",
+      "project": "seykota",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.PROTECTION_UNVERIFIED",
+      "project": "momentum",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.RUNTIME_CYCLE_FAILED",
+      "project": "momentum",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "project": "momentum",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+      "project": "momentum",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+      "project": "btc-competition",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.RECONCILE_DELTA_EXCEEDED",
+      "project": "mycrypto",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.RUNTIME_CYCLE_FAILED",
+      "project": "mycrypto",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.PROTECTION_PLACEMENT_ERROR",
+      "project": "mycrypto",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.PROTECTION_REPLACE_FAILED",
+      "project": "mycrypto",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "project": "seykota",
+      "type": "updated",
+      "note": "說明文字裡的英文代號改用名詞對照表的策略中文名；行為與判定沒變。"
     }
   ]
 }

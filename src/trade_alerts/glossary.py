@@ -12,6 +12,7 @@ ids) are listed as they are, not renamed.
 from __future__ import annotations
 
 import json
+import re
 from importlib import resources
 from pathlib import Path
 from typing import Any, Mapping
@@ -60,3 +61,30 @@ def retired_hits(text: str, glossary: Mapping[str, Any]) -> list[tuple[str, str,
             if term in text:
                 hits.append((term, entry["id"], entry["zh"]))
     return hits
+
+
+# English project codenames that must not stand in for the Chinese strategy
+# names (趨勢策略／加密策略／動能策略／競賽策略) inside Chinese prose.  Identifiers
+# are fine -- a command, unit, repo or path (``seykota-resume``, ``/opt/my-crypto-bot``)
+# or anything inside backticks -- so only a bare codename is flagged.
+_BARE_CODENAME = re.compile(
+    r"(?<![A-Za-z0-9_/\-.])(seykota|momentum|my-?crypto|btc[- ]competition)(?![A-Za-z0-9_/\-]|\.[A-Za-z0-9_])",
+    re.IGNORECASE,
+)
+_BACKTICK_SPAN = re.compile(r"`[^`]*`")
+_CJK = re.compile(r"[\u4e00-\u9fff]")
+
+
+def bare_codename_hits(text: str) -> list[str]:
+    """Bare English strategy codenames used inside Chinese prose (outside backticks).
+
+    Only lines that contain Chinese are looked at: an English-only line is a
+    code sample or an identifier list, not wording a reader sees.
+    """
+    found: list[str] = []
+    for line in text.splitlines():
+        if not _CJK.search(line):
+            continue
+        for match in _BARE_CODENAME.finditer(_BACKTICK_SPAN.sub("", line)):
+            found.append(match.group(1))
+    return found
