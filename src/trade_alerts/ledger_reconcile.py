@@ -258,6 +258,27 @@ ADOPTED_FILL_WINDOW_MS = 12 * 60 * 60 * 1000
 _ADOPTED_REAL_MODES = frozenset({"LIVE", "DEMO"})
 
 
+def _is_boolean(value: Any) -> bool:
+    """``True``/``False`` and numpy's ``bool_``: neither is ever a time, a price or a size."""
+    return isinstance(value, bool) or type(value).__name__ in ("bool", "bool_")
+
+
+def _finite_positive(value: Any) -> float | None:
+    """A finite number > 0 (numeric strings count as numbers), else ``None``.
+
+    Every comparison that decides "these two figures agree" must be written as a
+    *positive* test on a value that went through here: ``abs(a - b) > tol`` is
+    False for NaN, so a NaN price or size used to read as "the same" (reviewer
+    finding F3 on #117)."""
+    if _is_boolean(value):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) and number > 0 else None
+
+
 def _positive_ms(value: Any) -> int | None:
     """An epoch-millisecond timestamp, or ``None`` when there is no usable one.
 
@@ -270,7 +291,7 @@ def _positive_ms(value: Any) -> int | None:
     with each other -- so the adopted-fill matching and the unmatched-fill
     filter must both go through this and fail closed (reviewer findings on #117).
     """
-    if isinstance(value, bool):
+    if _is_boolean(value):
         return None
     try:
         ms = float(value)
@@ -317,14 +338,14 @@ def match_fills_to_adopted_events(
             continue
         et = e.get("event_type")
         if et == "position_recovered":
-            qty, price, entry = to_float(e.get("volume")), to_float(e.get("entry_price")), True
+            qty, price, entry = _finite_positive(e.get("volume")), _finite_positive(e.get("entry_price")), True
         elif et == "trade_close":
-            qty, price, entry = to_float(e.get("exit_volume")), to_float(e.get("exit_price")), False
+            qty, price, entry = _finite_positive(e.get("exit_volume")), _finite_positive(e.get("exit_price")), False
         else:
             continue
         side = str(e.get("side") or "").lower()
         event_ms = _positive_ms(e.get("event_epoch_ms"))
-        if side not in ("long", "short") or qty <= 0 or price <= 0 or event_ms is None:
+        if side not in ("long", "short") or qty is None or price is None or event_ms is None:
             continue
         fill_side = ("buy" if side == "long" else "sell") if entry else ("sell" if side == "long" else "buy")
         candidates.append({
@@ -343,9 +364,12 @@ def match_fills_to_adopted_events(
                 continue
             if norm_symbol(f.get("symbol")) != c["symbol"] or str(f.get("side") or "").lower() != c["side"]:
                 continue
-            if abs(to_float(f.get("quantity")) - c["qty"]) > 1e-9:
+            fill_qty, fill_price = _finite_positive(f.get("quantity")), _finite_positive(f.get("price"))
+            if fill_qty is None or fill_price is None:
                 continue
-            if abs(to_float(f.get("price")) - c["price"]) > max(1e-9, abs(c["price"]) * 1e-9):
+            if not abs(fill_qty - c["qty"]) <= 1e-9:
+                continue
+            if not abs(fill_price - c["price"]) <= max(1e-9, c["price"] * 1e-9):
                 continue
             if best is None or fill_ms < (_positive_ms(fills[best].get("time_ms")) or fill_ms):
                 best = i
@@ -442,7 +466,7 @@ def _ledger_positions(
             pos[sym] = pos.get(sym, 0.0) - to_float(e.get("exit_volume") or e.get("entry_volume"))
         elif et in CLOSE_MARKERS:
             pos[sym] = 0.0
-    return {s: q for s, q in pos.items() if abs(q) > 1e-9}
+    return {s: q for s, q in pos.items() if not abs(q) <= 1e-9}  # NaN is kept: it must not read as flat
 
 
 def exchange_ledger_compare(
@@ -497,7 +521,7 @@ def exchange_ledger_compare(
     for sym in sorted(set(ledger_pos) | set(ex_pos)):
         lq = ledger_pos.get(sym, 0.0)
         eq = ex_pos.get(sym, 0.0)
-        if abs(lq - eq) > 1e-6:
+        if not abs(lq - eq) <= 1e-6:  # NaN on either side is a mismatch
             position_diffs.append({"symbol": sym, "ledger_qty": lq, "exchange_qty": eq})
 
     # A fill whose time cannot be read is kept (never silently dropped): the

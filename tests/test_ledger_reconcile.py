@@ -789,3 +789,78 @@ def test_the_window_edge_is_inclusive_and_one_millisecond_more_is_not():
     just_past = _adopt_fill(1002, "buy", 84593.6, 0.002, _ADOPT_T0 - 1)
     assert lr.match_fills_to_adopted_events([on_edge], [_recovered(ms=event_ms)], norm_symbol=norm_symbol_plain) != {}
     assert lr.match_fills_to_adopted_events([just_past], [_recovered(ms=event_ms)], norm_symbol=norm_symbol_plain) == {}
+
+
+# --- reviewer finding F3 on #117: NaN price/size must never read as "equal" ---
+class bool_:  # stands in for numpy.bool_ (same type name, no numpy dependency)
+    def __float__(self):
+        return 1.0
+
+
+_BAD_FIGURES = [float("nan"), "nan", float("inf"), float("-inf"), "inf", 0, -1, None, "", True, False,
+                "abc", bool_()]
+
+
+@pytest.mark.parametrize("bad", _BAD_FIGURES)
+@pytest.mark.parametrize("field", ["price", "quantity"])
+def test_a_fill_with_an_unusable_price_or_size_is_never_matched(bad, field):
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), field: bad}
+    assert lr.match_fills_to_adopted_events([fill], [_recovered()], norm_symbol=norm_symbol_plain) == {}
+
+
+@pytest.mark.parametrize("bad", _BAD_FIGURES)
+@pytest.mark.parametrize("field", ["volume", "entry_price"])
+def test_a_ledger_row_with_an_unusable_price_or_size_explains_nothing(bad, field):
+    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
+    event = _recovered(**{field: bad})
+    assert lr.match_fills_to_adopted_events([fill], [event], norm_symbol=norm_symbol_plain) == {}
+
+
+@pytest.mark.parametrize("bad", _BAD_FIGURES)
+@pytest.mark.parametrize("field", ["price", "quantity"])
+def test_an_unusable_fill_price_or_size_stays_unmatched_end_to_end(bad, field):
+    """The reviewer's reproduction: valid times, ledger row normal, position already
+    agrees -- only the fill's price or size is NaN / "nan" / inf.  It must not
+    become RECONCILED."""
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), field: bad}
+    verdict = _compare_with_position([fill], [_recovered()])
+    assert verdict["value"] == "DIVERGED"
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
+    assert "fills_matched_to_adopted_events" not in verdict["evidence"]
+
+
+@pytest.mark.parametrize("bad", _BAD_FIGURES)
+@pytest.mark.parametrize("field", ["volume", "entry_price"])
+def test_an_unusable_ledger_price_or_size_stays_unmatched_end_to_end(bad, field):
+    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
+    verdict = _compare_with_position([fill], [_recovered(**{field: bad})])
+    assert verdict["value"] != "RECONCILED"
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
+
+
+@pytest.mark.parametrize("bad", ["nan", float("nan")])
+def test_a_nan_ledger_position_is_a_mismatch_not_flat(bad):
+    """Same family: ``abs(a - b) > tol`` and ``abs(q) > 1e-9`` are both False for NaN, which
+    used to drop a NaN ledger position and read the account as flat/agreeing."""
+    state = _adopt_state([])  # exchange holds nothing
+    verdict = exchange_ledger_compare(
+        state, [_recovered(volume=bad)], is_paper=_seykota_style_paper, norm_symbol=norm_symbol_plain,
+        open_event_types=frozenset({"trade_open", "position_recovered"}), include_pending_markers=False, now=NOW,
+    )
+    assert verdict["value"] == "DIVERGED"
+    assert verdict["evidence"]["position_diffs"]
+
+
+def test_numpy_style_booleans_are_not_times():
+    assert lr._positive_ms(bool_()) is None
+    assert lr._finite_positive(bool_()) is None
+    assert lr._finite_positive("84593.6") == 84593.6
+
+
+def test_the_usual_figures_still_match_with_the_positive_comparisons():
+    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
+    assert lr.match_fills_to_adopted_events([fill], [_recovered()], norm_symbol=norm_symbol_plain) != {}
+    within = {**fill, "price": 84593.6 + 1e-6}  # inside the 1e-9 relative tolerance (~8.5e-5 here)
+    assert lr.match_fills_to_adopted_events([within], [_recovered()], norm_symbol=norm_symbol_plain) != {}
+    other = {**fill, "price": 84593.6 + 1.0}
+    assert lr.match_fills_to_adopted_events([other], [_recovered()], norm_symbol=norm_symbol_plain) == {}
