@@ -588,3 +588,279 @@ def test_an_empty_or_missing_list_leaves_the_document_exactly_as_before():
     assert json.dumps(without, sort_keys=True) == json.dumps(empty, sort_keys=True)
     assert sorted(without) == ["checked_at", "discrepancies", "last_reconciled_at", "note", "scope", "sheet_name", "summary", "value"]
     assert sorted(without["summary"]) == ["actionable", "by_kind", "discrepancies", "local_trades", "sheet_rows"]
+
+
+# --------------------------------------------------------------------------- #
+# adopted positions / reconciled native-stop closes carry no order_id
+# (2026-10-03 trend-strategy demo incident: two real fills stayed DIVERGED)
+# --------------------------------------------------------------------------- #
+_ADOPT_T0 = FETCHED_MS - 3_600_000  # an hour before the snapshot
+
+
+def _seykota_style_paper(e):
+    """Mirrors the trend strategy: a LIVE/DEMO close with a real exit price is real."""
+    if str(e.get("source") or "") in {"dry_run", "dry_run_signal", "dry_run_simulated"}:
+        return True
+    if e.get("event_type") in ("trade_open", "trade_close") and e.get("order_id") is None:
+        return not (e.get("event_type") == "trade_close"
+                    and str(e.get("execution_mode") or "").upper() in ("LIVE", "DEMO")
+                    and to_float(e.get("exit_price")) > 0)
+    return False
+
+
+def _adopt_state(fills):
+    return {"schema_version": RECONCILE_SOURCE_SCHEMA, "fetched_at": FETCHED_AT,
+            "fetch_status": {"complete": True, "errors": []}, "positions": [], "fills": fills}
+
+
+def _adopt_fill(order_id, side, price, qty, ms):
+    return {"order_id": order_id, "trade_id": order_id + 1, "symbol": "BTCUSDT", "side": side,
+            "price": price, "quantity": qty, "time_ms": ms}
+
+
+def _recovered(price=84593.6, qty=0.002, ms=None, **over):
+    event = {"event_type": "position_recovered", "symbol": "BTCUSDT", "side": "long", "volume": qty,
+             "entry_price": price, "order_id": None, "execution_mode": "DEMO",
+             "source": "exchange_position_sync", "trade_id": "BTCUSDT-adopted-1", "event_id": "r1",
+             "event_epoch_ms": ms if ms is not None else _ADOPT_T0 + 17_000}
+    event.update(over)
+    return event
+
+
+def _native_close(price=84586.0, qty=0.002, ms=None, **over):
+    event = {"event_type": "trade_close", "symbol": "BTCUSDT", "side": "long", "exit_volume": qty,
+             "exit_price": price, "order_id": None, "execution_mode": "DEMO",
+             "source": "native_stop_reconciled", "trade_id": "BTCUSDT-adopted-1", "event_id": "c1",
+             "event_epoch_ms": ms if ms is not None else _ADOPT_T0 + 133_000}
+    event.update(over)
+    return event
+
+
+def _adopt_compare(fills, events):
+    return exchange_ledger_compare(
+        _adopt_state(fills), events, is_paper=_seykota_style_paper, norm_symbol=norm_symbol_plain,
+        open_event_types=frozenset({"trade_open", "position_recovered"}), include_pending_markers=False,
+        now=NOW,
+    )
+
+
+def _incident_fills():
+    return [_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0),
+            _adopt_fill(1002, "sell", 84586.0, 0.002, _ADOPT_T0 + 104_000)]
+
+
+def test_fills_behind_an_adopted_position_and_its_native_close_are_accounted_for():
+    verdict = _adopt_compare(_incident_fills(), [_recovered(), _native_close()])
+    assert verdict["value"] == "RECONCILED"
+    assert verdict["evidence"]["unmatched_exchange_fills"] == []
+    matched = verdict["evidence"]["fills_matched_to_adopted_events"]
+    assert [m["order_id"] for m in matched] == [1001, 1002]
+    assert {m["ledger_trade_id"] for m in matched} == {"BTCUSDT-adopted-1"}
+
+
+def test_without_the_ledger_rows_the_same_fills_still_diverge():
+    verdict = _adopt_compare(_incident_fills(), [_recovered(order_id=None, event_type="trade_open",
+                                                            source="dry_run_signal")])
+    # a dry-run row is not real, so there is no real ledger at all
+    assert verdict["value"] == "UNKNOWN"
+    verdict = _adopt_compare(_incident_fills(), [_recovered(ms=_ADOPT_T0 + 17_000, event_type="trade_open",
+                                                            order_id=7)])
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001, 1002]
+
+
+def test_a_duplicated_send_is_not_hidden_by_one_adopted_event():
+    fills = [_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0),
+             _adopt_fill(1003, "buy", 84593.6, 0.002, _ADOPT_T0 + 1_000)]  # same price and size, second order
+    verdict = _adopt_compare(fills, [_recovered()])
+    unmatched = verdict["evidence"]["unmatched_exchange_fills"]
+    assert [f["order_id"] for f in unmatched] == [1003]  # only one fill is explained by the one event
+    assert verdict["value"] == "DIVERGED"
+
+
+@pytest.mark.parametrize("fill_over", [
+    {"price": 84593.7},                      # price differs
+    {"quantity": 0.003},                     # size differs
+    {"side": "sell"},                        # wrong side for the entry of a long
+    {"symbol": "ETHUSDT"},                   # other symbol
+    {"time_ms": _ADOPT_T0 + 1_000_000},      # fill happened after the ledger row
+    {"time_ms": _ADOPT_T0 - 13 * 3_600_000},  # fill far too long before the ledger row
+])
+def test_a_fill_that_does_not_line_up_exactly_stays_unmatched(fill_over):
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), **fill_over}
+    verdict = _adopt_compare([fill], [_recovered()])
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
+
+
+@pytest.mark.parametrize("event_over", [
+    {"order_id": 555},                       # has an order id: the order-id comparison owns it
+    {"execution_mode": "DRY_RUN"},           # not a real-money or demo row
+    {"source": "dry_run_signal"},
+    {"side": "short"},                       # an entry of a short would be a sell
+])
+def test_ledger_rows_that_are_not_adopted_real_rows_explain_nothing(event_over):
+    fills = [_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)]
+    matched = lr.match_fills_to_adopted_events(fills, [_recovered(**event_over)], norm_symbol=norm_symbol_plain)
+    assert matched == {}
+
+
+def test_the_exit_of_a_short_is_a_buy():
+    fills = [_adopt_fill(2001, "sell", 100.0, 1.0, _ADOPT_T0), _adopt_fill(2002, "buy", 99.0, 1.0, _ADOPT_T0 + 60_000)]
+    events = [_recovered(price=100.0, qty=1.0, side="short"), _native_close(price=99.0, qty=1.0, side="short")]
+    assert sorted(lr.match_fills_to_adopted_events(fills, events, norm_symbol=norm_symbol_plain)) == [0, 1]
+
+
+# --- reviewer finding on #117: a missing/zero/garbled time must fail closed ---
+_BAD_TIMES = [None, 0, "", "abc", -5, float("nan"), float("inf"), float("-inf"), True, False, 0.5, 10 ** 400]
+
+
+@pytest.mark.parametrize("bad", _BAD_TIMES)
+def test_a_ledger_row_without_a_usable_time_explains_nothing(bad):
+    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
+    matched = lr.match_fills_to_adopted_events([fill], [_recovered(event_epoch_ms=bad)], norm_symbol=norm_symbol_plain)
+    assert matched == {}
+
+
+@pytest.mark.parametrize("bad", _BAD_TIMES)
+def test_a_fill_without_a_usable_time_is_never_matched(bad):
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), "time_ms": bad}
+    matched = lr.match_fills_to_adopted_events([fill], [_recovered()], norm_symbol=norm_symbol_plain)
+    assert matched == {}
+
+
+def _adopt_state_with_position(fills):
+    """Position already agrees with the ledger (0.002 BTC), so the verdict can
+    only be driven by the fill -- the reviewer's reproduction."""
+    state = _adopt_state(fills)
+    state["positions"] = [{"symbol": "BTCUSDT", "quantity": 0.002}]
+    return state
+
+
+def _compare_with_position(fills, events):
+    return exchange_ledger_compare(
+        _adopt_state_with_position(fills), events, is_paper=_seykota_style_paper, norm_symbol=norm_symbol_plain,
+        open_event_types=frozenset({"trade_open", "position_recovered"}), include_pending_markers=False, now=NOW,
+    )
+
+
+@pytest.mark.parametrize("bad", _BAD_TIMES)
+def test_an_unusable_fill_time_keeps_the_fill_unmatched_end_to_end(bad):
+    """NaN / +inf / bool / 0.5 / overflow on the *fill* must neither match nor
+    silently disappear in the grace filter: the fill stays in unmatched and the
+    verdict is not RECONCILED."""
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), "time_ms": bad}
+    verdict = _compare_with_position([fill], [_recovered()])
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
+    assert "fills_matched_to_adopted_events" not in verdict["evidence"]
+    assert verdict["value"] == "DIVERGED"
+
+
+@pytest.mark.parametrize("bad", _BAD_TIMES)
+def test_an_unusable_time_on_both_sides_never_lines_up_end_to_end(bad):
+    """The reviewer's reproduction, now for every unusable value: ledger row and
+    fill both carry the same bad time, everything else identical."""
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), "time_ms": bad}
+    if bad == "abc":
+        # A garbled *string* on the ledger side already makes the older raw
+        # ``> cutoff`` comparisons raise TypeError; the strategy wrappers turn
+        # that into an UNKNOWN verdict.  That is existing, stricter-than-needed
+        # fail-closed behaviour (the whole comparison aborts), kept on purpose.
+        with pytest.raises(TypeError):
+            _compare_with_position([fill], [_recovered(event_epoch_ms=bad)])
+        return
+    verdict = _compare_with_position([fill], [_recovered(event_epoch_ms=bad)])
+    assert verdict["value"] != "RECONCILED"
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
+    assert "fills_matched_to_adopted_events" not in verdict["evidence"]
+
+
+def test_a_numeric_string_time_is_read_as_a_number():
+    from trade_alerts.ledger_reconcile import _positive_ms
+
+    assert _positive_ms("1788263700000") == 1788263700000
+    assert _positive_ms(1788263700000.0) == 1788263700000
+    assert _positive_ms(1) == 1 and _positive_ms(True) is None
+
+
+def test_the_window_edge_is_inclusive_and_one_millisecond_more_is_not():
+    from trade_alerts.ledger_reconcile import ADOPTED_FILL_WINDOW_MS
+
+    event_ms = _ADOPT_T0 + ADOPTED_FILL_WINDOW_MS
+    on_edge = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
+    just_past = _adopt_fill(1002, "buy", 84593.6, 0.002, _ADOPT_T0 - 1)
+    assert lr.match_fills_to_adopted_events([on_edge], [_recovered(ms=event_ms)], norm_symbol=norm_symbol_plain) != {}
+    assert lr.match_fills_to_adopted_events([just_past], [_recovered(ms=event_ms)], norm_symbol=norm_symbol_plain) == {}
+
+
+# --- reviewer finding F3 on #117: NaN price/size must never read as "equal" ---
+class bool_:  # stands in for numpy.bool_ (same type name, no numpy dependency)
+    def __float__(self):
+        return 1.0
+
+
+_BAD_FIGURES = [float("nan"), "nan", float("inf"), float("-inf"), "inf", 0, -1, None, "", True, False,
+                "abc", bool_()]
+
+
+@pytest.mark.parametrize("bad", _BAD_FIGURES)
+@pytest.mark.parametrize("field", ["price", "quantity"])
+def test_a_fill_with_an_unusable_price_or_size_is_never_matched(bad, field):
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), field: bad}
+    assert lr.match_fills_to_adopted_events([fill], [_recovered()], norm_symbol=norm_symbol_plain) == {}
+
+
+@pytest.mark.parametrize("bad", _BAD_FIGURES)
+@pytest.mark.parametrize("field", ["volume", "entry_price"])
+def test_a_ledger_row_with_an_unusable_price_or_size_explains_nothing(bad, field):
+    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
+    event = _recovered(**{field: bad})
+    assert lr.match_fills_to_adopted_events([fill], [event], norm_symbol=norm_symbol_plain) == {}
+
+
+@pytest.mark.parametrize("bad", _BAD_FIGURES)
+@pytest.mark.parametrize("field", ["price", "quantity"])
+def test_an_unusable_fill_price_or_size_stays_unmatched_end_to_end(bad, field):
+    """The reviewer's reproduction: valid times, ledger row normal, position already
+    agrees -- only the fill's price or size is NaN / "nan" / inf.  It must not
+    become RECONCILED."""
+    fill = {**_adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0), field: bad}
+    verdict = _compare_with_position([fill], [_recovered()])
+    assert verdict["value"] == "DIVERGED"
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
+    assert "fills_matched_to_adopted_events" not in verdict["evidence"]
+
+
+@pytest.mark.parametrize("bad", _BAD_FIGURES)
+@pytest.mark.parametrize("field", ["volume", "entry_price"])
+def test_an_unusable_ledger_price_or_size_stays_unmatched_end_to_end(bad, field):
+    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
+    verdict = _compare_with_position([fill], [_recovered(**{field: bad})])
+    assert verdict["value"] != "RECONCILED"
+    assert [f["order_id"] for f in verdict["evidence"]["unmatched_exchange_fills"]] == [1001]
+
+
+@pytest.mark.parametrize("bad", ["nan", float("nan")])
+def test_a_nan_ledger_position_is_a_mismatch_not_flat(bad):
+    """Same family: ``abs(a - b) > tol`` and ``abs(q) > 1e-9`` are both False for NaN, which
+    used to drop a NaN ledger position and read the account as flat/agreeing."""
+    state = _adopt_state([])  # exchange holds nothing
+    verdict = exchange_ledger_compare(
+        state, [_recovered(volume=bad)], is_paper=_seykota_style_paper, norm_symbol=norm_symbol_plain,
+        open_event_types=frozenset({"trade_open", "position_recovered"}), include_pending_markers=False, now=NOW,
+    )
+    assert verdict["value"] == "DIVERGED"
+    assert verdict["evidence"]["position_diffs"]
+
+
+def test_numpy_style_booleans_are_not_times():
+    assert lr._positive_ms(bool_()) is None
+    assert lr._finite_positive(bool_()) is None
+    assert lr._finite_positive("84593.6") == 84593.6
+
+
+def test_the_usual_figures_still_match_with_the_positive_comparisons():
+    fill = _adopt_fill(1001, "buy", 84593.6, 0.002, _ADOPT_T0)
+    assert lr.match_fills_to_adopted_events([fill], [_recovered()], norm_symbol=norm_symbol_plain) != {}
+    within = {**fill, "price": 84593.6 + 1e-6}  # inside the 1e-9 relative tolerance (~8.5e-5 here)
+    assert lr.match_fills_to_adopted_events([within], [_recovered()], norm_symbol=norm_symbol_plain) != {}
+    other = {**fill, "price": 84593.6 + 1.0}
+    assert lr.match_fills_to_adopted_events([other], [_recovered()], norm_symbol=norm_symbol_plain) == {}
