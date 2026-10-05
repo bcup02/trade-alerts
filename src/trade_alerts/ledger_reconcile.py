@@ -458,6 +458,67 @@ def unsettled_pending_markers(
 # Layer 1 -- ledger vs exchange
 # --------------------------------------------------------------------------- #
 
+def _id_text(value: Any) -> str | None:
+    """A usable identifier as text: a non-empty string or an int (never a bool, list,
+    dict, ...), else ``None``.  Nothing unhashable ever reaches a comparison."""
+    if _is_boolean(value):
+        return None
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, int):
+        return str(value)
+    return None
+
+
+def _adoption_twin_positions(
+    real_events: list[dict[str, Any]], *, cutoff_ms: int,
+    norm_symbol: Callable[[Any], str], open_event_types: frozenset[str],
+) -> set[int]:
+    """Indexes of ``position_recovered`` rows that are the second record of an opening
+    a ``trade_open`` already records.
+
+    The trend/momentum interrupted-entry adoption writes a ``position_recovered`` *and*
+    a ``trade_open`` for one opening; counting both reads the position double (reviewer
+    finding F1 on momentum #118).  A recovered row is collapsed into a ``trade_open``
+    only when the pair is PROVABLY the same opening -- the same ``trade_id``, the same
+    symbol, the same size, and a shared link: the same ``recovered_from_attempt_event_id``
+    or the same ``order_id`` (both non-empty).  Same ``trade_id`` alone is not enough: an
+    add to an adopted trade shares it (finding F1 on #123).  Pairs are one-to-one, only
+    rows at or before the snapshot are considered, and anything that cannot be proved
+    stays counted (it can only read as a divergence, never hide one)."""
+    if _ADOPTION_OPEN_TYPE not in open_event_types:
+        return set()
+
+    def usable(e: dict[str, Any]) -> bool:
+        return (e.get("event_epoch_ms") or 0) <= cutoff_ms and bool(norm_symbol(e.get("symbol")))
+
+    opens = [(i, e) for i, e in enumerate(real_events)
+             if usable(e) and e.get("event_type") in open_event_types and e.get("event_type") != _ADOPTION_OPEN_TYPE]
+    used: set[int] = set()
+    skip: set[int] = set()
+    for i, r in enumerate(real_events):
+        if r.get("event_type") != _ADOPTION_OPEN_TYPE or not usable(r):
+            continue
+        tid, r_vol = _id_text(r.get("trade_id")), _finite_positive(r.get("volume"))
+        if tid is None or r_vol is None:
+            continue
+        r_attempt, r_order = _id_text(r.get("recovered_from_attempt_event_id")), _id_text(r.get("order_id"))
+        for j, o in opens:
+            if j in used or _id_text(o.get("trade_id")) != tid:
+                continue
+            if norm_symbol(o.get("symbol")) != norm_symbol(r.get("symbol")):
+                continue
+            o_vol = _finite_positive(o.get("volume"))
+            if o_vol is None or not abs(o_vol - r_vol) <= 1e-9:
+                continue
+            o_attempt, o_order = _id_text(o.get("recovered_from_attempt_event_id")), _id_text(o.get("order_id"))
+            if (r_attempt is not None and r_attempt == o_attempt) or (r_order is not None and r_order == o_order):
+                used.add(j)
+                skip.add(i)
+                break
+    return skip
+
+
 def _ledger_positions(
     real_events: list[dict[str, Any]], *, cutoff_ms: int,
     norm_symbol: Callable[[Any], str], open_event_types: frozenset[str],
@@ -467,28 +528,17 @@ def _ledger_positions(
     exchange snapshot time) are counted -- a close recorded *after* the snapshot
     cannot be expected to show in it yet, so it is left for the PENDING path
     rather than read as a divergence."""
-    # An interrupted entry the strategy adopted is written as a ``position_recovered``
-    # *and* a ``trade_open`` under the same ``trade_id`` -- two records of ONE opening.
-    # Count the ``trade_open`` (the entry fact) and skip the adoption record of such a
-    # trade, or the ledger reads double (reviewer finding F1 on momentum #118).  Only a
-    # proven same-``trade_id`` pair is collapsed: separate ``trade_open`` rows (adds) all
-    # count, and a recovered row with no ``trade_id`` is never assumed to be a duplicate.
-    opened_by_trade_open: set[str] = set()
-    if _ADOPTION_OPEN_TYPE in open_event_types:
-        for e in real_events:
-            tid = e.get("trade_id")
-            if (e.get("event_epoch_ms") or 0) <= cutoff_ms and isinstance(tid, str) and tid \
-                    and e.get("event_type") in open_event_types and e.get("event_type") != _ADOPTION_OPEN_TYPE:
-                opened_by_trade_open.add(tid)
+    skip = _adoption_twin_positions(
+        real_events, cutoff_ms=cutoff_ms, norm_symbol=norm_symbol, open_event_types=open_event_types)
     pos: dict[str, float] = {}
-    for e in real_events:
+    for i, e in enumerate(real_events):
         if (e.get("event_epoch_ms") or 0) > cutoff_ms:
             continue
         sym = norm_symbol(e.get("symbol"))
         if not sym:
             continue
         et = e.get("event_type")
-        if et == _ADOPTION_OPEN_TYPE and et in open_event_types and e.get("trade_id") in opened_by_trade_open:
+        if i in skip:
             continue
         if et in open_event_types:
             pos[sym] = pos.get(sym, 0.0) + to_float(e.get("volume"))

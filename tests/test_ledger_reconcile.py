@@ -999,3 +999,52 @@ def test_a_trade_open_newer_than_the_snapshot_does_not_erase_the_recovered_row()
     events = [_recovered(order_id="7001"), _trade_open_row(ms=FETCHED_MS + 60_000)]
     verdict = _both_types_compare([_held_btc(0.002)], events)
     assert verdict["evidence"]["position_diffs"] == []
+
+
+# --- F1/F2 on #123: same trade_id is a candidate, not proof of one opening ---
+def test_an_add_to_an_adopted_trade_is_not_swallowed():
+    """The reviewer's reproduction: recovered 3.0 (order 7001) + a later add of 1.0 (order 7002), same trade_id."""
+    events = [_recovered(volume=3.0, qty=3.0, order_id="7001", trade_id="t1"),
+              _trade_open_row(trade_id="t1", qty=1.0, order_id="7002", ms=_ADOPT_T0 + 60_000,
+                              recovered_from_attempt_event_id=None)]
+    held_one = _both_types_compare([_held_btc(1.0)], events)
+    assert [(d["ledger_qty"], d["exchange_qty"]) for d in held_one["evidence"]["position_diffs"]] == [(4.0, 1.0)]
+    assert held_one["value"] == "DIVERGED"
+    held_four = _both_types_compare([_held_btc(4.0)], events)
+    assert held_four["evidence"]["position_diffs"] == []
+
+
+@pytest.mark.parametrize("trade_id", [[], {}, ["t1"], {"a": 1}, 1.5, True])
+def test_an_unusable_trade_id_never_raises_and_is_counted(trade_id):
+    events = [_recovered(order_id="7001", trade_id=trade_id)]
+    verdict = _both_types_compare([_held_btc(0.002)], events)
+    assert verdict["evidence"]["position_diffs"] == []
+
+
+def test_a_twin_is_recognised_by_the_attempt_id_when_the_recovered_row_has_no_order_id():
+    events = [_recovered(order_id=None, recovered_from_attempt_event_id="a1"), _trade_open_row()]
+    verdict = _both_types_compare([_held_btc(0.002)], events)
+    assert verdict["evidence"]["position_diffs"] == []
+
+
+def test_same_trade_id_without_any_shared_link_is_not_collapsed():
+    events = [_recovered(order_id="7001", recovered_from_attempt_event_id="a1"),
+              _trade_open_row(order_id="7999", recovered_from_attempt_event_id="a2")]
+    verdict = _both_types_compare([_held_btc(0.002)], events)
+    assert [(d["ledger_qty"], d["exchange_qty"]) for d in verdict["evidence"]["position_diffs"]] == [(0.004, 0.002)]
+
+
+def test_a_linked_pair_with_different_sizes_is_not_collapsed():
+    events = [_recovered(order_id="7001", qty=0.002), _trade_open_row(qty=0.003)]
+    verdict = _both_types_compare([_held_btc(0.003)], events)
+    assert [(d["ledger_qty"], d["exchange_qty"]) for d in verdict["evidence"]["position_diffs"]] == [(0.005, 0.003)]
+
+
+def test_pairs_are_one_to_one():
+    """Two recovered rows share one trade_open: only one of them is its twin."""
+    events = [_recovered(order_id="7001", event_id="r1"), _recovered(order_id="7001", event_id="r2"),
+              _trade_open_row()]
+    verdict = _both_types_compare([_held_btc(0.004)], events)
+    assert verdict["evidence"]["position_diffs"] == []
+    verdict = _both_types_compare([_held_btc(0.002)], events)
+    assert [(d["ledger_qty"], d["exchange_qty"]) for d in verdict["evidence"]["position_diffs"]] == [(0.004, 0.002)]
