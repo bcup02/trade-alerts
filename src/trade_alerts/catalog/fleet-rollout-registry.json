@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-05",
+  "updated_at": "2026-10-06",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -52,7 +52,7 @@
     "btc-competition": {
       "repo": "AI-for-column/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "ac991321928266e3fedea709ac56ad0c7733696a"
+      "commit": "d27246ac5a77d7a36a526ea25d5c914e6e1707c7"
     }
   },
   "capabilities": [
@@ -75,7 +75,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:457 build_safe_halt（Phase 4c）"
+          "evidence": "src/btc_competition/runner.py:482 build_safe_halt（Phase 4c）"
         }
       }
     },
@@ -483,7 +483,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/executor.py:226 market_order：只有交易所明確拒絕（:108 _is_definite_rejection）才丟 OrderRejected 讓收斂迴圈重新規劃；結果不明（逾時、網路錯誤、OrderNotFound）改用同一個 client id 查單，:38 _ORDER_VISIBILITY_SECONDS 60 秒仍查不到就丟 :87 OrderOutcomeUnknown。src/btc_competition/runner.py:287 收到後本輪立刻停止送單，:384 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
+          "evidence": "src/btc_competition/executor.py:226 market_order：只有交易所明確拒絕（:108 _is_definite_rejection）才丟 OrderRejected 讓收斂迴圈重新規劃；結果不明（逾時、網路錯誤、OrderNotFound）改用同一個 client id 查單，:38 _ORDER_VISIBILITY_SECONDS 60 秒仍查不到就丟 :87 OrderOutcomeUnknown。src/btc_competition/runner.py:312 收到後本輪立刻停止送單，:384 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
         }
       }
     },
@@ -606,7 +606,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/graceful_stop.py:54 install_signal_handlers；src/btc_competition/runner.py:720 每日調整啟動時安裝；deploy/btc-competition-bot.service:18 TimeoutStopSec=600。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。限制：競賽沒有常駐程序，A1 上還沒有在每日調整進行中被停止過，「送完手上那張單再停」只在開發機 DEMO 驗證，正式機沒有實測。"
+          "evidence": "src/btc_competition/graceful_stop.py:54 install_signal_handlers；src/btc_competition/runner.py:826 每日調整啟動時安裝；deploy/btc-competition-bot.service:18 TimeoutStopSec=600。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。限制：競賽沒有常駐程序，A1 上還沒有在每日調整進行中被停止過，「送完手上那張單再停」只在開發機 DEMO 驗證，正式機沒有實測。"
         }
       }
     },
@@ -629,7 +629,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/trade_ledger.py:140 order_attempt；src/btc_competition/runner.py:276 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:84 重啟後的補記輪讀沒結清的 order_attempt，依交易所回答補寫成交或標記結清。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO；A1 正式機沒有發生過被中斷的調整。"
+          "evidence": "src/btc_competition/trade_ledger.py:140 order_attempt；src/btc_competition/runner.py:300 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:84 重啟後的補記輪讀沒結清的 order_attempt，依交易所回答補寫成交或標記結清。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO；A1 正式機沒有發生過被中斷的調整。"
         }
       }
     },
@@ -984,7 +984,7 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:457 暫停並等人以 btc-competition-resume 解除"
+          "evidence": "src/btc_competition/runner.py:482 暫停並等人以 btc-competition-resume 解除"
         }
       },
       "emits_event": {
@@ -1017,7 +1017,7 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/executor.py:307 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:287 收到後本輪停止送單，src/btc_competition/runner.py:384 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:444 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
+          "evidence": "src/btc_competition/executor.py:307 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:312 收到後本輪停止送單，src/btc_competition/runner.py:409 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:469 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
         }
       },
       "emits_event": {
@@ -1048,16 +1048,14 @@
       "code": "BTC.RUNTIME_CYCLE_FAILED",
       "behaviour": {
         "btc-competition": {
-          "state": "pending",
-          "phase": "t9-competition-retry",
-          "reason": "2026-10-05 使用者決定（t9）：還沒送單的失敗當天自動重試（同一程序內等 15 分鐘後重跑、共 3 次，次數記在狀態檔；不用 systemd 自動重啟），第 3 次失敗或送單之後才失敗才升格通知。程式與服務設定在競賽 PR #45（審閱、合併後上開發機實測），A1 正式機（新）還沒部署，上線後改已做；正式機現在仍是「寫錯誤心跳、隔天重試」。"
+          "state": "done",
+          "evidence": "src/btc_competition/runner.py:557 _record_run_failure：送單前失敗當天重試（最多 3 次，次數存狀態檔）、第 3 次或已送單才升格；src/btc_competition/runner.py:871 同一程序內等 15 分鐘後重跑；src/btc_competition/runner.py:305 第一筆單送出前才設 orders_attempted；deploy/btc-competition-bot.service:22 TimeoutStartSec=3600（無 Restart=）"
         }
       },
       "emits_event": {
         "btc-competition": {
-          "state": "pending",
-          "phase": "8-btc-competition",
-          "reason": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。 升格事件（R2、escalated）隨 t9 一起部署。"
+          "state": "done",
+          "evidence": "src/btc_competition/runner.py:613 第 3 次失敗、已送單或次數無法保存時寫 R2 RUNTIME_CYCLE_FAILED（escalated），由 unrecorded-fill 作業匯出給維運通知；前兩次 src/btc_competition/runner.py:597 只寫 R0"
         }
       }
     },
@@ -1755,9 +1753,18 @@
     {
       "kind": "rule",
       "id": "BTC.RUNTIME_CYCLE_FAILED",
+      "aspect": "behaviour",
       "project": "btc-competition",
-      "type": "updated",
-      "note": "重試改成同一程序內等 15 分鐘後重跑（不用 systemd 自動重啟，避免被強制終止的程序在送單後被重跑）；其餘不變，仍是待辦（A1 未部署）。"
+      "type": "completed",
+      "note": "競賽策略失敗時當天重試（送單前的失敗最多 3 次、每次間隔 15 分鐘，同一程序內），已部署 A1 正式機（新）（台北 2026-10-06 11:45），改已做。"
+    },
+    {
+      "kind": "rule",
+      "id": "BTC.RUNTIME_CYCLE_FAILED",
+      "aspect": "emits_event",
+      "project": "btc-competition",
+      "type": "completed",
+      "note": "第 3 次失敗、已送單或次數無法保存時寫 R2 升格事件，同批部署上線，改已做。競賽 sources 換到新的 operations 版，引用行號已逐筆比對舊新行文字。"
     }
   ]
 }
