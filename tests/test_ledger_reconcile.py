@@ -501,6 +501,58 @@ def test_open_recent_but_already_closed_trade_missing_row_waits_for_the_open_row
     assert doc["value"] == "RECONCILED"
 
 
+def test_future_event_time_is_never_graced():
+    # B1 (review on #138): a timestamp far in the future must not look "recent" and hide a missing row
+    future = NOW_MS + 30 * 24 * 3600 * 1000
+    doc = _cmp(_trade("t1", opened_ms=future), [])
+    assert doc["value"] == "DIVERGED" and doc["discrepancies"][0]["kind"] == "SHEET_MISSING_ROW"
+    closed = _trade("t2", closed=True, close_event=_CLOSE, opened_ms=1, closed_ms=future)
+    doc2 = _cmp(closed, [_row(10, trade_id="t2")])
+    assert doc2["value"] == "DIVERGED" and doc2["discrepancies"][0]["kind"] == "SHEET_MISSING_CLOSE"
+    # and it stays a divergence an hour later, not "pending forever"
+    later = sheet_ledger_compare(_trade("t1", opened_ms=future), [], sheet_name="S",
+                                 norm_symbol=norm_symbol_plain,
+                                 now=datetime.fromtimestamp(NOW_MS / 1000 + 3700, timezone.utc))
+    assert later["value"] == "DIVERGED"
+
+
+def test_small_clock_jitter_ahead_is_still_graced_but_five_minutes_plus_is_not():
+    ahead_ok = _cmp(_trade("t1", opened_ms=NOW_MS + 5 * 60_000), [])        # exactly the allowance
+    assert ahead_ok["value"] == "RECONCILED" and ahead_ok["discrepancies"][0]["detail"]["age_seconds"] == 0
+    ahead_bad = _cmp(_trade("t1", opened_ms=NOW_MS + 5 * 60_000 + 1), [])   # one ms beyond
+    assert ahead_bad["value"] == "DIVERGED"
+
+
+def test_close_grace_boundary_is_inclusive_and_one_ms_later_diverges():
+    ok = _cmp(_trade("t1", closed=True, close_event=_CLOSE, opened_ms=1, closed_ms=NOW_MS - 3600 * 1000),
+              [_row(10, trade_id="t1")])
+    assert ok["value"] == "RECONCILED"
+    bad = _cmp(_trade("t1", closed=True, close_event=_CLOSE, opened_ms=1, closed_ms=NOW_MS - 3600 * 1000 - 1),
+               [_row(10, trade_id="t1")])
+    assert bad["value"] == "DIVERGED" and bad["discrepancies"][0]["kind"] == "SHEET_MISSING_CLOSE"
+
+
+def test_missing_row_with_unknown_open_time_falls_back_to_the_close_time():
+    pending = _cmp(_trade("t1", closed=True, close_event=_CLOSE, opened_ms=0, closed_ms=NOW_MS - 60_000), [])
+    assert pending["value"] == "RECONCILED" and pending["discrepancies"][0]["detail"]["awaiting"] == "open_row"
+    unknown = _cmp(_trade("t1", closed=True, close_event=_CLOSE, opened_ms=0, closed_ms=0), [])
+    assert unknown["value"] == "DIVERGED"
+
+
+def test_old_open_with_a_fresh_close_and_no_row_at_all_is_still_a_divergence():
+    # the open was 2 h ago: the row should have been on the sheet long ago, the fresh close must not mask that
+    trades = _trade("t1", closed=True, close_event=_CLOSE, opened_ms=NOW_MS - 2 * 3600 * 1000,
+                    closed_ms=NOW_MS - 60_000)
+    doc = _cmp(trades, [])
+    assert doc["value"] == "DIVERGED" and doc["discrepancies"][0]["kind"] == "SHEET_MISSING_ROW"
+
+
+def test_pending_next_to_a_ledger_missing_row_still_diverges():
+    doc = _cmp(_trade("new", opened_ms=NOW_MS - 20_000), [_row(5, trade_id="ghost", exit_time="2026-09-01")])
+    assert sorted(d["kind"] for d in doc["discrepancies"]) == ["LEDGER_MISSING_ROW", "projection_pending"]
+    assert doc["value"] == "DIVERGED"
+
+
 def test_close_markers_constant_exposed():
     assert "position_reconciled_closed" in CLOSE_MARKERS
 

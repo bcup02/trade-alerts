@@ -104,6 +104,12 @@ SHEET_INFO_KINDS = ("estimate_superseded", "trade_id_mismatch", "projection_pend
 #: drain intervals, the same window ``btc_competition.reconcile_google`` already uses.
 DEFAULT_SHEET_PROJECTION_GRACE_SECONDS = 3600
 
+#: How far ahead of the reconcile's clock an event time may be and still count as "just
+#: written" (clock jitter between the writer and the reconcile on one host).  Anything
+#: further in the future is a bad timestamp, not a recent event: it gets NO grace, so it can
+#: never keep a missing row looking healthy for days (review B1 on #138).
+_PROJECTION_FUTURE_SKEW_MS = 5 * 60 * 1000
+
 _FILL_GRACE_MS = 5 * 60 * 1000
 _PUBLISHED_MODE = 0o644
 
@@ -891,15 +897,20 @@ def sheet_ledger_compare(
     projection -- reported as the informational ``projection_pending`` kind, never as a
     divergence, so it cannot flip the verdict or raise the ops-notify alert.  Older than the
     window it is a real divergence again (a stuck queue stays visible).  A trade whose event
-    time cannot be read is never graced (``0`` disables the grace altogether)."""
+    time cannot be read, or lies more than five minutes in the future, is never graced
+    (``0`` disables the grace altogether)."""
     now = now or datetime.now(timezone.utc)
     checked_at = utc_now_iso(now)
     now_ms = int(now.timestamp() * 1000)
     grace_ms = max(0, int(projection_grace_seconds)) * 1000
 
     def _awaiting_projection(event_ms: int) -> bool:
-        # event_ms == 0 means "time unknown": keep it as a divergence, never silently grace it.
-        return grace_ms > 0 and event_ms > 0 and now_ms - event_ms <= grace_ms
+        # event_ms == 0 means "time unknown", and an event time more than the skew allowance in the
+        # future is a bad timestamp: both stay divergences, never silently graced.
+        if grace_ms <= 0 or event_ms <= 0:
+            return False
+        age_ms = now_ms - event_ms
+        return -_PROJECTION_FUTURE_SKEW_MS <= age_ms <= grace_ms
 
     def _pending_row(kind_awaiting: str, tid: str, rec: dict[str, Any],
                      sheet_row: Any, event_ms: int) -> dict[str, Any]:
