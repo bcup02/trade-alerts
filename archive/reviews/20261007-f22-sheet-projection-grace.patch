@@ -1,0 +1,350 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 6f461f0..a9b5326 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -909,3 +909,16 @@ trade-alerts：v0.27.6（錯誤清單：競賽 ERR-025 的重試改成同一程
+ 版本驗證／服務驗證／部署時間：待競賽釘版部署後補記。
+ 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.27.7（帳本↔Google 表對帳：剛開／剛平、還在等 Google 同步的交易不算對不上；f-22）
++變更摘要：1. sheet_ledger_compare 新增 projection_grace_seconds（預設 3600 秒＝四個同步週期，與競賽 reconcile_google 的寬限一致）：帳本裡新開（SHEET_MISSING_ROW）或新平（SHEET_MISSING_CLOSE）不到這段時間、表上還沒有的交易，改記為資訊類 projection_pending（divergence=False），不翻轉判定、不觸發維運通知的 ERR-044；超過寬限仍沒上表就照舊判 DIVERGED。事件時間讀不出來（0）、或比對帳時鐘晚超過 5 分鐘（壞時間，審閱 #138 B1）一律不給寬限；0 秒＝關閉寬限、行為與 v0.27.6 完全相同。
++          2. 原因：A1 上動能 2026-10-05 到 10-06 兩天 7 輪 DIVERGED 讀數（5 次 LINE 告警），每一輪都是 4 小時 K 棒進場／平倉後的 :15 或 :30，對帳與 Google 同步計時器同一分鐘觸發、對帳比表先讀（例：21:15:04 對帳、同輪同步 21:15:04.7 才送出），下一輪自己恢復。
++          3. 摘要欄 awaiting_projection 只在有等待中的交易時才出現（文件形狀其他情況不變）；一致、資訊類說明照既有 SHEET_INFO_KINDS 顯示在 note。
++          4. ERR-044 的自動處置與白話說明同步（60 分鐘寬限）；新增 15 個測試（拿掉寬限有 5 個、拿掉未來時間檢查有 2 個會失敗）；既有測試零改動。
++向後相容：沒有等待中的交易時輸出完全不變；不改其他判定（LEDGER_MISSING_ROW、SHEET_UNEXPECTED_CLOSE、VALUE_MISMATCH 都不給寬限）。
++受影響消費專案：動能、趨勢（共用 sheet_ledger_compare，釘此版後生效）；加密仍釘 v0.15.0（換 Binance 的 x3 升級共用庫時具備）；競賽有自己的 reconcile_google.py 與 3600 秒寬限，不需要這版。
++部署入口：各專案既有部署腳本（開發機 → 正式機）。
++版本驗證／服務驗證／部署時間：待動能、趨勢釘版部署後補記。
++交易安全：未啟用真倉、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 97c9c6f..d72bb10 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -1343,7 +1343,7 @@
+    "bot": "fleet",
+    "bot_label": "全機隊",
+    "code": "FLEET.OPS_GOOGLE_DIVERGED",
+-   "direction": "帳本是標準答案，Google 表會由背景工作重送追上。多數幾輪內自己恢復；一直對不上才代表同步卡住。",
++   "direction": "帳本是標準答案，Google 表會由背景工作重送追上。剛開倉或剛平倉不到 60 分鐘、還在等同步的交易不會觸發這則；收到時代表已經超過 60 分鐘沒上表、內容真的對不上，或帳本事件的時間讀不出來（這種不等 60 分鐘就會報），多半是同步卡住。",
+    "emits_event": {
+     "state": "n/a"
+    },
+diff --git a/pyproject.toml b/pyproject.toml
+index dbf0add..e87e7a7 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.27.6"
++version = "0.27.7"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index a511d97..dc1419a 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -150,6 +150,7 @@ from .ledger_reconcile import (
+     SHEET_COLUMN_INDEX,
+     SHEET_DIVERGENCE_KINDS,
+     SHEET_INFO_KINDS,
++    DEFAULT_SHEET_PROJECTION_GRACE_SECONDS,
+     SHEET_PAPER_MODES,
+     atomic_write,
+     env_float,
+@@ -315,6 +316,7 @@ __all__ = [
+     "SHEET_COLUMN_INDEX",
+     "SHEET_DIVERGENCE_KINDS",
+     "SHEET_INFO_KINDS",
++    "DEFAULT_SHEET_PROJECTION_GRACE_SECONDS",
+     "SHEET_PAPER_MODES",
+     "atomic_write",
+     "env_float",
+@@ -339,4 +341,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.27.6"
++__version__ = "0.27.7"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index bc37f31..3980b23 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -1401,14 +1401,14 @@
+       },
+       "verdict": "JUDGEMENT",
+       "risk_tier": "R2",
+-      "auto_action": "Google 表由背景工作重送追上；維運通知連續幾輪仍 DIVERGED 才升級。",
++      "auto_action": "Google 表由背景工作重送追上；新開或新平不到 60 分鐘、還沒同步上表的交易，對帳只記成「等待同步」不算對不上（2026-10-07 f-22，共用庫 v0.27.7）；超過 60 分鐘還沒上表才算對不上（事件時間讀不出來、或比現在晚超過 5 分鐘的壞時間不給寬限，立刻算對不上），維運通知連續幾輪仍 DIVERGED 才升級。",
+       "human_action": "持續對不上時確認 Google 表同步是否卡住，必要時重送。",
+       "resume": "n/a",
+       "lands_in_phase": 4,
+       "rationale": "Google 表只是給人看的投影，不影響交易；多數會在下一輪自動追上，持續不一致才需要人。",
+       "operator_message": {
+         "what": "某支策略的本地帳本跟共用的 Google 表對不上。",
+-        "direction": "帳本是標準答案，Google 表會由背景工作重送追上。多數幾輪內自己恢復；一直對不上才代表同步卡住。",
++        "direction": "帳本是標準答案，Google 表會由背景工作重送追上。剛開倉或剛平倉不到 60 分鐘、還在等同步的交易不會觸發這則；收到時代表已經超過 60 分鐘沒上表、內容真的對不上，或帳本事件的時間讀不出來（這種不等 60 分鐘就會報），多半是同步卡住。",
+         "steps": [
+           "等下一兩輪對帳，若自動恢復會收到「已恢復」。",
+           "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，追查 Google 表同步為什麼卡住。"
+diff --git a/src/trade_alerts/ledger_reconcile.py b/src/trade_alerts/ledger_reconcile.py
+index 989879b..fca13c4 100644
+--- a/src/trade_alerts/ledger_reconcile.py
++++ b/src/trade_alerts/ledger_reconcile.py
+@@ -94,7 +94,21 @@ SHEET_DIVERGENCE_KINDS = frozenset({
+ })
+ 
+ #: Discrepancy kinds reported for visibility but never flipping the verdict.
+-SHEET_INFO_KINDS = ("estimate_superseded", "trade_id_mismatch")
++SHEET_INFO_KINDS = ("estimate_superseded", "trade_id_mismatch", "projection_pending")
++
++#: A ledger open / close that is younger than this and not on the sheet yet is "awaiting
++#: the Google projection", not a divergence (f-22, 2026-10-07).  The projection worker runs
++#: every 15 minutes and the reconcile runs in the very same minute, so a trade written
++#: right at a 4-hour candle close is routinely read before its row is sent (A1: 7 false
++#: DIVERGED readings in two days, every one cured by the next drain).  One hour = four
++#: drain intervals, the same window ``btc_competition.reconcile_google`` already uses.
++DEFAULT_SHEET_PROJECTION_GRACE_SECONDS = 3600
++
++#: How far ahead of the reconcile's clock an event time may be and still count as "just
++#: written" (clock jitter between the writer and the reconcile on one host).  Anything
++#: further in the future is a bad timestamp, not a recent event: it gets NO grace, so it can
++#: never keep a missing row looking healthy for days (review B1 on #138).
++_PROJECTION_FUTURE_SKEW_MS = 5 * 60 * 1000
+ 
+ _FILL_GRACE_MS = 5 * 60 * 1000
+ _PUBLISHED_MODE = 0o644
+@@ -865,6 +879,7 @@ def sheet_ledger_compare(
+     pnl_tol: float = 0.01,
+     ignore: Mapping[str, str] | None = None,
+     ignore_problem: str | None = None,
++    projection_grace_seconds: int = DEFAULT_SHEET_PROJECTION_GRACE_SECONDS,
+ ) -> dict[str, Any]:
+     """Pure verdict function for the ledger-vs-sheet layer.  Returns a
+     ``google_reconcile_status.json`` document (``RECONCILED`` / ``DIVERGED`` /
+@@ -875,9 +890,39 @@ def sheet_ledger_compare(
+     left out of the comparison -- but never silently: the document lists each
+     one under ``ignored`` and counts them in ``summary['ignored']``.
+     ``ignore_problem`` (a list file that could not be used) is carried into the
+-    document as ``ignore_list_problem`` so it is visible rather than hidden."""
++    document as ``ignore_list_problem`` so it is visible rather than hidden.
++
++    ``projection_grace_seconds``: a trade whose open (``SHEET_MISSING_ROW``) or close
++    (``SHEET_MISSING_CLOSE``) is younger than this is only *awaiting* the Google
++    projection -- reported as the informational ``projection_pending`` kind, never as a
++    divergence, so it cannot flip the verdict or raise the ops-notify alert.  Older than the
++    window it is a real divergence again (a stuck queue stays visible).  A trade whose event
++    time cannot be read, or lies more than five minutes in the future, is never graced
++    (``0`` disables the grace altogether)."""
+     now = now or datetime.now(timezone.utc)
+     checked_at = utc_now_iso(now)
++    now_ms = int(now.timestamp() * 1000)
++    grace_ms = max(0, int(projection_grace_seconds)) * 1000
++
++    def _awaiting_projection(event_ms: int) -> bool:
++        # event_ms == 0 means "time unknown", and an event time more than the skew allowance in the
++        # future is a bad timestamp: both stay divergences, never silently graced.
++        if grace_ms <= 0 or event_ms <= 0:
++            return False
++        age_ms = now_ms - event_ms
++        return -_PROJECTION_FUTURE_SKEW_MS <= age_ms <= grace_ms
++
++    def _pending_row(kind_awaiting: str, tid: str, rec: dict[str, Any],
++                     sheet_row: Any, event_ms: int) -> dict[str, Any]:
++        return {
++            "kind": "projection_pending", "trade_id": tid, "symbol": rec["symbol"],
++            "sheet_row": sheet_row, "divergence": False,
++            "detail": {"awaiting": kind_awaiting,
++                       "age_seconds": max(0, (now_ms - event_ms) // 1000),
++                       "grace_seconds": grace_ms // 1000,
++                       "note": "recent ledger event not on the sheet yet; the projection "
++                               "worker has not sent it -- not actionable inside the grace window"},
++        }
+     base = {"checked_at": checked_at, "scope": scope, "sheet_name": sheet_name,
+             "last_reconciled_at": None}
+ 
+@@ -927,6 +972,10 @@ def sheet_ledger_compare(
+             if entry is not None:
+                 matched_by = "entry_order_id"
+         if entry is None:
++            row_ms = rec["opened_ms"] or rec["closed_ms"]
++            if _awaiting_projection(row_ms):
++                discrepancies.append(_pending_row("open_row", tid, rec, None, row_ms))
++                continue
+             discrepancies.append({
+                 "kind": "SHEET_MISSING_ROW", "trade_id": tid, "symbol": rec["symbol"],
+                 "sheet_row": None, "divergence": True,
+@@ -951,7 +1000,9 @@ def sheet_ledger_compare(
+                            "entry_order_id": local_eoid},
+             })
+ 
+-        if rec["closed"] and not sheet_closed:
++        if rec["closed"] and not sheet_closed and _awaiting_projection(rec["closed_ms"]):
++            discrepancies.append(_pending_row("close", tid, rec, sheet_row, rec["closed_ms"]))
++        elif rec["closed"] and not sheet_closed:
+             discrepancies.append({
+                 "kind": "SHEET_MISSING_CLOSE", "trade_id": tid, "symbol": rec["symbol"],
+                 "sheet_row": sheet_row, "divergence": True,
+@@ -1016,6 +1067,8 @@ def sheet_ledger_compare(
+         "actionable": len(actionable),
+         "by_kind": by_kind,
+     }
++    if by_kind.get("projection_pending"):  # only when present: the document shape is otherwise unchanged
++        summary["awaiting_projection"] = by_kind["projection_pending"]
+     extra: dict[str, Any] = {}
+     if ignore or ignore_problem:
+         summary["ignored"] = len(ignored)
+diff --git a/tests/test_ledger_reconcile.py b/tests/test_ledger_reconcile.py
+index ab1c3b3..ffe0a91 100644
+--- a/tests/test_ledger_reconcile.py
++++ b/tests/test_ledger_reconcile.py
+@@ -415,6 +415,144 @@ def test_sheet_compare_skips_paper_mode_rows_for_ledger_missing():
+     assert not any(d["kind"] == "LEDGER_MISSING_ROW" for d in doc["discrepancies"])
+ 
+ 
++# f-22: a trade younger than the projection grace and not on the sheet yet is "awaiting projection"
++NOW_MS = int(NOW.timestamp() * 1000)
++_CLOSE = {"event_type": "trade_close", "exit_price": 2.0, "net_pnl": 1.0, "order_id": "c1"}
++
++
++def _cmp(trades, rows, **kw):
++    return sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW, **kw)
++
++
++def test_recent_open_not_on_sheet_is_pending_not_divergence():
++    doc = _cmp(_trade("t1", opened_ms=NOW_MS - 20_000), [])  # opened 20 s ago
++    assert doc["value"] == "RECONCILED"
++    assert doc["summary"]["actionable"] == 0 and doc["summary"]["awaiting_projection"] == 1
++    (d,) = doc["discrepancies"]
++    assert d["kind"] == "projection_pending" and d["divergence"] is False
++    assert d["detail"]["awaiting"] == "open_row" and d["detail"]["age_seconds"] == 20
++    assert "1x projection_pending" in doc["note"]  # visible, not hidden
++
++
++def test_recent_close_not_on_sheet_is_pending_not_divergence():
++    trades = _trade("t1", closed=True, close_event=_CLOSE, opened_ms=1, closed_ms=NOW_MS - 7 * 60_000)
++    doc = _cmp(trades, [_row(10, trade_id="t1")])  # row exists, still open on the sheet
++    assert doc["value"] == "RECONCILED"
++    (d,) = doc["discrepancies"]
++    assert d["kind"] == "projection_pending" and d["detail"]["awaiting"] == "close"
++    assert d["sheet_row"] == 10
++
++
++def test_pending_ends_exactly_at_the_grace_boundary():
++    inside = _cmp(_trade("t1", opened_ms=NOW_MS - 3600 * 1000), [])  # exactly the window: still pending
++    assert inside["value"] == "RECONCILED"
++    outside = _cmp(_trade("t1", opened_ms=NOW_MS - 3600 * 1000 - 1), [])  # one ms older: a stuck queue shows
++    assert outside["value"] == "DIVERGED"
++    assert outside["discrepancies"][0]["kind"] == "SHEET_MISSING_ROW"
++
++
++def test_old_missing_close_is_still_a_divergence():
++    trades = _trade("t1", closed=True, close_event=_CLOSE, opened_ms=1, closed_ms=NOW_MS - 2 * 3600 * 1000)
++    doc = _cmp(trades, [_row(10, trade_id="t1")])
++    assert doc["value"] == "DIVERGED"
++    assert doc["discrepancies"][0]["kind"] == "SHEET_MISSING_CLOSE"
++
++
++def test_unknown_event_time_is_never_graced():
++    # opened_ms == 0 and closed_ms == 0: the age cannot be told, so it must stay a divergence
++    doc = _cmp(_trade("t1", opened_ms=0), [])
++    assert doc["value"] == "DIVERGED"
++    assert doc["discrepancies"][0]["kind"] == "SHEET_MISSING_ROW"
++
++
++def test_grace_zero_restores_the_old_behaviour():
++    doc = _cmp(_trade("t1", opened_ms=NOW_MS - 20_000), [], projection_grace_seconds=0)
++    assert doc["value"] == "DIVERGED"
++    assert "awaiting_projection" not in doc["summary"]
++
++
++def test_pending_does_not_hide_a_real_divergence_next_to_it():
++    trades = {**_trade("new", opened_ms=NOW_MS - 20_000),
++              **_trade("bad", closed=True, close_event={**_CLOSE, "exit_price": 9.0, "net_pnl": 9.0},
++                       opened_ms=1, closed_ms=2)}
++    rows = [_row(11, trade_id="bad", exit_time="2026-09-01", exit_price="1.0", net_pnl="0.1")]
++    doc = _cmp(trades, rows)
++    kinds = sorted(d["kind"] for d in doc["discrepancies"])
++    assert kinds == ["VALUE_MISMATCH", "projection_pending"]
++    assert doc["value"] == "DIVERGED" and doc["summary"]["actionable"] == 1
++    assert doc["summary"]["awaiting_projection"] == 1
++
++
++def test_recent_age_does_not_excuse_ledger_missing_row_or_unexpected_close():
++    # the sheet has a LIVE row the ledger does not know, and a sheet that closed a trade the ledger left open
++    trades = _trade("t2", opened_ms=NOW_MS - 20_000)
++    rows = [_row(5, trade_id="ghost", exit_time="2026-09-01"),
++            _row(6, trade_id="t2", exit_time="2026-09-01", exit_price="1", net_pnl="1")]
++    doc = _cmp(trades, rows)
++    assert {d["kind"] for d in doc["discrepancies"]} == {"LEDGER_MISSING_ROW", "SHEET_UNEXPECTED_CLOSE"}
++    assert doc["value"] == "DIVERGED"
++
++
++def test_open_recent_but_already_closed_trade_missing_row_waits_for_the_open_row():
++    # opened and closed within the window, the row is not on the sheet at all yet
++    trades = _trade("t1", closed=True, close_event=_CLOSE, opened_ms=NOW_MS - 600_000, closed_ms=NOW_MS - 60_000)
++    doc = _cmp(trades, [])
++    assert [d["detail"]["awaiting"] for d in doc["discrepancies"]] == ["open_row"]
++    assert doc["value"] == "RECONCILED"
++
++
++def test_future_event_time_is_never_graced():
++    # B1 (review on #138): a timestamp far in the future must not look "recent" and hide a missing row
++    future = NOW_MS + 30 * 24 * 3600 * 1000
++    doc = _cmp(_trade("t1", opened_ms=future), [])
++    assert doc["value"] == "DIVERGED" and doc["discrepancies"][0]["kind"] == "SHEET_MISSING_ROW"
++    closed = _trade("t2", closed=True, close_event=_CLOSE, opened_ms=1, closed_ms=future)
++    doc2 = _cmp(closed, [_row(10, trade_id="t2")])
++    assert doc2["value"] == "DIVERGED" and doc2["discrepancies"][0]["kind"] == "SHEET_MISSING_CLOSE"
++    # and it stays a divergence an hour later, not "pending forever"
++    later = sheet_ledger_compare(_trade("t1", opened_ms=future), [], sheet_name="S",
++                                 norm_symbol=norm_symbol_plain,
++                                 now=datetime.fromtimestamp(NOW_MS / 1000 + 3700, timezone.utc))
++    assert later["value"] == "DIVERGED"
++
++
++def test_small_clock_jitter_ahead_is_still_graced_but_five_minutes_plus_is_not():
++    ahead_ok = _cmp(_trade("t1", opened_ms=NOW_MS + 5 * 60_000), [])        # exactly the allowance
++    assert ahead_ok["value"] == "RECONCILED" and ahead_ok["discrepancies"][0]["detail"]["age_seconds"] == 0
++    ahead_bad = _cmp(_trade("t1", opened_ms=NOW_MS + 5 * 60_000 + 1), [])   # one ms beyond
++    assert ahead_bad["value"] == "DIVERGED"
++
++
++def test_close_grace_boundary_is_inclusive_and_one_ms_later_diverges():
++    ok = _cmp(_trade("t1", closed=True, close_event=_CLOSE, opened_ms=1, closed_ms=NOW_MS - 3600 * 1000),
++              [_row(10, trade_id="t1")])
++    assert ok["value"] == "RECONCILED"
++    bad = _cmp(_trade("t1", closed=True, close_event=_CLOSE, opened_ms=1, closed_ms=NOW_MS - 3600 * 1000 - 1),
++               [_row(10, trade_id="t1")])
++    assert bad["value"] == "DIVERGED" and bad["discrepancies"][0]["kind"] == "SHEET_MISSING_CLOSE"
++
++
++def test_missing_row_with_unknown_open_time_falls_back_to_the_close_time():
++    pending = _cmp(_trade("t1", closed=True, close_event=_CLOSE, opened_ms=0, closed_ms=NOW_MS - 60_000), [])
++    assert pending["value"] == "RECONCILED" and pending["discrepancies"][0]["detail"]["awaiting"] == "open_row"
++    unknown = _cmp(_trade("t1", closed=True, close_event=_CLOSE, opened_ms=0, closed_ms=0), [])
++    assert unknown["value"] == "DIVERGED"
++
++
++def test_old_open_with_a_fresh_close_and_no_row_at_all_is_still_a_divergence():
++    # the open was 2 h ago: the row should have been on the sheet long ago, the fresh close must not mask that
++    trades = _trade("t1", closed=True, close_event=_CLOSE, opened_ms=NOW_MS - 2 * 3600 * 1000,
++                    closed_ms=NOW_MS - 60_000)
++    doc = _cmp(trades, [])
++    assert doc["value"] == "DIVERGED" and doc["discrepancies"][0]["kind"] == "SHEET_MISSING_ROW"
++
++
++def test_pending_next_to_a_ledger_missing_row_still_diverges():
++    doc = _cmp(_trade("new", opened_ms=NOW_MS - 20_000), [_row(5, trade_id="ghost", exit_time="2026-09-01")])
++    assert sorted(d["kind"] for d in doc["discrepancies"]) == ["LEDGER_MISSING_ROW", "projection_pending"]
++    assert doc["value"] == "DIVERGED"
++
++
+ def test_close_markers_constant_exposed():
+     assert "position_reconciled_closed" in CLOSE_MARKERS
+ 
