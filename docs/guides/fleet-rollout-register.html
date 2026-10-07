@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>51</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>52</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>30</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">51 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">52 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -210,7 +210,7 @@
   <div id="glossaryHost"></div>
   <div class="foot">
     資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-07 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
-    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 9e3ae05</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 4780bd9</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations b5a605f</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations d27246a</code>。
+    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 3520da6</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 71ccee3</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations b5a605f</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations d27246a</code>。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
   </div>
 </div>
@@ -1837,11 +1837,11 @@
    "complete": true,
    "dots": {
     "btc-competition": "na",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "done",
-    "seykota": "recent"
+    "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "reconcile.funding_fee_sync",
    "kind": "cap",
    "rows": [
@@ -1892,6 +1892,68 @@
    ],
    "sub": "定時查交易所的資金費結算紀錄、寫進本機帳本，讓帳目跟交易所餘額對得起來。",
    "title": "資金費同步"
+  },
+  {
+   "added_recent": true,
+   "anchor": "cap-reconcile.google_projection_grace",
+   "complete": false,
+   "dots": {
+    "btc-competition": "na",
+    "momentum": "recent",
+    "mycrypto": "pending",
+    "seykota": "recent"
+   },
+   "has_recent": true,
+   "id": "reconcile.google_projection_grace",
+   "kind": "cap",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": null,
+       "state": "done",
+       "text": "src/seykota_bot/reconcile/google_reconcile.py:96 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（剛進場、剛平倉不算對不上；老交易缺列仍 DIVERGED）。A1 正式機（新）執行環境（唯讀查證）：operations 3520da6 於 2026-10-07 台北 16:07（A1 日誌 JST 17:07）部署；/opt 的 src/seykota_bot/reconcile/google_reconcile.py（7f854ee）、pyproject.toml（d328f78）、requirements.lock（879f662）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.27.7，其共用庫對帳模組檔（trade_alerts 套件的 ledger_reconcile 模組）的 blob（fca13c4）與 tag v0.27.7 同檔；部署後手動一輪對帳台北 16:08（JST 17:08）RECONCILED。限制：部署時趨勢空手、之後還沒有新交易，寬限路徑在 A1 沒有實際遇到「新交易等同步」，只在共用庫與策略端測試、開發機驗證。"
+      }
+     ]
+    },
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": null,
+       "state": "done",
+       "text": "src/google_reconcile.py:91 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（同上三項）。A1 正式機（新）執行環境（唯讀查證）：operations 71ccee3 於 2026-10-07 台北 16:07（A1 日誌 JST 17:07）部署；/opt 的 src/google_reconcile.py（48433a6）、pyproject.toml（5628afd）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.27.7，其共用庫對帳模組檔（trade_alerts 套件的 ledger_reconcile 模組）的 blob（fca13c4）與 tag v0.27.7 同檔；部署後手動一輪對帳台北 16:08（JST 17:08）RECONCILED。動機：2026-10-05～06 兩天 7 輪 DIVERGED 讀數、5 次 ERR-044 告警都是動能進場／平倉後對帳比同步先讀。限制：部署時動能空手，之後最早的進場在台北 20:00 的 K 棒，部署當下還沒看到它實際擋掉一次誤報。"
+      }
+     ]
+    },
+    {
+     "label": "加密策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+       "state": "pending",
+       "text": "加密仍釘共用庫 v0.15.0，沒有這個寬限；換 Binance（x3）升級共用庫時一併具備。加密這兩天的 Google 表對帳沒有 DIVERGED 讀數（只看了維運通知的狀態轉換，沒有逐日核對帳本）。"
+      }
+     ]
+    },
+    {
+     "label": "競賽策略",
+     "lines": [
+      {
+       "aspect": null,
+       "phase": null,
+       "state": "n/a",
+       "text": "競賽有自己的 src/btc_competition/reconcile_google.py，不用共用的 sheet_ledger_compare，自己的 src/btc_competition/reconcile_google.py:49 _GRACE_SECONDS=3600 對尚未同步的現貨成交回 PENDING。留意：PENDING 在維運通知是 warn 級、經去抖後仍會通知，競賽有調倉時是否會短暫告警還沒查。"
+      }
+     ]
+    }
+   ],
+   "sub": "Google 同步每 15 分鐘送一次，對帳在同一分鐘跑；剛開倉或剛平倉不到 60 分鐘、表上還沒有的交易，對帳只記成「等待同步」，不判 DIVERGED、不發 ERR-044；超過 60 分鐘、事件時間讀不出來、或時間比現在晚超過 5 分鐘仍照舊判對不上，卡住的同步看得到。共用庫 trade-alerts v0.27.7（f-22）。",
+   "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上"
   },
   {
    "added_recent": false,
@@ -4008,7 +4070,7 @@
    "title": "R3｜帳本跟交易所對不上（維運通知帳本軸）"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "rule-FLEET.OPS_GOOGLE_DIVERGED",
    "complete": true,
    "dots": {
@@ -4842,7 +4904,7 @@
   "v2-W3": 0,
   "v2-W4": 0,
   "v2-W6": 0,
-  "x3-crypto-binance": 1
+  "x3-crypto-binance": 2
  },
  "phase_order": [
   "v2-W2",
@@ -4906,36 +4968,48 @@
  },
  "recent_summary": [
   {
-   "anchor": "cap-reconcile.funding_fee_sync",
-   "note": "趨勢策略的資金費同步（Binance 版）已在 A1 正式機（新）上線並實際跑過（2026-10-06 台北 17:16 第一輪），登記冊改已做；sources 換到 A1 現在跑的 9e3ae05，既有引用行號已逐筆比對舊新行文字。",
-   "project": "趨勢策略",
-   "title": "資金費同步"
+   "anchor": "cap-reconcile.google_projection_grace",
+   "note": "新增一格：帳本↔Google 表對帳，剛開／剛平、還在等同步的交易不算對不上（共用庫 v0.27.7，f-22）；加密等 x3，競賽有自己的寬限。",
+   "project": null,
+   "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上"
   },
   {
-   "anchor": "cap-reconcile.funding_fee_sync",
-   "note": "動能策略的資金費同步（Binance 版）已在 A1 正式機（新）上線並實際跑過（2026-10-06 台北 17:15 部署後手動一輪），登記冊改已做；sources 換到 A1 現在跑的 4780bd9，既有引用行號已逐筆比對舊新行文字。",
+   "anchor": "cap-reconcile.google_projection_grace",
+   "note": "動能策略已於 2026-10-07 台北 16:07 部署 A1 正式機（新）（operations 71ccee3、共用庫 0.27.7），改已做；sources 換到 71ccee3，既有引用逐筆比對舊新行文字全相同。",
    "project": "動能策略",
-   "title": "資金費同步"
+   "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上"
+  },
+  {
+   "anchor": "cap-reconcile.google_projection_grace",
+   "note": "趨勢策略已於同時部署 A1 正式機（新）（operations 3520da6、共用庫 0.27.7），改已做；sources 換到 3520da6。",
+   "project": "趨勢策略",
+   "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上"
+  },
+  {
+   "anchor": "rule-FLEET.OPS_GOOGLE_DIVERGED",
+   "note": "說明補上：剛開／剛平不到 60 分鐘、還在等同步的交易不再觸發這則（共用庫 v0.27.7）。",
+   "project": null,
+   "title": "R2｜帳本跟 Google 表對不上（維運通知 Google 表軸）"
   }
  ],
  "totals": {
   "btc-competition": {
    "done": 27,
-   "n/a": 16,
+   "n/a": 17,
    "pending": 16
   },
   "momentum": {
-   "done": 40,
+   "done": 41,
    "n/a": 10,
    "pending": 11
   },
   "mycrypto": {
    "done": 16,
    "n/a": 13,
-   "pending": 28
+   "pending": 29
   },
   "seykota": {
-   "done": 49,
+   "done": 50,
    "n/a": 8,
    "pending": 26
   }

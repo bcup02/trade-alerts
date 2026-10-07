@@ -37,12 +37,12 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "4780bd9ff5613e105a5a083821f43717dbba5784"
+      "commit": "71ccee30608d3fcb73c01cb9c83c5d33c5cbde5d"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "9e3ae05f833cd7c597b753d8118a7e7d2f509c40"
+      "commit": "3520da6fc90c6704059b440a4d3f63cea903bf5d"
     },
     "mycrypto": {
       "repo": "AI-for-column/my-crypto-bot",
@@ -436,6 +436,30 @@
         "btc-competition": {
           "state": "n/a",
           "reason": "現貨再平衡策略，不是永續合約，沒有資金費結算這個概念。"
+        }
+      }
+    },
+    {
+      "id": "reconcile.google_projection_grace",
+      "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上",
+      "description": "Google 同步每 15 分鐘送一次，對帳在同一分鐘跑；剛開倉或剛平倉不到 60 分鐘、表上還沒有的交易，對帳只記成「等待同步」，不判 DIVERGED、不發 ERR-044；超過 60 分鐘、事件時間讀不出來、或時間比現在晚超過 5 分鐘仍照舊判對不上，卡住的同步看得到。共用庫 trade-alerts v0.27.7（f-22）。",
+      "status": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/reconcile/google_reconcile.py:96 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（剛進場、剛平倉不算對不上；老交易缺列仍 DIVERGED）。A1 正式機（新）執行環境（唯讀查證）：operations 3520da6 於 2026-10-07 台北 16:07（A1 日誌 JST 17:07）部署；/opt 的 src/seykota_bot/reconcile/google_reconcile.py（7f854ee）、pyproject.toml（d328f78）、requirements.lock（879f662）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.27.7，其共用庫對帳模組檔（trade_alerts 套件的 ledger_reconcile 模組）的 blob（fca13c4）與 tag v0.27.7 同檔；部署後手動一輪對帳台北 16:08（JST 17:08）RECONCILED。限制：部署時趨勢空手、之後還沒有新交易，寬限路徑在 A1 沒有實際遇到「新交易等同步」，只在共用庫與策略端測試、開發機驗證。"
+        },
+        "momentum": {
+          "state": "done",
+          "evidence": "src/google_reconcile.py:91 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（同上三項）。A1 正式機（新）執行環境（唯讀查證）：operations 71ccee3 於 2026-10-07 台北 16:07（A1 日誌 JST 17:07）部署；/opt 的 src/google_reconcile.py（48433a6）、pyproject.toml（5628afd）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.27.7，其共用庫對帳模組檔（trade_alerts 套件的 ledger_reconcile 模組）的 blob（fca13c4）與 tag v0.27.7 同檔；部署後手動一輪對帳台北 16:08（JST 17:08）RECONCILED。動機：2026-10-05～06 兩天 7 輪 DIVERGED 讀數、5 次 ERR-044 告警都是動能進場／平倉後對帳比同步先讀。限制：部署時動能空手，之後最早的進場在台北 20:00 的 K 棒，部署當下還沒看到它實際擋掉一次誤報。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "加密仍釘共用庫 v0.15.0，沒有這個寬限；換 Binance（x3）升級共用庫時一併具備。加密這兩天的 Google 表對帳沒有 DIVERGED 讀數（只看了維運通知的狀態轉換，沒有逐日核對帳本）。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "競賽有自己的 src/btc_competition/reconcile_google.py，不用共用的 sheet_ledger_compare，自己的 src/btc_competition/reconcile_google.py:49 _GRACE_SECONDS=3600 對尚未同步的現貨成交回 PENDING。留意：PENDING 在維運通知是 warn 級、經去抖後仍會通知，競賽有調倉時是否會短暫告警還沒查。"
         }
       }
     },
@@ -1750,17 +1774,29 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "reconcile.funding_fee_sync",
-      "project": "seykota",
-      "type": "completed",
-      "note": "趨勢策略的資金費同步（Binance 版）已在 A1 正式機（新）上線並實際跑過（2026-10-06 台北 17:16 第一輪），登記冊改已做；sources 換到 A1 現在跑的 9e3ae05，既有引用行號已逐筆比對舊新行文字。"
+      "id": "reconcile.google_projection_grace",
+      "type": "added",
+      "note": "新增一格：帳本↔Google 表對帳，剛開／剛平、還在等同步的交易不算對不上（共用庫 v0.27.7，f-22）；加密等 x3，競賽有自己的寬限。"
     },
     {
       "kind": "cap",
-      "id": "reconcile.funding_fee_sync",
+      "id": "reconcile.google_projection_grace",
       "project": "momentum",
       "type": "completed",
-      "note": "動能策略的資金費同步（Binance 版）已在 A1 正式機（新）上線並實際跑過（2026-10-06 台北 17:15 部署後手動一輪），登記冊改已做；sources 換到 A1 現在跑的 4780bd9，既有引用行號已逐筆比對舊新行文字。"
+      "note": "動能策略已於 2026-10-07 台北 16:07 部署 A1 正式機（新）（operations 71ccee3、共用庫 0.27.7），改已做；sources 換到 71ccee3，既有引用逐筆比對舊新行文字全相同。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.google_projection_grace",
+      "project": "seykota",
+      "type": "completed",
+      "note": "趨勢策略已於同時部署 A1 正式機（新）（operations 3520da6、共用庫 0.27.7），改已做；sources 換到 3520da6。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_GOOGLE_DIVERGED",
+      "type": "updated",
+      "note": "說明補上：剛開／剛平不到 60 分鐘、還在等同步的交易不再觸發這則（共用庫 v0.27.7）。"
     }
   ]
 }
