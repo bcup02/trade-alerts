@@ -150,6 +150,7 @@ from .ledger_reconcile import (
     SHEET_COLUMN_INDEX,
     SHEET_DIVERGENCE_KINDS,
     SHEET_INFO_KINDS,
+    DEFAULT_SHEET_PROJECTION_GRACE_SECONDS,
     SHEET_PAPER_MODES,
     atomic_write,
     env_float,
@@ -315,6 +316,7 @@ __all__ = [
     "SHEET_COLUMN_INDEX",
     "SHEET_DIVERGENCE_KINDS",
     "SHEET_INFO_KINDS",
+    "DEFAULT_SHEET_PROJECTION_GRACE_SECONDS",
     "SHEET_PAPER_MODES",
     "atomic_write",
     "env_float",
@@ -339,4 +341,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.27.6"
+__version__ = "0.27.7"

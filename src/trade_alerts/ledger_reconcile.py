@@ -94,7 +94,15 @@ SHEET_DIVERGENCE_KINDS = frozenset({
 })
 
 #: Discrepancy kinds reported for visibility but never flipping the verdict.
-SHEET_INFO_KINDS = ("estimate_superseded", "trade_id_mismatch")
+SHEET_INFO_KINDS = ("estimate_superseded", "trade_id_mismatch", "projection_pending")
+
+#: A ledger open / close that is younger than this and not on the sheet yet is "awaiting
+#: the Google projection", not a divergence (f-22, 2026-10-07).  The projection worker runs
+#: every 15 minutes and the reconcile runs in the very same minute, so a trade written
+#: right at a 4-hour candle close is routinely read before its row is sent (A1: 7 false
+#: DIVERGED readings in two days, every one cured by the next drain).  One hour = four
+#: drain intervals, the same window ``btc_competition.reconcile_google`` already uses.
+DEFAULT_SHEET_PROJECTION_GRACE_SECONDS = 3600
 
 _FILL_GRACE_MS = 5 * 60 * 1000
 _PUBLISHED_MODE = 0o644
@@ -865,6 +873,7 @@ def sheet_ledger_compare(
     pnl_tol: float = 0.01,
     ignore: Mapping[str, str] | None = None,
     ignore_problem: str | None = None,
+    projection_grace_seconds: int = DEFAULT_SHEET_PROJECTION_GRACE_SECONDS,
 ) -> dict[str, Any]:
     """Pure verdict function for the ledger-vs-sheet layer.  Returns a
     ``google_reconcile_status.json`` document (``RECONCILED`` / ``DIVERGED`` /
@@ -875,9 +884,34 @@ def sheet_ledger_compare(
     left out of the comparison -- but never silently: the document lists each
     one under ``ignored`` and counts them in ``summary['ignored']``.
     ``ignore_problem`` (a list file that could not be used) is carried into the
-    document as ``ignore_list_problem`` so it is visible rather than hidden."""
+    document as ``ignore_list_problem`` so it is visible rather than hidden.
+
+    ``projection_grace_seconds``: a trade whose open (``SHEET_MISSING_ROW``) or close
+    (``SHEET_MISSING_CLOSE``) is younger than this is only *awaiting* the Google
+    projection -- reported as the informational ``projection_pending`` kind, never as a
+    divergence, so it cannot flip the verdict or raise the ops-notify alert.  Older than the
+    window it is a real divergence again (a stuck queue stays visible).  A trade whose event
+    time cannot be read is never graced (``0`` disables the grace altogether)."""
     now = now or datetime.now(timezone.utc)
     checked_at = utc_now_iso(now)
+    now_ms = int(now.timestamp() * 1000)
+    grace_ms = max(0, int(projection_grace_seconds)) * 1000
+
+    def _awaiting_projection(event_ms: int) -> bool:
+        # event_ms == 0 means "time unknown": keep it as a divergence, never silently grace it.
+        return grace_ms > 0 and event_ms > 0 and now_ms - event_ms <= grace_ms
+
+    def _pending_row(kind_awaiting: str, tid: str, rec: dict[str, Any],
+                     sheet_row: Any, event_ms: int) -> dict[str, Any]:
+        return {
+            "kind": "projection_pending", "trade_id": tid, "symbol": rec["symbol"],
+            "sheet_row": sheet_row, "divergence": False,
+            "detail": {"awaiting": kind_awaiting,
+                       "age_seconds": max(0, (now_ms - event_ms) // 1000),
+                       "grace_seconds": grace_ms // 1000,
+                       "note": "recent ledger event not on the sheet yet; the projection "
+                               "worker has not sent it -- not actionable inside the grace window"},
+        }
     base = {"checked_at": checked_at, "scope": scope, "sheet_name": sheet_name,
             "last_reconciled_at": None}
 
@@ -927,6 +961,10 @@ def sheet_ledger_compare(
             if entry is not None:
                 matched_by = "entry_order_id"
         if entry is None:
+            row_ms = rec["opened_ms"] or rec["closed_ms"]
+            if _awaiting_projection(row_ms):
+                discrepancies.append(_pending_row("open_row", tid, rec, None, row_ms))
+                continue
             discrepancies.append({
                 "kind": "SHEET_MISSING_ROW", "trade_id": tid, "symbol": rec["symbol"],
                 "sheet_row": None, "divergence": True,
@@ -951,7 +989,9 @@ def sheet_ledger_compare(
                            "entry_order_id": local_eoid},
             })
 
-        if rec["closed"] and not sheet_closed:
+        if rec["closed"] and not sheet_closed and _awaiting_projection(rec["closed_ms"]):
+            discrepancies.append(_pending_row("close", tid, rec, sheet_row, rec["closed_ms"]))
+        elif rec["closed"] and not sheet_closed:
             discrepancies.append({
                 "kind": "SHEET_MISSING_CLOSE", "trade_id": tid, "symbol": rec["symbol"],
                 "sheet_row": sheet_row, "divergence": True,
@@ -1016,6 +1056,8 @@ def sheet_ledger_compare(
         "actionable": len(actionable),
         "by_kind": by_kind,
     }
+    if by_kind.get("projection_pending"):  # only when present: the document shape is otherwise unchanged
+        summary["awaiting_projection"] = by_kind["projection_pending"]
     extra: dict[str, Any] = {}
     if ignore or ignore_problem:
         summary["ignored"] = len(ignored)

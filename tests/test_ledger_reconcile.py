@@ -415,6 +415,92 @@ def test_sheet_compare_skips_paper_mode_rows_for_ledger_missing():
     assert not any(d["kind"] == "LEDGER_MISSING_ROW" for d in doc["discrepancies"])
 
 
+# f-22: a trade younger than the projection grace and not on the sheet yet is "awaiting projection"
+NOW_MS = int(NOW.timestamp() * 1000)
+_CLOSE = {"event_type": "trade_close", "exit_price": 2.0, "net_pnl": 1.0, "order_id": "c1"}
+
+
+def _cmp(trades, rows, **kw):
+    return sheet_ledger_compare(trades, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW, **kw)
+
+
+def test_recent_open_not_on_sheet_is_pending_not_divergence():
+    doc = _cmp(_trade("t1", opened_ms=NOW_MS - 20_000), [])  # opened 20 s ago
+    assert doc["value"] == "RECONCILED"
+    assert doc["summary"]["actionable"] == 0 and doc["summary"]["awaiting_projection"] == 1
+    (d,) = doc["discrepancies"]
+    assert d["kind"] == "projection_pending" and d["divergence"] is False
+    assert d["detail"]["awaiting"] == "open_row" and d["detail"]["age_seconds"] == 20
+    assert "1x projection_pending" in doc["note"]  # visible, not hidden
+
+
+def test_recent_close_not_on_sheet_is_pending_not_divergence():
+    trades = _trade("t1", closed=True, close_event=_CLOSE, opened_ms=1, closed_ms=NOW_MS - 7 * 60_000)
+    doc = _cmp(trades, [_row(10, trade_id="t1")])  # row exists, still open on the sheet
+    assert doc["value"] == "RECONCILED"
+    (d,) = doc["discrepancies"]
+    assert d["kind"] == "projection_pending" and d["detail"]["awaiting"] == "close"
+    assert d["sheet_row"] == 10
+
+
+def test_pending_ends_exactly_at_the_grace_boundary():
+    inside = _cmp(_trade("t1", opened_ms=NOW_MS - 3600 * 1000), [])  # exactly the window: still pending
+    assert inside["value"] == "RECONCILED"
+    outside = _cmp(_trade("t1", opened_ms=NOW_MS - 3600 * 1000 - 1), [])  # one ms older: a stuck queue shows
+    assert outside["value"] == "DIVERGED"
+    assert outside["discrepancies"][0]["kind"] == "SHEET_MISSING_ROW"
+
+
+def test_old_missing_close_is_still_a_divergence():
+    trades = _trade("t1", closed=True, close_event=_CLOSE, opened_ms=1, closed_ms=NOW_MS - 2 * 3600 * 1000)
+    doc = _cmp(trades, [_row(10, trade_id="t1")])
+    assert doc["value"] == "DIVERGED"
+    assert doc["discrepancies"][0]["kind"] == "SHEET_MISSING_CLOSE"
+
+
+def test_unknown_event_time_is_never_graced():
+    # opened_ms == 0 and closed_ms == 0: the age cannot be told, so it must stay a divergence
+    doc = _cmp(_trade("t1", opened_ms=0), [])
+    assert doc["value"] == "DIVERGED"
+    assert doc["discrepancies"][0]["kind"] == "SHEET_MISSING_ROW"
+
+
+def test_grace_zero_restores_the_old_behaviour():
+    doc = _cmp(_trade("t1", opened_ms=NOW_MS - 20_000), [], projection_grace_seconds=0)
+    assert doc["value"] == "DIVERGED"
+    assert "awaiting_projection" not in doc["summary"]
+
+
+def test_pending_does_not_hide_a_real_divergence_next_to_it():
+    trades = {**_trade("new", opened_ms=NOW_MS - 20_000),
+              **_trade("bad", closed=True, close_event={**_CLOSE, "exit_price": 9.0, "net_pnl": 9.0},
+                       opened_ms=1, closed_ms=2)}
+    rows = [_row(11, trade_id="bad", exit_time="2026-09-01", exit_price="1.0", net_pnl="0.1")]
+    doc = _cmp(trades, rows)
+    kinds = sorted(d["kind"] for d in doc["discrepancies"])
+    assert kinds == ["VALUE_MISMATCH", "projection_pending"]
+    assert doc["value"] == "DIVERGED" and doc["summary"]["actionable"] == 1
+    assert doc["summary"]["awaiting_projection"] == 1
+
+
+def test_recent_age_does_not_excuse_ledger_missing_row_or_unexpected_close():
+    # the sheet has a LIVE row the ledger does not know, and a sheet that closed a trade the ledger left open
+    trades = _trade("t2", opened_ms=NOW_MS - 20_000)
+    rows = [_row(5, trade_id="ghost", exit_time="2026-09-01"),
+            _row(6, trade_id="t2", exit_time="2026-09-01", exit_price="1", net_pnl="1")]
+    doc = _cmp(trades, rows)
+    assert {d["kind"] for d in doc["discrepancies"]} == {"LEDGER_MISSING_ROW", "SHEET_UNEXPECTED_CLOSE"}
+    assert doc["value"] == "DIVERGED"
+
+
+def test_open_recent_but_already_closed_trade_missing_row_waits_for_the_open_row():
+    # opened and closed within the window, the row is not on the sheet at all yet
+    trades = _trade("t1", closed=True, close_event=_CLOSE, opened_ms=NOW_MS - 600_000, closed_ms=NOW_MS - 60_000)
+    doc = _cmp(trades, [])
+    assert [d["detail"]["awaiting"] for d in doc["discrepancies"]] == ["open_row"]
+    assert doc["value"] == "RECONCILED"
+
+
 def test_close_markers_constant_exposed():
     assert "position_reconciled_closed" in CLOSE_MARKERS
 
