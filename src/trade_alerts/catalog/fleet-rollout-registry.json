@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-06",
+  "updated_at": "2026-10-07",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -37,12 +37,12 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "97f5ebbc98534455568e257766f835e602a47bc5"
+      "commit": "4780bd9ff5613e105a5a083821f43717dbba5784"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "5958bbff1a551b324cd3caeb405f0ccc479521eb"
+      "commit": "9e3ae05f833cd7c597b753d8118a7e7d2f509c40"
     },
     "mycrypto": {
       "repo": "AI-for-column/my-crypto-bot",
@@ -230,7 +230,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:234 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         },
         "mycrypto": {
           "state": "pending",
@@ -254,7 +254,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 run_repair_round＋:114 staging_ledger（本策略帳本寫入器整批原子寫入），含加碼與做空（v2-W4）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:234 run_repair_round＋:133 staging_ledger（本策略帳本寫入器整批原子寫入），含加碼與做空（v2-W4）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         },
         "mycrypto": {
           "state": "pending",
@@ -278,7 +278,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 run_repair_round 由共用修復執行器讀 SEYKOTA_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔；正式機每輪輸出都帶 paused 欄位。"
+          "evidence": "scripts/repair_bot.py:234 run_repair_round 由共用修復執行器讀 SEYKOTA_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔；正式機每輪輸出都帶 paused 欄位。"
         },
         "mycrypto": {
           "state": "pending",
@@ -302,7 +302,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
+          "evidence": "scripts/repair_bot.py:234 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
         },
         "mycrypto": {
           "state": "pending",
@@ -327,7 +327,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機尚未開（開發機的通知路徑會在「通知分兩則」那包重整）。"
+          "evidence": "scripts/repair_bot.py:234 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機尚未開（開發機的通知路徑會在「通知分兩則」那包重整）。"
         },
         "mycrypto": {
           "state": "pending",
@@ -347,7 +347,7 @@
       "status": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 趨勢策略專屬受控測試事件 f9c595f9b545449a91794e7ab01c27d6（標明測試、只寫事件未開請求）02:50 UTC 匯出（1134 字）並 sent=1、使用者手機確認收到、03:00 UTC attempted=0 未重送；同輪修復機器人仍零候選。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
+          "evidence": "scripts/repair_bot.py:234 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 趨勢策略專屬受控測試事件 f9c595f9b545449a91794e7ab01c27d6（標明測試、只寫事件未開請求）02:50 UTC 匯出（1134 字）並 sent=1、使用者手機確認收到、03:00 UTC attempted=0 未重送；同輪修復機器人仍零候選。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
         },
         "momentum": {
           "state": "done",
@@ -422,14 +422,12 @@
       "description": "定時查交易所的資金費結算紀錄、寫進本機帳本，讓帳目跟交易所餘額對得起來。",
       "status": {
         "momentum": {
-          "state": "pending",
-          "phase": "binance-funding-sync",
-          "reason": "2026-09-18 查證：scripts/sync_funding_fees.py 存在且會跑，但查的是 MEXC——正式機上的動能策略已於 2026-09-04 切換到 EXCHANGE=binance，這支程式從那天起就一直在查錯的交易所，對現在的真倉交易沒有實質幫助。09-04 起 25 筆真倉交易全部持倉很短（最長 2.83 小時），目前沒有一筆跨過資金費結算時間點，所以尚未造成已知漏記；但只要有一筆撐過 8 小時就會真的漏記且無法事後補回。PR AI-for-column/mexc-4h-momentum-trailing-stop#92 修好了這支程式本身的節流/重試/DRY_RUN 排除問題，但沒有解決「查錯交易所」這件事。"
+          "state": "done",
+          "evidence": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:296（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證）：operations 4780bd9；/opt 的 scripts/sync_funding_fees.py（1770c9a）、src/binance_funding_sync.py（1ef48a2）、service（08446a1）、timer（38496fb）的 blob 與 4780bd9 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
         },
         "seykota": {
-          "state": "pending",
-          "phase": "binance-funding-sync",
-          "reason": "2026-09-18 查證：整個 repo 沒有任何資金費同步腳本，也沒有對應的 systemd unit。已經造成一筆真實漏記：唯一一筆真倉交易（BTCUSDT，2026-09-03T17:31 開倉、2026-09-04T02:41 平倉，持倉 9.16 小時）真的跨過 00:00 UTC 結算時間點，這筆資金費沒有任何程式查過、也永遠補不回來了（金額應該很小，但缺口是真實發生過的，不是推測）。趨勢策略持倉時間本來就比動能策略長，之後再發生同樣情況的機率比動能策略高，建議優先權高於動能。"
+          "state": "done",
+          "evidence": "src/seykota_bot/funding_sync.py:157（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :165（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證）：operations 9e3ae05（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，之後只多 order_not_found 修正）；/opt 的 src/seykota_bot/funding_sync.py（2e7b53f）、service（e274d7c）、timer（f706bc0）的 blob 與 9e3ae05 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
         },
         "mycrypto": {
           "state": "done",
@@ -518,7 +516,7 @@
       "status": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:212 修復機器人每輪接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:90 只認 sk-＋32 位十六進位的自有編號。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7），01:35 UTC 第一輪 0 筆、無錯誤。9/21 那一筆已於 9/24 以人工帳本更正處理。"
+          "evidence": "scripts/repair_bot.py:237 修復機器人每輪接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:91 只認 sk-＋32 位十六進位的自有編號。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7），01:35 UTC 第一輪 0 筆、無錯誤。9/21 那一筆已於 9/24 以人工帳本更正處理。"
         },
         "momentum": {
           "state": "done",
@@ -546,7 +544,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 呼叫共用修復執行器 run_repair_round；共用庫 trade_alerts/repair_runner.py（git tag v0.26.0＝e266a673ba406f112e0ab30c29883582f74e392e，檔案 blob cd00814a845f75dd6648d337c11c77d0b15a36b9，與 v0.25.0 的同檔 blob 相同）第 226 行每輪呼叫 _check_recurring、第 248 行定義：同一支策略最近 7 天內自動補寫達 2 次（第 83–84 行 RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次，窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）。A1 正式機（新）實際執行環境（2026-10-04 台北約 20:16 唯讀查）：seykota-repair-shadow.service 的 ExecStart 是 /opt/ed-seykota-systematic-trend-following/.venv/bin/python /opt/ed-seykota-systematic-trend-following/scripts/repair_bot.py；該 venv 載入的 trade-alerts 是 0.26.0（模組 /opt/ed-seykota-systematic-trend-following/.venv/lib/python3.12/site-packages/trade_alerts/repair_runner.py，在 A1 上 git hash-object 為 cd00814a845f75dd6648d337c11c77d0b15a36b9，與上述 blob 相同；執行時讀回 RECURRING_THRESHOLD 2、RECURRING_WINDOW_DAYS 7）；seykota-repair-shadow.timer 每 15 分鐘排程（台北 20:05 東京 21:05 的那一輪日誌輸出 candidates／repaired／failed／escalated 全為空，paused false）。2026-10-04 台北 17:18–17:22 隨 A1 部署（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）；升格邏輯本身只在共用庫測試與開發機驗證，沒有在正式機製造修補去觸發。"
+          "evidence": "scripts/repair_bot.py:234 呼叫共用修復執行器 run_repair_round；共用庫 trade_alerts/repair_runner.py（git tag v0.26.0＝e266a673ba406f112e0ab30c29883582f74e392e，檔案 blob cd00814a845f75dd6648d337c11c77d0b15a36b9，與 v0.25.0 的同檔 blob 相同）第 226 行每輪呼叫 _check_recurring、第 248 行定義：同一支策略最近 7 天內自動補寫達 2 次（第 83–84 行 RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次，窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）。A1 正式機（新）實際執行環境（2026-10-04 台北約 20:16 唯讀查）：seykota-repair-shadow.service 的 ExecStart 是 /opt/ed-seykota-systematic-trend-following/.venv/bin/python /opt/ed-seykota-systematic-trend-following/scripts/repair_bot.py；該 venv 載入的 trade-alerts 是 0.26.0（模組 /opt/ed-seykota-systematic-trend-following/.venv/lib/python3.12/site-packages/trade_alerts/repair_runner.py，在 A1 上 git hash-object 為 cd00814a845f75dd6648d337c11c77d0b15a36b9，與上述 blob 相同；執行時讀回 RECURRING_THRESHOLD 2、RECURRING_WINDOW_DAYS 7）；seykota-repair-shadow.timer 每 15 分鐘排程（台北 20:05 東京 21:05 的那一輪日誌輸出 candidates／repaired／failed／escalated 全為空，paused false）。2026-10-04 台北 17:18–17:22 隨 A1 部署（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）；升格邏輯本身只在共用庫測試與開發機驗證，沒有在正式機製造修補去觸發。"
         },
         "mycrypto": {
           "state": "pending",
@@ -1179,13 +1177,13 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:234 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+          "evidence": "scripts/repair_bot.py:234 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
         }
       }
     },
@@ -1194,13 +1192,13 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:234 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+          "evidence": "scripts/repair_bot.py:234 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
         }
       }
     },
@@ -1209,13 +1207,13 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:234 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+          "evidence": "scripts/repair_bot.py:234 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
         }
       }
     },
@@ -1224,13 +1222,13 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 修復機器人每輪先跑修復輪，:212 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；:90 只認得 sk-＋32 位十六進位的自有編號（owns_client_order_id），確定是自己重複送單且已平倉才自動追加帳本更正。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
+          "evidence": "scripts/repair_bot.py:234 修復機器人每輪先跑修復輪，:237 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；:91 只認得 sk-＋32 位十六進位的自有編號（owns_client_order_id），確定是自己重複送單且已平倉才自動追加帳本更正。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:212 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
+          "evidence": "scripts/repair_bot.py:237 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
         }
       }
     },
@@ -1239,13 +1237,13 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 修復機器人每輪先跑修復輪，:212 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；:90 只認得 sk-＋32 位十六進位的自有編號（owns_client_order_id），確定是自己重複送單且已平倉才自動追加帳本更正。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
+          "evidence": "scripts/repair_bot.py:234 修復機器人每輪先跑修復輪，:237 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；:91 只認得 sk-＋32 位十六進位的自有編號（owns_client_order_id），確定是自己重複送單且已平倉才自動追加帳本更正。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:212 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
+          "evidence": "scripts/repair_bot.py:237 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪修復機器人刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #76（g1-3），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）。"
         }
       }
     },
@@ -1492,7 +1490,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:209 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）。"
+          "evidence": "scripts/repair_bot.py:234 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）。"
         },
         "mycrypto": {
           "state": "pending",
@@ -1751,20 +1749,18 @@
   ],
   "recent_changes": [
     {
-      "kind": "rule",
-      "id": "BTC.RUNTIME_CYCLE_FAILED",
-      "aspect": "behaviour",
-      "project": "btc-competition",
+      "kind": "cap",
+      "id": "reconcile.funding_fee_sync",
+      "project": "seykota",
       "type": "completed",
-      "note": "競賽策略失敗時當天重試（送單前的失敗最多 3 次、每次間隔 15 分鐘，同一程序內），已部署 A1 正式機（新）（台北 2026-10-06 11:45），改已做。"
+      "note": "趨勢策略的資金費同步（Binance 版）已在 A1 正式機（新）上線並實際跑過（2026-10-06 台北 17:16 第一輪），登記冊改已做；sources 換到 A1 現在跑的 9e3ae05，既有引用行號已逐筆比對舊新行文字。"
     },
     {
-      "kind": "rule",
-      "id": "BTC.RUNTIME_CYCLE_FAILED",
-      "aspect": "emits_event",
-      "project": "btc-competition",
+      "kind": "cap",
+      "id": "reconcile.funding_fee_sync",
+      "project": "momentum",
       "type": "completed",
-      "note": "第 3 次失敗、已送單或次數無法保存時寫 R2 升格事件，同批部署上線，改已做。競賽 sources 換到新的 operations 版，引用行號已逐筆比對舊新行文字。"
+      "note": "動能策略的資金費同步（Binance 版）已在 A1 正式機（新）上線並實際跑過（2026-10-06 台北 17:15 部署後手動一輪），登記冊改已做；sources 換到 A1 現在跑的 4780bd9，既有引用行號已逐筆比對舊新行文字。"
     }
   ]
 }
