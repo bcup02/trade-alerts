@@ -311,7 +311,9 @@ def requeue_rejected_projection_intents(path: str | Path, *, trade_id: str) -> t
     """
     with _exclusive_outbox_lock(path):
         intents: list[ProjectionIntent] = []
-        last_status: dict[str, str] = {}
+        # Every status ever recorded per intent: a CONFIRMED is an irrevocable fact, so a later (contradictory)
+        # REJECTED record must not hide it.
+        seen: dict[str, set[str]] = {}
         for record in _read_records(path):
             kind = record.get("kind")
             if kind == "projection_intent_v1":
@@ -319,16 +321,17 @@ def requeue_rejected_projection_intents(path: str | Path, *, trade_id: str) -> t
             elif kind == "projection_dispatch_v1":
                 raw = record.get("dispatch")
                 if isinstance(raw, Mapping):
-                    last_status[str(raw.get("intent_id"))] = str(raw.get("status"))
+                    seen.setdefault(str(raw.get("intent_id")), set()).add(str(raw.get("status")))
         by_key: dict[tuple[str, ...], list[ProjectionIntent]] = {}
         for intent in intents:
             if intent.trade_id == trade_id:
                 by_key.setdefault(_intent_key(intent), []).append(intent)
         queued: list[ProjectionIntent] = []
         for key_intents in by_key.values():
-            statuses = [last_status.get(i.intent_id) for i in key_intents]
-            if "CONFIRMED" in statuses or any(s not in _TERMINAL_STATUSES for s in statuses):
-                continue  # already delivered, or a copy is still waiting in the queue
+            if any("CONFIRMED" in seen.get(i.intent_id, ()) for i in key_intents):
+                continue  # already delivered (whatever was recorded afterwards)
+            if any(not (seen.get(i.intent_id, set()) & _TERMINAL_STATUSES) for i in key_intents):
+                continue  # a copy is still waiting in the queue
             latest = key_intents[-1]
             queued.append(replace(latest, intent_id=uuid4().hex, created_at=_utc_now()))
         for intent in queued:

@@ -368,3 +368,34 @@ def test_requeue_twice_in_a_row_queues_only_once(tmp_path: Path) -> None:
     record_projection_dispatch(path, intent=closed, status="REJECTED", error_code=ORPHAN_CLOSE_PARKED_CODE)
     assert len(requeue_rejected_projection_intents(path, trade_id="trade-001")) == 1
     assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()
+
+
+def test_requeue_never_resends_what_was_ever_confirmed_even_if_a_later_record_says_rejected(tmp_path: Path) -> None:
+    """Review of #144: a CONFIRMED followed by a contradictory REJECTED must not make the projection requeueable."""
+    path = tmp_path / "projection-outbox.jsonl"
+    closed = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    record_projection_dispatch(path, intent=closed, status="CONFIRMED", receiver_row=2)
+    record_projection_dispatch(path, intent=closed, status="REJECTED", error_code="late_error")
+    assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()
+
+
+def test_requeue_with_a_confirmed_copy_and_a_rejected_copy_of_the_same_projection_queues_nothing(tmp_path: Path, monkeypatch) -> None:
+    _ticking_clock(monkeypatch)
+    path = tmp_path / "projection-outbox.jsonl"
+    first = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    record_projection_dispatch(path, intent=first, status="REJECTED", error_code=ORPHAN_CLOSE_PARKED_CODE)
+    (second,) = requeue_rejected_projection_intents(path, trade_id="trade-001")
+    record_projection_dispatch(path, intent=second, status="CONFIRMED", receiver_row=2)
+    assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()
+
+
+def test_requeue_with_two_rejected_copies_of_one_projection_queues_one(tmp_path: Path, monkeypatch) -> None:
+    _ticking_clock(monkeypatch)
+    path = tmp_path / "projection-outbox.jsonl"
+    first = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    record_projection_dispatch(path, intent=first, status="REJECTED", error_code=ORPHAN_CLOSE_PARKED_CODE)
+    (second,) = requeue_rejected_projection_intents(path, trade_id="trade-001")
+    record_projection_dispatch(path, intent=second, status="REJECTED", error_code=ORPHAN_CLOSE_PARKED_CODE)
+    (third,) = requeue_rejected_projection_intents(path, trade_id="trade-001")
+    assert third.intent_id not in {first.intent_id, second.intent_id}
+    assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()  # the third is outstanding now
