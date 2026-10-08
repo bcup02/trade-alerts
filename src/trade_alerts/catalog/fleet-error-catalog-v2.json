@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 56,
+  "error_ids_issued": 59,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -1799,6 +1799,102 @@
           "不需要任何動作。",
           "想讓對帳恢復一致：確認這筆交易真的存在，再補開倉列或列入忽略清單。"
         ]
+      }
+    },
+    {
+      "error_id": "ERR-057",
+      "code": "SEY.FUNDING_SHEET_WRITE_FAILED",
+      "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
+      "project": "seykota",
+      "sources": [
+        "src/seykota_bot/funding_sync.py:224"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": 3
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "本機帳本先寫好，再把累計資金費寫進 Google 表「帳戶餘額總表」分頁這支策略那一列的 G 欄。接收端明確回「不」（例如找不到這個專案名）就不會自己好，立刻算失敗；連線逾時、網路錯誤、空回覆這類沒有答案的失敗，每次執行（每小時）都再試，連續 3 次都失敗才算失敗。算失敗時：寫一筆事件日誌（R2，標記已重試用盡）由匯出檔通知一次，服務以結束碼 3 結束（顯示失敗，維運通知背景服務軸另會通知）；失敗期間每次執行仍以結束碼 3 結束，但通知不重發，寫入成功後才重新計。不動帳本、不暫停交易。",
+      "human_action": "帳本是正本，交易不受影響；要做的是讓「帳戶餘額總表」分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致，不一致就改表上的文字或請 Claude 改程式設定；其他原因照給 AI 的追查指令查。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-07 使用者把「帳戶餘額總表」分頁 B 欄改成策略中文名，三支資金費同步仍用英文專案名比對，接收端每次回 key_value not found，只記警告、結束碼照常 0，累計資金費約一天沒更新、沒人發現（f-26）。修復機器人沒辦法自己修：要看 B 欄實際文字與接收端設定，是人才有的資訊，所以是通知人附步驟與追查指令（R2：重試用盡才通知），不是自動處理。接收端明確拒絕時重試沒有意義，所以立刻算用盡；連線類失敗連續 3 次才算，避免 Google 偶發逾時吵人。",
+      "operator_message": {
+        "what": "趨勢策略的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但這支策略那一列的累計資金費（G 欄）沒有更新。",
+        "direction": "帳本是正本、交易不受影響，不需要立刻動作。要讓分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致；不一致就改表上的文字，或請 Claude 改程式設定。",
+        "steps": [
+          "看訊息裡的原因（reason）與專案名（project_name）：receiver_rejected 是接收端明確回絕，repeated 是連線類失敗連續 3 次。",
+          "到 Google 表的「帳戶餘額總表」分頁，看 B 欄這支策略那一列的實際文字，跟訊息裡的專案名逐字比對。",
+          "文字不同：把表上 B 欄改成跟程式一致，或請 Claude 改主機環境檔的 SHEETS_SUMMARY_PROJECT_NAME；修好後下一輪自動寫入，失敗次數歸零。",
+          "文字相同、或是連線類失敗：把下方「給 AI 的追查指令」整段貼給 Claude，追查原因並提出修正。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 seykota-funding-sync.service 最近幾次執行的 journal（程式在 src/seykota_bot/funding_sync.py 的 publish_total／publish_and_judge）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。"
+      }
+    },
+    {
+      "error_id": "ERR-058",
+      "code": "MOM.FUNDING_SHEET_WRITE_FAILED",
+      "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
+      "project": "momentum",
+      "sources": [
+        "src/binance_funding_sync.py:356"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": 3
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "本機帳本先寫好，再把累計資金費寫進 Google 表「帳戶餘額總表」分頁這支策略那一列的 G 欄。接收端明確回「不」（例如找不到這個專案名）就不會自己好，立刻算失敗；連線逾時、網路錯誤、空回覆這類沒有答案的失敗，每次執行（每 4 小時）都再試，連續 3 次都失敗才算失敗。算失敗時：寫一筆事件日誌（R2，標記已重試用盡）由匯出檔通知一次，服務以結束碼 3 結束（顯示失敗，維運通知背景服務軸另會通知）；失敗期間每次執行仍以結束碼 3 結束，但通知不重發，寫入成功後才重新計。不動帳本、不暫停交易。",
+      "human_action": "帳本是正本，交易不受影響；要做的是讓「帳戶餘額總表」分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致，不一致就改表上的文字或請 Claude 改程式設定；其他原因照給 AI 的追查指令查。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-07 使用者把「帳戶餘額總表」分頁 B 欄改成策略中文名，三支資金費同步仍用英文專案名比對，接收端每次回 key_value not found，只記警告、結束碼照常 0，累計資金費約一天沒更新、沒人發現（f-26）。修復機器人沒辦法自己修：要看 B 欄實際文字與接收端設定，是人才有的資訊，所以是通知人附步驟與追查指令（R2：重試用盡才通知），不是自動處理。接收端明確拒絕時重試沒有意義，所以立刻算用盡；連線類失敗連續 3 次才算，避免 Google 偶發逾時吵人。",
+      "operator_message": {
+        "what": "動能策略的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但這支策略那一列的累計資金費（G 欄）沒有更新。",
+        "direction": "帳本是正本、交易不受影響，不需要立刻動作。要讓分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致；不一致就改表上的文字，或請 Claude 改程式設定。",
+        "steps": [
+          "看訊息裡的原因（reason）與專案名（project_name）：receiver_rejected 是接收端明確回絕，repeated 是連線類失敗連續 3 次。",
+          "到 Google 表的「帳戶餘額總表」分頁，看 B 欄這支策略那一列的實際文字，跟訊息裡的專案名逐字比對。",
+          "文字不同：把表上 B 欄改成跟程式一致，或請 Claude 改主機環境檔的 SHEETS_SUMMARY_PROJECT_NAME；修好後下一輪自動寫入，失敗次數歸零。",
+          "文字相同、或是連線類失敗：把下方「給 AI 的追查指令」整段貼給 Claude，追查原因並提出修正。"
+        ],
+        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 mexc-momentum-funding-sync.service 最近幾次執行的 journal（程式在 src/binance_funding_sync.py 的 publish_total／judge_publish）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。"
+      }
+    },
+    {
+      "error_id": "ERR-059",
+      "code": "MYC.FUNDING_SHEET_WRITE_FAILED",
+      "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
+      "project": "mycrypto",
+      "sources": [
+        "sync_funding_fees_entry.py:267"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": 3
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "本機帳本先寫好，再把累計資金費寫進 Google 表「帳戶餘額總表」分頁這支策略那一列的 G 欄。接收端明確回「不」（例如找不到這個專案名）就不會自己好，立刻算失敗；連線逾時、網路錯誤、空回覆這類沒有答案的失敗，每次執行（每 4 小時）都再試，連續 3 次都失敗才算失敗。算失敗時：服務以結束碼 3 結束（顯示失敗，維運通知背景服務軸 ERR-046 通知，前提是這個服務在監控清單裡）；失敗期間每次執行仍以結束碼 3 結束，寫入成功後才重新計。加密還沒有事件日誌的通知管道（要等換 Binance、升級共用庫），所以目前沒有專屬的白話通知，這則編號的說明是給人與 AI 查案用。不動帳本、不暫停交易。",
+      "human_action": "帳本是正本，交易不受影響；要做的是讓「帳戶餘額總表」分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致，不一致就改表上的文字或請 Claude 改程式設定；其他原因照給 AI 的追查指令查。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-07 使用者把「帳戶餘額總表」分頁 B 欄改成策略中文名，三支資金費同步仍用英文專案名比對，接收端每次回 key_value not found，只記警告、結束碼照常 0，累計資金費約一天沒更新、沒人發現（f-26）。修復機器人沒辦法自己修：要看 B 欄實際文字與接收端設定，是人才有的資訊，所以是通知人附步驟與追查指令（R2：重試用盡才通知），不是自動處理。接收端明確拒絕時重試沒有意義，所以立刻算用盡；連線類失敗連續 3 次才算，避免 Google 偶發逾時吵人。",
+      "operator_message": {
+        "what": "加密策略的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但這支策略那一列的累計資金費（G 欄）沒有更新。",
+        "direction": "帳本是正本、交易不受影響，不需要立刻動作。要讓分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致；不一致就改表上的文字，或請 Claude 改程式設定。",
+        "steps": [
+          "看訊息裡的原因（reason）與專案名（project_name）：receiver_rejected 是接收端明確回絕，repeated 是連線類失敗連續 3 次。",
+          "到 Google 表的「帳戶餘額總表」分頁，看 B 欄這支策略那一列的實際文字，跟訊息裡的專案名逐字比對。",
+          "文字不同：把表上 B 欄改成跟程式一致，或請 Claude 改主機環境檔的 SHEETS_SUMMARY_PROJECT_NAME；修好後下一輪自動寫入，失敗次數歸零。",
+          "文字相同、或是連線類失敗：把下方「給 AI 的追查指令」整段貼給 Claude，追查原因並提出修正。"
+        ],
+        "ai_prompt": "請在 my-crypto-bot（主機上的 /opt/my-crypto-bot）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 my-crypto-bot-funding-sync.service 最近幾次執行的 journal（程式在 sync_funding_fees_entry.py 的 publish_total／sync_funding_total_to_sheet）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。"
       }
     }
   ],

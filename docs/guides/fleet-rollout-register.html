@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>55</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>58</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>31</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">55 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">58 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -2514,16 +2514,16 @@
    "title": "接手倉位與原生停損平倉的成交，對帳不再誤判成「帳本沒記」"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-projection.park_unconfirmed_correction",
    "complete": false,
    "dots": {
     "btc-competition": "na",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "pending",
-    "seykota": "recent"
+    "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "projection.park_unconfirmed_correction",
    "kind": "cap",
    "rows": [
@@ -2576,16 +2576,16 @@
    "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-projection.requeue_parked",
    "complete": false,
    "dots": {
-    "btc-competition": "recent",
-    "momentum": "recent",
+    "btc-competition": "done",
+    "momentum": "done",
     "mycrypto": "pending",
-    "seykota": "recent"
+    "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "projection.requeue_parked",
    "kind": "cap",
    "rows": [
@@ -2638,16 +2638,16 @@
    "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-google.close_whole_trade_entry",
    "complete": false,
    "dots": {
     "btc-competition": "na",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "pending",
-    "seykota": "recent"
+    "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "google.close_whole_trade_entry",
    "kind": "cap",
    "rows": [
@@ -2700,16 +2700,16 @@
    "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-google.spot_fill_row",
    "complete": true,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "done",
     "momentum": "na",
     "mycrypto": "na",
     "seykota": "na"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "google.spot_fill_row",
    "kind": "cap",
    "rows": [
@@ -5044,7 +5044,7 @@
    "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
    "complete": false,
    "dots": {
@@ -5128,6 +5128,111 @@
    ],
    "sub": "ERR-056 · FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
    "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-SEY.FUNDING_SHEET_WRITE_FAILED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "none",
+    "seykota": "pending"
+   },
+   "has_recent": false,
+   "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "趨勢策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+       "state": "pending",
+       "text": "已實作、審閱中（ed-seykota-systematic-trend-following f-26a PR），還沒上 A1 正式機（新）；seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+       "state": "pending",
+       "text": "已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 ed-seykota-systematic-trend-following 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。"
+      }
+     ]
+    }
+   ],
+   "sub": "ERR-057 · SEY.FUNDING_SHEET_WRITE_FAILED",
+   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-MOM.FUNDING_SHEET_WRITE_FAILED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "pending",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+       "state": "pending",
+       "text": "已實作、審閱中（mexc-4h-momentum-trailing-stop f-26a PR），還沒上 A1 正式機（新）；mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+       "state": "pending",
+       "text": "已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 mexc-4h-momentum-trailing-stop 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。"
+      }
+     ]
+    }
+   ],
+   "sub": "ERR-058 · MOM.FUNDING_SHEET_WRITE_FAILED",
+   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
+  },
+  {
+   "added_recent": true,
+   "anchor": "rule-MYC.FUNDING_SHEET_WRITE_FAILED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "none",
+    "mycrypto": "pending",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "加密策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+       "state": "pending",
+       "text": "已實作、審閱中（my-crypto-bot f-26a PR），還沒上 A1 正式機（新）；失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+       "state": "pending",
+       "text": "加密仍釘共用庫 v0.15.0，沒有匯出檔與修復機器人，事件日誌的通知到不了手機；換 Binance（x3）升級共用庫後才會有白話通知。在那之前只有服務失敗（ERR-046）一條路。"
+      }
+     ]
+    }
+   ],
+   "sub": "ERR-059 · MYC.FUNDING_SHEET_WRITE_FAILED",
+   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
   }
  ],
  "phase_counts": {
@@ -5140,6 +5245,7 @@
   "error-ids": 4,
   "f-12": 12,
   "f-16": 3,
+  "f-26a": 5,
   "h4-trade-correction": 0,
   "hotfix-btc-order-resend": 0,
   "hotfix-seykota-order-resend": 0,
@@ -5152,7 +5258,7 @@
   "v2-W3": 0,
   "v2-W4": 0,
   "v2-W6": 0,
-  "x3-crypto-binance": 5
+  "x3-crypto-binance": 6
  },
  "phase_order": [
   "v2-W2",
@@ -5176,7 +5282,8 @@
   "f-12",
   "f-16",
   "x3-crypto-binance",
-  "t9-competition-retry"
+  "t9-competition-retry",
+  "f-26a"
  ],
  "phases": {
   "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
@@ -5188,6 +5295,7 @@
   "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
   "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
   "f-16": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
+  "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
   "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
   "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
@@ -5216,82 +5324,22 @@
  },
  "recent_summary": [
   {
-   "anchor": "cap-projection.park_unconfirmed_correction",
-   "note": "新增一格：Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄。",
+   "anchor": "rule-SEY.FUNDING_SHEET_WRITE_FAILED",
+   "note": "新增一列：趨勢策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-057，R2；f-26a，審閱中、部署 A1 後改已做）。",
    "project": null,
-   "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
+   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
   },
   {
-   "anchor": "cap-projection.requeue_parked",
-   "note": "新增一格：停放（REJECTED）的 Google 投影可以用正式的方式重新排入。",
+   "anchor": "rule-MOM.FUNDING_SHEET_WRITE_FAILED",
+   "note": "新增一列：動能策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-058，R2；f-26a，審閱中、部署 A1 後改已做）。",
    "project": null,
-   "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
+   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
   },
   {
-   "anchor": "cap-google.close_whole_trade_entry",
-   "note": "新增一格：平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）。",
+   "anchor": "rule-MYC.FUNDING_SHEET_WRITE_FAILED",
+   "note": "新增一列：加密策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-059，R2；f-26a，審閱中、部署 A1 後改已做）。",
    "project": null,
-   "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
-  },
-  {
-   "anchor": "cap-google.spot_fill_row",
-   "note": "新增一格：現貨成交用專屬的寫入動作（append_fill_v2），不再假裝成永遠沒平倉的開倉列。",
-   "project": null,
-   "title": "現貨成交用專屬的寫入動作（append_fill_v2），不再假裝成永遠沒平倉的開倉列"
-  },
-  {
-   "anchor": "cap-projection.park_unconfirmed_correction",
-   "note": "趨勢策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 9952c3d。",
-   "project": "趨勢策略",
-   "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
-  },
-  {
-   "anchor": "cap-projection.park_unconfirmed_correction",
-   "note": "動能策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 fe4637e。",
-   "project": "動能策略",
-   "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
-  },
-  {
-   "anchor": "cap-projection.requeue_parked",
-   "note": "趨勢策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 9952c3d。",
-   "project": "趨勢策略",
-   "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
-  },
-  {
-   "anchor": "cap-projection.requeue_parked",
-   "note": "動能策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 fe4637e。",
-   "project": "動能策略",
-   "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
-  },
-  {
-   "anchor": "cap-projection.requeue_parked",
-   "note": "競賽策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 0409a9f。",
-   "project": "競賽策略",
-   "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
-  },
-  {
-   "anchor": "cap-google.close_whole_trade_entry",
-   "note": "趨勢策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 9952c3d。",
-   "project": "趨勢策略",
-   "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
-  },
-  {
-   "anchor": "cap-google.close_whole_trade_entry",
-   "note": "動能策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 fe4637e。",
-   "project": "動能策略",
-   "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
-  },
-  {
-   "anchor": "cap-google.spot_fill_row",
-   "note": "競賽策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 0409a9f。",
-   "project": "競賽策略",
-   "title": "現貨成交用專屬的寫入動作（append_fill_v2），不再假裝成永遠沒平倉的開倉列"
-  },
-  {
-   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
-   "note": "說明補上：同一筆交易的帳本更正連續 12 次回「平倉未確認」也會停放，並可重新排入（共用庫 v0.27.9，ERR-056）。",
-   "project": null,
-   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
   }
  ],
  "totals": {
@@ -5303,17 +5351,17 @@
   "momentum": {
    "done": 44,
    "n/a": 11,
-   "pending": 11
+   "pending": 13
   },
   "mycrypto": {
    "done": 16,
    "n/a": 14,
-   "pending": 32
+   "pending": 34
   },
   "seykota": {
    "done": 53,
    "n/a": 9,
-   "pending": 26
+   "pending": 28
   }
  }
 }

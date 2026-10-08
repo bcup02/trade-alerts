@@ -31,7 +31,8 @@
     "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
     "f-16": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
     "x3-crypto-binance": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
-    "t9-competition-retry": "t9：競賽策略失敗時當天重試（同一程序內每 15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.6 錯誤清單已改；競賽程式在 PR #45（審閱中，合併後上開發機實測），之後才部署 A1 正式機（新）"
+    "t9-competition-retry": "t9：競賽策略失敗時當天重試（同一程序內每 15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.6 錯誤清單已改；競賽程式在 PR #45（審閱中，合併後上開發機實測），之後才部署 A1 正式機（新）",
+    "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）"
   },
   "sources": {
     "momentum": {
@@ -1864,94 +1865,77 @@
           "reason": "同上，且要先升級共用庫。"
         }
       }
+    },
+    {
+      "code": "SEY.FUNDING_SHEET_WRITE_FAILED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "f-26a",
+          "reason": "已實作、審閱中（ed-seykota-systematic-trend-following f-26a PR），還沒上 A1 正式機（新）；seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "f-26a",
+          "reason": "已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 ed-seykota-systematic-trend-following 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。"
+        }
+      }
+    },
+    {
+      "code": "MOM.FUNDING_SHEET_WRITE_FAILED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-26a",
+          "reason": "已實作、審閱中（mexc-4h-momentum-trailing-stop f-26a PR），還沒上 A1 正式機（新）；mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-26a",
+          "reason": "已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 mexc-4h-momentum-trailing-stop 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。"
+        }
+      }
+    },
+    {
+      "code": "MYC.FUNDING_SHEET_WRITE_FAILED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "f-26a",
+          "reason": "已實作、審閱中（my-crypto-bot f-26a PR），還沒上 A1 正式機（新）；失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "加密仍釘共用庫 v0.15.0，沒有匯出檔與修復機器人，事件日誌的通知到不了手機；換 Binance（x3）升級共用庫後才會有白話通知。在那之前只有服務失敗（ERR-046）一條路。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "projection.park_unconfirmed_correction",
+      "kind": "rule",
+      "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
       "type": "added",
-      "note": "新增一格：Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.requeue_parked",
-      "type": "added",
-      "note": "新增一格：停放（REJECTED）的 Google 投影可以用正式的方式重新排入。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.close_whole_trade_entry",
-      "type": "added",
-      "note": "新增一格：平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.spot_fill_row",
-      "type": "added",
-      "note": "新增一格：現貨成交用專屬的寫入動作（append_fill_v2），不再假裝成永遠沒平倉的開倉列。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.park_unconfirmed_correction",
-      "project": "seykota",
-      "type": "completed",
-      "note": "趨勢策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 9952c3d。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.park_unconfirmed_correction",
-      "project": "momentum",
-      "type": "completed",
-      "note": "動能策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 fe4637e。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.requeue_parked",
-      "project": "seykota",
-      "type": "completed",
-      "note": "趨勢策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 9952c3d。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.requeue_parked",
-      "project": "momentum",
-      "type": "completed",
-      "note": "動能策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 fe4637e。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.requeue_parked",
-      "project": "btc-competition",
-      "type": "completed",
-      "note": "競賽策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 0409a9f。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.close_whole_trade_entry",
-      "project": "seykota",
-      "type": "completed",
-      "note": "趨勢策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 9952c3d。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.close_whole_trade_entry",
-      "project": "momentum",
-      "type": "completed",
-      "note": "動能策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 fe4637e。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.spot_fill_row",
-      "project": "btc-competition",
-      "type": "completed",
-      "note": "競賽策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 0409a9f。"
+      "note": "新增一列：趨勢策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-057，R2；f-26a，審閱中、部署 A1 後改已做）。"
     },
     {
       "kind": "rule",
-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
-      "type": "updated",
-      "note": "說明補上：同一筆交易的帳本更正連續 12 次回「平倉未確認」也會停放，並可重新排入（共用庫 v0.27.9，ERR-056）。"
+      "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
+      "type": "added",
+      "note": "新增一列：動能策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-058，R2；f-26a，審閱中、部署 A1 後改已做）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
+      "type": "added",
+      "note": "新增一列：加密策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-059，R2；f-26a，審閱中、部署 A1 後改已做）。"
     }
   ]
 }
