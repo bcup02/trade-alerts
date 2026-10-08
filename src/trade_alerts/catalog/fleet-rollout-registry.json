@@ -32,7 +32,7 @@
     "f-16": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
     "x3-crypto-binance": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
     "t9-competition-retry": "t9：競賽策略失敗時當天重試（同一程序內每 15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.6 錯誤清單已改；競賽程式在 PR #45（審閱中，合併後上開發機實測），之後才部署 A1 正式機（新）",
-    "f-26a": "f-26a：資金費同步寫不進「帳戶餘額總表」時服務要顯示失敗（結束碼 3，維運通知背景服務軸 ERR-046 會通知），預設專案名改成策略中文名（趨勢、動能、加密各一個 PR，部署 A1 正式機（新）後改已做；加密還要把資金費同步服務加進維運通知的監控清單）"
+    "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）"
   },
   "sources": {
     "momentum": {
@@ -772,32 +772,6 @@
         "btc-competition": {
           "state": "done",
           "evidence": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證）：operations 0409a9f 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/btc_competition/google_ledger_provenance.py（blob f339f78） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：部署後競賽還沒有新的成交，第一次實際用 append_fill_v2 送出要等下一次每日調整（2026-10-09 台北 08:10）有成交；接收端的收單只用非機密探測驗證過（回簽章檢查，不是寫入）。"
-        }
-      }
-    },
-    {
-      "id": "reconcile.funding_sheet_write_visible",
-      "title": "資金費同步寫不進「帳戶餘額總表」時，服務會顯示失敗（維運通知看得到）",
-      "description": "資金費同步把本機帳本算好的累計資金費寫進 Google「帳戶餘額總表」的 G 欄，用 B 欄專案名（現在是策略中文名）找列。2026-10-07 B 欄改成中文後三支都回 key_value not found，只記警告、約一天沒人發現（f-26）。現在本機帳本照舊先寫好，總表寫入失敗時：接收端明確回「不」（例如 key_value not found）立刻讓服務以結束碼 3 結束；連線逾時、網路錯誤、空回覆這類沒有答案的失敗，連續 3 次才結束碼 3（次數存在帳本旁的 funding_sheet_failures.json，存不下來就直接 3），寫入成功歸零。服務顯示失敗後由維運通知的背景服務軸（ERR-046）通知，所以該服務要在維運通知的監控清單裡。",
-      "status": {
-        "seykota": {
-          "state": "pending",
-          "phase": "f-26a",
-          "reason": "趨勢已實作、PR 審閱中（ed-seykota-systematic-trend-following f-26a PR），還沒上 A1 正式機（新）；資金費同步服務 seykota-funding-sync 已在 A1 的維運通知監控清單（f-5）。"
-        },
-        "momentum": {
-          "state": "pending",
-          "phase": "f-26a",
-          "reason": "動能已實作、PR 審閱中（mexc-4h-momentum-trailing-stop f-26a PR），還沒上 A1 正式機（新）；資金費同步服務 mexc-momentum-funding-sync 已在 A1 的維運通知監控清單（f-5）。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變（A1 上走 Binance 版）。"
-        },
-        "mycrypto": {
-          "state": "pending",
-          "phase": "f-26a",
-          "reason": "加密已實作、PR 審閱中（my-crypto-bot f-26a PR，另含總表階段牆鐘預算與服務時限 60→180 秒），還沒上 A1 正式機（新）；而且加密的背景服務還沒進維運通知的監控清單（見「維運通知盯背景服務有沒有掛掉」那一格），要把 my-crypto-bot-funding-sync.service 加進去，結束碼 3 才有人看得到。"
-        },
-        "btc-competition": {
-          "state": "n/a",
-          "reason": "現貨再平衡策略，沒有資金費同步，也不寫「帳戶餘額總表」的資金費欄。"
         }
       }
     }
@@ -1891,14 +1865,77 @@
           "reason": "同上，且要先升級共用庫。"
         }
       }
+    },
+    {
+      "code": "SEY.FUNDING_SHEET_WRITE_FAILED",
+      "behaviour": {
+        "seykota": {
+          "state": "pending",
+          "phase": "f-26a",
+          "reason": "已實作、審閱中（ed-seykota-systematic-trend-following f-26a PR），還沒上 A1 正式機（新）；seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "f-26a",
+          "reason": "已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 ed-seykota-systematic-trend-following 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。"
+        }
+      }
+    },
+    {
+      "code": "MOM.FUNDING_SHEET_WRITE_FAILED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-26a",
+          "reason": "已實作、審閱中（mexc-4h-momentum-trailing-stop f-26a PR），還沒上 A1 正式機（新）；mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-26a",
+          "reason": "已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 mexc-4h-momentum-trailing-stop 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。"
+        }
+      }
+    },
+    {
+      "code": "MYC.FUNDING_SHEET_WRITE_FAILED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "f-26a",
+          "reason": "已實作、審閱中（my-crypto-bot f-26a PR），還沒上 A1 正式機（新）；失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "加密仍釘共用庫 v0.15.0，沒有匯出檔與修復機器人，事件日誌的通知到不了手機；換 Binance（x3）升級共用庫後才會有白話通知。在那之前只有服務失敗（ERR-046）一條路。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "reconcile.funding_sheet_write_visible",
+      "kind": "rule",
+      "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
       "type": "added",
-      "note": "新增一格：資金費同步寫不進「帳戶餘額總表」時服務會顯示失敗（f-26a；三支 PR 審閱中，部署 A1 後改已做）。"
+      "note": "新增一列：趨勢策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-057，R2；f-26a，審閱中、部署 A1 後改已做）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
+      "type": "added",
+      "note": "新增一列：動能策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-058，R2；f-26a，審閱中、部署 A1 後改已做）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
+      "type": "added",
+      "note": "新增一列：加密策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-059，R2；f-26a，審閱中、部署 A1 後改已做）。"
     }
   ]
 }

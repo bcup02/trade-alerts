@@ -100,9 +100,9 @@
   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>56 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    四支策略目前所有已知的「出問題」情況，共 <b>59 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>36 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>39 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -1697,6 +1697,102 @@
    "tier": "R1",
    "title": "Google 表同步佇列停放了一筆找不到開倉列的平倉",
    "what": "有一筆平倉在 Google 表找不到對應的開倉列（或它的帳本更正因為平倉沒確認而一直失敗），同步佇列重試 12 次後把它停放，免得擋住後面的紀錄。"
+  },
+  {
+   "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 seykota-funding-sync.service 最近幾次執行的 journal（程式在 src/seykota_bot/funding_sync.py 的 publish_total／publish_and_judge）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。",
+   "behaviour": {
+    "phase": "f-26a",
+    "reason": "已實作、審閱中（ed-seykota-systematic-trend-following f-26a PR），還沒上 A1 正式機（新）；seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。",
+    "state": "pending"
+   },
+   "bot": "seykota",
+   "bot_label": "趨勢策略",
+   "code": "SEY.FUNDING_SHEET_WRITE_FAILED",
+   "direction": "帳本是正本、交易不受影響，不需要立刻動作。要讓分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致；不一致就改表上的文字，或請 Claude 改程式設定。",
+   "emits_event": {
+    "phase": "f-26a",
+    "reason": "已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 ed-seykota-systematic-trend-following 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。",
+    "state": "pending"
+   },
+   "error_id": "ERR-057",
+   "notes": [
+    "行為未做 — 已實作、審閱中（ed-seykota-systematic-trend-following f-26a PR），還沒上 A1 正式機（新）；seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。（預定：f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單））",
+    "寫進事件日誌未做 — 已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 ed-seykota-systematic-trend-following 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。（預定：f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單））"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的原因（reason）與專案名（project_name）：receiver_rejected 是接收端明確回絕，repeated 是連線類失敗連續 3 次。",
+    "到 Google 表的「帳戶餘額總表」分頁，看 B 欄這支策略那一列的實際文字，跟訊息裡的專案名逐字比對。",
+    "文字不同：把表上 B 欄改成跟程式一致，或請 Claude 改主機環境檔的 SHEETS_SUMMARY_PROJECT_NAME；修好後下一輪自動寫入，失敗次數歸零。",
+    "文字相同、或是連線類失敗：把下方「給 AI 的追查指令」整段貼給 Claude，追查原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
+   "what": "趨勢策略的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但這支策略那一列的累計資金費（G 欄）沒有更新。"
+  },
+  {
+   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 mexc-momentum-funding-sync.service 最近幾次執行的 journal（程式在 src/binance_funding_sync.py 的 publish_total／judge_publish）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。",
+   "behaviour": {
+    "phase": "f-26a",
+    "reason": "已實作、審閱中（mexc-4h-momentum-trailing-stop f-26a PR），還沒上 A1 正式機（新）；mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。",
+    "state": "pending"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.FUNDING_SHEET_WRITE_FAILED",
+   "direction": "帳本是正本、交易不受影響，不需要立刻動作。要讓分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致；不一致就改表上的文字，或請 Claude 改程式設定。",
+   "emits_event": {
+    "phase": "f-26a",
+    "reason": "已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 mexc-4h-momentum-trailing-stop 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。",
+    "state": "pending"
+   },
+   "error_id": "ERR-058",
+   "notes": [
+    "行為未做 — 已實作、審閱中（mexc-4h-momentum-trailing-stop f-26a PR），還沒上 A1 正式機（新）；mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。（預定：f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單））",
+    "寫進事件日誌未做 — 已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 mexc-4h-momentum-trailing-stop 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。（預定：f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單））"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的原因（reason）與專案名（project_name）：receiver_rejected 是接收端明確回絕，repeated 是連線類失敗連續 3 次。",
+    "到 Google 表的「帳戶餘額總表」分頁，看 B 欄這支策略那一列的實際文字，跟訊息裡的專案名逐字比對。",
+    "文字不同：把表上 B 欄改成跟程式一致，或請 Claude 改主機環境檔的 SHEETS_SUMMARY_PROJECT_NAME；修好後下一輪自動寫入，失敗次數歸零。",
+    "文字相同、或是連線類失敗：把下方「給 AI 的追查指令」整段貼給 Claude，追查原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
+   "what": "動能策略的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但這支策略那一列的累計資金費（G 欄）沒有更新。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot（主機上的 /opt/my-crypto-bot）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 my-crypto-bot-funding-sync.service 最近幾次執行的 journal（程式在 sync_funding_fees_entry.py 的 publish_total／sync_funding_total_to_sheet）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。",
+   "behaviour": {
+    "phase": "f-26a",
+    "reason": "已實作、審閱中（my-crypto-bot f-26a PR），還沒上 A1 正式機（新）；失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.FUNDING_SHEET_WRITE_FAILED",
+   "direction": "帳本是正本、交易不受影響，不需要立刻動作。要讓分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致；不一致就改表上的文字，或請 Claude 改程式設定。",
+   "emits_event": {
+    "phase": "x3-crypto-binance",
+    "reason": "加密仍釘共用庫 v0.15.0，沒有匯出檔與修復機器人，事件日誌的通知到不了手機；換 Binance（x3）升級共用庫後才會有白話通知。在那之前只有服務失敗（ERR-046）一條路。",
+    "state": "pending"
+   },
+   "error_id": "ERR-059",
+   "notes": [
+    "行為未做 — 已實作、審閱中（my-crypto-bot f-26a PR），還沒上 A1 正式機（新）；失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去。（預定：f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單））",
+    "寫進事件日誌未做 — 加密仍釘共用庫 v0.15.0，沒有匯出檔與修復機器人，事件日誌的通知到不了手機；換 Binance（x3）升級共用庫後才會有白話通知。在那之前只有服務失敗（ERR-046）一條路。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的原因（reason）與專案名（project_name）：receiver_rejected 是接收端明確回絕，repeated 是連線類失敗連續 3 次。",
+    "到 Google 表的「帳戶餘額總表」分頁，看 B 欄這支策略那一列的實際文字，跟訊息裡的專案名逐字比對。",
+    "文字不同：把表上 B 欄改成跟程式一致，或請 Claude 改主機環境檔的 SHEETS_SUMMARY_PROJECT_NAME；修好後下一輪自動寫入，失敗次數歸零。",
+    "文字相同、或是連線類失敗：把下方「給 AI 的追查指令」整段貼給 Claude，追查原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
+   "what": "加密策略的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但這支策略那一列的累計資金費（G 欄）沒有更新。"
   }
  ],
  "tiers": [

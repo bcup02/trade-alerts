@@ -963,3 +963,15 @@ trade-alerts：v0.28.0（現貨成交專用的 Google 表寫入動作 append_fil
 ```
 
 補記（v0.28.0 審閱 BLOCK 後）：google_ledger_client 的 _TERMINAL_RECEIVER_ERRORS 加入 fill_projection_invalid（永久無效的成交投影記 REJECTED，不再當可重試擋住佇列）；receiver 回 unsupported_action（還沒部署新接收端）仍是可重試。新增跨 receiver 錯誤→client 狀態→outbox 流程的測試。
+
+```text
+trade-alerts：v0.29.0（錯誤清單新增 ERR-057／058／059：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁；f-26a）
+變更摘要：1. 錯誤清單新增三條 R2：SEY.FUNDING_SHEET_WRITE_FAILED（ERR-057）、MOM.FUNDING_SHEET_WRITE_FAILED（ERR-058）、MYC.FUNDING_SHEET_WRITE_FAILED（ERR-059），各附白話說明、處理步驟與給 AI 的追查指令（key_value not found、接收端授權、連線逾時各怎麼查）。
+          2. 觸發時機由各策略的資金費同步決定：接收端明確回「不」立刻、連線類失敗連續 3 次才算失敗；算失敗時寫一筆事件日誌（R2，標記已重試用盡）並讓服務以結束碼 3 結束。趨勢、動能的修復機器人每輪把事件匯出給維運通知；加密仍釘 v0.15.0，沒有匯出管道，只有服務失敗（ERR-046）一條路，等換 Binance（x3）。
+          3. 沒有程式或函式簽名變更；只有錯誤清單資料與版本號。
+向後相容：沒釘此版的專案不受影響；趨勢、動能釘此版後，通知才認得新編號（沒釘時事件仍會寫入，但匯出時查不到清單條目）。
+受影響消費專案：趨勢、動能（隨 f-26a 改釘）；加密不釘（等 x3）。
+部署入口：各專案既有部署腳本。
+版本驗證／服務驗證／部署時間：待各專案釘版部署後補記。
+交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+```
