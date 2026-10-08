@@ -1,0 +1,374 @@
+diff --git a/apps_script/google_ledger_receiver.gs b/apps_script/google_ledger_receiver.gs
+index 4f930c3..1e10861 100644
+--- a/apps_script/google_ledger_receiver.gs
++++ b/apps_script/google_ledger_receiver.gs
+@@ -62,7 +62,12 @@ const OPEN_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time
+ const OPEN_REQUIRED_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time', 'entry_price', 'volume', 'leverage', 'entry_fee'];
+ const CLOSE_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source', 'exit_order_id', 'stop_plan_order_id', 'exit_anomaly', 'exit_price_is_confirmed'];
+ const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source'];
++// append_fill_v2 (e-2): one standalone spot fill per row -- no open/close pair.  Same columns as an open row
++// plus source (P) = 'spot_fill', so the sheet says what the row is instead of looking like an unclosed trade.
++const FILL_FIELDS = OPEN_FIELDS.concat(['source']);
++const FILL_REQUIRED_FIELDS = OPEN_REQUIRED_FIELDS.concat(['source']);
+ const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
++const FILL_COLUMN_MAP = Object.assign({source: 'P'}, OPEN_COLUMN_MAP);
+ // entry_price / entry_volume: the close carries the whole trade (weighted average price, total
+ // quantity), so a trade with adds no longer shows only its first entry on the sheet (e-5).
+ const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_price: 'G', entry_volume: 'I', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
+@@ -234,7 +239,7 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
+ // ---- V2 handler: ledger-backed, source-scoped, and fail-closed. ----
+ 
+ function handleV2(data) {
+-  if (!['append_open_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
++  if (!['append_open_v2', 'append_fill_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
+   const source = sourceRegistration(data.source_id);
+   if (!source || data.project_id !== source.project_id || data.sheet_name !== source.sheet_name) return {ok: false, error: 'source_not_allowed'};
+   if (!verifySignature(data, source.hmac_secret)) return {ok: false, error: 'signature_invalid'};
+@@ -245,6 +250,7 @@ function handleV2(data) {
+   if (!validProvenance(data.provenance, data)) return {ok: false, error: 'provenance_invalid'};
+   const projection = data.projection || {};
+   if (data.action === 'append_open_v2') return appendOpen(sheet, data, projection);
++  if (data.action === 'append_fill_v2') return appendFill(sheet, data, projection);
+   if (data.action === 'update_close_v2') return updateClose(sheet, data, projection);
+   if (data.action === 'correct_close_v2') return correctClose(sheet, data, projection);
+   if (data.action === 'read_audit_v2') return readAudit(data);
+@@ -294,7 +300,7 @@ function validProvenance(provenance, data) {
+   const required = ['project_id', 'trade_id', 'event_type', 'ledger_event_digest', 'payload_digest', 'request_id', 'issued_at', 'source_id', 'schema_version'];
+   if (required.some(key => typeof provenance[key] !== 'string' || provenance[key] === '')) return false;
+   if (provenance.project_id !== data.project_id || provenance.source_id !== data.source_id || provenance.request_id !== data.request_id || provenance.issued_at !== data.issued_at || provenance.schema_version !== V2_SCHEMA) return false;
+-  if (!['trade_open', 'trade_close', 'trade_correction'].includes(provenance.event_type)) return false;
++  if (!['trade_open', 'trade_close', 'trade_correction', 'spot_fill'].includes(provenance.event_type)) return false;
+   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(provenance.trade_id)) return false;
+   if (!/^[0-9a-f]{64}$/.test(provenance.ledger_event_digest) || !/^[0-9a-f]{64}$/.test(provenance.payload_digest)) return false;
+   if (sha256Hex(canonicalJson(data.projection || {})) !== provenance.payload_digest) return false;
+@@ -337,6 +343,21 @@ function appendOpen(sheet, data, projection) {
+   return {ok: true, row: row, provenance_status: 'CONFIRMED'};
+ }
+ 
++function appendFill(sheet, data, projection) {
++  if (data.provenance.event_type !== 'spot_fill' || !validateProjection(projection, FILL_FIELDS, FILL_REQUIRED_FIELDS, data.provenance.trade_id) || projection.source !== 'spot_fill') return rejectAndAudit(data, 'fill_projection_invalid');
++  const existing = findTradeRows(sheet, data.provenance.trade_id);
++  if (existing.length > 1) return rejectAndAudit(data, 'duplicate_trade_id');
++  if (existing.length === 1) {
++    const prior = confirmedAuditByTradeId(data.project_id, data.provenance.trade_id, 'spot_fill');
++    if (prior.length === 1 && prior[0].payload_digest === data.provenance.payload_digest) return {ok: true, row: existing[0], idempotent: true};
++    return rejectAndAudit(data, 'trade_id_conflict');
++  }
++  const row = sheet.getLastRow() + 1;
++  writeProjection(sheet, row, projection, FILL_COLUMN_MAP);
++  writeAudit(data, row, 'CONFIRMED');
++  return {ok: true, row: row, provenance_status: 'CONFIRMED'};
++}
++
+ function updateClose(sheet, data, projection) {
+   if (data.provenance.event_type !== 'trade_close' || !validateProjection(projection, CLOSE_FIELDS, CLOSE_REQUIRED_FIELDS, data.provenance.trade_id)) return rejectAndAudit(data, 'close_projection_invalid');
+   const existing = findTradeRows(sheet, data.provenance.trade_id);
+diff --git a/apps_script/google_ledger_receiver_v2.gs b/apps_script/google_ledger_receiver_v2.gs
+index da12a09..0ddab24 100644
+--- a/apps_script/google_ledger_receiver_v2.gs
++++ b/apps_script/google_ledger_receiver_v2.gs
+@@ -18,7 +18,12 @@ const OPEN_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time
+ const OPEN_REQUIRED_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time', 'entry_price', 'volume', 'leverage', 'entry_fee'];
+ const CLOSE_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source', 'exit_order_id', 'stop_plan_order_id', 'exit_anomaly', 'exit_price_is_confirmed'];
+ const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source'];
++// append_fill_v2 (e-2): one standalone spot fill per row -- no open/close pair.  Same columns as an open row
++// plus source (P) = 'spot_fill', so the sheet says what the row is instead of looking like an unclosed trade.
++const FILL_FIELDS = OPEN_FIELDS.concat(['source']);
++const FILL_REQUIRED_FIELDS = OPEN_REQUIRED_FIELDS.concat(['source']);
+ const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
++const FILL_COLUMN_MAP = Object.assign({source: 'P'}, OPEN_COLUMN_MAP);
+ // entry_price / entry_volume: the close carries the whole trade (weighted average price, total
+ // quantity), so a trade with adds no longer shows only its first entry on the sheet (e-5).
+ const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_price: 'G', entry_volume: 'I', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
+@@ -50,7 +55,7 @@ function doPost(e) {
+ 
+ function handleV2(data) {
+   if (!data || data.schema_version !== V2_SCHEMA) return {ok: false, error: 'unsupported_schema'};
+-  if (!['append_open_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
++  if (!['append_open_v2', 'append_fill_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
+   const source = sourceRegistration(data.source_id);
+   if (!source || data.project_id !== source.project_id || data.sheet_name !== source.sheet_name) return {ok: false, error: 'source_not_allowed'};
+   if (!verifySignature(data, source.hmac_secret)) return {ok: false, error: 'signature_invalid'};
+@@ -62,6 +67,7 @@ function handleV2(data) {
+   if (!validProvenance(data.provenance, data)) return {ok: false, error: 'provenance_invalid'};
+   const projection = data.projection || {};
+   if (data.action === 'append_open_v2') return appendOpen(sheet, data, projection);
++  if (data.action === 'append_fill_v2') return appendFill(sheet, data, projection);
+   if (data.action === 'update_close_v2') return updateClose(sheet, data, projection);
+   if (data.action === 'correct_close_v2') return correctClose(sheet, data, projection);
+   if (data.action === 'read_audit_v2') return readAudit(data);
+@@ -111,7 +117,7 @@ function validProvenance(provenance, data) {
+   const required = ['project_id', 'trade_id', 'event_type', 'ledger_event_digest', 'payload_digest', 'request_id', 'issued_at', 'source_id', 'schema_version'];
+   if (required.some(key => typeof provenance[key] !== 'string' || provenance[key] === '')) return false;
+   if (provenance.project_id !== data.project_id || provenance.source_id !== data.source_id || provenance.request_id !== data.request_id || provenance.issued_at !== data.issued_at || provenance.schema_version !== V2_SCHEMA) return false;
+-  if (!['trade_open', 'trade_close', 'trade_correction'].includes(provenance.event_type)) return false;
++  if (!['trade_open', 'trade_close', 'trade_correction', 'spot_fill'].includes(provenance.event_type)) return false;
+   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(provenance.trade_id)) return false;
+   if (!/^[0-9a-f]{64}$/.test(provenance.ledger_event_digest) || !/^[0-9a-f]{64}$/.test(provenance.payload_digest)) return false;
+   if (sha256Hex(canonicalJson(data.projection || {})) !== provenance.payload_digest) return false;
+@@ -154,6 +160,21 @@ function appendOpen(sheet, data, projection) {
+   return {ok: true, row: row, provenance_status: 'CONFIRMED'};
+ }
+ 
++function appendFill(sheet, data, projection) {
++  if (data.provenance.event_type !== 'spot_fill' || !validateProjection(projection, FILL_FIELDS, FILL_REQUIRED_FIELDS, data.provenance.trade_id) || projection.source !== 'spot_fill') return rejectAndAudit(data, 'fill_projection_invalid');
++  const existing = findTradeRows(sheet, data.provenance.trade_id);
++  if (existing.length > 1) return rejectAndAudit(data, 'duplicate_trade_id');
++  if (existing.length === 1) {
++    const prior = confirmedAuditByTradeId(data.project_id, data.provenance.trade_id, 'spot_fill');
++    if (prior.length === 1 && prior[0].payload_digest === data.provenance.payload_digest) return {ok: true, row: existing[0], idempotent: true};
++    return rejectAndAudit(data, 'trade_id_conflict');
++  }
++  const row = sheet.getLastRow() + 1;
++  writeProjection(sheet, row, projection, FILL_COLUMN_MAP);
++  writeAudit(data, row, 'CONFIRMED');
++  return {ok: true, row: row, provenance_status: 'CONFIRMED'};
++}
++
+ function updateClose(sheet, data, projection) {
+   if (data.provenance.event_type !== 'trade_close' || !validateProjection(projection, CLOSE_FIELDS, CLOSE_REQUIRED_FIELDS, data.provenance.trade_id)) return rejectAndAudit(data, 'close_projection_invalid');
+   const existing = findTradeRows(sheet, data.provenance.trade_id);
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 85045b5..535e43e 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -948,3 +948,18 @@ trade-alerts：v0.27.9（Google 表同步佇列：停放的紀錄可重新排入
+ 版本驗證／服務驗證／部署時間：待各專案釘版部署與接收端部署後補記。
+ 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.28.0（現貨成交專用的 Google 表寫入動作 append_fill_v2；e-2）
++變更摘要：1. 接收端（google_ledger_receiver.gs 與 google_ledger_receiver_v2.gs 兩份同步）新增 append_fill_v2：事件類型 spot_fill，一列一筆成交，欄位同開倉列加 source（P 欄）固定 'spot_fill'；事件類型不對、少了 source 或 source 不是 'spot_fill' 一律 fill_projection_invalid 並寫稽核；同一 trade_id 內容相同＝冪等、內容不同＝trade_id_conflict（與開倉列同規則）。append_open_v2 的行為不變。
++          2. Python：ProjectionAction／事件類型／簽章與送出白名單加入 append_fill_v2／spot_fill（projection_outbox、ledger_integrity、google_ledger_client）；action 與事件類型必須成對（fill 配 spot_fill，open 配 trade_open）。
++          3. 原因：競賽是現貨，每一筆成交原本被送成一列「只有開倉、永遠沒有平倉」的孤兒開倉列（舊待辦 E2），讀表的人分不出是未平倉還是單純的成交。這版先讓接收端與共用庫支援；競賽改用要另外改釘並部署（它的 provenance 轉接層另開 PR）。
++          4. 新增 1 個 Python 測試與 1 段接收端 Node 測試（含錯誤事件類型、缺 source、source 不對、衝突）。
++向後相容：舊的 append_open_v2／trade_open 路徑完全不動；已經在表上的孤兒開倉列不會被改。接收端要由你重新部署（開發機 DEV 先、正式機後）；競賽在接收端部署前不能改用新動作（舊接收端會回 unsupported_action，佇列會重試而不丟資料）。競賽改用時，佇列裡還在等的舊 trade_open intent 會因事件類型不同被判 rehydration_invalid，所以部署要挑佇列已排空（沒有待送成交）的時候。
++受影響消費專案：競賽（要另外改用）；趨勢、動能不受影響；加密不適用（期貨）。
++部署入口：競賽既有部署腳本；接收端手動部署（Apps Script）。
++版本驗證／服務驗證／部署時間：待競賽改釘與接收端部署後補記。
++交易安全：未啟用真倉、未下單、未修改秘密或保護單。
++```
++
++補記（v0.28.0 審閱 BLOCK 後）：google_ledger_client 的 _TERMINAL_RECEIVER_ERRORS 加入 fill_projection_invalid（永久無效的成交投影記 REJECTED，不再當可重試擋住佇列）；receiver 回 unsupported_action（還沒部署新接收端）仍是可重試。新增跨 receiver 錯誤→client 狀態→outbox 流程的測試。
+diff --git a/pyproject.toml b/pyproject.toml
+index 3bfb723..d1bf809 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.27.9"
++version = "0.28.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 49c67f6..09b8c6f 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -343,4 +343,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.27.9"
++__version__ = "0.28.0"
+diff --git a/src/trade_alerts/google_ledger_client.py b/src/trade_alerts/google_ledger_client.py
+index b5db6c4..77d7e08 100644
+--- a/src/trade_alerts/google_ledger_client.py
++++ b/src/trade_alerts/google_ledger_client.py
+@@ -18,7 +18,7 @@ from .ledger_integrity import LedgerProvenance
+ from .provenance_outbox import append_outbox_record
+ 
+ 
+-_PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_close_v2"})
++_PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2"})
+ 
+ # Receiver ``ok: false`` errors that mean the payload itself is structurally
+ # wrong -- the SAME intent can never succeed, so its dispatch is terminal.
+@@ -30,6 +30,7 @@ _PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "update_close_v2",
+ _TERMINAL_RECEIVER_ERRORS = frozenset({
+     "provenance_invalid",
+     "open_projection_invalid",
++    "fill_projection_invalid",
+     "close_projection_invalid",
+     "correction_projection_invalid",
+     "correction_base_mismatch",
+diff --git a/src/trade_alerts/ledger_integrity.py b/src/trade_alerts/ledger_integrity.py
+index 074eea6..70f26e6 100644
+--- a/src/trade_alerts/ledger_integrity.py
++++ b/src/trade_alerts/ledger_integrity.py
+@@ -19,8 +19,8 @@ from typing import Any, Mapping
+ from uuid import UUID
+ 
+ LEDGER_PROJECTION_SCHEMA_VERSION = "google-ledger-projection-v2"
+-_ALLOWED_EVENT_TYPES = frozenset({"trade_open", "trade_close", "trade_correction"})
+-_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_close_v2", "read_audit_v2", "read_reconciliation_v2", "quarantine_v2"})
++_ALLOWED_EVENT_TYPES = frozenset({"trade_open", "trade_close", "trade_correction", "spot_fill"})
++_ALLOWED_ACTIONS = frozenset({"append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2", "read_audit_v2", "read_reconciliation_v2", "quarantine_v2"})
+ _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
+ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+ 
+diff --git a/src/trade_alerts/projection_outbox.py b/src/trade_alerts/projection_outbox.py
+index f6a3a3c..400c681 100644
+--- a/src/trade_alerts/projection_outbox.py
++++ b/src/trade_alerts/projection_outbox.py
+@@ -19,11 +19,11 @@ from uuid import uuid4
+ 
+ from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance, LedgerUnreadableError
+ 
+-ProjectionAction = Literal["append_open_v2", "update_close_v2", "correct_close_v2"]
++ProjectionAction = Literal["append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2"]
+ ProjectionOutcomeStatus = Literal["CONFIRMED", "REJECTED", "TRANSPORT_FAILED"]
+-_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_close_v2"})
++_ALLOWED_ACTIONS = frozenset({"append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2"})
+ # Each write action projects exactly one kind of ledger event.
+-_ACTION_EVENT_TYPE = {"append_open_v2": "trade_open", "update_close_v2": "trade_close", "correct_close_v2": "trade_correction"}
++_ACTION_EVENT_TYPE = {"append_open_v2": "trade_open", "append_fill_v2": "spot_fill", "update_close_v2": "trade_close", "correct_close_v2": "trade_correction"}
+ _TERMINAL_STATUSES = frozenset({"CONFIRMED", "REJECTED"})
+ #: A close whose trade the receiver has never heard of (``trade_id_not_found``)
+ #: is not a transport problem: the open row is missing, so no retry will help
+diff --git a/tests/apps_script_unified_receiver_node_test.js b/tests/apps_script_unified_receiver_node_test.js
+index 3a6ce7f..26de109 100644
+--- a/tests/apps_script_unified_receiver_node_test.js
++++ b/tests/apps_script_unified_receiver_node_test.js
+@@ -288,4 +288,31 @@ assert.equal(projectSheet.rows[lateRow - 1][8], 3);     // I whole-trade quantit
+ const lateOther = v2Write({action: 'update_close_v2', eventType: 'trade_close', tradeId: 'v2-late-open-1', projection: {...lateCloseProjection, net_pnl: '-9'}, requestId: '00000000-0000-4000-8000-000000000034'});
+ assert.deepEqual(route(lateOther), {ok: false, error: 'trade_close_conflict'});
+ 
++// e-2: append_fill_v2 -- one standalone spot fill per row (event_type spot_fill), source column P = 'spot_fill'.
++const fillProjection = {trade_id: 'ETHBTC-5551212', execution_mode: 'LIVE', symbol: 'ETHBTC', side: 'BUY', entry_time: '2026-10-08T00:10:00Z', entry_price: '0.03', volume: '1.5', leverage: '1', entry_fee: '0.00001', entry_order_id: '5551212', source: 'spot_fill'};
++const fillWrite = v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-5551212', projection: fillProjection, requestId: '00000000-0000-4000-8000-000000000040'});
++const fillResult = route(fillWrite);
++assert.equal(fillResult.ok, true);
++assert.equal(fillResult.provenance_status, 'CONFIRMED');
++const fillRow = fillResult.row;
++assert.equal(projectSheet.rows[fillRow - 1][0], 'ETHBTC-5551212');
++assert.equal(projectSheet.rows[fillRow - 1][3], 'BUY');
++assert.equal(projectSheet.rows[fillRow - 1][6], 0.03);      // G price
++assert.equal(projectSheet.rows[fillRow - 1][8], 1.5);       // I quantity
++assert.equal(projectSheet.rows[fillRow - 1][15], 'spot_fill');  // P source marks it as a standalone fill
++assert.deepEqual(route(fillWrite), {ok: true, row: fillRow, idempotent: true});
++// a fill is not an open: the wrong event type or a missing / different source marker is refused and audited
++const fillAsOpen = v2Write({action: 'append_fill_v2', eventType: 'trade_open', tradeId: 'ETHBTC-9', projection: {...fillProjection, trade_id: 'ETHBTC-9'}, requestId: '00000000-0000-4000-8000-000000000041'});
++assert.deepEqual(route(fillAsOpen), {ok: false, error: 'fill_projection_invalid'});
++const noSource = {...fillProjection, trade_id: 'ETHBTC-10'};
++delete noSource.source;
++assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-10', projection: noSource, requestId: '00000000-0000-4000-8000-000000000042'})), {ok: false, error: 'fill_projection_invalid'});
++assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-11', projection: {...fillProjection, trade_id: 'ETHBTC-11', source: 'trade_open'}, requestId: '00000000-0000-4000-8000-000000000043'})), {ok: false, error: 'fill_projection_invalid'});
++const openAsFill = v2Write({action: 'append_open_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-12', projection: {...v2OpenProjection, trade_id: 'ETHBTC-12'}, requestId: '00000000-0000-4000-8000-000000000044'});
++assert.deepEqual(route(openAsFill), {ok: false, error: 'open_projection_invalid'});
++// payload-level idempotency: same projection under a NEW request id is still an idempotent resend, not a second row
++assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-5551212', projection: fillProjection, requestId: '00000000-0000-4000-8000-000000000046'})), {ok: true, row: fillRow, idempotent: true});
++// the same trade id with different content is a conflict, as for an open
++assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-5551212', projection: {...fillProjection, volume: '9'}, requestId: '00000000-0000-4000-8000-000000000045'})), {ok: false, error: 'trade_id_conflict'});
++
+ console.log('apps_script_unified_receiver_node_test: passed');
+diff --git a/tests/test_google_ledger_client.py b/tests/test_google_ledger_client.py
+index 6b9f447..f2f7d5e 100644
+--- a/tests/test_google_ledger_client.py
++++ b/tests/test_google_ledger_client.py
+@@ -170,3 +170,16 @@ def test_read_audit_is_read_only_and_requires_fixed_audit_action():
+     wrong_action = read_projection_audit_v2(endpoint="https://example.test/receiver", payload={**payload, "action": "append_open_v2"})
+     assert not wrong_action.ok
+     assert wrong_action.error_code == "audit_action_invalid"
++
++
++def test_an_invalid_fill_projection_is_terminal_but_a_stale_receiver_stays_retryable(tmp_path):
++    """Review of #145: the receiver's fill_projection_invalid can never succeed on retry (REJECTED), while a receiver
++    that does not know append_fill_v2 yet answers unsupported_action, which must stay retryable."""
++    provenance, payload = _payload()
++    for err, expected in (("fill_projection_invalid", "REJECTED"), ("unsupported_action", "TRANSPORT_FAILED")):
++        out = submit_projection_v2(
++            endpoint="https://example.test/receiver", payload=payload, provenance=provenance,
++            outbox_path=tmp_path / f"{err}.jsonl",
++            post=lambda *a, _e=err, **k: _Response({"ok": False, "error": _e}), sleep=lambda _: None, attempts=1,
++        )
++        assert out.status == expected and out.error_code == err
+diff --git a/tests/test_projection_outbox.py b/tests/test_projection_outbox.py
+index 7aa7e1d..12c5266 100644
+--- a/tests/test_projection_outbox.py
++++ b/tests/test_projection_outbox.py
+@@ -1,5 +1,6 @@
+ from __future__ import annotations
+ 
++import json
+ from dataclasses import dataclass
+ from pathlib import Path
+ from uuid import uuid4
+@@ -399,3 +400,74 @@ def test_requeue_with_two_rejected_copies_of_one_projection_queues_one(tmp_path:
+     (third,) = requeue_rejected_projection_intents(path, trade_id="trade-001")
+     assert third.intent_id not in {first.intent_id, second.intent_id}
+     assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()  # the third is outstanding now
++
++def test_a_spot_fill_is_its_own_action_not_an_open_row(tmp_path: Path) -> None:
++    """e-2: a spot fill is projected by append_fill_v2 / spot_fill; it is not an open that waits for a close."""
++    fill = LedgerProvenance(
++        project_id="btc-competition", trade_id="ETHBTC-5551212", event_type="spot_fill", ledger_event_digest=DIGEST_A,
++        payload_digest=DIGEST_B, request_id=str(uuid4()), issued_at="2026-10-08T00:00:00Z",
++        source_id="btc-competition-wsl-prod", schema_version=LEDGER_PROJECTION_SCHEMA_VERSION,
++    )
++    path = tmp_path / "projection-outbox.jsonl"
++    intent = enqueue_projection_intent(path, action="append_fill_v2", provenance=fill)
++    assert intent.event_type == "spot_fill" and intent.action == "append_fill_v2"
++    assert outstanding_projection_intents(path) == (intent,)
++    # the old pairing no longer fits: a fill is not an open, and an open is not a fill
++    try:
++        enqueue_projection_intent(path, action="append_open_v2", provenance=fill)
++    except ValueError as exc:
++        assert "does not match" in str(exc)
++    else:  # pragma: no cover
++        raise AssertionError("append_open_v2 must refuse a spot_fill provenance")
++    try:
++        enqueue_projection_intent(path, action="append_fill_v2", provenance=_open_provenance())
++    except ValueError as exc:
++        assert "does not match" in str(exc)
++    else:  # pragma: no cover
++        raise AssertionError("append_fill_v2 must refuse a trade_open provenance")
++
++
++def test_an_invalid_fill_is_rejected_and_the_next_projection_still_goes_out(tmp_path: Path, monkeypatch) -> None:
++    """Review of #145, receiver error -> client status -> outbox lifecycle: an invalid fill is REJECTED (not retried
++    forever at the head of the queue) and the next intent is delivered; a stale receiver's unsupported_action is retried."""
++    from trade_alerts.google_ledger_client import deliver_projection_v2
++
++    _ticking_clock(monkeypatch)
++    path = tmp_path / "projection-outbox.jsonl"
++    fill_proof = LedgerProvenance(
++        project_id="mexc-4h-momentum", trade_id="ETHBTC-5551212", event_type="spot_fill", ledger_event_digest=DIGEST_A,
++        payload_digest=DIGEST_B, request_id=str(uuid4()), issued_at="2026-10-08T00:00:00Z",
++        source_id="momentum-wsl-prod", schema_version=LEDGER_PROJECTION_SCHEMA_VERSION,
++    )
++    fill = enqueue_projection_intent(path, action="append_fill_v2", provenance=fill_proof)
++    nxt = enqueue_projection_intent(path, action="append_open_v2", provenance=_open_provenance())
++
++    class _Resp:
++        def __init__(self, body):
++            self._body = body
++            self.status_code = 200
++            self.headers = {}
++
++        def raise_for_status(self):
++            pass
++
++        def json(self):
++            return self._body
++
++    def submit_with(answer_for_fill):
++        def post(url, **kwargs):
++            payload = kwargs.get("json") or json.loads(kwargs["data"])
++            if payload["action"] == "append_fill_v2":
++                return _Resp(answer_for_fill)
++            return _Resp({"ok": True, "row": 2})
++        return lambda payload, _proof: deliver_projection_v2(endpoint="https://example.test/receiver", payload=payload, post=post, sleep=lambda _: None, attempts=1)
++
++    stale = dispatch_next_projection(path, rebuild=_rebuild_like, submit=submit_with({"ok": False, "error": "unsupported_action"}))
++    assert stale.dispatch.status == "TRANSPORT_FAILED"
++    assert outstanding_projection_intents(path)[0].intent_id == fill.intent_id  # retried later, not dropped
++
++    invalid = dispatch_next_projection(path, rebuild=_rebuild_like, submit=submit_with({"ok": False, "error": "fill_projection_invalid"}))
++    assert invalid.dispatch.status == "REJECTED" and invalid.dispatch.error_code == "fill_projection_invalid"
++    assert [i.intent_id for i in outstanding_projection_intents(path)] == [nxt.intent_id]
++    delivered = dispatch_next_projection(path, rebuild=_rebuild_like, submit=submit_with({"ok": True, "row": 2}))
++    assert delivered.dispatch.status == "CONFIRMED"
