@@ -1,0 +1,80 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index e3893b8..98936c1 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -922,3 +922,15 @@ trade-alerts：v0.27.7（帳本↔Google 表對帳：剛開／剛平、還在等
+ 版本驗證／服務驗證／部署時間：待動能、趨勢釘版部署後補記。
+ 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.27.8（Google 表同步佇列：同一秒排進去的紀錄照排入順序送；f-21）
++變更摘要：1. outstanding_projection_intents 不再用（created_at, intent_id）排序，改照檔案寫入順序（寫入有鎖，順序＝建立順序）。created_at 只有 1 秒精度，同一秒排進去的兩筆原本由隨機 intent_id 決定先後，平倉可能排在自己的開倉前面。
++          2. 原因：2026-10-06 開發機趨勢 f-19 測試，同一筆交易的開倉與平倉同一秒（09:37:53）排進佇列，平倉的隨機編號 1e794fad 小於開倉的 20ca9096，平倉先送、接收端回 trade_id_not_found，連 12 次後被停放（ERR-056）；開倉 10:00 才送出，之後該筆的帳本更正因「平倉未確認」一直重試（510 次）。
++          3. 新增 1 個測試（同秒、平倉編號排在前面的情況；還原修正會失敗）；既有測試零改動。
++向後相容：佇列內容與格式不變；只影響「同一秒排進去的多筆」與「檔案順序和 created_at 順序不一致的舊檔」（後者以檔案順序為準）。
++受影響消費專案：趨勢、動能、競賽（共用佇列；釘此版後生效）；加密仍釘 v0.15.0。
++部署入口：各專案既有部署腳本（開發機 → 正式機）。
++版本驗證／服務驗證／部署時間：待各專案釘版部署後補記。
++交易安全：未啟用真倉、未下單、未修改秘密或保護單。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index e87e7a7..11a248f 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.27.7"
++version = "0.27.8"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index dc1419a..c36401c 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -341,4 +341,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.27.7"
++__version__ = "0.27.8"
+diff --git a/src/trade_alerts/projection_outbox.py b/src/trade_alerts/projection_outbox.py
+index 1b72c6c..71e2829 100644
+--- a/src/trade_alerts/projection_outbox.py
++++ b/src/trade_alerts/projection_outbox.py
+@@ -212,7 +212,7 @@ def outstanding_projection_intents(path: str | Path) -> tuple[ProjectionIntent,
+                 raise ValueError("projection dispatch is invalid") from exc
+             if dispatch.status in _TERMINAL_STATUSES:
+                 terminal.add(dispatch.intent_id)
+-    return tuple(intent for intent in sorted(intents.values(), key=lambda value: (value.created_at, value.intent_id)) if intent.intent_id not in terminal)
++    return tuple(intent for intent in intents.values() if intent.intent_id not in terminal)  # file order = creation order; never sort by the 1-second created_at (f-21)
+ 
+ 
+ def record_projection_dispatch(path: str | Path, *, intent: ProjectionIntent, status: ProjectionOutcomeStatus, receiver_row: int | None = None, error_code: str | None = None) -> ProjectionDispatch:
+diff --git a/tests/test_projection_outbox.py b/tests/test_projection_outbox.py
+index 5c15814..4e15430 100644
+--- a/tests/test_projection_outbox.py
++++ b/tests/test_projection_outbox.py
+@@ -248,3 +248,19 @@ def test_an_open_that_is_not_found_is_never_parked(tmp_path: Path) -> None:
+     for _ in range(ORPHAN_CLOSE_PARK_AFTER + 3):
+         result = dispatch_next_projection(path, rebuild=rebuilt_open, submit=not_found)
+         assert result.dispatch.status == "TRANSPORT_FAILED"
++
++
++def test_intents_queued_in_the_same_second_keep_their_queue_order(tmp_path: Path, monkeypatch) -> None:
++    """f-21: a trade's open and close queued in one second must go out open first,
++    whatever their random ids sort like (the close's id here sorts before the open's)."""
++    from types import SimpleNamespace
++
++    monkeypatch.setattr("trade_alerts.projection_outbox._utc_now", lambda: "2026-10-06T09:37:53Z")
++    ids = iter(["20ca9096" + "0" * 24, "1e794fad" + "0" * 24])  # open first, then close
++    monkeypatch.setattr("trade_alerts.projection_outbox.uuid4", lambda: SimpleNamespace(hex=next(ids)))
++    path = tmp_path / "projection-outbox.jsonl"
++    opened = enqueue_projection_intent(path, action="append_open_v2", provenance=_open_provenance())
++    closed = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
++    assert closed.intent_id < opened.intent_id  # the trap: sorting by (created_at, intent_id) would put the close first
++
++    assert [i.intent_id for i in outstanding_projection_intents(path)] == [opened.intent_id, closed.intent_id]
