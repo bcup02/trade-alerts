@@ -11,7 +11,7 @@ import fcntl
 import json
 import os
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Literal, Mapping
@@ -34,6 +34,14 @@ ORPHAN_CLOSE_PARK_AFTER = 12
 ORPHAN_CLOSE_ERROR = "trade_id_not_found"
 ORPHAN_CLOSE_PARKED_CODE = "orphan_close_no_open_row"
 _CLOSE_ACTIONS = frozenset({"update_close_v2", "correct_close_v2"})
+#: A correction whose trade the receiver answers ``close_not_confirmed`` can never succeed on its own: the
+#: queue sends a trade's close before its correction, so the close is terminal (parked or lost) and the
+#: receiver has no confirmed close to correct.  Retrying forever blocked the head of the queue (f-25), so
+#: after this many consecutive answers it is parked as REJECTED; ``requeue_rejected_projection_intents``
+#: puts the trade's rejected intents back, in their original order, once the close can be confirmed.
+CORRECTION_UNCONFIRMED_ERROR = "close_not_confirmed"
+CORRECTION_UNCONFIRMED_PARK_AFTER = 12
+CORRECTION_PARKED_CODE = "correction_close_not_confirmed"
 
 
 @dataclass(frozen=True)
@@ -267,11 +275,19 @@ def dispatch_next_projection(
         if status == "TRANSPORT_FAILED" and error_code == ORPHAN_CLOSE_ERROR and intent.action in _CLOSE_ACTIONS:
             if _consecutive_orphan_answers(path, intent.intent_id) + 1 >= ORPHAN_CLOSE_PARK_AFTER:
                 status, receiver_row, error_code = "REJECTED", None, ORPHAN_CLOSE_PARKED_CODE
+        elif status == "TRANSPORT_FAILED" and error_code == CORRECTION_UNCONFIRMED_ERROR and intent.action == "correct_close_v2":
+            if _consecutive_answers(path, intent.intent_id, CORRECTION_UNCONFIRMED_ERROR) + 1 >= CORRECTION_UNCONFIRMED_PARK_AFTER:
+                status, receiver_row, error_code = "REJECTED", None, CORRECTION_PARKED_CODE
         return ProjectionDispatchResult(intent, record_projection_dispatch(path, intent=intent, status=status, receiver_row=receiver_row, error_code=error_code))
 
 
 def _consecutive_orphan_answers(path: str | Path, intent_id: str) -> int:
     """How many dispatches of this intent in a row were ``trade_id_not_found``."""
+    return _consecutive_answers(path, intent_id, ORPHAN_CLOSE_ERROR)
+
+
+def _consecutive_answers(path: str | Path, intent_id: str, code: str) -> int:
+    """How many dispatches of this intent in a row ended with ``code``."""
     count = 0
     for record in _read_records(path):
         if record.get("kind") != "projection_dispatch_v1":
@@ -279,8 +295,48 @@ def _consecutive_orphan_answers(path: str | Path, intent_id: str) -> int:
         raw = record.get("dispatch")
         if not isinstance(raw, Mapping) or raw.get("intent_id") != intent_id:
             continue
-        count = count + 1 if raw.get("error_code") == ORPHAN_CLOSE_ERROR else 0
+        count = count + 1 if raw.get("error_code") == code else 0
     return count
+
+
+def requeue_rejected_projection_intents(path: str | Path, *, trade_id: str) -> tuple[ProjectionIntent, ...]:
+    """Queue a fresh copy of every parked (REJECTED) intent of one trade, in its original order.
+
+    ``enqueue_projection_intent`` returns the original intent for the same immutable projection, so a
+    REJECTED one could never be sent again.  This is the supported recovery (f-25): for each immutable
+    projection of ``trade_id`` whose latest intent ended REJECTED -- and that has no CONFIRMED or still
+    outstanding intent -- append a new intent (new ``intent_id`` and ``created_at``, same digests).  The
+    receiver and the dispatcher keep their usual checks, so a requeue cannot write anything the ledger does
+    not back.  Returns the intents it queued (empty when there is nothing to recover).
+    """
+    with _exclusive_outbox_lock(path):
+        intents: list[ProjectionIntent] = []
+        # Every status ever recorded per intent: a CONFIRMED is an irrevocable fact, so a later (contradictory)
+        # REJECTED record must not hide it.
+        seen: dict[str, set[str]] = {}
+        for record in _read_records(path):
+            kind = record.get("kind")
+            if kind == "projection_intent_v1":
+                intents.append(_intent_from_record(record))
+            elif kind == "projection_dispatch_v1":
+                raw = record.get("dispatch")
+                if isinstance(raw, Mapping):
+                    seen.setdefault(str(raw.get("intent_id")), set()).add(str(raw.get("status")))
+        by_key: dict[tuple[str, ...], list[ProjectionIntent]] = {}
+        for intent in intents:
+            if intent.trade_id == trade_id:
+                by_key.setdefault(_intent_key(intent), []).append(intent)
+        queued: list[ProjectionIntent] = []
+        for key_intents in by_key.values():
+            if any("CONFIRMED" in seen.get(i.intent_id, ()) for i in key_intents):
+                continue  # already delivered (whatever was recorded afterwards)
+            if any(not (seen.get(i.intent_id, set()) & _TERMINAL_STATUSES) for i in key_intents):
+                continue  # a copy is still waiting in the queue
+            latest = key_intents[-1]
+            queued.append(replace(latest, intent_id=uuid4().hex, created_at=_utc_now()))
+        for intent in queued:
+            _append_locked(path, {"kind": "projection_intent_v1", "intent": asdict(intent)})
+        return tuple(queued)
 
 
 def _validate_rebuilt(intent: ProjectionIntent, rebuilt: RebuiltProjection) -> None:

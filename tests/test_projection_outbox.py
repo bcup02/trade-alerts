@@ -7,11 +7,16 @@ from uuid import uuid4
 from trade_alerts.ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance
 from trade_alerts.projection_outbox import (
     ORPHAN_CLOSE_PARK_AFTER,
+    CORRECTION_PARKED_CODE,
+    CORRECTION_UNCONFIRMED_ERROR,
+    CORRECTION_UNCONFIRMED_PARK_AFTER,
     ORPHAN_CLOSE_PARKED_CODE,
     RebuiltProjection,
     dispatch_next_projection,
     enqueue_projection_intent,
     outstanding_projection_intents,
+    record_projection_dispatch,
+    requeue_rejected_projection_intents,
 )
 
 
@@ -264,3 +269,133 @@ def test_intents_queued_in_the_same_second_keep_their_queue_order(tmp_path: Path
     assert closed.intent_id < opened.intent_id  # the trap: sorting by (created_at, intent_id) would put the close first
 
     assert [i.intent_id for i in outstanding_projection_intents(path)] == [opened.intent_id, closed.intent_id]
+
+
+# --------------------------------------------------------------------------- #
+# f-25: a correction behind a parked close is parked too; parked intents can be requeued
+# --------------------------------------------------------------------------- #
+def _prov(event_type: str, digest: str, trade_id: str = "trade-001") -> LedgerProvenance:
+    return LedgerProvenance(
+        project_id="mexc-4h-momentum", trade_id=trade_id, event_type=event_type, ledger_event_digest=DIGEST_A,
+        payload_digest=digest, request_id=str(uuid4()), issued_at="2026-08-26T00:00:00Z",
+        source_id="momentum-wsl-prod", schema_version=LEDGER_PROJECTION_SCHEMA_VERSION,
+    )
+
+
+def _rebuild_like(intent) -> RebuiltProjection:
+    """A rebuild that reproduces whatever immutable binding the intent carries."""
+    proof = LedgerProvenance(
+        project_id=intent.project_id, trade_id=intent.trade_id, event_type=intent.event_type,
+        ledger_event_digest=intent.ledger_event_digest, payload_digest=intent.payload_digest,
+        request_id=str(uuid4()), issued_at="2026-08-26T00:01:00Z", source_id=intent.source_id,
+        schema_version=intent.schema_version,
+    )
+    payload = {
+        "schema_version": intent.schema_version, "action": intent.action, "source_id": intent.source_id,
+        "project_id": intent.project_id, "sheet_name": "mexc-4h-momentum-trailing-stop",
+        "request_id": proof.request_id, "issued_at": proof.issued_at, "provenance": proof.as_dict(),
+        "projection": {"trade_id": intent.trade_id}, "signature": "0" * 64,
+    }
+    return RebuiltProjection(payload=payload, provenance=proof)
+
+
+def _answer(code: str, status: str = "TRANSPORT_FAILED", row: int | None = None):
+    return lambda *_a: Submission(status, receiver_row=row, error_code=code)
+
+
+def test_a_correction_the_receiver_cannot_confirm_a_close_for_is_parked_so_the_queue_moves_on(tmp_path: Path, monkeypatch) -> None:
+    _ticking_clock(monkeypatch)
+    path = tmp_path / "projection-outbox.jsonl"
+    correction = enqueue_projection_intent(path, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
+    later = enqueue_projection_intent(path, action="append_open_v2", provenance=_open_provenance())
+    unconfirmed = _answer(CORRECTION_UNCONFIRMED_ERROR)
+
+    for attempt in range(1, CORRECTION_UNCONFIRMED_PARK_AFTER):
+        result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=unconfirmed)
+        assert result.dispatch.status == "TRANSPORT_FAILED", attempt
+        assert outstanding_projection_intents(path)[0].intent_id == correction.intent_id  # still blocking
+
+    parked = dispatch_next_projection(path, rebuild=_rebuild_like, submit=unconfirmed)
+    assert parked.dispatch.status == "REJECTED" and parked.dispatch.error_code == CORRECTION_PARKED_CODE
+    assert [i.intent_id for i in outstanding_projection_intents(path)] == [later.intent_id]
+
+
+def test_close_not_confirmed_on_a_plain_close_is_never_parked(tmp_path: Path) -> None:
+    path = tmp_path / "projection-outbox.jsonl"
+    enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    for _ in range(CORRECTION_UNCONFIRMED_PARK_AFTER + 3):
+        result = dispatch_next_projection(path, rebuild=rebuilt, submit=_answer(CORRECTION_UNCONFIRMED_ERROR))
+        assert result.dispatch.status == "TRANSPORT_FAILED"
+
+
+def test_requeue_puts_a_trades_parked_intents_back_in_their_original_order(tmp_path: Path, monkeypatch) -> None:
+    _ticking_clock(monkeypatch)
+    path = tmp_path / "projection-outbox.jsonl"
+    opened = enqueue_projection_intent(path, action="append_open_v2", provenance=_prov("trade_open", "b" * 64))
+    closed = enqueue_projection_intent(path, action="update_close_v2", provenance=_prov("trade_close", "c" * 64))
+    corrected = enqueue_projection_intent(path, action="correct_close_v2", provenance=_prov("trade_correction", "d" * 64))
+    other = enqueue_projection_intent(path, action="update_close_v2", provenance=_prov("trade_close", "e" * 64, trade_id="trade-other"))
+    # the open lands, the close is parked (the open was late), the correction is parked behind it, the other trade is parked too
+    record_projection_dispatch(path, intent=opened, status="CONFIRMED", receiver_row=2)
+    record_projection_dispatch(path, intent=closed, status="REJECTED", error_code=ORPHAN_CLOSE_PARKED_CODE)
+    record_projection_dispatch(path, intent=corrected, status="REJECTED", error_code=CORRECTION_PARKED_CODE)
+    record_projection_dispatch(path, intent=other, status="REJECTED", error_code=ORPHAN_CLOSE_PARKED_CODE)
+    assert outstanding_projection_intents(path) == ()
+
+    queued = requeue_rejected_projection_intents(path, trade_id="trade-001")
+
+    assert [q.action for q in queued] == ["update_close_v2", "correct_close_v2"]  # not the confirmed open, not the other trade
+    assert all(q.intent_id not in {closed.intent_id, corrected.intent_id} for q in queued)
+    assert [(q.ledger_event_digest, q.payload_digest) for q in queued] == [(closed.ledger_event_digest, closed.payload_digest), (corrected.ledger_event_digest, corrected.payload_digest)]
+    assert outstanding_projection_intents(path) == queued
+    # the receiver's usual path takes it from here
+    first = dispatch_next_projection(path, rebuild=_rebuild_like, submit=lambda *_a: Submission("CONFIRMED", receiver_row=2))
+    assert first.intent.action == "update_close_v2" and first.dispatch.status == "CONFIRMED"
+
+
+def test_requeue_does_nothing_twice_or_for_delivered_intents(tmp_path: Path) -> None:
+    path = tmp_path / "projection-outbox.jsonl"
+    closed = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()  # still outstanding
+    record_projection_dispatch(path, intent=closed, status="CONFIRMED", receiver_row=2)
+    assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()  # delivered
+    assert requeue_rejected_projection_intents(path, trade_id="no-such-trade") == ()
+
+
+def test_requeue_twice_in_a_row_queues_only_once(tmp_path: Path) -> None:
+    path = tmp_path / "projection-outbox.jsonl"
+    closed = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    record_projection_dispatch(path, intent=closed, status="REJECTED", error_code=ORPHAN_CLOSE_PARKED_CODE)
+    assert len(requeue_rejected_projection_intents(path, trade_id="trade-001")) == 1
+    assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()
+
+
+def test_requeue_never_resends_what_was_ever_confirmed_even_if_a_later_record_says_rejected(tmp_path: Path) -> None:
+    """Review of #144: a CONFIRMED followed by a contradictory REJECTED must not make the projection requeueable."""
+    path = tmp_path / "projection-outbox.jsonl"
+    closed = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    record_projection_dispatch(path, intent=closed, status="CONFIRMED", receiver_row=2)
+    record_projection_dispatch(path, intent=closed, status="REJECTED", error_code="late_error")
+    assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()
+
+
+def test_requeue_with_a_confirmed_copy_and_a_rejected_copy_of_the_same_projection_queues_nothing(tmp_path: Path, monkeypatch) -> None:
+    _ticking_clock(monkeypatch)
+    path = tmp_path / "projection-outbox.jsonl"
+    first = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    record_projection_dispatch(path, intent=first, status="REJECTED", error_code=ORPHAN_CLOSE_PARKED_CODE)
+    (second,) = requeue_rejected_projection_intents(path, trade_id="trade-001")
+    record_projection_dispatch(path, intent=second, status="CONFIRMED", receiver_row=2)
+    assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()
+
+
+def test_requeue_with_two_rejected_copies_of_one_projection_queues_one(tmp_path: Path, monkeypatch) -> None:
+    _ticking_clock(monkeypatch)
+    path = tmp_path / "projection-outbox.jsonl"
+    first = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    record_projection_dispatch(path, intent=first, status="REJECTED", error_code=ORPHAN_CLOSE_PARKED_CODE)
+    (second,) = requeue_rejected_projection_intents(path, trade_id="trade-001")
+    record_projection_dispatch(path, intent=second, status="REJECTED", error_code=ORPHAN_CLOSE_PARKED_CODE)
+    (third,) = requeue_rejected_projection_intents(path, trade_id="trade-001")
+    assert third.intent_id not in {first.intent_id, second.intent_id}
+    assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()  # the third is outstanding now
