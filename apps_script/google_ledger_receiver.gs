@@ -62,7 +62,12 @@ const OPEN_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time
 const OPEN_REQUIRED_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time', 'entry_price', 'volume', 'leverage', 'entry_fee'];
 const CLOSE_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source', 'exit_order_id', 'stop_plan_order_id', 'exit_anomaly', 'exit_price_is_confirmed'];
 const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source'];
+// append_fill_v2 (e-2): one standalone spot fill per row -- no open/close pair.  Same columns as an open row
+// plus source (P) = 'spot_fill', so the sheet says what the row is instead of looking like an unclosed trade.
+const FILL_FIELDS = OPEN_FIELDS.concat(['source']);
+const FILL_REQUIRED_FIELDS = OPEN_REQUIRED_FIELDS.concat(['source']);
 const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
+const FILL_COLUMN_MAP = Object.assign({source: 'P'}, OPEN_COLUMN_MAP);
 // entry_price / entry_volume: the close carries the whole trade (weighted average price, total
 // quantity), so a trade with adds no longer shows only its first entry on the sheet (e-5).
 const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_price: 'G', entry_volume: 'I', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
@@ -234,7 +239,7 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
 // ---- V2 handler: ledger-backed, source-scoped, and fail-closed. ----
 
 function handleV2(data) {
-  if (!['append_open_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
+  if (!['append_open_v2', 'append_fill_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
   const source = sourceRegistration(data.source_id);
   if (!source || data.project_id !== source.project_id || data.sheet_name !== source.sheet_name) return {ok: false, error: 'source_not_allowed'};
   if (!verifySignature(data, source.hmac_secret)) return {ok: false, error: 'signature_invalid'};
@@ -245,6 +250,7 @@ function handleV2(data) {
   if (!validProvenance(data.provenance, data)) return {ok: false, error: 'provenance_invalid'};
   const projection = data.projection || {};
   if (data.action === 'append_open_v2') return appendOpen(sheet, data, projection);
+  if (data.action === 'append_fill_v2') return appendFill(sheet, data, projection);
   if (data.action === 'update_close_v2') return updateClose(sheet, data, projection);
   if (data.action === 'correct_close_v2') return correctClose(sheet, data, projection);
   if (data.action === 'read_audit_v2') return readAudit(data);
@@ -294,7 +300,7 @@ function validProvenance(provenance, data) {
   const required = ['project_id', 'trade_id', 'event_type', 'ledger_event_digest', 'payload_digest', 'request_id', 'issued_at', 'source_id', 'schema_version'];
   if (required.some(key => typeof provenance[key] !== 'string' || provenance[key] === '')) return false;
   if (provenance.project_id !== data.project_id || provenance.source_id !== data.source_id || provenance.request_id !== data.request_id || provenance.issued_at !== data.issued_at || provenance.schema_version !== V2_SCHEMA) return false;
-  if (!['trade_open', 'trade_close', 'trade_correction'].includes(provenance.event_type)) return false;
+  if (!['trade_open', 'trade_close', 'trade_correction', 'spot_fill'].includes(provenance.event_type)) return false;
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(provenance.trade_id)) return false;
   if (!/^[0-9a-f]{64}$/.test(provenance.ledger_event_digest) || !/^[0-9a-f]{64}$/.test(provenance.payload_digest)) return false;
   if (sha256Hex(canonicalJson(data.projection || {})) !== provenance.payload_digest) return false;
@@ -333,6 +339,21 @@ function appendOpen(sheet, data, projection) {
   }
   const row = sheet.getLastRow() + 1;
   writeProjection(sheet, row, projection, OPEN_COLUMN_MAP);
+  writeAudit(data, row, 'CONFIRMED');
+  return {ok: true, row: row, provenance_status: 'CONFIRMED'};
+}
+
+function appendFill(sheet, data, projection) {
+  if (data.provenance.event_type !== 'spot_fill' || !validateProjection(projection, FILL_FIELDS, FILL_REQUIRED_FIELDS, data.provenance.trade_id) || projection.source !== 'spot_fill') return rejectAndAudit(data, 'fill_projection_invalid');
+  const existing = findTradeRows(sheet, data.provenance.trade_id);
+  if (existing.length > 1) return rejectAndAudit(data, 'duplicate_trade_id');
+  if (existing.length === 1) {
+    const prior = confirmedAuditByTradeId(data.project_id, data.provenance.trade_id, 'spot_fill');
+    if (prior.length === 1 && prior[0].payload_digest === data.provenance.payload_digest) return {ok: true, row: existing[0], idempotent: true};
+    return rejectAndAudit(data, 'trade_id_conflict');
+  }
+  const row = sheet.getLastRow() + 1;
+  writeProjection(sheet, row, projection, FILL_COLUMN_MAP);
   writeAudit(data, row, 'CONFIRMED');
   return {ok: true, row: row, provenance_status: 'CONFIRMED'};
 }

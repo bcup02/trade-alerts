@@ -948,3 +948,18 @@ trade-alerts：v0.27.9（Google 表同步佇列：停放的紀錄可重新排入
 版本驗證／服務驗證／部署時間：待各專案釘版部署與接收端部署後補記。
 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.28.0（現貨成交專用的 Google 表寫入動作 append_fill_v2；e-2）
+變更摘要：1. 接收端（google_ledger_receiver.gs 與 google_ledger_receiver_v2.gs 兩份同步）新增 append_fill_v2：事件類型 spot_fill，一列一筆成交，欄位同開倉列加 source（P 欄）固定 'spot_fill'；事件類型不對、少了 source 或 source 不是 'spot_fill' 一律 fill_projection_invalid 並寫稽核；同一 trade_id 內容相同＝冪等、內容不同＝trade_id_conflict（與開倉列同規則）。append_open_v2 的行為不變。
+          2. Python：ProjectionAction／事件類型／簽章與送出白名單加入 append_fill_v2／spot_fill（projection_outbox、ledger_integrity、google_ledger_client）；action 與事件類型必須成對（fill 配 spot_fill，open 配 trade_open）。
+          3. 原因：競賽是現貨，每一筆成交原本被送成一列「只有開倉、永遠沒有平倉」的孤兒開倉列（舊待辦 E2），讀表的人分不出是未平倉還是單純的成交。這版先讓接收端與共用庫支援；競賽改用要另外改釘並部署（它的 provenance 轉接層另開 PR）。
+          4. 新增 1 個 Python 測試與 1 段接收端 Node 測試（含錯誤事件類型、缺 source、source 不對、衝突）。
+向後相容：舊的 append_open_v2／trade_open 路徑完全不動；已經在表上的孤兒開倉列不會被改。接收端要由你重新部署（開發機 DEV 先、正式機後）；競賽在接收端部署前不能改用新動作（舊接收端會回 unsupported_action，佇列會重試而不丟資料）。競賽改用時，佇列裡還在等的舊 trade_open intent 會因事件類型不同被判 rehydration_invalid，所以部署要挑佇列已排空（沒有待送成交）的時候。
+受影響消費專案：競賽（要另外改用）；趨勢、動能不受影響；加密不適用（期貨）。
+部署入口：競賽既有部署腳本；接收端手動部署（Apps Script）。
+版本驗證／服務驗證／部署時間：待競賽改釘與接收端部署後補記。
+交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+```
+
+補記（v0.28.0 審閱 BLOCK 後）：google_ledger_client 的 _TERMINAL_RECEIVER_ERRORS 加入 fill_projection_invalid（永久無效的成交投影記 REJECTED，不再當可重試擋住佇列）；receiver 回 unsupported_action（還沒部署新接收端）仍是可重試。新增跨 receiver 錯誤→client 狀態→outbox 流程的測試。

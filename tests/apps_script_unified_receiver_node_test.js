@@ -288,4 +288,31 @@ assert.equal(projectSheet.rows[lateRow - 1][8], 3);     // I whole-trade quantit
 const lateOther = v2Write({action: 'update_close_v2', eventType: 'trade_close', tradeId: 'v2-late-open-1', projection: {...lateCloseProjection, net_pnl: '-9'}, requestId: '00000000-0000-4000-8000-000000000034'});
 assert.deepEqual(route(lateOther), {ok: false, error: 'trade_close_conflict'});
 
+// e-2: append_fill_v2 -- one standalone spot fill per row (event_type spot_fill), source column P = 'spot_fill'.
+const fillProjection = {trade_id: 'ETHBTC-5551212', execution_mode: 'LIVE', symbol: 'ETHBTC', side: 'BUY', entry_time: '2026-10-08T00:10:00Z', entry_price: '0.03', volume: '1.5', leverage: '1', entry_fee: '0.00001', entry_order_id: '5551212', source: 'spot_fill'};
+const fillWrite = v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-5551212', projection: fillProjection, requestId: '00000000-0000-4000-8000-000000000040'});
+const fillResult = route(fillWrite);
+assert.equal(fillResult.ok, true);
+assert.equal(fillResult.provenance_status, 'CONFIRMED');
+const fillRow = fillResult.row;
+assert.equal(projectSheet.rows[fillRow - 1][0], 'ETHBTC-5551212');
+assert.equal(projectSheet.rows[fillRow - 1][3], 'BUY');
+assert.equal(projectSheet.rows[fillRow - 1][6], 0.03);      // G price
+assert.equal(projectSheet.rows[fillRow - 1][8], 1.5);       // I quantity
+assert.equal(projectSheet.rows[fillRow - 1][15], 'spot_fill');  // P source marks it as a standalone fill
+assert.deepEqual(route(fillWrite), {ok: true, row: fillRow, idempotent: true});
+// a fill is not an open: the wrong event type or a missing / different source marker is refused and audited
+const fillAsOpen = v2Write({action: 'append_fill_v2', eventType: 'trade_open', tradeId: 'ETHBTC-9', projection: {...fillProjection, trade_id: 'ETHBTC-9'}, requestId: '00000000-0000-4000-8000-000000000041'});
+assert.deepEqual(route(fillAsOpen), {ok: false, error: 'fill_projection_invalid'});
+const noSource = {...fillProjection, trade_id: 'ETHBTC-10'};
+delete noSource.source;
+assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-10', projection: noSource, requestId: '00000000-0000-4000-8000-000000000042'})), {ok: false, error: 'fill_projection_invalid'});
+assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-11', projection: {...fillProjection, trade_id: 'ETHBTC-11', source: 'trade_open'}, requestId: '00000000-0000-4000-8000-000000000043'})), {ok: false, error: 'fill_projection_invalid'});
+const openAsFill = v2Write({action: 'append_open_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-12', projection: {...v2OpenProjection, trade_id: 'ETHBTC-12'}, requestId: '00000000-0000-4000-8000-000000000044'});
+assert.deepEqual(route(openAsFill), {ok: false, error: 'open_projection_invalid'});
+// payload-level idempotency: same projection under a NEW request id is still an idempotent resend, not a second row
+assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-5551212', projection: fillProjection, requestId: '00000000-0000-4000-8000-000000000046'})), {ok: true, row: fillRow, idempotent: true});
+// the same trade id with different content is a conflict, as for an open
+assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-5551212', projection: {...fillProjection, volume: '9'}, requestId: '00000000-0000-4000-8000-000000000045'})), {ok: false, error: 'trade_id_conflict'});
+
 console.log('apps_script_unified_receiver_node_test: passed');
