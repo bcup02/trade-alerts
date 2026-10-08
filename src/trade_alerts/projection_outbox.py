@@ -212,7 +212,7 @@ def outstanding_projection_intents(path: str | Path) -> tuple[ProjectionIntent, 
                 raise ValueError("projection dispatch is invalid") from exc
             if dispatch.status in _TERMINAL_STATUSES:
                 terminal.add(dispatch.intent_id)
-    return tuple(intent for intent in sorted(intents.values(), key=lambda value: (value.created_at, value.intent_id)) if intent.intent_id not in terminal)
+    return tuple(intent for intent in intents.values() if intent.intent_id not in terminal)  # file order = creation order; never sort by the 1-second created_at (f-21)
 
 
 def record_projection_dispatch(path: str | Path, *, intent: ProjectionIntent, status: ProjectionOutcomeStatus, receiver_row: int | None = None, error_code: str | None = None) -> ProjectionDispatch:
