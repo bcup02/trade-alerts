@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-07",
+  "updated_at": "2026-10-08",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -37,12 +37,12 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "71ccee30608d3fcb73c01cb9c83c5d33c5cbde5d"
+      "commit": "fe4637e4c6624b7c60ca835860bf96784c564e06"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "3520da6fc90c6704059b440a4d3f63cea903bf5d"
+      "commit": "9952c3d9865670bb4b2002ae5a7cdd8182b9c10c"
     },
     "mycrypto": {
       "repo": "AI-for-column/my-crypto-bot",
@@ -52,7 +52,7 @@
     "btc-competition": {
       "repo": "AI-for-column/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "d27246ac5a77d7a36a526ea25d5c914e6e1707c7"
+      "commit": "0409a9f6704891f4502ad3c221ffed39701c1267"
     }
   },
   "capabilities": [
@@ -676,6 +676,101 @@
         "btc-competition": {
           "state": "n/a",
           "reason": "競賽策略是現貨再平衡；2026-10-05 對 btc-bull-market-competition development ac99132 的 src 目錄做關鍵字搜尋（adopt、position_recovered），沒有找到接手交易所持倉的寫法，所以目前列為不適用。尚未逐行盤點全部帳本寫入路徑；之後若新增接手持倉的寫法要重審這一格。"
+        }
+      }
+    },
+    {
+      "id": "projection.park_unconfirmed_correction",
+      "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄",
+      "description": "平倉被停放後，同一筆交易的帳本更正會一直回「平倉未確認」，每 15 分鐘重試、永遠不會成功，還排在佇列最前面擋住後面所有紀錄（開發機一筆重試 510 次）。共用庫 v0.27.9 起，連續 12 次這樣回答就記成 REJECTED（原因 correction_close_not_confirmed）停放，後面的紀錄照常送出；停放的紀錄用重新排入補送（見 projection.requeue_parked）。f-25。",
+      "status": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫，策略沒有自己的實作；pyproject.toml 釘 v0.28.0）。A1 正式機（新）執行環境（唯讀查證）：operations 9952c3d 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/seykota_bot/google_projection_worker.py（blob c0fb2df）與 pyproject.toml（blob 2225d6d）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：A1 沒有遇到過帳本更正卡住，停放路徑只在共用庫與策略端測試、開發機實測（開發機 2026-10-08 台北 18:21 一筆已連續 582 次的更正，在新版下下一次回答就停放）。"
+        },
+        "momentum": {
+          "state": "done",
+          "evidence": "src/google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫；pyproject.toml 釘 v0.28.0）。A1 正式機（新）執行環境（唯讀查證）：operations fe4637e 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/google_projection_worker.py（blob 0b364cd）與 pyproject.toml（blob b16ecad）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：同趨勢，A1 上停放路徑沒有實際被觸發過。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "加密仍釘共用庫 v0.15.0，沒有 v2 Google 投影，也就沒有這個佇列；換 Binance（x3）升級共用庫並接上新版投影時一併具備。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "競賽是現貨，只送成交（append_fill_v2），沒有帳本更正（trade_correction）這種投影，所以不會有卡在平倉後面的更正；0409a9f 的 src 內沒有任何 correct_close 或 trade_correction 的引用（git grep 查證）。"
+        }
+      }
+    },
+    {
+      "id": "projection.requeue_parked",
+      "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入",
+      "description": "平倉或更正被停放後，原本沒有補送的方式：排入同一筆投影只會回傳原本的紀錄，被停放的永遠送不出去。共用庫 v0.27.9 的 requeue_rejected_projection_intents 把某筆交易被停放的投影依原順序（開倉、平倉、更正）重新排入；曾送達過或仍在排隊的不動。各策略的 scripts/requeue_projection_intents.py 是操作入口，要人執行、只寫本機佇列檔、不連 Google。接收端要先升到版本 14（只算 CONFIRMED 稽核列）重新排入才救得回來。f-25。",
+      "status": {
+        "seykota": {
+          "state": "done",
+          "evidence": "scripts/requeue_projection_intents.py:44 呼叫 requeue_rejected_projection_intents（:36 只收單一 --trade-id、:43 沒有佇列檔就停）。A1 正式機（新）執行環境（唯讀查證）：operations 9952c3d 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 scripts/requeue_projection_intents.py（blob cce6b27） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。開發機實測（2026-10-08 台北 18:21）：開發機趨勢那筆停放的平倉與更正用這個指令稿重新排入後都 CONFIRMED（第 4 列），Google 對帳 RECONCILED、0 筆差異。限制：A1 還沒執行過這個指令稿（A1 沒有被停放的紀錄）。"
+        },
+        "momentum": {
+          "state": "done",
+          "evidence": "scripts/requeue_projection_intents.py:46 呼叫 requeue_rejected_projection_intents（:38 只收單一 --trade-id、:45 沒有佇列檔就停）。A1 正式機（新）執行環境（唯讀查證）：operations fe4637e 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 scripts/requeue_projection_intents.py（blob b5cfe80） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：只在測試與趨勢的開發機實測驗證；動能的指令稿本身沒在任何主機上實際執行過。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "加密仍釘共用庫 v0.15.0，沒有 v2 Google 投影佇列；換 Binance（x3）時一併具備。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "scripts/requeue_projection_intents.py:45 呼叫 requeue_rejected_projection_intents（:37 只收單一 --trade-id、:44 沒有佇列檔就停）。A1 正式機（新）執行環境（唯讀查證）：operations 0409a9f 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 scripts/requeue_projection_intents.py（blob afb517b） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：競賽的指令稿只在測試驗證，沒有在任何主機實際執行過；通用重排只是複製原本的綁定，不是把舊投影搬到新動作的 migration 工具。"
+        }
+      }
+    },
+    {
+      "id": "google.close_whole_trade_entry",
+      "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）",
+      "description": "有加碼的交易，平倉原本不會更新 Google 表的進場價（G 欄）與數量（I 欄），表上一直只有第一次進場的價量，損益卻是整筆的，兩者對不起來。Apps Script 接收端版本 14 起，平倉投影帶的整筆加權平均進場價與總量會寫回 G、I 欄（帳本更正本來就會寫）。已存在的舊列不改；查過 A1 帳本裡兩筆有加碼的舊交易（趨勢）都已有帳本更正、表上已是整筆。e-5。",
+      "status": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/google_ledger_provenance.py:210 與 :212 的平倉投影帶 entry_price、entry_volume（取自帳本平倉列，整筆加權平均價與總量）。A1 正式機（新）執行環境（唯讀查證）：operations 9952c3d 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/seykota_bot/google_ledger_provenance.py（blob 06b1a0a） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：寫回 G／I 的接收端路徑只在接收端 Node 測試與開發機驗證，A1 還沒有新的有加碼的交易走過這條路徑。"
+        },
+        "momentum": {
+          "state": "done",
+          "evidence": "src/google_ledger_provenance.py:189 與 :191 的平倉投影帶 entry_price、entry_volume。A1 正式機（新）執行環境（唯讀查證）：operations fe4637e 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/google_ledger_provenance.py（blob f572082） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：動能沒有加碼，這格對它只是把同樣的值再寫一次；沒有在 A1 實際看到寫回後的儲存格。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "加密仍釘共用庫 v0.15.0，沒有 v2 Google 投影（平倉不走這個接收端動作）；換 Binance（x3）接上新版投影時一併具備。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "競賽是現貨，每筆成交一列，沒有平倉投影，也就沒有進場價與數量被平倉覆蓋的問題。"
+        }
+      }
+    },
+    {
+      "id": "google.spot_fill_row",
+      "title": "現貨成交用專屬的寫入動作（append_fill_v2），不再假裝成永遠沒平倉的開倉列",
+      "description": "競賽是現貨，每一筆成交原本被送成一列「只有開倉、永遠沒有平倉」的孤兒開倉列，讀表的人分不出是未平倉部位還是單純的成交。共用庫 v0.28.0 與接收端版本 14 起有專屬動作 append_fill_v2（事件類型 spot_fill）：一列一筆成交，P 欄標 spot_fill。已經在表上的舊孤兒開倉列不改。表頭文字沒有調整。e-2。",
+      "status": {
+        "seykota": {
+          "state": "n/a",
+          "reason": "趨勢是期貨，開倉與平倉成對，沿用 append_open_v2 與 update_close_v2。"
+        },
+        "momentum": {
+          "state": "n/a",
+          "reason": "動能是期貨，開倉與平倉成對，沿用 append_open_v2 與 update_close_v2。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "加密是期貨，開倉與平倉成對，不是現貨成交。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證）：operations 0409a9f 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/btc_competition/google_ledger_provenance.py（blob f339f78） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：部署後競賽還沒有新的成交，第一次實際用 append_fill_v2 送出要等下一次每日調整（2026-10-09 台北 08:10）有成交；接收端的收單只用非機密探測驗證過（回簽章檢查，不是寫入）。"
         }
       }
     }
@@ -1774,29 +1869,89 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "reconcile.google_projection_grace",
+      "id": "projection.park_unconfirmed_correction",
       "type": "added",
-      "note": "新增一格：帳本↔Google 表對帳，剛開／剛平、還在等同步的交易不算對不上（共用庫 v0.27.7，f-22）；加密等 x3，競賽有自己的寬限。"
+      "note": "新增一格：Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄。"
     },
     {
       "kind": "cap",
-      "id": "reconcile.google_projection_grace",
-      "project": "momentum",
-      "type": "completed",
-      "note": "動能策略已於 2026-10-07 台北 16:07 部署 A1 正式機（新）（operations 71ccee3、共用庫 0.27.7），改已做；sources 換到 71ccee3，既有引用逐筆比對舊新行文字全相同。"
+      "id": "projection.requeue_parked",
+      "type": "added",
+      "note": "新增一格：停放（REJECTED）的 Google 投影可以用正式的方式重新排入。"
     },
     {
       "kind": "cap",
-      "id": "reconcile.google_projection_grace",
+      "id": "google.close_whole_trade_entry",
+      "type": "added",
+      "note": "新增一格：平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）。"
+    },
+    {
+      "kind": "cap",
+      "id": "google.spot_fill_row",
+      "type": "added",
+      "note": "新增一格：現貨成交用專屬的寫入動作（append_fill_v2），不再假裝成永遠沒平倉的開倉列。"
+    },
+    {
+      "kind": "cap",
+      "id": "projection.park_unconfirmed_correction",
       "project": "seykota",
       "type": "completed",
-      "note": "趨勢策略已於同時部署 A1 正式機（新）（operations 3520da6、共用庫 0.27.7），改已做；sources 換到 3520da6。"
+      "note": "趨勢策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 9952c3d。"
+    },
+    {
+      "kind": "cap",
+      "id": "projection.park_unconfirmed_correction",
+      "project": "momentum",
+      "type": "completed",
+      "note": "動能策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 fe4637e。"
+    },
+    {
+      "kind": "cap",
+      "id": "projection.requeue_parked",
+      "project": "seykota",
+      "type": "completed",
+      "note": "趨勢策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 9952c3d。"
+    },
+    {
+      "kind": "cap",
+      "id": "projection.requeue_parked",
+      "project": "momentum",
+      "type": "completed",
+      "note": "動能策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 fe4637e。"
+    },
+    {
+      "kind": "cap",
+      "id": "projection.requeue_parked",
+      "project": "btc-competition",
+      "type": "completed",
+      "note": "競賽策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 0409a9f。"
+    },
+    {
+      "kind": "cap",
+      "id": "google.close_whole_trade_entry",
+      "project": "seykota",
+      "type": "completed",
+      "note": "趨勢策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 9952c3d。"
+    },
+    {
+      "kind": "cap",
+      "id": "google.close_whole_trade_entry",
+      "project": "momentum",
+      "type": "completed",
+      "note": "動能策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 fe4637e。"
+    },
+    {
+      "kind": "cap",
+      "id": "google.spot_fill_row",
+      "project": "btc-competition",
+      "type": "completed",
+      "note": "競賽策略已於 2026-10-08 台北 21:26–21:28 部署 A1 正式機（新），改已做；sources 換到 0409a9f。"
     },
     {
       "kind": "rule",
-      "id": "FLEET.OPS_GOOGLE_DIVERGED",
+      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
       "type": "updated",
-      "note": "說明補上：剛開／剛平不到 60 分鐘、還在等同步的交易不再觸發這則（共用庫 v0.27.7）。"
+      "note": "說明補上：同一筆交易的帳本更正連續 12 次回「平倉未確認」也會停放，並可重新排入（共用庫 v0.27.9，ERR-056）。"
     }
   ]
 }
