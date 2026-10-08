@@ -399,3 +399,28 @@ def test_requeue_with_two_rejected_copies_of_one_projection_queues_one(tmp_path:
     (third,) = requeue_rejected_projection_intents(path, trade_id="trade-001")
     assert third.intent_id not in {first.intent_id, second.intent_id}
     assert requeue_rejected_projection_intents(path, trade_id="trade-001") == ()  # the third is outstanding now
+
+def test_a_spot_fill_is_its_own_action_not_an_open_row(tmp_path: Path) -> None:
+    """e-2: a spot fill is projected by append_fill_v2 / spot_fill; it is not an open that waits for a close."""
+    fill = LedgerProvenance(
+        project_id="btc-competition", trade_id="ETHBTC-5551212", event_type="spot_fill", ledger_event_digest=DIGEST_A,
+        payload_digest=DIGEST_B, request_id=str(uuid4()), issued_at="2026-10-08T00:00:00Z",
+        source_id="btc-competition-wsl-prod", schema_version=LEDGER_PROJECTION_SCHEMA_VERSION,
+    )
+    path = tmp_path / "projection-outbox.jsonl"
+    intent = enqueue_projection_intent(path, action="append_fill_v2", provenance=fill)
+    assert intent.event_type == "spot_fill" and intent.action == "append_fill_v2"
+    assert outstanding_projection_intents(path) == (intent,)
+    # the old pairing no longer fits: a fill is not an open, and an open is not a fill
+    try:
+        enqueue_projection_intent(path, action="append_open_v2", provenance=fill)
+    except ValueError as exc:
+        assert "does not match" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("append_open_v2 must refuse a spot_fill provenance")
+    try:
+        enqueue_projection_intent(path, action="append_fill_v2", provenance=_open_provenance())
+    except ValueError as exc:
+        assert "does not match" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("append_fill_v2 must refuse a trade_open provenance")

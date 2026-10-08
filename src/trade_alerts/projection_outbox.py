@@ -19,11 +19,11 @@ from uuid import uuid4
 
 from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance, LedgerUnreadableError
 
-ProjectionAction = Literal["append_open_v2", "update_close_v2", "correct_close_v2"]
+ProjectionAction = Literal["append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2"]
 ProjectionOutcomeStatus = Literal["CONFIRMED", "REJECTED", "TRANSPORT_FAILED"]
-_ALLOWED_ACTIONS = frozenset({"append_open_v2", "update_close_v2", "correct_close_v2"})
+_ALLOWED_ACTIONS = frozenset({"append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2"})
 # Each write action projects exactly one kind of ledger event.
-_ACTION_EVENT_TYPE = {"append_open_v2": "trade_open", "update_close_v2": "trade_close", "correct_close_v2": "trade_correction"}
+_ACTION_EVENT_TYPE = {"append_open_v2": "trade_open", "append_fill_v2": "spot_fill", "update_close_v2": "trade_close", "correct_close_v2": "trade_correction"}
 _TERMINAL_STATUSES = frozenset({"CONFIRMED", "REJECTED"})
 #: A close whose trade the receiver has never heard of (``trade_id_not_found``)
 #: is not a transport problem: the open row is missing, so no retry will help
