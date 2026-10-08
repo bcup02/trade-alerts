@@ -63,7 +63,9 @@ const OPEN_REQUIRED_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'e
 const CLOSE_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source', 'exit_order_id', 'stop_plan_order_id', 'exit_anomaly', 'exit_price_is_confirmed'];
 const CLOSE_REQUIRED_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source'];
 const OPEN_COLUMN_MAP = {trade_id: 'A', execution_mode: 'B', symbol: 'C', side: 'D', entry_time: 'E', entry_price: 'G', volume: 'I', leverage: 'J', entry_fee: 'K', entry_order_id: 'Q'};
-const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
+// entry_price / entry_volume: the close carries the whole trade (weighted average price, total
+// quantity), so a trade with adds no longer shows only its first entry on the sheet (e-5).
+const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_price: 'G', entry_volume: 'I', entry_fee: 'K', exit_fee: 'L', gross_pnl: 'M', net_pnl: 'N', return_on_margin: 'O', source: 'P', exit_order_id: 'R', stop_plan_order_id: 'S', exit_anomaly: 'T'};
 // correct_close_v2: an appended ledger trade_correction restates a closed
 // trade from the exchange's fills (e.g. ed-seykota's 2026-09-21 duplicate
 // entry).  It may only supersede the projection currently in force (the
@@ -325,7 +327,7 @@ function appendOpen(sheet, data, projection) {
   const existing = findTradeRows(sheet, data.provenance.trade_id);
   if (existing.length > 1) return rejectAndAudit(data, 'duplicate_trade_id');
   if (existing.length === 1) {
-    const prior = auditByTradeId(data.project_id, data.provenance.trade_id, 'trade_open');
+    const prior = confirmedAuditByTradeId(data.project_id, data.provenance.trade_id, 'trade_open');
     if (prior.length === 1 && prior[0].payload_digest === data.provenance.payload_digest) return {ok: true, row: existing[0], idempotent: true};
     return rejectAndAudit(data, 'trade_id_conflict');
   }
@@ -339,7 +341,9 @@ function updateClose(sheet, data, projection) {
   if (data.provenance.event_type !== 'trade_close' || !validateProjection(projection, CLOSE_FIELDS, CLOSE_REQUIRED_FIELDS, data.provenance.trade_id)) return rejectAndAudit(data, 'close_projection_invalid');
   const existing = findTradeRows(sheet, data.provenance.trade_id);
   if (existing.length !== 1) return rejectAndAudit(data, existing.length === 0 ? 'trade_id_not_found' : 'duplicate_trade_id');
-  const prior = auditByTradeId(data.project_id, data.provenance.trade_id, 'trade_close');
+  // Only CONFIRMED audit rows count: an earlier REJECTED attempt (e.g. trade_id_not_found before the open row
+  // existed) must not turn a later, valid resend into trade_close_conflict (f-25).
+  const prior = confirmedAuditByTradeId(data.project_id, data.provenance.trade_id, 'trade_close');
   if (prior.length === 1 && prior[0].payload_digest === data.provenance.payload_digest) return {ok: true, row: existing[0], idempotent: true};
   if (prior.length > 0) return rejectAndAudit(data, 'trade_close_conflict');
   writeProjection(sheet, existing[0], projection, CLOSE_COLUMN_MAP);
@@ -435,6 +439,10 @@ function auditByTradeId(projectId, tradeId, eventType) {
   const sheet = auditSheet(false);
   if (!sheet || sheet.getLastRow() < 2) return [];
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, 11).getValues().filter(row => row[1] === projectId && row[2] === tradeId && row[3] === eventType).map(row => ({payload_digest: row[6], status: row[9], reason: row[10]}));
+}
+
+function confirmedAuditByTradeId(projectId, tradeId, eventType) {
+  return auditByTradeId(projectId, tradeId, eventType).filter(row => row.status === 'CONFIRMED');
 }
 
 function readAudit(data) {

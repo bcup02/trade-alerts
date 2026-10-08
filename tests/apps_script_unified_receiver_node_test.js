@@ -266,4 +266,26 @@ assert.equal(auditSheetCreated, 1);
 const doPostResult = context.doPost({postData: {contents: JSON.stringify(v2Inventory())}});
 assert.equal(JSON.parse(doPostResult.text).ok, true);
 
+// f-25: a close that reached the receiver before its open (REJECTED trade_id_not_found, audited) must not make the
+// later, valid resend a trade_close_conflict; only CONFIRMED audit rows count.
+// e-5: the close carries the whole trade, so G (entry price) and I (quantity) show it, not just the first entry.
+const lateOpenProjection = {...v2OpenProjection, trade_id: 'v2-late-open-1', volume: '1', entry_price: '1'};
+const lateCloseProjection = {...v2CloseProjection, trade_id: 'v2-late-open-1', entry_price: '1.05', entry_volume: '3', exit_volume: '3'};
+const lateClose = v2Write({action: 'update_close_v2', eventType: 'trade_close', tradeId: 'v2-late-open-1', projection: lateCloseProjection, requestId: '00000000-0000-4000-8000-000000000030'});
+assert.deepEqual(route(lateClose), {ok: false, error: 'trade_id_not_found'});
+assert.deepEqual(route(v2Write({action: 'update_close_v2', eventType: 'trade_close', tradeId: 'v2-late-open-1', projection: lateCloseProjection, requestId: '00000000-0000-4000-8000-000000000031'})), {ok: false, error: 'trade_id_not_found'});
+const lateOpen = v2Write({action: 'append_open_v2', eventType: 'trade_open', tradeId: 'v2-late-open-1', projection: lateOpenProjection, requestId: '00000000-0000-4000-8000-000000000032'});
+const lateOpenResult = route(lateOpen);
+assert.equal(lateOpenResult.ok, true);
+const lateRow = lateOpenResult.row;
+assert.equal(projectSheet.rows[lateRow - 1][6], 1);   // G entry_price from the open
+assert.equal(projectSheet.rows[lateRow - 1][8], 1);   // I volume from the open (first entry only)
+const lateResend = v2Write({action: 'update_close_v2', eventType: 'trade_close', tradeId: 'v2-late-open-1', projection: lateCloseProjection, requestId: '00000000-0000-4000-8000-000000000033'});
+assert.deepEqual(route(lateResend), {ok: true, row: lateRow, provenance_status: 'CONFIRMED'});
+assert.equal(projectSheet.rows[lateRow - 1][6], 1.05);  // G whole-trade average entry price
+assert.equal(projectSheet.rows[lateRow - 1][8], 3);     // I whole-trade quantity
+// a second, different close is still a conflict once one is CONFIRMED
+const lateOther = v2Write({action: 'update_close_v2', eventType: 'trade_close', tradeId: 'v2-late-open-1', projection: {...lateCloseProjection, net_pnl: '-9'}, requestId: '00000000-0000-4000-8000-000000000034'});
+assert.deepEqual(route(lateOther), {ok: false, error: 'trade_close_conflict'});
+
 console.log('apps_script_unified_receiver_node_test: passed');

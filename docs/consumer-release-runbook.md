@@ -934,3 +934,17 @@ trade-alerts：v0.27.8（Google 表同步佇列：同一秒排進去的紀錄照
 版本驗證／服務驗證／部署時間：待各專案釘版部署後補記。
 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.27.9（Google 表同步佇列：停放的紀錄可重新排入、帳本更正不再無限重試；接收端 REJECTED 稽核列不算已處理；平倉寫回整筆進場價與數量；f-25、e-5）
+變更摘要：1. dispatch_next_projection：帳本更正（correct_close_v2）連續 12 次回 close_not_confirmed，記成 REJECTED（correction_close_not_confirmed）停放，不再擋住佇列（f-21 開發機一筆重試 510 次）；平倉的 close_not_confirmed 不停放。
+          2. 新增 requeue_rejected_projection_intents(path, trade_id=…)：對該交易每個「最新一筆是 REJECTED、且沒有 CONFIRMED 或仍在排隊的同一投影」，附加一筆新 intent（新 intent_id、created_at，摘要不變），依原順序（開倉、平倉、更正）；沒有可救的回傳空。
+          3. Apps Script 接收端（google_ledger_receiver.gs 與 google_ledger_receiver_v2.gs 兩份同步改）：updateClose／appendOpen 判斷「已處理過」只算 CONFIRMED 稽核列；先前 REJECTED（例如開倉列還沒到時的 trade_id_not_found）不會讓之後正確重送變成 trade_close_conflict。
+          4. 接收端平倉寫回 G 欄（進場價）與 I 欄（數量）＝整筆（加權平均價、總量），有加碼的交易不再只顯示第一次進場（e-5）。
+          5. 錯誤清單 ERR-056（停放）文字與 sources 行號同步；新增 5 個 Python 測試與 1 段接收端 Node 測試（舊接收端會失敗）。
+向後相容：不改任何現有欄位或函式簽名；已存在的舊列不會被改（只有之後平倉的交易才寫 G／I）。接收端要由你重新部署（開發機 DEV 與正式機各一個、先 DEV）；沒部署接收端時，Python 端照舊運作，只是重送與 G／I 修正不生效。
+受影響消費專案：趨勢、動能、競賽（釘此版後生效）；加密仍 v0.15.0。
+部署入口：各專案既有部署腳本；接收端手動部署（Apps Script）。
+版本驗證／服務驗證／部署時間：待各專案釘版部署與接收端部署後補記。
+交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+```

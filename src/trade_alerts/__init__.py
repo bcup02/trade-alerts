@@ -13,6 +13,7 @@ from .projection_outbox import (
     enqueue_projection_intent,
     outstanding_projection_intents,
     record_projection_dispatch,
+    requeue_rejected_projection_intents,
 )
 from .fleet_event_log import (
     FLEET_EVENT_KIND,
@@ -205,6 +206,7 @@ __all__ = [
     "dispatch_next_projection",
     "enqueue_projection_intent",
     "outstanding_projection_intents",
+    "requeue_rejected_projection_intents",
     "record_projection_dispatch",
     "BinanceReconcileParams",
     "fill_rows",
@@ -341,4 +343,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.27.8"
+__version__ = "0.27.9"
