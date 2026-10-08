@@ -248,3 +248,19 @@ def test_an_open_that_is_not_found_is_never_parked(tmp_path: Path) -> None:
     for _ in range(ORPHAN_CLOSE_PARK_AFTER + 3):
         result = dispatch_next_projection(path, rebuild=rebuilt_open, submit=not_found)
         assert result.dispatch.status == "TRANSPORT_FAILED"
+
+
+def test_intents_queued_in_the_same_second_keep_their_queue_order(tmp_path: Path, monkeypatch) -> None:
+    """f-21: a trade's open and close queued in one second must go out open first,
+    whatever their random ids sort like (the close's id here sorts before the open's)."""
+    from types import SimpleNamespace
+
+    monkeypatch.setattr("trade_alerts.projection_outbox._utc_now", lambda: "2026-10-06T09:37:53Z")
+    ids = iter(["20ca9096" + "0" * 24, "1e794fad" + "0" * 24])  # open first, then close
+    monkeypatch.setattr("trade_alerts.projection_outbox.uuid4", lambda: SimpleNamespace(hex=next(ids)))
+    path = tmp_path / "projection-outbox.jsonl"
+    opened = enqueue_projection_intent(path, action="append_open_v2", provenance=_open_provenance())
+    closed = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    assert closed.intent_id < opened.intent_id  # the trap: sorting by (created_at, intent_id) would put the close first
+
+    assert [i.intent_id for i in outstanding_projection_intents(path)] == [opened.intent_id, closed.intent_id]
