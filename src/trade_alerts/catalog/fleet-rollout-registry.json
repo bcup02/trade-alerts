@@ -1872,14 +1872,14 @@
         "seykota": {
           "state": "pending",
           "phase": "f-26a",
-          "reason": "已實作、審閱中（ed-seykota-systematic-trend-following f-26a PR），還沒上 A1 正式機（新）；seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
+          "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "pending",
           "phase": "f-26a",
-          "reason": "已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 ed-seykota-systematic-trend-following 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。"
+          "reason": "已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由趨勢的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（趨勢已改釘 v0.29.0）；還沒上 A1 正式機（新）。"
         }
       }
     },
@@ -1889,14 +1889,14 @@
         "momentum": {
           "state": "pending",
           "phase": "f-26a",
-          "reason": "已實作、審閱中（mexc-4h-momentum-trailing-stop f-26a PR），還沒上 A1 正式機（新）；mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
+          "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "pending",
           "phase": "f-26a",
-          "reason": "已實作、審閱中：算失敗時寫一筆事件日誌（R2，標記已重試用盡），由 mexc-4h-momentum-trailing-stop 的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（部署時一併改釘），還沒上 A1 正式機（新）。"
+          "reason": "已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由動能的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（動能已改釘 v0.29.0）；還沒上 A1 正式機（新）。"
         }
       }
     },
@@ -1906,7 +1906,7 @@
         "mycrypto": {
           "state": "pending",
           "phase": "f-26a",
-          "reason": "已實作、審閱中（my-crypto-bot f-26a PR），還沒上 A1 正式機（新）；失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去。"
+          "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：開發機沒有金鑰，資金費同步只走略過路徑）；還沒上 A1 正式機（新）。失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去（A1 設定）。"
         }
       },
       "emits_event": {
@@ -1922,20 +1922,20 @@
     {
       "kind": "rule",
       "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
-      "type": "added",
-      "note": "新增一列：趨勢策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-057，R2；f-26a，審閱中、部署 A1 後改已做）。"
+      "type": "updated",
+      "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。"
     },
     {
       "kind": "rule",
       "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
-      "type": "added",
-      "note": "新增一列：動能策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-058，R2；f-26a，審閱中、部署 A1 後改已做）。"
+      "type": "updated",
+      "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。"
     },
     {
       "kind": "rule",
       "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
-      "type": "added",
-      "note": "新增一列：加密策略資金費同步寫不進「帳戶餘額總表」分頁（ERR-059，R2；f-26a，審閱中、部署 A1 後改已做）。"
+      "type": "updated",
+      "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。"
     }
   ]
 }

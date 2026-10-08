@@ -1807,7 +1807,7 @@
       "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
       "project": "seykota",
       "sources": [
-        "src/seykota_bot/funding_sync.py:224"
+        "src/seykota_bot/funding_sync.py:354"
       ],
       "current": {
         "latch": null,
@@ -1839,7 +1839,7 @@
       "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
       "project": "momentum",
       "sources": [
-        "src/binance_funding_sync.py:356"
+        "src/binance_funding_sync.py:485"
       ],
       "current": {
         "latch": null,
@@ -1871,7 +1871,7 @@
       "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
       "project": "mycrypto",
       "sources": [
-        "sync_funding_fees_entry.py:267"
+        "sync_funding_fees_entry.py:314"
       ],
       "current": {
         "latch": null,
