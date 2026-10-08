@@ -170,3 +170,16 @@ def test_read_audit_is_read_only_and_requires_fixed_audit_action():
     wrong_action = read_projection_audit_v2(endpoint="https://example.test/receiver", payload={**payload, "action": "append_open_v2"})
     assert not wrong_action.ok
     assert wrong_action.error_code == "audit_action_invalid"
+
+
+def test_an_invalid_fill_projection_is_terminal_but_a_stale_receiver_stays_retryable(tmp_path):
+    """Review of #145: the receiver's fill_projection_invalid can never succeed on retry (REJECTED), while a receiver
+    that does not know append_fill_v2 yet answers unsupported_action, which must stay retryable."""
+    provenance, payload = _payload()
+    for err, expected in (("fill_projection_invalid", "REJECTED"), ("unsupported_action", "TRANSPORT_FAILED")):
+        out = submit_projection_v2(
+            endpoint="https://example.test/receiver", payload=payload, provenance=provenance,
+            outbox_path=tmp_path / f"{err}.jsonl",
+            post=lambda *a, _e=err, **k: _Response({"ok": False, "error": _e}), sleep=lambda _: None, attempts=1,
+        )
+        assert out.status == expected and out.error_code == err

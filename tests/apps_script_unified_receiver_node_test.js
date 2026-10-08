@@ -310,6 +310,8 @@ assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill'
 assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-11', projection: {...fillProjection, trade_id: 'ETHBTC-11', source: 'trade_open'}, requestId: '00000000-0000-4000-8000-000000000043'})), {ok: false, error: 'fill_projection_invalid'});
 const openAsFill = v2Write({action: 'append_open_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-12', projection: {...v2OpenProjection, trade_id: 'ETHBTC-12'}, requestId: '00000000-0000-4000-8000-000000000044'});
 assert.deepEqual(route(openAsFill), {ok: false, error: 'open_projection_invalid'});
+// payload-level idempotency: same projection under a NEW request id is still an idempotent resend, not a second row
+assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-5551212', projection: fillProjection, requestId: '00000000-0000-4000-8000-000000000046'})), {ok: true, row: fillRow, idempotent: true});
 // the same trade id with different content is a conflict, as for an open
 assert.deepEqual(route(v2Write({action: 'append_fill_v2', eventType: 'spot_fill', tradeId: 'ETHBTC-5551212', projection: {...fillProjection, volume: '9'}, requestId: '00000000-0000-4000-8000-000000000045'})), {ok: false, error: 'trade_id_conflict'});
 

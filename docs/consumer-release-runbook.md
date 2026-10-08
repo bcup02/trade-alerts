@@ -961,3 +961,5 @@ trade-alerts：v0.28.0（現貨成交專用的 Google 表寫入動作 append_fil
 版本驗證／服務驗證／部署時間：待競賽改釘與接收端部署後補記。
 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
 ```
+
+補記（v0.28.0 審閱 BLOCK 後）：google_ledger_client 的 _TERMINAL_RECEIVER_ERRORS 加入 fill_projection_invalid（永久無效的成交投影記 REJECTED，不再當可重試擋住佇列）；receiver 回 unsupported_action（還沒部署新接收端）仍是可重試。新增跨 receiver 錯誤→client 狀態→outbox 流程的測試。

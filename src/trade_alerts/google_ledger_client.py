@@ -30,6 +30,7 @@ _PROJECTION_SUBMISSION_ACTIONS = frozenset({"append_open_v2", "append_fill_v2", 
 _TERMINAL_RECEIVER_ERRORS = frozenset({
     "provenance_invalid",
     "open_projection_invalid",
+    "fill_projection_invalid",
     "close_projection_invalid",
     "correction_projection_invalid",
     "correction_base_mismatch",
