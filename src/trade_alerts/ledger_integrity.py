@@ -22,6 +22,9 @@ LEDGER_PROJECTION_SCHEMA_VERSION = "google-ledger-projection-v2"
 _ALLOWED_EVENT_TYPES = frozenset({"trade_open", "trade_close", "trade_correction", "spot_fill"})
 _ALLOWED_ACTIONS = frozenset({"append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2", "read_audit_v2", "read_reconciliation_v2", "quarantine_v2"})
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
+# A spreadsheet tab name is shown to people, so it may be written in Chinese (f-26b: 趨勢策略 …).  Letters, digits and
+# underscore of any script plus . : - are allowed; whitespace, quotes, slashes and control characters are not.
+_SHEET_NAME_RE = re.compile(r"^[^\W_][\w.:-]{0,99}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -129,6 +132,11 @@ def _require_identifier(name: str, value: str) -> None:
         raise LedgerIntegrityError(f"invalid {name}")
 
 
+def _require_sheet_name(value: str) -> None:
+    if not isinstance(value, str) or not _SHEET_NAME_RE.fullmatch(value):
+        raise LedgerIntegrityError("invalid sheet_name")
+
+
 def _require_digest(name: str, value: str) -> None:
     if not isinstance(value, str) or not _SHA256_RE.fullmatch(value):
         raise LedgerIntegrityError(f"invalid {name}")
@@ -192,7 +200,7 @@ def signed_request(
     """
     if action not in _ALLOWED_ACTIONS:
         raise LedgerIntegrityError("unsupported action")
-    _require_identifier("sheet_name", sheet_name)
+    _require_sheet_name(sheet_name)
     if not isinstance(source_hmac_secret, str) or not source_hmac_secret:
         raise LedgerIntegrityError("missing source signing credential")
     _require_digest("ledger_event_digest", provenance.ledger_event_digest)
@@ -230,7 +238,7 @@ def signed_reconciliation_request(
     it cannot select arbitrary spreadsheet rows or invoke any write action.
     """
     _require_identifier("project_id", project_id)
-    _require_identifier("sheet_name", sheet_name)
+    _require_sheet_name(sheet_name)
     _require_identifier("source_id", source_id)
     _require_request_id(request_id)
     if not isinstance(issued_at, str) or not issued_at:
