@@ -1852,7 +1852,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "src/seykota_bot/funding_sync.py:157（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :165（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證）：operations 9e3ae05（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，之後只多 order_not_found 修正）；/opt 的 src/seykota_bot/funding_sync.py（2e7b53f）、service（e274d7c）、timer（f706bc0）的 blob 與 9e3ae05 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
+       "text": "src/seykota_bot/funding_sync.py:462（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :470（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證）：operations 960792e（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，2026-10-09 台北 f-26a 換版）；/opt 的 src/seykota_bot/funding_sync.py（4ac684c）、service（e274d7c）、timer（f706bc0）的 blob 與 960792e 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
       }
      ]
     },
@@ -1863,7 +1863,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:296（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證）：operations 4780bd9；/opt 的 scripts/sync_funding_fees.py（1770c9a）、src/binance_funding_sync.py（1ef48a2）、service（08446a1）、timer（38496fb）的 blob 與 4780bd9 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
+       "text": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:598（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證）：operations 490e241（資金費同步 2026-10-06 台北 17:15 隨 4780bd9 部署，2026-10-09 台北 f-26a 換版）；/opt 的 scripts/sync_funding_fees.py（a6fa37f）、src/binance_funding_sync.py（ab1d5a0）、service（08446a1）、timer（38496fb）的 blob 與 490e241 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
       }
      ]
     },
