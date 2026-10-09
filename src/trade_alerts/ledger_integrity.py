@@ -22,9 +22,12 @@ LEDGER_PROJECTION_SCHEMA_VERSION = "google-ledger-projection-v2"
 _ALLOWED_EVENT_TYPES = frozenset({"trade_open", "trade_close", "trade_correction", "spot_fill"})
 _ALLOWED_ACTIONS = frozenset({"append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2", "read_audit_v2", "read_reconciliation_v2", "quarantine_v2"})
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
-# A spreadsheet tab name is shown to people, so it may be written in Chinese (f-26b: 趨勢策略 …).  Letters, digits and
-# underscore of any script plus . : - are allowed; whitespace, quotes, slashes and control characters are not.
-_SHEET_NAME_RE = re.compile(r"^[^\W_][\w.:-]{0,99}$")
+# A spreadsheet tab name is shown to people, so it may be written in Chinese (f-26b: 趨勢策略 ...).  It is matched
+# byte-for-byte against the name registered in the receiver, so the accepted set is an explicit whitelist, not
+# "any Unicode word character": the ASCII identifier set plus CJK Unified Ideographs (U+4E00-U+9FFF) and Extension A
+# (U+3400-U+4DBF).  Hangul fillers, full-width forms, circled/superscript digits, zero-width and combining marks stay out.
+# The length limit is the same 256 as the ASCII identifier contract, so every previously valid ASCII name stays valid.
+_SHEET_NAME_RE = re.compile(r"^[A-Za-z0-9\u3400-\u4dbf\u4e00-\u9fff][A-Za-z0-9._:\-\u3400-\u4dbf\u4e00-\u9fff]{0,255}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
