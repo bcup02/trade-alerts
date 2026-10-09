@@ -1,0 +1,506 @@
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 647c193..33ea7a8 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -102,7 +102,7 @@
+   <p class="lede">
+     四支策略目前所有已知的「出問題」情況，共 <b>59 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>39 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>37 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -113,7 +113,7 @@
+   <div id="filters"></div>
+   <div id="register"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-10-08 盤點）。
++    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-10-09 盤點）。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
+   </div>
+ </div>
+@@ -1701,25 +1701,20 @@
+   {
+    "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 seykota-funding-sync.service 最近幾次執行的 journal（程式在 src/seykota_bot/funding_sync.py 的 publish_total／publish_and_judge）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。",
+    "behaviour": {
+-    "phase": "f-26a",
+-    "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。",
+-    "state": "pending"
++    "evidence": "src/seykota_bot/funding_sync.py:107 EXIT_SHEET_FAILED = 3；:365／:368／:373／:445 放棄分支與寫入未確認都以結束碼 3 結束（接收端明確拒絕立刻放棄、連線類連續 3 次才放棄），狀態檔記住連續失敗直到寫入確認成功；seykota-funding-sync.service 在 A1 維運通知監控清單（f-5）。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=趨勢策略 row=7 total=-0.38607562）。限制：放棄分支沒有在 A1 真實觸發過；audit 目錄完全寫不進去時沒有東西能跨輪記住。",
++    "state": "done"
+    },
+    "bot": "seykota",
+    "bot_label": "趨勢策略",
+    "code": "SEY.FUNDING_SHEET_WRITE_FAILED",
+    "direction": "帳本是正本、交易不受影響，不需要立刻動作。要讓分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致；不一致就改表上的文字，或請 Claude 改程式設定。",
+    "emits_event": {
+-    "phase": "f-26a",
+-    "reason": "已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由趨勢的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（趨勢已改釘 v0.29.0）；還沒上 A1 正式機（新）。",
+-    "state": "pending"
++    "evidence": "src/seykota_bot/fleet_events.py:24 FUNDING_SHEET_WRITE_FAILED、:45 風險分級 R2；src/seykota_bot/funding_sync.py:433 放棄時寫一筆事件日誌（事件編號預存去重），由趨勢修復機器人每輪匯出給維運通知；ERR-057 在共用庫 v0.29.0 錯誤清單。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，趨勢）。限制：事件到手機的最後一段（匯出器＋維運通知）沒有實機跑過，A1 沒有真的觸發過放棄。",
++    "state": "done"
+    },
+    "error_id": "ERR-057",
+-   "notes": [
+-    "行為未做 — 已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。（預定：f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單））",
+-    "寫進事件日誌未做 — 已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由趨勢的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（趨勢已改釘 v0.29.0）；還沒上 A1 正式機（新）。（預定：f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單））"
+-   ],
+-   "open": true,
++   "notes": [],
++   "open": false,
+    "steps": [
+     "看訊息裡的原因（reason）與專案名（project_name）：receiver_rejected 是接收端明確回絕，repeated 是連線類失敗連續 3 次。",
+     "到 Google 表的「帳戶餘額總表」分頁，看 B 欄這支策略那一列的實際文字，跟訊息裡的專案名逐字比對。",
+@@ -1733,25 +1728,20 @@
+   {
+    "ai_prompt": "請在 mexc-4h-momentum-trailing-stop（主機上的 /opt/mexc-4h-momentum-trailing-stop）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 mexc-momentum-funding-sync.service 最近幾次執行的 journal（程式在 src/binance_funding_sync.py 的 publish_total／judge_publish）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。",
+    "behaviour": {
+-    "phase": "f-26a",
+-    "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。",
+-    "state": "pending"
++    "evidence": "src/binance_funding_sync.py:224 EXIT_SHEET_FAILED = 3；:496／:499／:504／:576 放棄分支與寫入未確認都以結束碼 3 結束（規則同趨勢）；mexc-momentum-funding-sync.service 在 A1 維運通知監控清單（f-5）。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=動能策略 row=6 total=-0.00191524）。限制：放棄分支沒有在 A1 真實觸發過。",
++    "state": "done"
+    },
+    "bot": "momentum",
+    "bot_label": "動能策略",
+    "code": "MOM.FUNDING_SHEET_WRITE_FAILED",
+    "direction": "帳本是正本、交易不受影響，不需要立刻動作。要讓分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致；不一致就改表上的文字，或請 Claude 改程式設定。",
+    "emits_event": {
+-    "phase": "f-26a",
+-    "reason": "已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由動能的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（動能已改釘 v0.29.0）；還沒上 A1 正式機（新）。",
+-    "state": "pending"
++    "evidence": "src/fleet_events.py:27 FUNDING_SHEET_WRITE_FAILED（ERR-058，R2）；src/binance_funding_sync.py:564 放棄時寫一筆事件日誌（R2、已重試用盡、事件編號預存去重），由動能修復機器人每輪匯出給維運通知。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，動能）。限制：事件到手機的最後一段沒有實機跑過，A1 沒有真的觸發過放棄。",
++    "state": "done"
+    },
+    "error_id": "ERR-058",
+-   "notes": [
+-    "行為未做 — 已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。（預定：f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單））",
+-    "寫進事件日誌未做 — 已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由動能的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（動能已改釘 v0.29.0）；還沒上 A1 正式機（新）。（預定：f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單））"
+-   ],
+-   "open": true,
++   "notes": [],
++   "open": false,
+    "steps": [
+     "看訊息裡的原因（reason）與專案名（project_name）：receiver_rejected 是接收端明確回絕，repeated 是連線類失敗連續 3 次。",
+     "到 Google 表的「帳戶餘額總表」分頁，看 B 欄這支策略那一列的實際文字，跟訊息裡的專案名逐字比對。",
+@@ -1765,9 +1755,8 @@
+   {
+    "ai_prompt": "請在 my-crypto-bot（主機上的 /opt/my-crypto-bot）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 my-crypto-bot-funding-sync.service 最近幾次執行的 journal（程式在 sync_funding_fees_entry.py 的 publish_total／sync_funding_total_to_sheet）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。",
+    "behaviour": {
+-    "phase": "f-26a",
+-    "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：開發機沒有金鑰，資金費同步只走略過路徑）；還沒上 A1 正式機（新）。失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去（A1 設定）。",
+-    "state": "pending"
++    "evidence": "sync_funding_fees_entry.py:54 EXIT_SHEET_FAILED = 3；:364 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:85 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations aba9569，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=加密策略 row=5 total=-0.01784778）。my-crypto-bot-funding-sync.service／.timer 已於同日加進 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（備份 ops-notify.env.bak-f26a-*），尚未實際收到過這個單元的失敗通知。限制：沒有事件管道（見 emits_event 格）。",
++    "state": "done"
+    },
+    "bot": "mycrypto",
+    "bot_label": "加密策略",
+@@ -1780,7 +1769,6 @@
+    },
+    "error_id": "ERR-059",
+    "notes": [
+-    "行為未做 — 已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：開發機沒有金鑰，資金費同步只走略過路徑）；還沒上 A1 正式機（新）。失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去（A1 設定）。（預定：f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單））",
+     "寫進事件日誌未做 — 加密仍釘共用庫 v0.15.0，沒有匯出檔與修復機器人，事件日誌的通知到不了手機；換 Binance（x3）升級共用庫後才會有白話通知。在那之前只有服務失敗（ERR-046）一條路。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）"
+    ],
+    "open": true,
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 1aec8aa..eb4125d 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,8 +177,8 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>58</b><span>項未完成——還有策略沒做到</span></a>
+-    <a class="c-done" href="#group-done"><b>31</b><span>項已完成——四支都到位，不用再動</span></a>
++    <a class="c-pending" href="#group-pending"><b>56</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-done" href="#group-done"><b>33</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+   <p class="dot-legend">
+@@ -193,11 +193,11 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">58 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">56 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+-  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">31 項</span></div>
++  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">33 項</span></div>
+   <p class="group-sub">每支相關的策略都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
+   <div id="done"></div>
+ 
+@@ -209,8 +209,8 @@
+   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+   <div id="glossaryHost"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-08 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+-    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 9952c3d</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations fe4637e</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations b5a605f</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 0409a9f</code>。
++    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-09 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
++    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 960792e</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 490e241</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations aba9569</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 0409a9f</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+   </div>
+ </div>
+@@ -1852,7 +1852,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/funding_sync.py:157（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :165（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證）：operations 9e3ae05（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，之後只多 order_not_found 修正）；/opt 的 src/seykota_bot/funding_sync.py（2e7b53f）、service（e274d7c）、timer（f706bc0）的 blob 與 9e3ae05 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
++       "text": "src/seykota_bot/funding_sync.py:462（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :470（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證）：operations 960792e（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，2026-10-09 台北 f-26a 換版）；/opt 的 src/seykota_bot/funding_sync.py（4ac684c）、service（e274d7c）、timer（f706bc0）的 blob 與 960792e 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
+       }
+      ]
+     },
+@@ -1863,7 +1863,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:296（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證）：operations 4780bd9；/opt 的 scripts/sync_funding_fees.py（1770c9a）、src/binance_funding_sync.py（1ef48a2）、service（08446a1）、timer（38496fb）的 blob 與 4780bd9 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
++       "text": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:598（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證）：operations 490e241（資金費同步 2026-10-06 台北 17:15 隨 4780bd9 部署，2026-10-09 台北 f-26a 換版）；/opt 的 scripts/sync_funding_fees.py（a6fa37f）、src/binance_funding_sync.py（ab1d5a0）、service（08446a1）、timer（38496fb）的 blob 與 490e241 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
+       }
+      ]
+     },
+@@ -5130,16 +5130,16 @@
+    "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-SEY.FUNDING_SHEET_WRITE_FAILED",
+-   "complete": false,
++   "complete": true,
+    "dots": {
+     "btc-competition": "none",
+     "momentum": "none",
+     "mycrypto": "none",
+-    "seykota": "pending"
++    "seykota": "recent"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
+    "kind": "rule",
+    "rows": [
+@@ -5148,15 +5148,15 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+-       "state": "pending",
+-       "text": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
++       "phase": null,
++       "state": "done",
++       "text": "src/seykota_bot/funding_sync.py:107 EXIT_SHEET_FAILED = 3；:365／:368／:373／:445 放棄分支與寫入未確認都以結束碼 3 結束（接收端明確拒絕立刻放棄、連線類連續 3 次才放棄），狀態檔記住連續失敗直到寫入確認成功；seykota-funding-sync.service 在 A1 維運通知監控清單（f-5）。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=趨勢策略 row=7 total=-0.38607562）。限制：放棄分支沒有在 A1 真實觸發過；audit 目錄完全寫不進去時沒有東西能跨輪記住。"
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+-       "state": "pending",
+-       "text": "已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由趨勢的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（趨勢已改釘 v0.29.0）；還沒上 A1 正式機（新）。"
++       "phase": null,
++       "state": "done",
++       "text": "src/seykota_bot/fleet_events.py:24 FUNDING_SHEET_WRITE_FAILED、:45 風險分級 R2；src/seykota_bot/funding_sync.py:433 放棄時寫一筆事件日誌（事件編號預存去重），由趨勢修復機器人每輪匯出給維運通知；ERR-057 在共用庫 v0.29.0 錯誤清單。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，趨勢）。限制：事件到手機的最後一段（匯出器＋維運通知）沒有實機跑過，A1 沒有真的觸發過放棄。"
+       }
+      ]
+     }
+@@ -5165,16 +5165,16 @@
+    "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-MOM.FUNDING_SHEET_WRITE_FAILED",
+-   "complete": false,
++   "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "pending",
++    "momentum": "recent",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
+    "kind": "rule",
+    "rows": [
+@@ -5183,15 +5183,15 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+-       "state": "pending",
+-       "text": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。"
++       "phase": null,
++       "state": "done",
++       "text": "src/binance_funding_sync.py:224 EXIT_SHEET_FAILED = 3；:496／:499／:504／:576 放棄分支與寫入未確認都以結束碼 3 結束（規則同趨勢）；mexc-momentum-funding-sync.service 在 A1 維運通知監控清單（f-5）。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=動能策略 row=6 total=-0.00191524）。限制：放棄分支沒有在 A1 真實觸發過。"
+       },
+       {
+        "aspect": "寫進事件日誌",
+-       "phase": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+-       "state": "pending",
+-       "text": "已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由動能的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（動能已改釘 v0.29.0）；還沒上 A1 正式機（新）。"
++       "phase": null,
++       "state": "done",
++       "text": "src/fleet_events.py:27 FUNDING_SHEET_WRITE_FAILED（ERR-058，R2）；src/binance_funding_sync.py:564 放棄時寫一筆事件日誌（R2、已重試用盡、事件編號預存去重），由動能修復機器人每輪匯出給維運通知。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，動能）。限制：事件到手機的最後一段沒有實機跑過，A1 沒有真的觸發過放棄。"
+       }
+      ]
+     }
+@@ -5200,7 +5200,7 @@
+    "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "rule-MYC.FUNDING_SHEET_WRITE_FAILED",
+    "complete": false,
+    "dots": {
+@@ -5209,7 +5209,7 @@
+     "mycrypto": "pending",
+     "seykota": "none"
+    },
+-   "has_recent": false,
++   "has_recent": true,
+    "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
+    "kind": "rule",
+    "rows": [
+@@ -5218,9 +5218,9 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+-       "state": "pending",
+-       "text": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：開發機沒有金鑰，資金費同步只走略過路徑）；還沒上 A1 正式機（新）。失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去（A1 設定）。"
++       "phase": null,
++       "state": "done",
++       "text": "sync_funding_fees_entry.py:54 EXIT_SHEET_FAILED = 3；:364 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:85 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations aba9569，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=加密策略 row=5 total=-0.01784778）。my-crypto-bot-funding-sync.service／.timer 已於同日加進 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（備份 ops-notify.env.bak-f26a-*），尚未實際收到過這個單元的失敗通知。限制：沒有事件管道（見 emits_event 格）。"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -5245,7 +5245,7 @@
+   "error-ids": 4,
+   "f-12": 12,
+   "f-16": 3,
+-  "f-26a": 5,
++  "f-26a": 0,
+   "h4-trade-correction": 0,
+   "hotfix-btc-order-resend": 0,
+   "hotfix-seykota-order-resend": 0,
+@@ -5325,20 +5325,32 @@
+  "recent_summary": [
+   {
+    "anchor": "rule-SEY.FUNDING_SHEET_WRITE_FAILED",
+-   "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。",
+-   "project": null,
++   "note": "f-26a 趨勢：2026-10-09 台北上 A1（operations 960792e）、手動一輪資金費同步寫入成功，改已做；sources 換版、引用行號逐筆比對。",
++   "project": "趨勢策略",
++   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
++  },
++  {
++   "anchor": "rule-SEY.FUNDING_SHEET_WRITE_FAILED",
++   "note": "f-26a 趨勢事件：同上改已做（事件到手機最後一段沒實機跑過，已寫進格內限制）。",
++   "project": "趨勢策略",
++   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
++  },
++  {
++   "anchor": "rule-MOM.FUNDING_SHEET_WRITE_FAILED",
++   "note": "f-26a 動能：2026-10-09 台北上 A1（operations 490e241）、手動一輪寫入成功，改已做。",
++   "project": "動能策略",
+    "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
+   },
+   {
+    "anchor": "rule-MOM.FUNDING_SHEET_WRITE_FAILED",
+-   "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。",
+-   "project": null,
++   "note": "f-26a 動能事件：同上改已做（限制同趨勢）。",
++   "project": "動能策略",
+    "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
+   },
+   {
+    "anchor": "rule-MYC.FUNDING_SHEET_WRITE_FAILED",
+-   "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。",
+-   "project": null,
++   "note": "f-26a 加密：2026-10-09 台北上 A1（operations aba9569）、手動一輪寫入成功並加進維運通知監控清單，改已做；加密的事件格仍未做（等換 Binance x3）。",
++   "project": "加密策略",
+    "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
+   }
+  ],
+@@ -5349,19 +5361,19 @@
+    "pending": 16
+   },
+   "momentum": {
+-   "done": 44,
++   "done": 46,
+    "n/a": 11,
+-   "pending": 13
++   "pending": 11
+   },
+   "mycrypto": {
+-   "done": 16,
++   "done": 17,
+    "n/a": 14,
+-   "pending": 34
++   "pending": 33
+   },
+   "seykota": {
+-   "done": 53,
++   "done": 55,
+    "n/a": 9,
+-   "pending": 28
++   "pending": 26
+   }
+  }
+ }
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 73ab7b3..a5a5084 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1,7 +1,7 @@
+ {
+   "registry_version": "fleet-rollout-registry/v1",
+   "catalog_version": "fleet-error-catalog/v2",
+-  "updated_at": "2026-10-08",
++  "updated_at": "2026-10-09",
+   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
+   "projects": {
+     "momentum": "動能策略",
+@@ -38,17 +38,17 @@
+     "momentum": {
+       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
+       "branch": "operations",
+-      "commit": "fe4637e4c6624b7c60ca835860bf96784c564e06"
++      "commit": "490e2414599e2feda1addeb1ac089fab4effd23b"
+     },
+     "seykota": {
+       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
+       "branch": "operations",
+-      "commit": "9952c3d9865670bb4b2002ae5a7cdd8182b9c10c"
++      "commit": "960792e76252534d31c6d187788c0cb115ef7a08"
+     },
+     "mycrypto": {
+       "repo": "AI-for-column/my-crypto-bot",
+       "branch": "operations",
+-      "commit": "b5a605f47bb8e68d5312b62645698289336f7af9"
++      "commit": "aba9569402e4bcb63df74a22f4c8995b0d02bddf"
+     },
+     "btc-competition": {
+       "repo": "AI-for-column/btc-bull-market-competition",
+@@ -424,11 +424,11 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:296（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證）：operations 4780bd9；/opt 的 scripts/sync_funding_fees.py（1770c9a）、src/binance_funding_sync.py（1ef48a2）、service（08446a1）、timer（38496fb）的 blob 與 4780bd9 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
++          "evidence": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:598（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證）：operations 490e241（資金費同步 2026-10-06 台北 17:15 隨 4780bd9 部署，2026-10-09 台北 f-26a 換版）；/opt 的 scripts/sync_funding_fees.py（a6fa37f）、src/binance_funding_sync.py（ab1d5a0）、service（08446a1）、timer（38496fb）的 blob 與 490e241 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
+         },
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/funding_sync.py:157（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :165（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證）：operations 9e3ae05（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，之後只多 order_not_found 修正）；/opt 的 src/seykota_bot/funding_sync.py（2e7b53f）、service（e274d7c）、timer（f706bc0）的 blob 與 9e3ae05 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
++          "evidence": "src/seykota_bot/funding_sync.py:462（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :470（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證）：operations 960792e（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，2026-10-09 台北 f-26a 換版）；/opt 的 src/seykota_bot/funding_sync.py（4ac684c）、service（e274d7c）、timer（f706bc0）的 blob 與 960792e 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
+         },
+         "mycrypto": {
+           "state": "done",
+@@ -1870,16 +1870,14 @@
+       "code": "SEY.FUNDING_SHEET_WRITE_FAILED",
+       "behaviour": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "f-26a",
+-          "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
++          "state": "done",
++          "evidence": "src/seykota_bot/funding_sync.py:107 EXIT_SHEET_FAILED = 3；:365／:368／:373／:445 放棄分支與寫入未確認都以結束碼 3 結束（接收端明確拒絕立刻放棄、連線類連續 3 次才放棄），狀態檔記住連續失敗直到寫入確認成功；seykota-funding-sync.service 在 A1 維運通知監控清單（f-5）。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=趨勢策略 row=7 total=-0.38607562）。限制：放棄分支沒有在 A1 真實觸發過；audit 目錄完全寫不進去時沒有東西能跨輪記住。"
+         }
+       },
+       "emits_event": {
+         "seykota": {
+-          "state": "pending",
+-          "phase": "f-26a",
+-          "reason": "已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由趨勢的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（趨勢已改釘 v0.29.0）；還沒上 A1 正式機（新）。"
++          "state": "done",
++          "evidence": "src/seykota_bot/fleet_events.py:24 FUNDING_SHEET_WRITE_FAILED、:45 風險分級 R2；src/seykota_bot/funding_sync.py:433 放棄時寫一筆事件日誌（事件編號預存去重），由趨勢修復機器人每輪匯出給維運通知；ERR-057 在共用庫 v0.29.0 錯誤清單。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，趨勢）。限制：事件到手機的最後一段（匯出器＋維運通知）沒有實機跑過，A1 沒有真的觸發過放棄。"
+         }
+       }
+     },
+@@ -1887,16 +1885,14 @@
+       "code": "MOM.FUNDING_SHEET_WRITE_FAILED",
+       "behaviour": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "f-26a",
+-          "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。"
++          "state": "done",
++          "evidence": "src/binance_funding_sync.py:224 EXIT_SHEET_FAILED = 3；:496／:499／:504／:576 放棄分支與寫入未確認都以結束碼 3 結束（規則同趨勢）；mexc-momentum-funding-sync.service 在 A1 維運通知監控清單（f-5）。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=動能策略 row=6 total=-0.00191524）。限制：放棄分支沒有在 A1 真實觸發過。"
+         }
+       },
+       "emits_event": {
+         "momentum": {
+-          "state": "pending",
+-          "phase": "f-26a",
+-          "reason": "已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由動能的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（動能已改釘 v0.29.0）；還沒上 A1 正式機（新）。"
++          "state": "done",
++          "evidence": "src/fleet_events.py:27 FUNDING_SHEET_WRITE_FAILED（ERR-058，R2）；src/binance_funding_sync.py:564 放棄時寫一筆事件日誌（R2、已重試用盡、事件編號預存去重），由動能修復機器人每輪匯出給維運通知。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，動能）。限制：事件到手機的最後一段沒有實機跑過，A1 沒有真的觸發過放棄。"
+         }
+       }
+     },
+@@ -1904,9 +1900,8 @@
+       "code": "MYC.FUNDING_SHEET_WRITE_FAILED",
+       "behaviour": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "f-26a",
+-          "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：開發機沒有金鑰，資金費同步只走略過路徑）；還沒上 A1 正式機（新）。失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去（A1 設定）。"
++          "state": "done",
++          "evidence": "sync_funding_fees_entry.py:54 EXIT_SHEET_FAILED = 3；:364 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:85 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations aba9569，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=加密策略 row=5 total=-0.01784778）。my-crypto-bot-funding-sync.service／.timer 已於同日加進 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（備份 ops-notify.env.bak-f26a-*），尚未實際收到過這個單元的失敗通知。限制：沒有事件管道（見 emits_event 格）。"
+         }
+       },
+       "emits_event": {
+@@ -1922,20 +1917,42 @@
+     {
+       "kind": "rule",
+       "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
+-      "type": "updated",
+-      "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。"
++      "project": "seykota",
++      "aspect": "behaviour",
++      "type": "completed",
++      "note": "f-26a 趨勢：2026-10-09 台北上 A1（operations 960792e）、手動一輪資金費同步寫入成功，改已做；sources 換版、引用行號逐筆比對。"
++    },
++    {
++      "kind": "rule",
++      "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
++      "project": "seykota",
++      "aspect": "emits_event",
++      "type": "completed",
++      "note": "f-26a 趨勢事件：同上改已做（事件到手機最後一段沒實機跑過，已寫進格內限制）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
++      "project": "momentum",
++      "aspect": "behaviour",
++      "type": "completed",
++      "note": "f-26a 動能：2026-10-09 台北上 A1（operations 490e241）、手動一輪寫入成功，改已做。"
+     },
+     {
+       "kind": "rule",
+       "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
+-      "type": "updated",
+-      "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。"
++      "project": "momentum",
++      "aspect": "emits_event",
++      "type": "completed",
++      "note": "f-26a 動能事件：同上改已做（限制同趨勢）。"
+     },
+     {
+       "kind": "rule",
+       "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
+-      "type": "updated",
+-      "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。"
++      "project": "mycrypto",
++      "aspect": "behaviour",
++      "type": "completed",
++      "note": "f-26a 加密：2026-10-09 台北上 A1（operations aba9569）、手動一輪寫入成功並加進維運通知監控清單，改已做；加密的事件格仍未做（等換 Binance x3）。"
+     }
+   ]
+ }
