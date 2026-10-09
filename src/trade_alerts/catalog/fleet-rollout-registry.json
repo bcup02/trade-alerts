@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-08",
+  "updated_at": "2026-10-09",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -38,17 +38,17 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "fe4637e4c6624b7c60ca835860bf96784c564e06"
+      "commit": "490e2414599e2feda1addeb1ac089fab4effd23b"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "9952c3d9865670bb4b2002ae5a7cdd8182b9c10c"
+      "commit": "960792e76252534d31c6d187788c0cb115ef7a08"
     },
     "mycrypto": {
       "repo": "AI-for-column/my-crypto-bot",
       "branch": "operations",
-      "commit": "b5a605f47bb8e68d5312b62645698289336f7af9"
+      "commit": "aba9569402e4bcb63df74a22f4c8995b0d02bddf"
     },
     "btc-competition": {
       "repo": "AI-for-column/btc-bull-market-competition",
@@ -1870,16 +1870,14 @@
       "code": "SEY.FUNDING_SHEET_WRITE_FAILED",
       "behaviour": {
         "seykota": {
-          "state": "pending",
-          "phase": "f-26a",
-          "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。seykota-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。"
+          "state": "done",
+          "evidence": "src/seykota_bot/funding_sync.py:107 EXIT_SHEET_FAILED = 3；:365／:368／:373／:445 放棄分支與寫入未確認都以結束碼 3 結束（接收端明確拒絕立刻放棄、連線類連續 3 次才放棄），狀態檔記住連續失敗直到寫入確認成功；seykota-funding-sync.service 在 A1 維運通知監控清單（f-5）。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=趨勢策略 row=7 total=-0.38607562）。限制：放棄分支沒有在 A1 真實觸發過；audit 目錄完全寫不進去時沒有東西能跨輪記住。"
         }
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "f-26a",
-          "reason": "已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由趨勢的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（趨勢已改釘 v0.29.0）；還沒上 A1 正式機（新）。"
+          "state": "done",
+          "evidence": "src/seykota_bot/fleet_events.py:24 FUNDING_SHEET_WRITE_FAILED、:45 風險分級 R2；src/seykota_bot/funding_sync.py:433 放棄時寫一筆事件日誌（事件編號預存去重），由趨勢修復機器人每輪匯出給維運通知；ERR-057 在共用庫 v0.29.0 錯誤清單。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，趨勢）。限制：事件到手機的最後一段（匯出器＋維運通知）沒有實機跑過，A1 沒有真的觸發過放棄。"
         }
       }
     },
@@ -1887,16 +1885,14 @@
       "code": "MOM.FUNDING_SHEET_WRITE_FAILED",
       "behaviour": {
         "momentum": {
-          "state": "pending",
-          "phase": "f-26a",
-          "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：testing 部署完成、0 個失敗單元、資金費同步手動一輪成功；開發機是 DEMO 或沒有金鑰，只走「略過」路徑，放棄分支沒有實際被觸發過）；還沒上 A1 正式機（新）。mexc-momentum-funding-sync.service 已在 A1 的維運通知監控清單（f-5），失敗時服務以結束碼 3 結束。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。"
+          "state": "done",
+          "evidence": "src/binance_funding_sync.py:224 EXIT_SHEET_FAILED = 3；:496／:499／:504／:576 放棄分支與寫入未確認都以結束碼 3 結束（規則同趨勢）；mexc-momentum-funding-sync.service 在 A1 維運通知監控清單（f-5）。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=動能策略 row=6 total=-0.00191524）。限制：放棄分支沒有在 A1 真實觸發過。"
         }
       },
       "emits_event": {
         "momentum": {
-          "state": "pending",
-          "phase": "f-26a",
-          "reason": "已實作、外部審閱 PASS、已部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49），只走略過路徑）：算失敗時寫一筆事件日誌（R2，標記已重試用盡、事件編號預存去重），由動能的修復機器人每輪匯出給維運通知；需要共用庫 v0.29.0 的錯誤清單條目（動能已改釘 v0.29.0）；還沒上 A1 正式機（新）。"
+          "state": "done",
+          "evidence": "src/fleet_events.py:27 FUNDING_SHEET_WRITE_FAILED（ERR-058，R2）；src/binance_funding_sync.py:564 放棄時寫一筆事件日誌（R2、已重試用盡、事件編號預存去重），由動能修復機器人每輪匯出給維運通知。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，動能）。限制：事件到手機的最後一段沒有實機跑過，A1 沒有真的觸發過放棄。"
         }
       }
     },
@@ -1904,9 +1900,8 @@
       "code": "MYC.FUNDING_SHEET_WRITE_FAILED",
       "behaviour": {
         "mycrypto": {
-          "state": "pending",
-          "phase": "f-26a",
-          "reason": "已實作、外部審閱 PASS、已合併開發主幹並部署開發機（2026-10-09 台北 04:49（開發機日誌 UTC 20:49）：開發機沒有金鑰，資金費同步只走略過路徑）；還沒上 A1 正式機（新）。失敗時服務以結束碼 3 結束，但加密的背景服務還沒進維運通知的監控清單，部署時要把 my-crypto-bot-funding-sync.service 加進去（A1 設定）。"
+          "state": "done",
+          "evidence": "sync_funding_fees_entry.py:54 EXIT_SHEET_FAILED = 3；:364 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:85 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations aba9569，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=加密策略 row=5 total=-0.01784778）。my-crypto-bot-funding-sync.service／.timer 已於同日加進 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（備份 ops-notify.env.bak-f26a-*），尚未實際收到過這個單元的失敗通知。限制：沒有事件管道（見 emits_event 格）。"
         }
       },
       "emits_event": {
@@ -1922,20 +1917,42 @@
     {
       "kind": "rule",
       "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
-      "type": "updated",
-      "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。"
+      "project": "seykota",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "f-26a 趨勢：2026-10-09 台北上 A1（operations 960792e）、手動一輪資金費同步寫入成功，改已做；sources 換版、引用行號逐筆比對。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "f-26a 趨勢事件：同上改已做（事件到手機最後一段沒實機跑過，已寫進格內限制）。"
     },
     {
       "kind": "rule",
       "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
-      "type": "updated",
-      "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。"
+      "project": "momentum",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "f-26a 動能：2026-10-09 台北上 A1（operations 490e241）、手動一輪寫入成功，改已做。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
+      "project": "momentum",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "f-26a 動能事件：同上改已做（限制同趨勢）。"
     },
     {
       "kind": "rule",
       "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
-      "type": "updated",
-      "note": "f-26a 三支實作已合併並部署開發機（還沒上 A1，仍是未做）；引用行號對齊已合併版本。"
+      "project": "mycrypto",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "f-26a 加密：2026-10-09 台北上 A1（operations aba9569）、手動一輪寫入成功並加進維運通知監控清單，改已做；加密的事件格仍未做（等換 Binance x3）。"
     }
   ]
 }
