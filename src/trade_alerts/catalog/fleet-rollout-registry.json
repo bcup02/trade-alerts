@@ -1953,6 +1953,23 @@
           "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
         }
       }
+    },
+    {
+      "code": "BTC.LEDGER_PENDING_EXPIRED",
+      "behaviour": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-28b",
+          "reason": "2026-10-10 f-30 開發中：競賽的對帳超過 24 小時改按比對判斷（f-28，已在 A1 正式機）；逾時後通知一次尚未部署，上正式機後改已做。"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-28b",
+          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由 unrecorded-fill 作業匯出，等升級共用庫並部署。"
+        }
+      }
     }
   ],
   "recent_changes": [

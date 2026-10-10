@@ -16,7 +16,11 @@ expires later gets its own notice.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+
+from .fleet_event_log import append_fleet_event, exclusive_log_lock, read_fleet_events, utc_now_iso
 
 CODE_PENDING_EXPIRED = "LEDGER_PENDING_EXPIRED"
 
@@ -92,3 +96,88 @@ def plan_pending_expired_notice(
         "details": {"ledger_value": ledger_status.get("value"), "max_hours": max_hours,
                     "markers": fresh, "notice_text": "\n".join(lines)},
     }
+
+
+# --------------------------------------------------------------------------- #
+# btc-competition: one unsettled rebalance batch / fills after the last snapshot
+# --------------------------------------------------------------------------- #
+_MAX_EPISODE_IDS = 50
+
+
+def _valid_batch_block(block: Any) -> bool:
+    """A usable competition ``pending_expired`` block: a known reason and a finite, positive limit.
+    An empty or half-filled dict is not evidence of anything and must not become an R3 event."""
+    if not isinstance(block, Mapping) or "markers" in block or block.get("reason") not in _REASON_TEXT:
+        return False
+    limit = block.get("max_hours")
+    return isinstance(limit, (int, float)) and not isinstance(limit, bool) and 0 < limit < float("inf")
+
+
+def _batch_episode(block: Mapping[str, Any], moment: datetime) -> str:
+    """Identity of one stuck period, strongest first:
+
+    1. ``since`` -- when the oldest waiting thing began (readable times only);
+    2. ``episode_ids`` -- the ledger event ids of the waiting rows (the competition supplies them when a
+       time cannot be read): a different stuck period has different rows;
+    3. neither: nothing identifies the period, so it is announced at most once per UTC day while it lasts.
+       Never silently once-for-ever: a later, different period must not be swallowed by an old notice.
+    """
+    since = block.get("since")
+    if isinstance(since, str) and since:
+        return f"since:{since}"
+    ids = block.get("episode_ids")
+    if isinstance(ids, list):
+        clean = sorted({str(i) for i in ids if isinstance(i, (str, int)) and str(i)})[:_MAX_EPISODE_IDS]
+        if clean:
+            return "ids:" + "|".join(clean)
+    return f"unidentified:{block.get('reason')}:{moment.strftime('%Y-%m-%d')}"
+
+
+def announce_batch_expired(
+    ledger_status: Any,
+    *,
+    project: str,
+    fleet_event_log: str | Path,
+    risk_tier: str,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    """The competition's version of the notice: its compare gives up waiting for an unsettled rebalance
+    batch (or spot fills after the last holdings snapshot) after 24 h and records ONE
+    ``evidence["pending_expired"]`` dict (not a marker list).  Written once per episode, only when the
+    verdict is ``RECONCILED`` (balances agree); a DIVERGED verdict already has its own alert.
+
+    The read of "already announced" and the append share one lock.  Returns the stored event, or
+    ``None`` when there is nothing new.  Raises on an unreadable log or a failed write -- the caller
+    isolates that, nothing has been announced then and the next round tries again.
+    """
+    if not isinstance(ledger_status, Mapping) or ledger_status.get("value") != "RECONCILED":
+        return None
+    evidence = ledger_status.get("evidence")
+    block = evidence.get("pending_expired") if isinstance(evidence, Mapping) else None
+    if not _valid_batch_block(block):
+        return None
+    moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    episode = _batch_episode(block, moment)
+    with exclusive_log_lock(fleet_event_log):
+        for event in read_fleet_events(fleet_event_log):
+            ev = event.get("evidence")
+            if (event.get("project") == project and event.get("code") == CODE_PENDING_EXPIRED
+                    and isinstance(ev, Mapping) and ev.get("episode") == episode):
+                return None
+        age = f"，已等 {block['age_hours']} 小時" if block.get("age_hours") is not None else ""
+        why = _REASON_TEXT.get(str(block.get("reason")), str(block.get("reason")))
+        text = "\n".join([
+            f"對帳等了超過 {block.get('max_hours')} 小時，有調倉批次或快照之後的現貨成交還沒結算；系統已不再等，"
+            f"改按交易所餘額與帳本比對（比對結果：{ledger_status.get('value')}）。",
+            f"- 開始等的時間：{block.get('since')}{age}（{why}）",
+            f"- 沒有持倉快照就結束的調倉批次：{'有' if block.get('rebalance_batch_without_snapshot') else '沒有'}；"
+            f"最後一份持倉快照之後的現貨成交：{block.get('spot_fills_after_last_snapshot')} 筆",
+        ])
+        return append_fleet_event(
+            fleet_event_log, project=project, code=CODE_PENDING_EXPIRED, risk_tier=risk_tier,
+            recorded_at=utc_now_iso(moment),
+            summary="rebalance batch or spot fills unsettled past the limit",
+            evidence={"episode": episode},
+            details={"pending_expired": dict(block), "ledger_value": ledger_status.get("value"),
+                     "notice_text": text},
+        )
