@@ -115,7 +115,7 @@
         "seykota": {
           "state": "pending",
           "phase": "8-seykota",
-          "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。　2026-10-01：已在開發主幹的 f-12 趨勢 PR 實作（守衛通過後自動清除並記 safe_halt_cleared），還沒上正式機，上線後改已做。"
+          "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:134），目前只能手改 state 檔。　2026-10-01：已在開發主幹的 f-12 趨勢 PR 實作（守衛通過後自動清除並記 safe_halt_cleared），還沒上正式機，上線後改已做。"
         },
         "mycrypto": {
           "state": "n/a",
