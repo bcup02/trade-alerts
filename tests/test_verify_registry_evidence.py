@@ -1,0 +1,239 @@
+"""``scripts/verify_registry_evidence.py`` must notice when changing a ``sources``
+commit moves a cited line onto different code -- the gap that let 108 citations
+point elsewhere on 2026-10-04 while the script said "0 problem(s)".  Each test
+builds a throwaway clone with an old and a new commit and compares registries
+that cite it.
+"""
+from __future__ import annotations
+
+import copy
+import importlib.util
+import subprocess
+from pathlib import Path
+
+import pytest
+
+_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _script():
+    spec = importlib.util.spec_from_file_location("verify_registry_evidence", _ROOT / "scripts" / "verify_registry_evidence.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+script = _script()
+
+OLD_BOT = """import os
+
+
+def alpha():
+    value = load()
+    return value
+
+
+def beta():
+    value = load()
+    return None
+"""
+
+# Three lines are inserted at the top, so every cited line shifts by 3; beta()
+# also gains a line, and gamma() reuses the text "return None".
+NEW_BOT = """import os
+import sys
+import json
+
+
+def alpha():
+    value = load()
+    return value
+
+
+def beta():
+    check()
+    value = load()
+    return None
+
+
+def gamma():
+    return None
+"""
+
+
+def _git(clone: Path, *args: str) -> str:
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+           "PATH": "/usr/bin:/bin:/usr/local/bin"}
+    return subprocess.run(["git", "-C", str(clone), *args], check=True, capture_output=True, text=True, env=env).stdout.strip()
+
+
+@pytest.fixture()
+def clones(tmp_path):
+    clone = tmp_path / "bot-repo"
+    clone.mkdir()
+    _git(clone, "init", "-q")
+    (clone / "src").mkdir()
+    (clone / "src" / "bot.py").write_text(OLD_BOT, encoding="utf-8")
+    _git(clone, "add", "-A")
+    _git(clone, "commit", "-q", "-m", "old")
+    old = _git(clone, "rev-parse", "HEAD")
+    (clone / "src" / "bot.py").write_text(NEW_BOT, encoding="utf-8")
+    _git(clone, "commit", "-q", "-am", "new")
+    new = _git(clone, "rev-parse", "HEAD")
+    return tmp_path, old, new
+
+
+def _registry(commit: str, evidence: str, reason: str | None = None) -> dict:
+    status = {"state": "done", "evidence": evidence}
+    if reason is not None:
+        status["reason"] = reason
+    return {
+        "sources": {"p": {"repo": "owner/bot-repo", "branch": "operations", "commit": commit}},
+        "capabilities": [{"id": "cap.x", "status": {"p": status}}],
+        "catalog": [],
+    }
+
+
+def _reader(root: Path, registry: dict):
+    def read(project, commit, path):
+        content = script._show(root / registry["sources"][project]["repo"].split("/", 1)[1], commit, path)
+        return content.splitlines() if content is not None else None
+    return read
+
+
+def _drift(root, old_registry, new_registry):
+    return script.drift(old_registry, new_registry, _reader(root, new_registry))
+
+
+def test_same_line_number_on_a_new_commit_is_flagged_when_the_text_moved(clones):
+    root, old, new = clones
+    # old line 5 is "value = load()" in alpha(); at the same number in the new commit it is a blank line.
+    report = _drift(root, _registry(old, "src/bot.py:5"), _registry(new, "src/bot.py:5"))
+    assert report["compared"] == 1
+    assert [(m["kind"], m["reason"][:17]) for m in report["mismatches"]] == [("shifted", "line text differs")]
+
+
+def test_relocated_citation_to_the_same_text_passes(clones):
+    root, old, new = clones
+    report = _drift(root, _registry(old, "src/bot.py:5"), _registry(new, "src/bot.py:7"))
+    assert report["compared"] == 1 and report["mismatches"] == []
+
+
+def test_same_text_in_a_different_function_is_flagged(clones):
+    root, old, new = clones
+    # old :11 is "return None" in beta(); new :18 is "return None" in gamma().
+    report = _drift(root, _registry(old, "src/bot.py:11"), _registry(new, "src/bot.py:18"))
+    # beta()'s "return None" is still in beta() -- the citation now points at the wrong function.
+    assert [(m["kind"], m["reason"]) for m in report["mismatches"]] == [("shifted", "same text but in gamma (was beta)")]
+
+
+def test_unchanged_commit_is_not_compared(clones):
+    root, old, _new = clones
+    report = _drift(root, _registry(old, "src/bot.py:5"), _registry(old, "src/bot.py:5"))
+    assert report == {"mismatches": [], "rewritten": [], "compared": 0, "unreadable": 0}
+
+
+def test_rewritten_cell_is_listed_not_compared(clones):
+    root, old, new = clones
+    report = _drift(root, _registry(old, "src/bot.py:5"), _registry(new, "src/bot.py:7 以及 src/other.py:3"))
+    assert report["mismatches"] == [] and report["rewritten"] == ["capability cap.x / p"]
+
+
+def test_bare_line_shorthand_and_reason_text_are_compared(clones):
+    root, old, new = clones
+    report = _drift(root, _registry(old, "src/bot.py:5", "同檔 :6"), _registry(new, "src/bot.py:7", "同檔 :6"))
+    # :6 was "return value"; the new :6 is "def alpha():" -- the bare line in the reason is checked.
+    assert [(m["old_line"], m["new_line"]) for m in report["mismatches"]] == [(6, 6)]
+
+
+def test_relocation_moves_citations_in_evidence_and_reason_and_leaves_correct_ones(clones):
+    root, old, new = clones
+    old_registry = _registry(old, "src/bot.py:5 先載入，:6 再回傳", "見 src/bot.py:11")
+    new_registry = copy.deepcopy(old_registry)
+    new_registry["sources"]["p"]["commit"] = new
+    report = _drift(root, old_registry, new_registry)
+    moved, unresolved = script.apply_relocation(report)
+    status = new_registry["capabilities"][0]["status"]["p"]
+    # :5 -> 7, :6 -> 8 (alpha), :11 "return None" -> 14 (beta, not gamma's :18).
+    assert status["evidence"] == "src/bot.py:7 先載入，:8 再回傳"
+    assert status["reason"] == "見 src/bot.py:14"
+    assert len(moved) == 3 and unresolved == []
+    assert _drift(root, old_registry, new_registry)["mismatches"] == []
+
+
+def test_relocation_reports_what_it_cannot_place(clones):
+    root, old, _new = clones
+    clone = root / "bot-repo"
+    (clone / "src" / "bot.py").write_text(NEW_BOT.replace("def beta():", "def renamed():"), encoding="utf-8")
+    _git(clone, "commit", "-q", "-am", "rename")
+    renamed = _git(clone, "rev-parse", "HEAD")
+    (clone / "src" / "bot.py").write_text("x = 1\n", encoding="utf-8")
+    _git(clone, "commit", "-q", "-am", "gone")
+    gone = _git(clone, "rev-parse", "HEAD")
+    # beta() was renamed: "return None" still exists, but only outside beta -- not guessed.
+    report = _drift(root, _registry(old, "src/bot.py:11"), _registry(renamed, "src/bot.py:11"))
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"]
+    moved, unresolved = script.apply_relocation(report)
+    assert moved == [] and unresolved == []  # a function rename is for a human ("changed"), not relocation
+    # The cited text no longer exists anywhere.
+    report = _drift(root, _registry(old, "src/bot.py:5"), _registry(gone, "src/bot.py:1"))
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"]
+    moved, unresolved = script.apply_relocation(report)
+    assert moved == [] and unresolved == []
+
+
+def test_baseline_registry_unreadable_fails_the_run(clones, monkeypatch, capsys):
+    root, old, _new = clones
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(old, "src/bot.py:5"))
+    assert script.main(["--repos-root", str(root), "--against", "no-such-ref-xyz"]) == 1
+    assert "cannot read the baseline registry" in capsys.readouterr().out
+
+
+def test_main_exits_nonzero_on_moved_code_and_zero_when_clean(clones, monkeypatch, capsys):
+    root, old, new = clones
+    monkeypatch.setattr(script, "baseline_registry", lambda ref: _registry(old, "src/bot.py:5"))
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(new, "src/bot.py:5"))
+    assert script.main(["--repos-root", str(root)]) == 1
+    assert "FAIL [shifted]" in capsys.readouterr().out
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(new, "src/bot.py:7"))
+    assert script.main(["--repos-root", str(root)]) == 0
+    assert "1 citation(s) compared, 0 shifted, 0 changed" in capsys.readouterr().out
+
+
+def test_no_compare_skips_the_baseline(clones, monkeypatch):
+    root, _old, new = clones
+    monkeypatch.setattr(script, "baseline_registry", lambda ref: pytest.fail("baseline must not be read"))
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(new, "src/bot.py:7"))
+    assert script.main(["--repos-root", str(root), "--no-compare"]) == 0
+
+
+def test_changed_lines_fail_until_a_human_accepts_them_but_shifted_ones_never_pass(clones, monkeypatch, capsys):
+    root, old, _new = clones
+    clone = root / "bot-repo"
+    (clone / "src" / "bot.py").write_text(OLD_BOT.replace("value = load()", "value = load(retry=True)", 1), encoding="utf-8")
+    _git(clone, "commit", "-q", "-am", "edit in place")
+    edited = _git(clone, "rev-parse", "HEAD")
+    monkeypatch.setattr(script, "baseline_registry", lambda ref: _registry(old, "src/bot.py:5 、 src/bot.py:6"))
+    # :5 was edited in place (a human has to read it); :6 is unchanged.
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(edited, "src/bot.py:5 、 src/bot.py:6"))
+    assert script.main(["--repos-root", str(root)]) == 1
+    out = capsys.readouterr().out
+    assert "FAIL [changed]" in out and "value = load(retry=True)" in out
+    assert script.main(["--repos-root", str(root), "--accept-changed"]) == 0
+    assert "note [changed, accepted]" in capsys.readouterr().out
+    # A shifted citation is not accepted by the flag.
+    monkeypatch.setattr(script, "baseline_registry", lambda ref: _registry(old, "src/bot.py:5"))
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(_new, "src/bot.py:5"))
+    assert script.main(["--repos-root", str(root), "--accept-changed"]) == 1
+
+
+def test_several_equal_lines_in_the_function_is_for_a_human_not_a_wrong_citation(clones):
+    root, old, _new = clones
+    clone = root / "bot-repo"
+    many = OLD_BOT.replace("    return None\n", "    log()\n    return None\n    return None\n    return None\n")
+    (clone / "src" / "bot.py").write_text(many, encoding="utf-8")
+    _git(clone, "commit", "-q", "-am", "repeated lines")
+    repeated = _git(clone, "rev-parse", "HEAD")
+    # old :11 is beta()'s only "return None"; beta() now holds three, and :11 is "log()": no single place to move it to.
+    report = _drift(root, _registry(old, "src/bot.py:11"), _registry(repeated, "src/bot.py:11"))
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"]

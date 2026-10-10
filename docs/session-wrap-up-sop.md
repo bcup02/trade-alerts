@@ -41,6 +41,9 @@ cd ~/trade-alerts
 ```
 
 - [ ] 三個指令都通過。
+- [ ] 動 `sources`（換來源提交）前先讀 `archive/reviews` 裡 registry 相關歸檔的教訓；換版後 `verify_registry_evidence.py`
+      會自動跟 `origin/main` 比對引用行（舊提交那行文字＝新提交新行號那行文字）：`shifted` 先用 `--relocate` 修，
+      `changed` 要逐筆讀過、把腳本印出的清單附進審閱附件，才用 `--accept-changed`。
 - [ ] `recent_changes` 反映**最後一次**登記冊編輯真正改的東西（不能放著上一輪的舊內容）：格子變成已做用 `completed`、新增一列用 `added`、既有列內容改了但狀態沒變用 `updated`。只有這次完全沒碰任何現存列才設成 `[]`，並在回覆講明（2026-09-30：清空會讓頁面的「最新變動」框消失）。
 - [ ] 一致性登記冊、風險登記冊兩個 Artifact 已用 `main` 上的檔案重新發布到原網址（先 `read` 一次再帶 `url` 發布）。
 - [ ] 新增給人看的文字沒有舊叫法（`tests/test_fleet_glossary.py` 會擋 trade-alerts 內的；其他 repo 要人工留意）。
