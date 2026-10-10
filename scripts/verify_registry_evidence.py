@@ -42,8 +42,8 @@ a file or between files, must not look clean.  A paired citation that no longer 
   the old commit and exactly once at the new one, so the citation now points at
   the wrong code.  Always fails.
 * ``changed`` -- the old line was edited or removed, moved to another function,
-  has several equal lines in the function and cannot be matched to the same
-  one by the line above it, its enclosing blocks and its place among look-alikes, sits
+  has several equal lines in the function that moved (equal lines cannot be told
+  apart; a line with an unchanged file above it is the same line), sits
   in a function whose name is not unique in its file (or in a multi-line
   lambda), a file could not be read or parsed, or the old citation was already
   invalid.  Nothing can say whether the citation is
@@ -203,25 +203,6 @@ def _scope(lines: list[str], line_no: int, path: str) -> str | None:
     return table[line_no - 1] if line_no - 1 < len(table) else "<module>"
 
 
-def _identity(lines: list[str], number: int) -> tuple[str, tuple[str, ...]]:
-    """What tells one of several equal lines from another: the nearest non-blank line above it and the
-    chain of block headers around it (the nearest earlier lines with smaller indentation, innermost
-    first), all as stripped text."""
-    above = next((line.strip() for line in reversed(lines[:number - 1]) if line.strip()), "")
-    indent = len(lines[number - 1]) - len(lines[number - 1].lstrip())
-    chain: list[str] = []
-    for line in reversed(lines[:number - 1]):
-        if not line.strip():
-            continue
-        line_indent = len(line) - len(line.lstrip())
-        if line_indent < indent:
-            chain.append(line.strip())
-            indent = line_indent
-            if indent == 0:
-                break
-    return above, tuple(chain)
-
-
 def _same_text_lines(lines: list[str], text: str, scope: str | None, path: str) -> list[int]:
     return [n for n, line in enumerate(lines, 1) if line.strip() == text and _scope(lines, n, path) == scope]
 
@@ -305,17 +286,12 @@ def _check_pair(project: str, path: str, old_commit: str, new_commit: str, old_l
         new_same = _same_text_lines(new_lines, new_text, new_scope, path)
         if len(old_same) == 1 and len(new_same) == 1:
             return "ok"
-        old_id, new_id = _identity(old_lines, old_line), _identity(new_lines, new_line)
-        if old_id == new_id:
-            # same text, same line above, same enclosing blocks: it is the same line when it is also the same
-            # one of the lines that look exactly alike (several blocks can be word for word the same)
-            alike_old = [n for n in old_same if _identity(old_lines, n) == old_id]
-            alike_new = [n for n in new_same if _identity(new_lines, n) == new_id]
-            if len(alike_old) == len(alike_new) and alike_old.index(old_line) == alike_new.index(new_line):
-                return "ok"
+        if old_line == new_line and old_lines[:old_line] == new_lines[:new_line]:
+            return "ok"  # nothing above the line (and the line itself) changed: it is the same line
+        # Several equal lines in the function: nothing in the text says which one a citation meant (the
+        # lines above, the enclosing blocks and the order all move with the code), so a human reads it.
         return ("changed", f"the same text appears {len(old_same)}x in {old_scope} at the old commit and {len(new_same)}x at the "
-                           "new one, and this one cannot be told apart from the others by the lines and blocks around it; "
-                           "compare by hand", old_lines, new_lines)
+                           "new one; equal lines cannot be told apart, compare by hand", old_lines, new_lines)
     target, _why = _relocate(old_lines, old_line, new_lines, path)
     # The old code is at one known place in the same function and the citation does not point there:
     # wrong.  Anything else needs a human to read it.

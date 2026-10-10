@@ -429,15 +429,6 @@ def test_the_bodies_of_different_multi_line_lambdas_are_not_the_module(tmp_path)
     assert [m["kind"] for m in report["mismatches"]] == ["changed"]
 
 
-def test_a_citation_that_slid_onto_another_equal_line_of_the_function_is_caught(tmp_path):
-    root, old, new = _make(tmp_path, EQUAL_BRANCHES, "# inserted\n" + EQUAL_BRANCHES)
-    # old :3 is the buy branch's send(); new :4 is still the buy branch's, new :6 is the sell branch's
-    assert _drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:4"))["mismatches"] == []
-    report = _drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:6"))
-    assert [m["kind"] for m in report["mismatches"]] == ["changed"]
-    assert "cannot be told apart" in report["mismatches"][0]["reason"]
-
-
 def test_no_compare_numbers_lines_by_newline_only_through_the_real_reader(tmp_path, monkeypatch, capsys):
     root, _old, new = _make(tmp_path, "# a\nx = 1\n", "# a\u2028b\nx = 1\n")
     monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(new, "src/bot.py:3"))
@@ -487,42 +478,50 @@ SWAPPED_OLD = "def f():\n    if buy:\n        send()\n    if sell:\n        send
 SWAPPED_NEW = "def f():\n    if sell:\n        send()\n    if buy:\n        send()\n"
 
 
-def test_equal_lines_whose_branches_were_reordered_are_not_the_same_line(tmp_path):
-    root, old, new = _make(tmp_path, SWAPPED_OLD, SWAPPED_NEW)
-    # old :3 is the buy branch's send(); new :3 is the sell branch's -- same text, same ordinal, other branch
-    report = _drift(root, _registry(old, "買入見 src/bot.py:3"), _registry(new, "買入見 src/bot.py:3"))
-    assert [m["kind"] for m in report["mismatches"]] == ["changed"]
-    assert "cannot be told apart" in report["mismatches"][0]["reason"]
-    both = _drift(root, _registry(old, "買入見 src/bot.py:3；賣出見 src/bot.py:5"),
-                  _registry(new, "買入見 src/bot.py:3；賣出見 src/bot.py:5"))
-    assert [m["kind"] for m in both["mismatches"]] == ["changed", "changed"]
-    # the buy citation pointed at the buy branch's new place is fine
-    assert _drift(root, _registry(old, "買入見 src/bot.py:3"), _registry(new, "買入見 src/bot.py:5"))["mismatches"] == []
-
-
-def test_a_repeated_line_with_unchanged_neighbours_stays_clean_when_unrelated_code_is_inserted(tmp_path):
-    root, old, new = _make(tmp_path, EQUAL_BRANCHES, "import os\n" + EQUAL_BRANCHES)
-    report = _drift(root, _registry(old, "src/bot.py:3 src/bot.py:5"), _registry(new, "src/bot.py:4 src/bot.py:6"))
-    assert report["compared"] == 2 and report["mismatches"] == []
-
-
-def test_word_for_word_identical_blocks_are_told_apart_by_their_order(tmp_path):
-    src = "def f():\n    if a:\n        prep()\n        send()\n    if a:\n        prep()\n        send()\n"
-    root, old, new = _make(tmp_path, src, "import os\n" + src)
-    # the first block's send() (:4) must stay the first one; pointing it at the second block's (:7 -> new :8) is caught
-    assert _drift(root, _registry(old, "src/bot.py:4"), _registry(new, "src/bot.py:5"))["mismatches"] == []
-    assert [m["kind"] for m in _drift(root, _registry(old, "src/bot.py:4"), _registry(new, "src/bot.py:8"))["mismatches"]] == ["changed"]
-
-
-def test_an_identical_block_added_in_front_changes_which_one_is_first(tmp_path):
-    src = "def f():\n    if a:\n        prep()\n        send()\n    if a:\n        prep()\n        send()\n"
-    block = "    if a:\n        prep()\n        send()\n"
-    root, old, new = _make(tmp_path, src, "def f():\n" + block + src[len("def f():\n"):])
-    report = _drift(root, _registry(old, "src/bot.py:4"), _registry(new, "src/bot.py:4"))
-    assert [m["kind"] for m in report["mismatches"]] == ["changed"]  # three look-alikes now; left for a human
-
-
 def test_line_zero_is_not_a_line(clones):
     root, old, new = clones
     report = _drift(root, _registry(old, "src/bot.py:0"), _registry(new, "src/bot.py:0"))
     assert [m["kind"] for m in report["mismatches"]] == ["changed"]
+
+
+# --- equal lines in one function are never "verified": a human reads them (fourth review) -------------------
+
+MULTI_LINE_OLD = ("def f():\n    if (\n        buy\n    ):\n        prep()\n        send()\n"
+                  "    if (\n        sell\n    ):\n        prep()\n        send()\n")
+MULTI_LINE_SWAPPED = MULTI_LINE_OLD.replace("buy", "TMP").replace("sell", "buy").replace("TMP", "sell")
+
+
+@pytest.mark.parametrize("new_src, new_citation", [
+    ("# inserted\n" + EQUAL_BRANCHES, "src/bot.py:4"),            # unrelated line inserted, citation moved with it
+    ("# inserted\n" + EQUAL_BRANCHES, "src/bot.py:6"),            # slid onto the other equal line
+    (SWAPPED_NEW, "src/bot.py:3"),                                 # branches reordered, same number
+])
+def test_a_citation_on_one_of_several_equal_lines_is_always_left_for_a_human(tmp_path, new_src, new_citation):
+    root, old, new = _make(tmp_path, EQUAL_BRANCHES, new_src)
+    report = _drift(root, _registry(old, "src/bot.py:3"), _registry(new, new_citation))
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"]
+    assert "equal lines cannot be told apart" in report["mismatches"][0]["reason"]
+
+
+def test_branches_with_multi_line_conditions_are_never_waved_through(tmp_path):
+    root, old, new = _make(tmp_path, MULTI_LINE_OLD, MULTI_LINE_SWAPPED)
+    # old :6 is the buy branch's send(); new :6 is the sell branch's, new :11 the buy branch's
+    wrong = _drift(root, _registry(old, "買入見 src/bot.py:6"), _registry(new, "買入見 src/bot.py:6"))
+    assert [m["kind"] for m in wrong["mismatches"]] == ["changed"]
+    both = _drift(root, _registry(old, "買入見 src/bot.py:6；賣出見 src/bot.py:11"),
+                  _registry(new, "買入見 src/bot.py:6；賣出見 src/bot.py:11"))
+    assert [m["kind"] for m in both["mismatches"]] == ["changed", "changed"]
+    right = _drift(root, _registry(old, "買入見 src/bot.py:6"), _registry(new, "買入見 src/bot.py:11"))
+    assert [m["kind"] for m in right["mismatches"]] == ["changed"]  # conservative: a human confirms the right one too
+
+
+def test_a_repeated_line_with_nothing_changed_above_it_is_the_same_line(tmp_path):
+    # only code below the citation changed: the line cannot have moved, however many look-alikes there are
+    root, old, new = _make(tmp_path, EQUAL_BRANCHES, EQUAL_BRANCHES + "# tail\n")
+    report = _drift(root, _registry(old, "src/bot.py:3 src/bot.py:5"), _registry(new, "src/bot.py:3 src/bot.py:5"))
+    assert report["compared"] == 2 and report["mismatches"] == []
+    # but once anything is inserted above, the look-alikes are left for a human
+    root2 = tmp_path / "again"
+    root2.mkdir()
+    root2, old2, new2 = _make(root2, EQUAL_BRANCHES, "# inserted\n" + EQUAL_BRANCHES)
+    assert [m["kind"] for m in _drift(root2, _registry(old2, "src/bot.py:3"), _registry(new2, "src/bot.py:4"))["mismatches"]] == ["changed"]
