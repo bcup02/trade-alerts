@@ -100,9 +100,9 @@
   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>60 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    四支策略目前所有已知的「出問題」情況，共 <b>61 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>38 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>39 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -1814,6 +1814,38 @@
    "tier": "R3",
    "title": "對帳標記超過 24 小時沒結清，系統已不再等待",
    "what": "動能策略的帳本裡有「位置對帳標記」超過 24 小時沒結清（平倉時交易所查不到成交證據，帳本先留下標記等著補）。系統已不再等：交易所和帳本的部位與成交現在對得上，所以對帳狀態是「一致」。但標記還在，那筆平倉在帳本裡可能仍是估算的損益。"
+  },
+  {
+   "ai_prompt": "請在 btc-bull-market-competition 追查調倉批次為什麼沒有持倉快照就結束：讀 audit/ledger_status.json 的 evidence.pending_expired（since、rebalance_batch_without_snapshot、spot_fills_after_last_snapshot），對照 audit/trading_ledger.jsonl 從 since 前後的事件（rebalance 開始、order_attempt、spot_fill、holdings_snapshot），以及該時段 btc-competition-daily.service 的 journal（是否被殺、逾時、例外），判斷是批次中途被中斷（graceful_stop／interrupted_orders 有沒有處理）、還是快照寫入失敗；提出治本修正與回歸測試。注意這是現貨策略，不要下單或修改帳本。",
+   "behaviour": {
+    "phase": "f-28b",
+    "reason": "2026-10-10 f-30 開發中：競賽的對帳超過 24 小時改按比對判斷（f-28，已在 A1 正式機）；逾時後通知一次尚未部署，上正式機後改已做。",
+    "state": "pending"
+   },
+   "bot": "btc-competition",
+   "bot_label": "競賽策略",
+   "code": "BTC.LEDGER_PENDING_EXPIRED",
+   "direction": "餘額沒有問題，不需要立刻動作。要追出當天每日調整為什麼沒有寫持倉快照，免得下一次又卡住。",
+   "emits_event": {
+    "phase": "f-28b",
+    "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由 unrecorded-fill 作業匯出，等升級共用庫並部署。",
+    "state": "pending"
+   },
+   "error_id": "ERR-061",
+   "notes": [
+    "行為未做 — 2026-10-10 f-30 開發中：競賽的對帳超過 24 小時改按比對判斷（f-28，已在 A1 正式機）；逾時後通知一次尚未部署，上正式機後改已做。（預定：f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1））",
+    "寫進事件日誌未做 — 同上：事件寫進 audit/fleet_event_log.jsonl 由 unrecorded-fill 作業匯出，等升級共用庫並部署。（預定：f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1））"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的開始等的時間，對照那天台北 08:10 前後每日調整（btc-competition-daily）的 journal。",
+    "到交易所確認現貨餘額和預期相符（對帳已經說一致，這一步只是人工再確認）。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼沒寫持倉快照並提出修正。",
+    "下一次每日調整正常收尾後，狀態不再有逾時證據；若又出現，會是另一段期間、再通知一次。"
+   ],
+   "tier": "R3",
+   "title": "調倉批次或現貨成交超過 24 小時沒結算，系統已不再等待",
+   "what": "競賽策略有一個調倉批次沒有寫下持倉快照就結束了（或最後一份持倉快照之後還有現貨成交沒結算），已經超過 24 小時。系統不再等：交易所餘額和帳本現在對得上，所以對帳狀態是「一致」。但那一段一直沒有正常收尾。"
   }
  ],
  "tiers": [

@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 60,
+  "error_ids_issued": 61,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -1928,6 +1928,38 @@
           "交易所其實還有部位，或結清工具拒絕：不要硬做，把下方「給 AI 的追查指令」整段貼給 Claude。"
         ],
         "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼平倉標記一直沒結清：讀 audit/ledger_status.json 的 evidence.pending_expired（交易編號、symbol、event_time、expired_reason），對照 audit/trading_ledger.jsonl 裡這些 trade_id 的全部紀錄（trade_open、position_reconciliation_pending 與有沒有 trade_close），再用只讀的方式到交易所查這些商品的持倉與歷史成交；判斷是交易所真的沒有成交證據（可以用 src/reconcile_apply.py 結清）、還是有成交但帳本沒補（要走 fetch_verified_close_evidence 與 append_reconciled_close），並找出平倉時為什麼沒有拿到成交證據，提出治本修正與回歸測試。注意 src/reconcile_apply.py 預覽與結清都需要使用者先到交易所確認已平倉並自己下 --exchange-verified。"
+      }
+    },
+    {
+      "error_id": "ERR-061",
+      "code": "BTC.LEDGER_PENDING_EXPIRED",
+      "title": "調倉批次或現貨成交超過 24 小時沒結算，系統已不再等待",
+      "project": "btc-competition",
+      "sources": [
+        "src/btc_competition/unrecorded_fill.py:234"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不動帳本、不暫停、不下單。帳本對交易所的對帳在「有調倉批次沒有持倉快照就結束、或最後一份持倉快照之後還有現貨成交」的狀態超過 24 小時（環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS）後，不再把狀態停在「核對進行中」，改成按交易所餘額與帳本的實際比對判斷：對不上變成「對帳不一致」並照原本的告警通知；對得上時狀態是「一致」，並由 unrecorded-fill 作業對這一段卡住的期間寫一筆事件日誌、由匯出檔通知一次（同一段期間不重發，之後另一段卡住才再通知）。開始等的時間讀不出來或比現在晚，也視為超時。",
+      "human_action": "餘額現在對得上，但那個調倉批次或現貨成交一直沒有被結算，代表當天的每日調整沒有正常收尾。要追出為什麼沒有寫持倉快照，確認下一次每日調整後不再卡住。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-10 使用者核可（f-30）：競賽的「核對進行中」曾在開發機卡 8 天（f-28 已加 24 小時上限）；上限一到改按比對判斷，但「一致」會讓人以為沒事，所以一致時也通知一次（使用者選「通知你一次」）。因為餘額已經對得上，這是請人追查為什麼沒收尾，不是帳本壞了，所以是 R3 事件通知而不是請求。",
+      "operator_message": {
+        "what": "競賽策略有一個調倉批次沒有寫下持倉快照就結束了（或最後一份持倉快照之後還有現貨成交沒結算），已經超過 24 小時。系統不再等：交易所餘額和帳本現在對得上，所以對帳狀態是「一致」。但那一段一直沒有正常收尾。",
+        "direction": "餘額沒有問題，不需要立刻動作。要追出當天每日調整為什麼沒有寫持倉快照，免得下一次又卡住。",
+        "steps": [
+          "看訊息裡的開始等的時間，對照那天台北 08:10 前後每日調整（btc-competition-daily）的 journal。",
+          "到交易所確認現貨餘額和預期相符（對帳已經說一致，這一步只是人工再確認）。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼沒寫持倉快照並提出修正。",
+          "下一次每日調整正常收尾後，狀態不再有逾時證據；若又出現，會是另一段期間、再通知一次。"
+        ],
+        "ai_prompt": "請在 btc-bull-market-competition 追查調倉批次為什麼沒有持倉快照就結束：讀 audit/ledger_status.json 的 evidence.pending_expired（since、rebalance_batch_without_snapshot、spot_fills_after_last_snapshot），對照 audit/trading_ledger.jsonl 從 since 前後的事件（rebalance 開始、order_attempt、spot_fill、holdings_snapshot），以及該時段 btc-competition-daily.service 的 journal（是否被殺、逾時、例外），判斷是批次中途被中斷（graceful_stop／interrupted_orders 有沒有處理）、還是快照寫入失敗；提出治本修正與回歸測試。注意這是現貨策略，不要下單或修改帳本。"
       }
     }
   ],
