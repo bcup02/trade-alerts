@@ -103,7 +103,8 @@ development 或只在測試機上的算 `pending`。證據是否真的指到程�
 `python scripts/verify_registry_evidence.py`（對四個 repo 的 clone 逐條檢查，不在 CI 裡）。
 換了 `sources` 的提交時，同一支腳本還會跟 `origin/main` 上的登記冊比對：舊提交那一行的文字，要等於新提交新行號
 那一行的文字（而且在同一個函式裡）。舊那行還在、只是行號變了＝`shifted`，一律擋下，可用 `--relocate` 自動改到新行號；
-那行被改寫、刪掉或搬到別的函式＝`changed`，也會擋下並印出新舊兩行，人讀過、附進審閱附件後才加 `--accept-changed` 放行。
+那行被改寫、刪掉、搬到別的函式、有多行相同、或檔案讀不到＝`changed`，也會擋下並印出新舊兩行，人讀過、附進審閱附件後才加 `--accept-changed` 放行；
+格子的引用增減或改寫而無法逐一配對＝`unpaired`，同樣擋下，人比對過才加 `--accept-unpaired`。函式範圍用 `ast` 判斷（巢狀函式、同名方法、decorator、多行簽章）。
 規則是「四支一起做，否則寫在這裡」——
 `trade_alerts.registry_problems()` 是這條規則的可執行版本，`tests/test_rollout_registry.py` 讓 CI 擋下
 漏列、缺理由、目錄與登記冊對不上的情況；策略 repo 的測試可用 `project_rows()` 檢查登記冊對自己的宣稱。
