@@ -55,7 +55,9 @@ from typing import Any, Callable, Mapping
 
 from .atomic_ledger_append import append_lines_atomically, stage_lines
 from .error_request_queue import open_error_request, outstanding_error_requests, record_request_outcome
-from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for, utc_now_iso
+from .fleet_event_log import (
+    append_fleet_event, exclusive_log_lock, load_error_catalog, read_fleet_events, risk_tier_for, utc_now_iso,
+)
 from .ledger_reconcile import atomic_write, norm_symbol_plain, read_json, read_ledger
 from .notice_replay import replay_unannounced_requests
 from .pending_expired_notice import CODE_PENDING_EXPIRED, plan_pending_expired_notice
@@ -165,7 +167,7 @@ def run_repair_round(
         "project": adapter.project, "paused": paused, "candidates": [], "repaired": [], "failed": [],
         "escalated": [], "blocked": [], "still_open": [], "awaiting_human": [], "deferred": [],
         "closed_requests": [], "replayed": [], "recurring": None, "pending_expired": None,
-        "ops_export_written": False,
+        "pending_expired_error": None, "ops_export_written": False,
     }
     try:
         if not paused:
@@ -295,17 +297,27 @@ class _Round:
         nothing about the unsettled close.  Evaluated every round and idempotent (what was announced
         is read back from the event log), so a kill between the compare and this check loses nothing.
         """
-        plan = plan_pending_expired_notice(
-            read_json(self.paths.ledger_status), read_fleet_events(self.paths.fleet_event_log),
-            project=self.project,
-        )
-        if plan is None:
+        try:
+            # The read of "what was announced" and the append share one lock: two rounds on the same
+            # host cannot both see the old log and each write the notice (review #162 B1).
+            with exclusive_log_lock(self.paths.fleet_event_log):
+                plan = plan_pending_expired_notice(
+                    read_json(self.paths.ledger_status), read_fleet_events(self.paths.fleet_event_log),
+                    project=self.project,
+                )
+                if plan is None:
+                    return
+                event = append_fleet_event(
+                    self.paths.fleet_event_log, project=self.project, code=CODE_PENDING_EXPIRED,
+                    risk_tier=risk_tier_for(self.catalog, self.project, CODE_PENDING_EXPIRED),
+                    recorded_at=utc_now_iso(self.now), **plan,
+                )
+        except Exception as exc:  # noqa: BLE001 -- a notice that cannot be written must not stop the repair round
+            # An unreadable event log or a failed write loses nothing: the evidence stays in
+            # ledger_status.json and the next round tries again (nothing was announced).
+            LOGGER.warning("pending_expired_notice_failed error=%s: %s", type(exc).__name__, exc)
+            self.result["pending_expired_error"] = f"{type(exc).__name__}: {exc}"
             return
-        event = append_fleet_event(
-            self.paths.fleet_event_log, project=self.project, code=CODE_PENDING_EXPIRED,
-            risk_tier=risk_tier_for(self.catalog, self.project, CODE_PENDING_EXPIRED),
-            recorded_at=utc_now_iso(self.now), **plan,
-        )
         self.result["pending_expired"] = {"trade_ids": plan["evidence"]["trade_ids"], "fleet_event_id": event["event_id"]}
 
     # -- one candidate ------------------------------------------------------ #

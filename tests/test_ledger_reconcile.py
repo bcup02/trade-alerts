@@ -1349,3 +1349,18 @@ def test_the_limit_is_configurable_and_validated():
 def test_expiry_is_skipped_when_markers_are_not_tracked():
     doc = _compare(_flat_ledger(_pending("t1")), include_pending_markers=False)
     assert doc["value"] == "RECONCILED" and "pending_expired" not in doc["evidence"]
+
+
+def test_exactly_at_the_limit_is_still_waited_for_and_one_second_over_is_not():
+    at = _pending("t1", event_time="2026-08-31T12:00:00Z")      # exactly 24 h
+    over = _pending("t1", event_time="2026-08-31T11:59:59Z")    # 24 h + 1 s
+    assert _compare(_flat_ledger(at))["value"] == "PENDING"
+    assert _compare(_flat_ledger(over))["value"] == "RECONCILED"
+
+
+def test_expiry_never_hides_an_unmatched_exchange_fill():
+    snap = _snapshot(fills=[{"order_id": "x9", "symbol": "GPS_USDT", "time_ms": FETCHED_MS - 3_600_000,
+                             "quantity": 1, "price": 1, "side": "sell"}])
+    doc = exchange_ledger_compare(snap, _flat_ledger(_pending("t1", event_time="2026-08-01T00:00:00Z")),
+                                  is_paper=_paper, norm_symbol=norm_symbol_plain, now=NOW)
+    assert doc["value"] == "DIVERGED" and doc["evidence"]["unmatched_exchange_fills"]

@@ -29,14 +29,23 @@ _REASON_TEXT = {
 
 def expired_markers(ledger_status: Any) -> list[dict[str, Any]]:
     """The markers the compare stopped waiting for, or ``[]`` for any other document shape."""
-    if not isinstance(ledger_status, Mapping):
+    # Only a verdict that says the two sides agree: a DIVERGED / UNKNOWN / PENDING document keeps the
+    # evidence but must not be announced as "matches, only the marker is left" (review #162 B2).
+    if not isinstance(ledger_status, Mapping) or ledger_status.get("value") != "RECONCILED":
         return []
     evidence = ledger_status.get("evidence")
     block = evidence.get("pending_expired") if isinstance(evidence, Mapping) else None
     markers = block.get("markers") if isinstance(block, Mapping) else None
     if not isinstance(markers, list):
         return []
-    return [m for m in markers if isinstance(m, Mapping) and str(m.get("trade_id") or "")]
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for m in markers:
+        trade_id = str(m.get("trade_id") or "") if isinstance(m, Mapping) else ""
+        if trade_id and trade_id not in seen:   # one entry per trade, whatever the document repeats (review #162 B3)
+            seen.add(trade_id)
+            out.append(dict(m))
+    return out
 
 
 def _announced_trade_ids(events: list[dict[str, Any]], project: str) -> set[str]:
