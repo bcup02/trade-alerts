@@ -133,11 +133,12 @@ def test_unchanged_commit_is_not_compared(clones):
     assert report == {"mismatches": [], "unpaired": [], "compared": 0, "skipped": 0}
 
 
-def test_a_citation_that_gains_a_partner_in_another_file_is_unpaired_but_the_rest_still_compare(clones):
+def test_a_cell_that_gains_a_citation_in_another_file_is_unpaired_as_a_whole(clones):
     root, old, new = clones
     report = _drift(root, _registry(old, "src/bot.py:5"), _registry(new, "src/bot.py:7 以及 src/other.py:3"))
-    assert report["mismatches"] == [] and report["compared"] == 1
-    assert report["unpaired"] == [{"where": "capability cap.x", "project": "p", "old": [], "new": ["src/other.py:3"]}]
+    assert report["mismatches"] == [] and report["compared"] == 0
+    assert report["unpaired"] == [{"where": "capability cap.x", "project": "p", "old": ["src/bot.py:5"],
+                                   "new": ["src/bot.py:7", "src/other.py:3"]}]
 
 
 def test_bare_line_shorthand_and_reason_text_are_compared(clones):
@@ -434,7 +435,7 @@ def test_a_citation_that_slid_onto_another_equal_line_of_the_function_is_caught(
     assert _drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:4"))["mismatches"] == []
     report = _drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:6"))
     assert [m["kind"] for m in report["mismatches"]] == ["changed"]
-    assert "not the same one of them" in report["mismatches"][0]["reason"]
+    assert "cannot be told apart" in report["mismatches"][0]["reason"]
 
 
 def test_no_compare_numbers_lines_by_newline_only_through_the_real_reader(tmp_path, monkeypatch, capsys):
@@ -443,3 +444,85 @@ def test_no_compare_numbers_lines_by_newline_only_through_the_real_reader(tmp_pa
     # the file has two lines (a U+2028 is not a line break for grep or ast); str.splitlines used to say three
     assert script.main(["--repos-root", str(root), "--no-compare"]) == 1
     assert "line past end of file (2 lines)" in capsys.readouterr().out
+
+
+# --- review of #156, third round -------------------------------------------------------------------------
+
+
+def _make_two(tmp_path, files_old, files_new):
+    clone = tmp_path / "bot-repo"
+    clone.mkdir()
+    _git(clone, "init", "-q")
+    (clone / "src").mkdir()
+    for name, text in files_old.items():
+        (clone / "src" / name).write_text(text, encoding="utf-8")
+    _git(clone, "add", "-A")
+    _git(clone, "commit", "-q", "-m", "old")
+    old = _git(clone, "rev-parse", "HEAD")
+    for name, text in files_new.items():
+        (clone / "src" / name).write_text(text, encoding="utf-8")
+    _git(clone, "commit", "-q", "-am", "new")
+    return tmp_path, old, _git(clone, "rev-parse", "HEAD")
+
+
+def test_swapping_citations_between_files_does_not_look_clean(tmp_path, monkeypatch, capsys):
+    buy, sell = "def buy():\n    buy_order()\n", "def sell():\n    sell_order()\n"
+    root, old, new = _make_two(tmp_path, {"buy.py": buy, "sell.py": sell},
+                               {"buy.py": "# inserted\n" + buy, "sell.py": "# inserted\n" + sell})
+    old_reg = _registry(old, "買入見 src/buy.py:2；賣出見 src/sell.py:2")
+    swapped = _registry(new, "買入見 src/sell.py:3；賣出見 src/buy.py:3")
+    report = _drift(root, old_reg, swapped)
+    assert report["mismatches"] == [] and report["compared"] == 0 and len(report["unpaired"]) == 1
+    monkeypatch.setattr(script, "baseline_registry", lambda ref: old_reg)
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: swapped)
+    assert script.main(["--repos-root", str(root)]) == 1
+    assert "FAIL [unpaired]" in capsys.readouterr().out
+    # the same citations in the right order are paired and relocated
+    right = _registry(new, "買入見 src/buy.py:2；賣出見 src/sell.py:2")
+    fixed = _drift(root, old_reg, right)
+    assert _kinds(fixed) == [("shifted", 3), ("shifted", 3)]
+
+
+SWAPPED_OLD = "def f():\n    if buy:\n        send()\n    if sell:\n        send()\n"
+SWAPPED_NEW = "def f():\n    if sell:\n        send()\n    if buy:\n        send()\n"
+
+
+def test_equal_lines_whose_branches_were_reordered_are_not_the_same_line(tmp_path):
+    root, old, new = _make(tmp_path, SWAPPED_OLD, SWAPPED_NEW)
+    # old :3 is the buy branch's send(); new :3 is the sell branch's -- same text, same ordinal, other branch
+    report = _drift(root, _registry(old, "買入見 src/bot.py:3"), _registry(new, "買入見 src/bot.py:3"))
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"]
+    assert "cannot be told apart" in report["mismatches"][0]["reason"]
+    both = _drift(root, _registry(old, "買入見 src/bot.py:3；賣出見 src/bot.py:5"),
+                  _registry(new, "買入見 src/bot.py:3；賣出見 src/bot.py:5"))
+    assert [m["kind"] for m in both["mismatches"]] == ["changed", "changed"]
+    # the buy citation pointed at the buy branch's new place is fine
+    assert _drift(root, _registry(old, "買入見 src/bot.py:3"), _registry(new, "買入見 src/bot.py:5"))["mismatches"] == []
+
+
+def test_a_repeated_line_with_unchanged_neighbours_stays_clean_when_unrelated_code_is_inserted(tmp_path):
+    root, old, new = _make(tmp_path, EQUAL_BRANCHES, "import os\n" + EQUAL_BRANCHES)
+    report = _drift(root, _registry(old, "src/bot.py:3 src/bot.py:5"), _registry(new, "src/bot.py:4 src/bot.py:6"))
+    assert report["compared"] == 2 and report["mismatches"] == []
+
+
+def test_word_for_word_identical_blocks_are_told_apart_by_their_order(tmp_path):
+    src = "def f():\n    if a:\n        prep()\n        send()\n    if a:\n        prep()\n        send()\n"
+    root, old, new = _make(tmp_path, src, "import os\n" + src)
+    # the first block's send() (:4) must stay the first one; pointing it at the second block's (:7 -> new :8) is caught
+    assert _drift(root, _registry(old, "src/bot.py:4"), _registry(new, "src/bot.py:5"))["mismatches"] == []
+    assert [m["kind"] for m in _drift(root, _registry(old, "src/bot.py:4"), _registry(new, "src/bot.py:8"))["mismatches"]] == ["changed"]
+
+
+def test_an_identical_block_added_in_front_changes_which_one_is_first(tmp_path):
+    src = "def f():\n    if a:\n        prep()\n        send()\n    if a:\n        prep()\n        send()\n"
+    block = "    if a:\n        prep()\n        send()\n"
+    root, old, new = _make(tmp_path, src, "def f():\n" + block + src[len("def f():\n"):])
+    report = _drift(root, _registry(old, "src/bot.py:4"), _registry(new, "src/bot.py:4"))
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"]  # three look-alikes now; left for a human
+
+
+def test_line_zero_is_not_a_line(clones):
+    root, old, new = clones
+    report = _drift(root, _registry(old, "src/bot.py:0"), _registry(new, "src/bot.py:0"))
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"]

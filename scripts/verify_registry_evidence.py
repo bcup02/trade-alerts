@@ -32,17 +32,18 @@ sit in the same function (found with ``ast``: nested functions, same-named
 methods of different classes, decorators and multi-line signatures included) --
 at the old commit (old line number) as at the new commit (new line number).
 
-Citations of a cell are paired old-to-new by position: per cited file, in
-reading order, when the old and new cell cite that file equally often (the
-author re-pointed each citation in place).  Nothing is paired by what a line
-says -- two citations that read alike are not interchangeable, and swapping
-them must not look clean.  A paired citation that no longer reads the same is:
+Citations of a cell are paired old-to-new by position in the cell: only when
+the old and new cell cite the same files in the same order (the author
+re-pointed each citation in place).  Nothing is paired by what a line says --
+two citations that read alike are not interchangeable, and swapping them, within
+a file or between files, must not look clean.  A paired citation that no longer reads the same is:
 
 * ``shifted`` -- the old line's text appears exactly once in that function at
   the old commit and exactly once at the new one, so the citation now points at
   the wrong code.  Always fails.
 * ``changed`` -- the old line was edited or removed, moved to another function,
-  has several equal lines in the function and is not the same one of them, sits
+  has several equal lines in the function and cannot be matched to the same
+  one by the line above it, its enclosing blocks and its place among look-alikes, sits
   in a function whose name is not unique in its file (or in a multi-line
   lambda), a file could not be read or parsed, or the old citation was already
   invalid.  Nothing can say whether the citation is
@@ -50,8 +51,7 @@ them must not look clean.  A paired citation that no longer reads the same is:
   ``--accept-changed`` turns those into notes once someone has (put the printed
   list in the review attachment).
 
-A citation that cannot be paired (a cell cites a file more or less often than
-before, or a new file) is ``unpaired``: it fails too, printing the old and new citations of the cell;
+A cell whose cited files differ in number or order is ``unpaired`` as a whole: it fails too, printing the old and new citations of the cell;
 ``--accept-unpaired`` turns those into notes once a human has compared them.
 A cited file that exists at neither commit is left to the checks below.
 
@@ -203,6 +203,25 @@ def _scope(lines: list[str], line_no: int, path: str) -> str | None:
     return table[line_no - 1] if line_no - 1 < len(table) else "<module>"
 
 
+def _identity(lines: list[str], number: int) -> tuple[str, tuple[str, ...]]:
+    """What tells one of several equal lines from another: the nearest non-blank line above it and the
+    chain of block headers around it (the nearest earlier lines with smaller indentation, innermost
+    first), all as stripped text."""
+    above = next((line.strip() for line in reversed(lines[:number - 1]) if line.strip()), "")
+    indent = len(lines[number - 1]) - len(lines[number - 1].lstrip())
+    chain: list[str] = []
+    for line in reversed(lines[:number - 1]):
+        if not line.strip():
+            continue
+        line_indent = len(line) - len(line.lstrip())
+        if line_indent < indent:
+            chain.append(line.strip())
+            indent = line_indent
+            if indent == 0:
+                break
+    return above, tuple(chain)
+
+
 def _same_text_lines(lines: list[str], text: str, scope: str | None, path: str) -> list[int]:
     return [n for n, line in enumerate(lines, 1) if line.strip() == text and _scope(lines, n, path) == scope]
 
@@ -245,19 +264,12 @@ Reader = Callable[[str, str, str], "list[str] | None"]  # (project, commit, path
 
 
 def _pair(old: list, new: list) -> tuple[list, list, list]:
-    """Pair old and new citations of one cell by position: per cited file, in reading order, when the
-    file is cited equally often in both.  Returns ``(pairs, old_left, new_left)``; a file cited a
-    different number of times (or only on one side) leaves all its citations unpaired."""
-    pairs, old_left, new_left = [], [], []
-    for path in dict.fromkeys([c[0] for c in old] + [c[0] for c in new]):
-        o = [c for c in old if c[0] == path]
-        n = [c for c in new if c[0] == path]
-        if len(o) == len(n):
-            pairs.extend(zip(o, n))
-        else:
-            old_left += o
-            new_left += n
-    return pairs, old_left, new_left
+    """Pair the citations of one cell by position: only when the old and new cell cite the same files in
+    the same order.  Anything else (a citation added, dropped, re-filed or swapped with one in another
+    file) leaves the whole cell unpaired for a human.  Returns ``(pairs, old_left, new_left)``."""
+    if [c[0] for c in old] == [c[0] for c in new]:
+        return list(zip(old, new)), [], []
+    return [], list(old), list(new)
 
 
 def _check_pair(project: str, path: str, old_commit: str, new_commit: str, old_line: int, new_line: int,
@@ -267,6 +279,8 @@ def _check_pair(project: str, path: str, old_commit: str, new_commit: str, old_l
     old_lines, new_lines = read(project, old_commit, path), read(project, new_commit, path)
     if old_lines is None and new_lines is None:
         return "skip"
+    if old_line < 1 or new_line < 1:
+        return "changed", f"line numbers start at 1 (cited :{old_line} and :{new_line} in {path})", old_lines, new_lines
     if old_lines is None:
         return "changed", f"{path} is not readable at the old commit {old_commit[:7]} (file or commit missing)", None, None
     if new_lines is None:
@@ -289,11 +303,19 @@ def _check_pair(project: str, path: str, old_commit: str, new_commit: str, old_l
     else:
         old_same = _same_text_lines(old_lines, old_text, old_scope, path)
         new_same = _same_text_lines(new_lines, new_text, new_scope, path)
-        if (len(old_same) == 1 and len(new_same) == 1) or (
-                len(old_same) == len(new_same) and old_same.index(old_line) == new_same.index(new_line)):
+        if len(old_same) == 1 and len(new_same) == 1:
             return "ok"
+        old_id, new_id = _identity(old_lines, old_line), _identity(new_lines, new_line)
+        if old_id == new_id:
+            # same text, same line above, same enclosing blocks: it is the same line when it is also the same
+            # one of the lines that look exactly alike (several blocks can be word for word the same)
+            alike_old = [n for n in old_same if _identity(old_lines, n) == old_id]
+            alike_new = [n for n in new_same if _identity(new_lines, n) == new_id]
+            if len(alike_old) == len(alike_new) and alike_old.index(old_line) == alike_new.index(new_line):
+                return "ok"
         return ("changed", f"the same text appears {len(old_same)}x in {old_scope} at the old commit and {len(new_same)}x at the "
-                           "new one, and this is not the same one of them; compare by hand", old_lines, new_lines)
+                           "new one, and this one cannot be told apart from the others by the lines and blocks around it; "
+                           "compare by hand", old_lines, new_lines)
     target, _why = _relocate(old_lines, old_line, new_lines, path)
     # The old code is at one known place in the same function and the citation does not point there:
     # wrong.  Anything else needs a human to read it.
