@@ -1,0 +1,478 @@
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 33ea7a8..b50f386 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -113,7 +113,7 @@
+   <div id="filters"></div>
+   <div id="register"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-10-09 盤點）。
++    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-10-10 盤點）。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
+   </div>
+ </div>
+@@ -1396,7 +1396,7 @@
+    },
+    "error_id": "ERR-046",
+    "notes": [
+-    "行為未做 — 加密策略：還沒決定要盯哪些背景服務（見「維運通知盯背景服務有沒有掛掉」）。（預定：第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢））"
++    "行為未做 — 加密策略：現況：維運通知目前只盯加密的資金費同步（my-crypto-bot-funding-sync.service 與 .timer，2026-10-06 起）；主程式、對帳抓取、快照、報表等背景服務沒盯，掛掉時靠運行狀態（策略停止回報）與對帳間接發現。使用者 2026-10-10 決定照現狀，換 Binance（x3）接上共用做法時一併補齊要盯的清單。（見「維運通知盯背景服務有沒有掛掉」）（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）"
+    ],
+    "open": true,
+    "steps": [
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index eb4125d..0b0f81a 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -209,8 +209,8 @@
+   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+   <div id="glossaryHost"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-09 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+-    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 960792e</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 490e241</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations aba9569</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 0409a9f</code>。
++    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-10 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
++    「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 489bbcd</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations ac378ed</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 4d13631</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 70630a1</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+   </div>
+ </div>
+@@ -1026,7 +1026,7 @@
+    "title": "兩段式解除工具"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-latch.restart_only_clear",
+    "complete": false,
+    "dots": {
+@@ -1046,7 +1046,7 @@
+        "aspect": null,
+        "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
+        "state": "pending",
+-       "text": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。　2026-10-01：已在開發主幹的 f-12 趨勢 PR 實作（守衛通過後自動清除並記 safe_halt_cleared），還沒上正式機，上線後改已做。"
++       "text": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:134），目前只能手改 state 檔。　2026-10-01：已在開發主幹的 f-12 趨勢 PR 實作（守衛通過後自動清除並記 safe_halt_cleared），還沒上正式機，上線後改已做。"
+       }
+      ]
+     },
+@@ -1770,7 +1770,7 @@
+    "title": "需要人處理的通知在 Telegram 持續提醒（含兩顆按鈕）"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-ops_notify.units_axis",
+    "complete": false,
+    "dots": {
+@@ -1810,9 +1810,9 @@
+      "lines": [
+       {
+        "aspect": null,
+-       "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
++       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+        "state": "pending",
+-       "text": "還沒決定要盯哪些背景服務。"
++       "text": "現況：維運通知目前只盯加密的資金費同步（my-crypto-bot-funding-sync.service 與 .timer，2026-10-06 起）；主程式、對帳抓取、快照、報表等背景服務沒盯，掛掉時靠運行狀態（策略停止回報）與對帳間接發現。使用者 2026-10-10 決定照現狀，換 Binance（x3）接上共用做法時一併補齊要盯的清單。"
+       }
+      ]
+     },
+@@ -1832,7 +1832,7 @@
+    "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-reconcile.funding_fee_sync",
+    "complete": true,
+    "dots": {
+@@ -1852,7 +1852,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "src/seykota_bot/funding_sync.py:462（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :470（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證）：operations 960792e（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，2026-10-09 台北 f-26a 換版）；/opt 的 src/seykota_bot/funding_sync.py（4ac684c）、service（e274d7c）、timer（f706bc0）的 blob 與 960792e 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
++       "text": "src/seykota_bot/funding_sync.py:462（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :470（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 489bbcd（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，2026-10-09 台北 f-26a、f-26b 換版）；/opt 的 src/seykota_bot/funding_sync.py（4ac684c）、service（e274d7c）、timer（f706bc0）的 blob 與 489bbcd 同檔相同（A1 hash-object 與 git rev-parse 逐檔比對，三個檔案 blob 都沒變）；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
+       }
+      ]
+     },
+@@ -1863,7 +1863,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:598（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證）：operations 490e241（資金費同步 2026-10-06 台北 17:15 隨 4780bd9 部署，2026-10-09 台北 f-26a 換版）；/opt 的 scripts/sync_funding_fees.py（a6fa37f）、src/binance_funding_sync.py（ab1d5a0）、service（08446a1）、timer（38496fb）的 blob 與 490e241 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
++       "text": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:598（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations ac378ed（資金費同步 2026-10-06 台北 17:15 隨 4780bd9 部署，2026-10-09 台北 f-26a、f-26b 換版）；/opt 的 scripts/sync_funding_fees.py（a6fa37f）、src/binance_funding_sync.py（ab1d5a0）、service（08446a1）、timer（38496fb）的 blob 與 ac378ed 同檔相同（A1 hash-object 與 git rev-parse 逐檔比對，四個檔案 blob 都沒變）；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
+       }
+      ]
+     },
+@@ -2567,7 +2567,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "n/a",
+-       "text": "競賽是現貨，只送成交（append_fill_v2），沒有帳本更正（trade_correction）這種投影，所以不會有卡在平倉後面的更正；0409a9f 的 src 內沒有任何 correct_close 或 trade_correction 的引用（git grep 查證）。"
++       "text": "競賽是現貨，只送成交（append_fill_v2），沒有帳本更正（trade_correction）這種投影，所以不會有卡在平倉後面的更正；70630a1 的 src 內沒有任何 correct_close 或 trade_correction 的引用（2026-10-10 git grep 查證）。"
+       }
+      ]
+     }
+@@ -2576,7 +2576,7 @@
+    "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-projection.requeue_parked",
+    "complete": false,
+    "dots": {
+@@ -2629,7 +2629,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "scripts/requeue_projection_intents.py:45 呼叫 requeue_rejected_projection_intents（:37 只收單一 --trade-id、:44 沒有佇列檔就停）。A1 正式機（新）執行環境（唯讀查證）：operations 0409a9f 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 scripts/requeue_projection_intents.py（blob afb517b） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：競賽的指令稿只在測試驗證，沒有在任何主機實際執行過；通用重排只是複製原本的綁定，不是把舊投影搬到新動作的 migration 工具。"
++       "text": "scripts/requeue_projection_intents.py:45 呼叫 requeue_rejected_projection_intents（:37 只收單一 --trade-id、:44 沒有佇列檔就停）。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版）；/opt 的 scripts/requeue_projection_intents.py（blob afb517b）的 blob 與 70630a1 同檔相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：競賽的指令稿只在測試驗證，沒有在任何主機實際執行過；通用重排只是複製原本的綁定，不是把舊投影搬到新動作的 migration 工具。"
+       }
+      ]
+     }
+@@ -2700,7 +2700,7 @@
+    "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-google.spot_fill_row",
+    "complete": true,
+    "dots": {
+@@ -2753,7 +2753,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證）：operations 0409a9f 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/btc_competition/google_ledger_provenance.py（blob f339f78） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：部署後競賽還沒有新的成交，第一次實際用 append_fill_v2 送出要等下一次每日調整（2026-10-09 台北 08:10）有成交；接收端的收單只用非機密探測驗證過（回簽章檢查，不是寫入）。"
++       "text": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：部署後競賽還沒有新的成交，第一次實際用 append_fill_v2 送出要等下一次每日調整（2026-10-09 台北 08:10）有成交；接收端的收單只用非機密探測驗證過（回簽章檢查，不是寫入）。"
+       }
+      ]
+     }
+@@ -4490,7 +4490,7 @@
+    "title": "R3｜策略出錯或安全暫停（維運通知運行狀態軸）"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "rule-FLEET.OPS_UNIT_FAILED",
+    "complete": false,
+    "dots": {
+@@ -4542,9 +4542,9 @@
+      "lines": [
+       {
+        "aspect": "行為",
+-       "phase": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
++       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+        "state": "pending",
+-       "text": "還沒決定要盯哪些背景服務（見「維運通知盯背景服務有沒有掛掉」）。"
++       "text": "現況：維運通知目前只盯加密的資金費同步（my-crypto-bot-funding-sync.service 與 .timer，2026-10-06 起）；主程式、對帳抓取、快照、報表等背景服務沒盯，掛掉時靠運行狀態（策略停止回報）與對帳間接發現。使用者 2026-10-10 決定照現狀，換 Binance（x3）接上共用做法時一併補齊要盯的清單。（見「維運通知盯背景服務有沒有掛掉」）"
+       },
+       {
+        "aspect": "寫進事件日誌",
+@@ -5137,9 +5137,9 @@
+     "btc-competition": "none",
+     "momentum": "none",
+     "mycrypto": "none",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
+    "kind": "rule",
+    "rows": [
+@@ -5170,11 +5170,11 @@
+    "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
+    "kind": "rule",
+    "rows": [
+@@ -5209,7 +5209,7 @@
+     "mycrypto": "pending",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
+    "kind": "rule",
+    "rows": [
+@@ -5239,7 +5239,7 @@
+   "7e": 4,
+   "8-btc-competition": 8,
+   "8-momentum": 4,
+-  "8-mycrypto": 20,
++  "8-mycrypto": 18,
+   "8-seykota": 19,
+   "binance-funding-sync": 0,
+   "error-ids": 4,
+@@ -5258,7 +5258,7 @@
+   "v2-W3": 0,
+   "v2-W4": 0,
+   "v2-W6": 0,
+-  "x3-crypto-binance": 6
++  "x3-crypto-binance": 8
+  },
+  "phase_order": [
+   "v2-W2",
+@@ -5324,34 +5324,46 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "rule-SEY.FUNDING_SHEET_WRITE_FAILED",
+-   "note": "f-26a 趨勢：2026-10-09 台北上 A1（operations 960792e）、手動一輪資金費同步寫入成功，改已做；sources 換版、引用行號逐筆比對。",
++   "anchor": "cap-latch.restart_only_clear",
++   "note": "f-27：理由裡引用的 safe_halt_resume.py 行號從 :103 改成 :134（原本指到不相干的 if；f-18 的新檢查回測發現，不是狀態變動）。",
+    "project": "趨勢策略",
+-   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
++   "title": "「改好設定重啟」就能解除的安全暫停真的會被清掉"
+   },
+   {
+-   "anchor": "rule-SEY.FUNDING_SHEET_WRITE_FAILED",
+-   "note": "f-26a 趨勢事件：同上改已做（事件到手機最後一段沒實機跑過，已寫進格內限制）。",
++   "anchor": "cap-reconcile.funding_fee_sync",
++   "note": "f-27：sources 換到 A1 現行版 ac378ed，A1 執行環境逐檔雜湊重查（四個檔案 blob 都沒變）。",
++   "project": "動能策略",
++   "title": "資金費同步"
++  },
++  {
++   "anchor": "cap-reconcile.funding_fee_sync",
++   "note": "f-27：sources 換到 A1 現行版 489bbcd，A1 執行環境逐檔雜湊重查（三個檔案 blob 都沒變）。",
+    "project": "趨勢策略",
+-   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
++   "title": "資金費同步"
+   },
+   {
+-   "anchor": "rule-MOM.FUNDING_SHEET_WRITE_FAILED",
+-   "note": "f-26a 動能：2026-10-09 台北上 A1（operations 490e241）、手動一輪寫入成功，改已做。",
+-   "project": "動能策略",
+-   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
++   "anchor": "cap-projection.requeue_parked",
++   "note": "f-27：sources 換到 70630a1；A1 共用庫已是 0.29.1，說明與模組雜湊重查（ledger_integrity 變成 d11ef39）。",
++   "project": "競賽策略",
++   "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
+   },
+   {
+-   "anchor": "rule-MOM.FUNDING_SHEET_WRITE_FAILED",
+-   "note": "f-26a 動能事件：同上改已做（限制同趨勢）。",
+-   "project": "動能策略",
+-   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
++   "anchor": "cap-google.spot_fill_row",
++   "note": "f-27：google_ledger_provenance.py 因 f-26b 改了分頁名稱常數（blob d0a5bb2），引用三處文字不變；共用庫 0.29.1 說明重查。",
++   "project": "競賽策略",
++   "title": "現貨成交用專屬的寫入動作（append_fill_v2），不再假裝成永遠沒平倉的開倉列"
+   },
+   {
+-   "anchor": "rule-MYC.FUNDING_SHEET_WRITE_FAILED",
+-   "note": "f-26a 加密：2026-10-09 台北上 A1（operations aba9569）、手動一輪寫入成功並加進維運通知監控清單，改已做；加密的事件格仍未做（等換 Binance x3）。",
++   "anchor": "cap-ops_notify.units_axis",
++   "note": "f-27：加密「盯背景服務」不再寫「還沒決定」：照現狀只盯資金費同步（使用者 2026-10-10 選 A），換 Binance（x3）時補齊；階段改 x3-crypto-binance。仍是未做。",
+    "project": "加密策略",
+-   "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
++   "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
++  },
++  {
++   "anchor": "rule-FLEET.OPS_UNIT_FAILED",
++   "note": "f-27：同上，加密只盯資金費同步，換 Binance（x3）時補齊；仍是未做。",
++   "project": "加密策略",
++   "title": "R2｜背景服務掛掉（維運通知服務單元軸）"
+   }
+  ],
+  "totals": {
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index a5a5084..bba32ac 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1,7 +1,7 @@
+ {
+   "registry_version": "fleet-rollout-registry/v1",
+   "catalog_version": "fleet-error-catalog/v2",
+-  "updated_at": "2026-10-09",
++  "updated_at": "2026-10-10",
+   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
+   "projects": {
+     "momentum": "動能策略",
+@@ -38,22 +38,22 @@
+     "momentum": {
+       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
+       "branch": "operations",
+-      "commit": "490e2414599e2feda1addeb1ac089fab4effd23b"
++      "commit": "ac378ed0fa96817d1fe4e767e40fc1ae9b209477"
+     },
+     "seykota": {
+       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
+       "branch": "operations",
+-      "commit": "960792e76252534d31c6d187788c0cb115ef7a08"
++      "commit": "489bbcdd253d2acb8cedc056ad8357f4b5717146"
+     },
+     "mycrypto": {
+       "repo": "AI-for-column/my-crypto-bot",
+       "branch": "operations",
+-      "commit": "aba9569402e4bcb63df74a22f4c8995b0d02bddf"
++      "commit": "4d136313faa66c69c546587144eec134c4873489"
+     },
+     "btc-competition": {
+       "repo": "AI-for-column/btc-bull-market-competition",
+       "branch": "operations",
+-      "commit": "0409a9f6704891f4502ad3c221ffed39701c1267"
++      "commit": "70630a11f84dd28425511e41fe80fcc61167c1f2"
+     }
+   },
+   "capabilities": [
+@@ -115,7 +115,7 @@
+         "seykota": {
+           "state": "pending",
+           "phase": "8-seykota",
+-          "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:103），目前只能手改 state 檔。　2026-10-01：已在開發主幹的 f-12 趨勢 PR 實作（守衛通過後自動清除並記 safe_halt_cleared），還沒上正式機，上線後改已做。"
++          "reason": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:134），目前只能手改 state 檔。　2026-10-01：已在開發主幹的 f-12 趨勢 PR 實作（守衛通過後自動清除並記 safe_halt_cleared），還沒上正式機，上線後改已做。"
+         },
+         "mycrypto": {
+           "state": "n/a",
+@@ -408,8 +408,8 @@
+         },
+         "mycrypto": {
+           "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "還沒決定要盯哪些背景服務。"
++          "phase": "x3-crypto-binance",
++          "reason": "現況：維運通知目前只盯加密的資金費同步（my-crypto-bot-funding-sync.service 與 .timer，2026-10-06 起）；主程式、對帳抓取、快照、報表等背景服務沒盯，掛掉時靠運行狀態（策略停止回報）與對帳間接發現。使用者 2026-10-10 決定照現狀，換 Binance（x3）接上共用做法時一併補齊要盯的清單。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -424,11 +424,11 @@
+       "status": {
+         "momentum": {
+           "state": "done",
+-          "evidence": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:598（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證）：operations 490e241（資金費同步 2026-10-06 台北 17:15 隨 4780bd9 部署，2026-10-09 台北 f-26a 換版）；/opt 的 scripts/sync_funding_fees.py（a6fa37f）、src/binance_funding_sync.py（ab1d5a0）、service（08446a1）、timer（38496fb）的 blob 與 490e241 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
++          "evidence": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:598（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations ac378ed（資金費同步 2026-10-06 台北 17:15 隨 4780bd9 部署，2026-10-09 台北 f-26a、f-26b 換版）；/opt 的 scripts/sync_funding_fees.py（a6fa37f）、src/binance_funding_sync.py（ab1d5a0）、service（08446a1）、timer（38496fb）的 blob 與 ac378ed 同檔相同（A1 hash-object 與 git rev-parse 逐檔比對，四個檔案 blob 都沒變）；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
+         },
+         "seykota": {
+           "state": "done",
+-          "evidence": "src/seykota_bot/funding_sync.py:462（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :470（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證）：operations 960792e（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，2026-10-09 台北 f-26a 換版）；/opt 的 src/seykota_bot/funding_sync.py（4ac684c）、service（e274d7c）、timer（f706bc0）的 blob 與 960792e 同檔相同；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
++          "evidence": "src/seykota_bot/funding_sync.py:462（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :470（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 489bbcd（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，2026-10-09 台北 f-26a、f-26b 換版）；/opt 的 src/seykota_bot/funding_sync.py（4ac684c）、service（e274d7c）、timer（f706bc0）的 blob 與 489bbcd 同檔相同（A1 hash-object 與 git rev-parse 逐檔比對，三個檔案 blob 都沒變）；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
+         },
+         "mycrypto": {
+           "state": "done",
+@@ -700,7 +700,7 @@
+         },
+         "btc-competition": {
+           "state": "n/a",
+-          "reason": "競賽是現貨，只送成交（append_fill_v2），沒有帳本更正（trade_correction）這種投影，所以不會有卡在平倉後面的更正；0409a9f 的 src 內沒有任何 correct_close 或 trade_correction 的引用（git grep 查證）。"
++          "reason": "競賽是現貨，只送成交（append_fill_v2），沒有帳本更正（trade_correction）這種投影，所以不會有卡在平倉後面的更正；70630a1 的 src 內沒有任何 correct_close 或 trade_correction 的引用（2026-10-10 git grep 查證）。"
+         }
+       }
+     },
+@@ -724,7 +724,7 @@
+         },
+         "btc-competition": {
+           "state": "done",
+-          "evidence": "scripts/requeue_projection_intents.py:45 呼叫 requeue_rejected_projection_intents（:37 只收單一 --trade-id、:44 沒有佇列檔就停）。A1 正式機（新）執行環境（唯讀查證）：operations 0409a9f 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 scripts/requeue_projection_intents.py（blob afb517b） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：競賽的指令稿只在測試驗證，沒有在任何主機實際執行過；通用重排只是複製原本的綁定，不是把舊投影搬到新動作的 migration 工具。"
++          "evidence": "scripts/requeue_projection_intents.py:45 呼叫 requeue_rejected_projection_intents（:37 只收單一 --trade-id、:44 沒有佇列檔就停）。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版）；/opt 的 scripts/requeue_projection_intents.py（blob afb517b）的 blob 與 70630a1 同檔相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：競賽的指令稿只在測試驗證，沒有在任何主機實際執行過；通用重排只是複製原本的綁定，不是把舊投影搬到新動作的 migration 工具。"
+         }
+       }
+     },
+@@ -771,7 +771,7 @@
+         },
+         "btc-competition": {
+           "state": "done",
+-          "evidence": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證）：operations 0409a9f 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/btc_competition/google_ledger_provenance.py（blob f339f78） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：部署後競賽還沒有新的成交，第一次實際用 append_fill_v2 送出要等下一次每日調整（2026-10-09 台北 08:10）有成交；接收端的收單只用非機密探測驗證過（回簽章檢查，不是寫入）。"
++          "evidence": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：部署後競賽還沒有新的成交，第一次實際用 append_fill_v2 送出要等下一次每日調整（2026-10-09 台北 08:10）有成交；接收端的收單只用非機密探測驗證過（回簽章檢查，不是寫入）。"
+         }
+       }
+     }
+@@ -1574,8 +1574,8 @@
+         },
+         "mycrypto": {
+           "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "還沒決定要盯哪些背景服務（見「維運通知盯背景服務有沒有掛掉」）。"
++          "phase": "x3-crypto-binance",
++          "reason": "現況：維運通知目前只盯加密的資金費同步（my-crypto-bot-funding-sync.service 與 .timer，2026-10-06 起）；主程式、對帳抓取、快照、報表等背景服務沒盯，掛掉時靠運行狀態（策略停止回報）與對帳間接發現。使用者 2026-10-10 決定照現狀，換 Binance（x3）接上共用做法時一併補齊要盯的清單。（見「維運通知盯背景服務有沒有掛掉」）"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -1915,44 +1915,54 @@
+   ],
+   "recent_changes": [
+     {
+-      "kind": "rule",
+-      "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
++      "kind": "cap",
++      "id": "latch.restart_only_clear",
+       "project": "seykota",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "f-26a 趨勢：2026-10-09 台北上 A1（operations 960792e）、手動一輪資金費同步寫入成功，改已做；sources 換版、引用行號逐筆比對。"
++      "type": "updated",
++      "note": "f-27：理由裡引用的 safe_halt_resume.py 行號從 :103 改成 :134（原本指到不相干的 if；f-18 的新檢查回測發現，不是狀態變動）。"
+     },
+     {
+-      "kind": "rule",
+-      "id": "SEY.FUNDING_SHEET_WRITE_FAILED",
++      "kind": "cap",
++      "id": "reconcile.funding_fee_sync",
++      "project": "momentum",
++      "type": "updated",
++      "note": "f-27：sources 換到 A1 現行版 ac378ed，A1 執行環境逐檔雜湊重查（四個檔案 blob 都沒變）。"
++    },
++    {
++      "kind": "cap",
++      "id": "reconcile.funding_fee_sync",
+       "project": "seykota",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "f-26a 趨勢事件：同上改已做（事件到手機最後一段沒實機跑過，已寫進格內限制）。"
++      "type": "updated",
++      "note": "f-27：sources 換到 A1 現行版 489bbcd，A1 執行環境逐檔雜湊重查（三個檔案 blob 都沒變）。"
+     },
+     {
+-      "kind": "rule",
+-      "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
+-      "project": "momentum",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "f-26a 動能：2026-10-09 台北上 A1（operations 490e241）、手動一輪寫入成功，改已做。"
++      "kind": "cap",
++      "id": "projection.requeue_parked",
++      "project": "btc-competition",
++      "type": "updated",
++      "note": "f-27：sources 換到 70630a1；A1 共用庫已是 0.29.1，說明與模組雜湊重查（ledger_integrity 變成 d11ef39）。"
+     },
+     {
+-      "kind": "rule",
+-      "id": "MOM.FUNDING_SHEET_WRITE_FAILED",
+-      "project": "momentum",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "f-26a 動能事件：同上改已做（限制同趨勢）。"
++      "kind": "cap",
++      "id": "google.spot_fill_row",
++      "project": "btc-competition",
++      "type": "updated",
++      "note": "f-27：google_ledger_provenance.py 因 f-26b 改了分頁名稱常數（blob d0a5bb2），引用三處文字不變；共用庫 0.29.1 說明重查。"
++    },
++    {
++      "kind": "cap",
++      "id": "ops_notify.units_axis",
++      "project": "mycrypto",
++      "type": "updated",
++      "note": "f-27：加密「盯背景服務」不再寫「還沒決定」：照現狀只盯資金費同步（使用者 2026-10-10 選 A），換 Binance（x3）時補齊；階段改 x3-crypto-binance。仍是未做。"
+     },
+     {
+       "kind": "rule",
+-      "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
++      "id": "FLEET.OPS_UNIT_FAILED",
+       "project": "mycrypto",
+       "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "f-26a 加密：2026-10-09 台北上 A1（operations aba9569）、手動一輪寫入成功並加進維運通知監控清單，改已做；加密的事件格仍未做（等換 Binance x3）。"
++      "type": "updated",
++      "note": "f-27：同上，加密只盯資金費同步，換 Binance（x3）時補齊；仍是未做。"
+     }
+   ]
+ }
