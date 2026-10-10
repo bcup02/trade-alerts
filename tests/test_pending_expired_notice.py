@@ -29,9 +29,9 @@ def _announce(log, status, **kw):
 def test_announced_once_per_episode(tmp_path):
     log = tmp_path / "log.jsonl"
     first = _announce(log, _status())
-    assert first["code"] == CODE_PENDING_EXPIRED and first["evidence"] == {"episode": "2026-10-02T08:10:00Z"}
+    assert first["code"] == CODE_PENDING_EXPIRED and first["evidence"] == {"episode": "since:2026-10-02T08:10:00Z"}
     assert _announce(log, _status()) is None
-    assert _announce(log, _status({**BLOCK, "since": "2026-10-09T08:10:00Z"}))["evidence"]["episode"].startswith("2026-10-09")
+    assert _announce(log, _status({**BLOCK, "since": "2026-10-09T08:10:00Z"}))["evidence"]["episode"].startswith("since:2026-10-09")
     assert len(read_fleet_events(log)) == 2
 
 
@@ -44,6 +44,12 @@ def test_other_projects_events_do_not_suppress_it(tmp_path):
 @pytest.mark.parametrize("status", [
     None, [], "x", {}, _status(value="DIVERGED"), _status(value="PENDING"), {"value": "RECONCILED", "evidence": []},
     {"value": "RECONCILED", "evidence": {"pending_expired": []}},
+    {"value": "RECONCILED", "evidence": {"pending_expired": {}}},                                   # review #164
+    {"value": "RECONCILED", "evidence": {"pending_expired": {"reason": "waited_over_limit"}}},     # no limit
+    {"value": "RECONCILED", "evidence": {"pending_expired": {"reason": "bogus", "max_hours": 24.0}}},
+    {"value": "RECONCILED", "evidence": {"pending_expired": {"reason": "time_unreadable", "max_hours": 0}}},
+    {"value": "RECONCILED", "evidence": {"pending_expired": {"reason": "time_unreadable", "max_hours": float("nan")}}},
+    {"value": "RECONCILED", "evidence": {"pending_expired": {"reason": "time_unreadable", "max_hours": True}}},
     {"value": "RECONCILED", "evidence": {"pending_expired": {"markers": [{"trade_id": "T1"}]}}},   # momentum's shape
 ])
 def test_nothing_to_announce(tmp_path, status):
@@ -78,3 +84,32 @@ def test_an_unreadable_log_raises_for_the_caller_to_isolate(tmp_path):
 def test_the_marker_planner_ignores_the_batch_shape():
     assert expired_markers(_status()) == []
     assert plan_pending_expired_notice(_status(), [], project="btc-competition") is None
+
+
+UNREADABLE = {"reason": "time_unreadable", "since": None, "age_hours": None, "max_hours": 24.0,
+              "rebalance_batch_without_snapshot": True, "spot_fills_after_last_snapshot": 1}
+
+
+def test_two_unreadable_periods_with_different_rows_are_announced_separately(tmp_path):
+    """Review #164 BLOCK-01: same reason and same counts, but different ledger rows."""
+    log = tmp_path / "log.jsonl"
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["a1", "f1"]})) is not None
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["f1", "a1"]})) is None      # same rows, any order
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["b2", "g2"]})) is not None  # a later, different period
+    assert len(read_fleet_events(log)) == 2
+
+
+def test_an_unidentifiable_period_is_announced_at_most_once_per_utc_day(tmp_path):
+    from datetime import datetime, timezone
+    log = tmp_path / "log.jsonl"
+    day = lambda d, h: datetime(2026, 10, d, h, 0, tzinfo=timezone.utc)  # noqa: E731
+    assert _announce(log, _status(UNREADABLE), now=day(10, 1)) is not None
+    assert _announce(log, _status(UNREADABLE), now=day(10, 23)) is None       # same UTC day: quiet
+    assert _announce(log, _status(UNREADABLE), now=day(15, 1)) is not None    # a later day is never swallowed
+    assert len(read_fleet_events(log)) == 2
+
+
+def test_junk_episode_ids_fall_back_instead_of_crashing(tmp_path):
+    for n, bad in enumerate(("x", 5, [None, {}, ""], [])):
+        event = _announce(tmp_path / f"log{n}.jsonl", _status({**UNREADABLE, "episode_ids": bad}))
+        assert event["evidence"]["episode"].startswith("unidentified:time_unreadable:")

@@ -101,14 +101,36 @@ def plan_pending_expired_notice(
 # --------------------------------------------------------------------------- #
 # btc-competition: one unsettled rebalance batch / fills after the last snapshot
 # --------------------------------------------------------------------------- #
-def _batch_episode(block: Mapping[str, Any]) -> str:
-    """Identity of one stuck episode: when the oldest waiting thing began.  Without a readable time the
-    reason and what was waiting stand in, so a later, different stuck episode is still announced."""
+_MAX_EPISODE_IDS = 50
+
+
+def _valid_batch_block(block: Any) -> bool:
+    """A usable competition ``pending_expired`` block: a known reason and a finite, positive limit.
+    An empty or half-filled dict is not evidence of anything and must not become an R3 event."""
+    if not isinstance(block, Mapping) or "markers" in block or block.get("reason") not in _REASON_TEXT:
+        return False
+    limit = block.get("max_hours")
+    return isinstance(limit, (int, float)) and not isinstance(limit, bool) and 0 < limit < float("inf")
+
+
+def _batch_episode(block: Mapping[str, Any], moment: datetime) -> str:
+    """Identity of one stuck period, strongest first:
+
+    1. ``since`` -- when the oldest waiting thing began (readable times only);
+    2. ``episode_ids`` -- the ledger event ids of the waiting rows (the competition supplies them when a
+       time cannot be read): a different stuck period has different rows;
+    3. neither: nothing identifies the period, so it is announced at most once per UTC day while it lasts.
+       Never silently once-for-ever: a later, different period must not be swallowed by an old notice.
+    """
     since = block.get("since")
     if isinstance(since, str) and since:
-        return since
-    return (f"{block.get('reason')}:batch={block.get('rebalance_batch_without_snapshot')}"
-            f":fills={block.get('spot_fills_after_last_snapshot')}")
+        return f"since:{since}"
+    ids = block.get("episode_ids")
+    if isinstance(ids, list):
+        clean = sorted({str(i) for i in ids if isinstance(i, (str, int)) and str(i)})[:_MAX_EPISODE_IDS]
+        if clean:
+            return "ids:" + "|".join(clean)
+    return f"unidentified:{block.get('reason')}:{moment.strftime('%Y-%m-%d')}"
 
 
 def announce_batch_expired(
@@ -132,10 +154,10 @@ def announce_batch_expired(
         return None
     evidence = ledger_status.get("evidence")
     block = evidence.get("pending_expired") if isinstance(evidence, Mapping) else None
-    if not isinstance(block, Mapping) or "markers" in block:
+    if not _valid_batch_block(block):
         return None
-    episode = _batch_episode(block)
     moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    episode = _batch_episode(block, moment)
     with exclusive_log_lock(fleet_event_log):
         for event in read_fleet_events(fleet_event_log):
             ev = event.get("evidence")
