@@ -39,7 +39,7 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "ac378ed0fa96817d1fe4e767e40fc1ae9b209477"
+      "commit": "53e04ced2b0c5f823cbcb71293fa94cbf76f9615"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
@@ -54,7 +54,7 @@
     "btc-competition": {
       "repo": "AI-for-column/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "0025f3c658e4337cdc4f711815de93c3894b4a0d"
+      "commit": "7d499bbc5827bd14da434fc598993aab092f524c"
     }
   },
   "capabilities": [
@@ -314,7 +314,7 @@
         "btc-competition": {
           "state": "pending",
           "phase": "8-btc-competition",
-          "reason": "匯出檔已經有了：src/btc_competition/unrecorded_fill.py:215 每輪（含跳過）重寫 audit/ops_export.json（g1-5，2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤），目前只帶帳本少記成交的通知。策略自己的安全暫停（下單結果不明、帳本持倉出現負數、連續 3 天零成交）還沒寫進事件日誌，所以還不會出現在匯出檔；第 8 關接上後改已做。"
+          "reason": "匯出檔已經有了：src/btc_competition/unrecorded_fill.py:219 每輪（含跳過）重寫 audit/ops_export.json（g1-5，2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤），目前只帶帳本少記成交的通知。策略自己的安全暫停（下單結果不明、帳本持倉出現負數、連續 3 天零成交）還沒寫進事件日誌，所以還不會出現在匯出檔；第 8 關接上後改已做。"
         }
       }
     },
@@ -338,7 +338,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:215 寫出的匯出檔由維運通知轉送：正式機 /etc/ops-notify/ops-notify.env 於 2026-09-26 設 OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on，首輪匯出軸 OK、零誤發；開發機 2026-09-25 同樣開啟，DEMO 實測的 R3 通知已送達 Telegram。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:219 寫出的匯出檔由維運通知轉送：正式機 /etc/ops-notify/ops-notify.env 於 2026-09-26 設 OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on，首輪匯出軸 OK、零誤發；開發機 2026-09-25 同樣開啟，DEMO 實測的 R3 通知已送達 Telegram。"
         }
       }
     },
@@ -522,7 +522,7 @@
         },
         "momentum": {
           "state": "done",
-          "evidence": "src/reconcile_compare.py:66 帳本對交易所走共用 exchange_ledger_compare，更正涵蓋的單號算已記、部位不變；src/google_ledger_provenance.py:99 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正，src/google_ledger_provenance.py:224 依佇列的 ledger digest 選擇；src/google_projection_worker.py:75 送出時帶入該 digest；src/portfolio_snapshot_adapter.py:184 LINE 查詢快照套用 apply_trade_corrections；scripts/append_trade_correction.py:151 兩段式人工更正工具（預覽→確認碼→寫入）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+          "evidence": "src/reconcile_compare.py:68 帳本對交易所走共用 exchange_ledger_compare，更正涵蓋的單號算已記、部位不變；src/google_ledger_provenance.py:99 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正，src/google_ledger_provenance.py:224 依佇列的 ledger digest 選擇；src/google_projection_worker.py:75 送出時帶入該 digest；src/portfolio_snapshot_adapter.py:184 LINE 查詢快照套用 apply_trade_corrections；scripts/append_trade_correction.py:151 兩段式人工更正工具（預覽→確認碼→寫入）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
         },
         "mycrypto": {
           "state": "pending",
@@ -555,7 +555,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:254 新計時器 btc-competition-unrecorded-fill 每 15 分鐘跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關 BTC_COMPETITION_REPAIR_PAUSED 一併擋）：只有交易所回報的 clientOrderId 與帳本已記訂單相同才把那張單補記成一筆現貨成交；src/btc_competition/trade_ledger.py:334 已被批次持倉快照包含的補記不再重算。PR #37（g1-5），2026-09-25 開發機 DEMO 故意重複送單實測整條通過；2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:285 新計時器 btc-competition-unrecorded-fill 每 15 分鐘跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關 BTC_COMPETITION_REPAIR_PAUSED 一併擋）：只有交易所回報的 clientOrderId 與帳本已記訂單相同才把那張單補記成一筆現貨成交；src/btc_competition/trade_ledger.py:334 已被批次持倉快照包含的補記不再重算。PR #37（g1-5），2026-09-25 開發機 DEMO 故意重複送單實測整條通過；2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
         }
       }
     },
@@ -664,7 +664,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "src/reconcile_compare.py:55 _OPEN_EVENT_TYPES = frozenset({\"trade_open\", \"position_recovered\"})（接手倉位也算開倉，#118）、src/google_reconcile.py:79 local_trades 同樣的 open_event_types；共用庫 v0.27.3（pyproject.toml:57，含 MEXC 方向代碼與同一次開倉兩列只算一次）。2026-10-05 台北 18:57（JST 19:57，UTC 10:57）部署 A1 正式機（新）（operations 97f5ebb，bot 於該時間重啟）：/opt 的 src/reconcile_compare.py、src/google_reconcile.py、pyproject.toml 與該 commit 的檔案雜湊相同，venv trade-alerts 0.27.3 的對帳檔與 v0.27.3 同檔（blob 83a90df），部署後手動一輪與 JST 20:00（台北 19:00）排程一輪的對帳與 Google 對帳都 RECONCILED。限制：A1 上動能沒有接手倉位，新路徑只在開發機與測試驗證過；動能預設紙上判斷會把沒有訂單編號的原生停損平倉當紙上，那一筆成交仍會留在清單（保守方向）。"
+          "evidence": "src/reconcile_compare.py:56 _OPEN_EVENT_TYPES = frozenset({\"trade_open\", \"position_recovered\"})（接手倉位也算開倉，#118）、src/google_reconcile.py:79 local_trades 同樣的 open_event_types；共用庫 v0.27.3（pyproject.toml:57，含 MEXC 方向代碼與同一次開倉兩列只算一次）。2026-10-05 台北 18:57（JST 19:57，UTC 10:57）部署 A1 正式機（新）（operations 97f5ebb，bot 於該時間重啟）：/opt 的 src/reconcile_compare.py、src/google_reconcile.py、pyproject.toml 與該 commit 的檔案雜湊相同，venv trade-alerts 0.27.3 的對帳檔與 v0.27.3 同檔（blob 83a90df），部署後手動一輪與 JST 20:00（台北 19:00）排程一輪的對帳與 Google 對帳都 RECONCILED。限制：A1 上動能沒有接手倉位，新路徑只在開發機與測試驗證過；動能預設紙上判斷會把沒有訂單編號的原生停損平倉當紙上，那一筆成交仍會留在清單（保守方向）。"
         },
         "seykota": {
           "state": "done",
@@ -782,9 +782,8 @@
       "description": "對帳回「收斂中」（PENDING）時程式不比對餘額，所以一個一直不會收尾的批次或快照後的成交，會讓這條軸 PENDING 很久、餘額從沒被比過（開發機競賽 2026-10-02 起 PENDING 8 天）。現在未收尾的項目最多等 24 小時（可用環境變數調整）；超過就比對餘額：不同判對不上（發 ERR-043）、相同判一致，證據寫明是真的等超時，還是時間讀不出或不可信所以沒有等。2026-10-10 f-28。",
       "status": {
         "momentum": {
-          "state": "pending",
-          "phase": "f-28b",
-          "reason": "動能走共用庫的對帳：「帳本事件比交易所快照新」那條路徑下一輪抓快照就自己恢復，不用改；另一條「位置對帳標記（position_reconciliation_pending）沒被結清就一直回 PENDING」的路徑原本沒有時間上限。f-30 已做完並合併：共用庫 v0.30.0（bcup02/trade-alerts#162，審閱兩輪 PASS）加上同樣的 24 小時上限（標記時間讀不出或不可信也視為逾時）與逾時通知一次（ERR-060），動能改釘並讓結清工具認逾時標記（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）。2026-10-11 台北 00:10 已部署開發機（testing 53e04ce），A1 正式機（新）要等使用者同意部署，部署後改已做。"
+          "state": "done",
+          "evidence": "src/reconcile_compare.py:85 把環境變數 RECONCILE_PENDING_MAX_SECONDS（預設共用庫 DEFAULT_PENDING_MAX_SECONDS＝24 小時）傳給共用比對（:72）；超過上限的位置對帳標記（時間讀不出，或比現在晚超過 5 分鐘，也視為逾時）不再讓狀態停在 PENDING：部位與成交對不上仍判對不上，對得上則 RECONCILED，並在證據 pending_expired 列出被放棄等待的標記（共用庫 v0.30.0 ledger_reconcile，審閱 bcup02/trade-alerts#162）。src/reconcile_apply.py:105 結清工具接受「RECONCILED 且帶 pending_expired」（逾時後狀態已不是 PENDING），:127 起只結清該狀態點名的標記，狀態寫出之後才出現的新標記一律拒絕（審閱 BLOCK-135-01）。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 53e04ce 於 2026-10-11 台北 00:24（A1 日誌 JST 01:24）部署（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）；/opt 的 src/reconcile_compare.py（blob 957a848）、src/reconcile_apply.py（aa7ba79）、scripts/repair_bot.py（eb6be00）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.0，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（44daf37）、錯誤清單（9836736）都與 tag v0.30.0 同檔。部署前後啟用與運行中的單元清單逐項無差異（第一次比對只差控制消費者計時器正好在執行，20 秒後再比對完全相同）、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）、動能空手（交易所持倉 0）；部署後手動一輪：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired；修復輪 candidates 空、pending_expired 為空。限制：A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
         },
         "seykota": {
           "state": "n/a",
@@ -796,7 +795,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/reconcile_compare.py:65 _PENDING_MAX_SECONDS（24 小時）；:207 回 PENDING 只在「剛到的交易所成交還沒進帳本」或「未收尾的批次／快照後成交還沒過期」；:179 起算與過期判定（時間讀不出，或比現在晚超過 :258 _CLOCK_SKEW_SECONDS 的 300 秒，視為已過期、不再等）；:294 環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS；過期後比對餘額，證據帶 pending_expired（:188 reason：waited_over_limit／time_unreadable／time_in_future）。A1 正式機（新）執行環境（唯讀查證）：operations 0025f3c 於 2026-10-10 台北 21:10（A1 日誌 JST 22:10）部署（AI-for-column/btc-bull-market-competition#53，審閱三輪 PASS）；/opt 的 src/btc_competition/reconcile_compare.py（blob 1b4ff00）的 blob 與該 commit 同檔相同；部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED。限制：A1 的競賽目前沒有未收尾的項目，超過 24 小時的行為在 A1 沒有實際被觸發過；只在測試與開發機實測（開發機 8 天的 PENDING 在 2026-10-10 台北 20:35 部署後恢復為 RECONCILED，證據記的是等了 197.6 小時）。"
+          "evidence": "src/btc_competition/reconcile_compare.py:65 _PENDING_MAX_SECONDS（24 小時）；:210 回 PENDING 只在「剛到的交易所成交還沒進帳本」或「未收尾的批次／快照後成交還沒過期」；:179 起算與過期判定（時間讀不出，或比現在晚超過 :266 _CLOCK_SKEW_SECONDS 的 300 秒，視為已過期、不再等）；:302 環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS；過期後比對餘額，證據帶 pending_expired（:188 reason：waited_over_limit／time_unreadable／time_in_future）。A1 正式機（新）執行環境（唯讀查證）：operations 0025f3c 於 2026-10-10 台北 21:10（A1 日誌 JST 22:10）部署（AI-for-column/btc-bull-market-competition#53，審閱三輪 PASS）；/opt 的 src/btc_competition/reconcile_compare.py（blob 1b4ff00）的 blob 與該 commit 同檔相同；部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED。限制：A1 的競賽目前沒有未收尾的項目，超過 24 小時的行為在 A1 沒有實際被觸發過；只在測試與開發機實測（開發機 8 天的 PENDING 在 2026-10-10 台北 20:35 部署後恢復為 RECONCILED，證據記的是等了 197.6 小時）。"
         }
       }
     }
@@ -1427,13 +1426,13 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:254 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:285 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
         }
       },
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:254 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:285 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:219 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
         }
       }
     },
@@ -1442,13 +1441,13 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:254 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:285 共用處理程式 run_unrecorded_fill_round；確定是自己重複送單才補記一筆現貨成交並立刻通知，其他一律不寫帳本、開請求並通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
         }
       },
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:254 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:215 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:285 共用處理程式直接寫事件日誌與請求佇列，同一輪刷新 audit/ops_export.json（:219 跳過時也刷新）交給維運通知。2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
         }
       }
     },
@@ -1644,7 +1643,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:215 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on）。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:219 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on）。"
         }
       },
       "emits_event": {
@@ -1941,16 +1940,14 @@
       "code": "MOM.LEDGER_PENDING_EXPIRED",
       "behaviour": {
         "momentum": {
-          "state": "pending",
-          "phase": "f-28b",
-          "reason": "2026-10-10 f-30 開發中：共用庫的位置對帳標記上限與逾時通知已實作，動能升級共用庫、設定上限並部署後才會發，上正式機後改已做。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:176 run_repair_round（共用庫 repair_runner）每輪讀 audit/ledger_status.json 的 evidence.pending_expired，對還沒通知過的逾時標記寫一筆事件日誌 LEDGER_PENDING_EXPIRED（R3，錯誤清單 ERR-060）；同一筆標記不重發（已通知名單從事件日誌讀回，讀與寫同一把鎖），只有狀態是 RECONCILED 才通知，讀寫失敗只記警告、下輪重試（共用庫 repair_runner 模組的 _check_pending_expired（錯誤清單 ERR-060 的來源是它發事件的那一行），審閱 bcup02/trade-alerts#162 兩輪）。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 53e04ce 於 2026-10-11 台北 00:24（A1 日誌 JST 01:24）部署（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）；/opt 的 src/reconcile_compare.py（blob 957a848）、src/reconcile_apply.py（aa7ba79）、scripts/repair_bot.py（eb6be00）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.0，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（44daf37）、錯誤清單（9836736）都與 tag v0.30.0 同檔。部署前後啟用與運行中的單元清單逐項無差異（第一次比對只差控制消費者計時器正好在執行，20 秒後再比對完全相同）、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）、動能空手（交易所持倉 0）；部署後手動一輪：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired；修復輪 candidates 空、pending_expired 為空。限制：A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
         }
       },
       "emits_event": {
         "momentum": {
-          "state": "pending",
-          "phase": "f-28b",
-          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+          "state": "done",
+          "evidence": "scripts/repair_bot.py:176 同一個修復輪寫事件日誌 audit/fleet_event_log.jsonl 後刷新匯出檔 audit/ops_export.json，ERR-060 通知（含結清步驟與給 AI 的追查指令）由維運通知轉送；動能的結清工具與步驟一致（src/reconcile_apply.py:105）。A1 的匯出檔寫入與維運通知轉送是既有路徑（修復輪 ops_export_written、維運通知手動一輪 notices=0）。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 53e04ce 於 2026-10-11 台北 00:24（A1 日誌 JST 01:24）部署（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）；/opt 的 src/reconcile_compare.py（blob 957a848）、src/reconcile_apply.py（aa7ba79）、scripts/repair_bot.py（eb6be00）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.0，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（44daf37）、錯誤清單（9836736）都與 tag v0.30.0 同檔。部署前後啟用與運行中的單元清單逐項無差異（第一次比對只差控制消費者計時器正好在執行，20 秒後再比對完全相同）、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）、動能空手（交易所持倉 0）；部署後手動一輪：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired；修復輪 candidates 空、pending_expired 為空。限制：A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
         }
       }
     },
@@ -1958,39 +1955,57 @@
       "code": "BTC.LEDGER_PENDING_EXPIRED",
       "behaviour": {
         "btc-competition": {
-          "state": "pending",
-          "phase": "f-28b",
-          "reason": "2026-10-10 f-30 開發中：競賽的對帳超過 24 小時改按比對判斷（f-28，已在 A1 正式機）；逾時後通知一次尚未部署，上正式機後改已做。"
+          "state": "done",
+          "evidence": "src/btc_competition/unrecorded_fill.py:234 announce_batch_expired（共用庫 v0.30.1 pending_expired_notice）在 :226 announce_pending_expired 內被呼叫，:244 起 run 每輪先通知（:246）再跑 _run_round（:247）；只在對帳為 RECONCILED 且證據帶 pending_expired 時，每一段卡住的期間寫一筆 LEDGER_PENDING_EXPIRED（R3，ERR-061），期間身分用開始等的時間 since，時間讀不出時用 src/btc_competition/reconcile_compare.py:197 的 episode_ids（等待中帳本列的 event_id）；寫入或讀取失敗只記警告、回傳 error，不中斷這一輪（審閱 bcup02/trade-alerts#164 兩輪、競賽 #55）。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 7d499bb 於 2026-10-11 台北約 00:22（A1 日誌 JST 約 01:22）部署（AI-for-column/btc-bull-market-competition#55，審閱 PASS）；/opt 的 src/btc_competition/unrecorded_fill.py（blob 7461592）、src/btc_competition/reconcile_compare.py（166d84a）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.1，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（eb9be02）、錯誤清單（ce83d1e）都與 tag v0.30.1 同檔。部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪 unrecorded-fill（ops_export_written 為 true）與對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired。限制：A1 的競賽目前沒有超過 24 小時未結算的批次，ERR-061 通知在 A1 沒有實際被觸發過，只在測試驗證（競賽 tests/test_unrecorded_fill_pending_expired.py、tests/test_reconcile_compare.py 的 f-30 測試）；開發機同樣沒有逾時案例。競賽沒有結清工具，通知的步驟是追查為什麼沒收尾。"
         }
       },
       "emits_event": {
         "btc-competition": {
-          "state": "pending",
-          "phase": "f-28b",
-          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由 unrecorded-fill 作業匯出，等升級共用庫並部署。"
+          "state": "done",
+          "evidence": "src/btc_competition/unrecorded_fill.py:246 通知先於 _run_round，所以該輪結尾 refresh_ops_export（:219）寫的匯出檔 audit/ops_export.json 已帶出 ERR-061 通知，由維運通知轉送；事件寫進 audit/fleet_event_log.jsonl。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 7d499bb 於 2026-10-11 台北約 00:22（A1 日誌 JST 約 01:22）部署（AI-for-column/btc-bull-market-competition#55，審閱 PASS）；/opt 的 src/btc_competition/unrecorded_fill.py（blob 7461592）、src/btc_competition/reconcile_compare.py（166d84a）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.1，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（eb9be02）、錯誤清單（ce83d1e）都與 tag v0.30.1 同檔。部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪 unrecorded-fill（ops_export_written 為 true）與對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired。限制：A1 的競賽目前沒有超過 24 小時未結算的批次，ERR-061 通知在 A1 沒有實際被觸發過，只在測試驗證（競賽 tests/test_unrecorded_fill_pending_expired.py、tests/test_reconcile_compare.py 的 f-30 測試）；開發機同樣沒有逾時案例。競賽沒有結清工具，通知的步驟是追查為什麼沒收尾。"
         }
       }
     }
   ],
   "recent_changes": [
     {
+      "kind": "cap",
+      "id": "reconcile.pending_age_cap",
+      "project": "momentum",
+      "type": "completed",
+      "note": "f-30 動能：2026-10-11 台北 00:24 上 A1（operations 53e04ce），位置對帳標記 24 小時上限與結清工具調整改已做；sources 換到 53e04ce。"
+    },
+    {
       "kind": "rule",
       "id": "MOM.LEDGER_PENDING_EXPIRED",
-      "type": "added",
-      "note": "f-30：動能的位置對帳標記超過 24 小時沒結清時，通知一次（ERR-060）並附結清步驟；未做，等動能 A1 部署。"
+      "project": "momentum",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "f-30 動能：逾時標記通知一次（ERR-060）隨動能上 A1（2026-10-11 台北 00:24），改已做。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.LEDGER_PENDING_EXPIRED",
+      "project": "momentum",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "f-30 動能：逾時標記通知一次（ERR-060）隨動能上 A1（2026-10-11 台北 00:24），改已做。"
     },
     {
       "kind": "rule",
       "id": "BTC.LEDGER_PENDING_EXPIRED",
-      "type": "added",
-      "note": "f-30：競賽的調倉批次或現貨成交超過 24 小時沒結算（對帳已改按餘額比對）且一致時，通知一次（ERR-061）；未做，等競賽 A1 部署。"
+      "project": "btc-competition",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "f-30 競賽：調倉批次逾時通知一次（ERR-061）隨競賽上 A1（2026-10-11 台北約 00:22），改已做；sources 換到 7d499bb。"
     },
     {
-      "kind": "cap",
-      "id": "reconcile.pending_age_cap",
-      "project": "momentum",
-      "type": "updated",
-      "note": "f-30：動能的標記上限與結清工具調整已合併並部署開發機；A1 正式機（新）未部署，仍是未做。"
+      "kind": "rule",
+      "id": "BTC.LEDGER_PENDING_EXPIRED",
+      "project": "btc-competition",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "f-30 競賽：調倉批次逾時通知一次（ERR-061）隨競賽上 A1（2026-10-11 台北約 00:22），改已做；sources 換到 7d499bb。"
     }
   ]
 }
