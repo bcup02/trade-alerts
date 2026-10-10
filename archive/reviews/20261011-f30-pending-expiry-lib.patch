@@ -1,0 +1,957 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index ed9c036..c62de85 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -988,3 +988,15 @@ trade-alerts：v0.29.1（Google 表逐筆分頁名稱允許中文；f-26b）
+ 版本驗證／服務驗證／部署時間：待策略改釘並部署後補記。
+ 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.30.0（對帳標記最多等 24 小時，逾時通知一次；f-30）
++變更摘要：1. ledger_reconcile.exchange_ledger_compare 新增 pending_max_seconds（預設 24 小時）：位置對帳標記（position_reconciliation_pending）超過上限、或時間讀不出來／比現在晚超過 5 分鐘，就不再讓對帳狀態停在「核對進行中」。部位與成交先比對（對不上仍是「對帳不一致」），所以標記是最後剩下的東西時兩邊已經對得上，狀態改為「一致」，並把這些標記列在 evidence.pending_expired（含 expired_reason、since、age_hours）。新增 split_expired_pending_markers。
++          2. 新增 pending_expired_notice.plan_pending_expired_notice：把 evidence.pending_expired 變成一筆事件日誌內容，同一筆標記只通知一次（已通知過的交易編號從事件日誌自己讀回，不另存狀態）。repair_runner 每輪呼叫，事件代號 LEDGER_PENDING_EXPIRED（動能 ERR-060，R3，附結清步驟與給 AI 的追查指令）。
++          3. 有跟 include_pending_markers=False 搭配的呼叫端（加密、趨勢自己的比對）不受影響；動能要升級共用庫才會有上限與通知。
++向後相容：舊呼叫端不傳新參數就套預設 24 小時；原本沒有時間的標記現在會被視為超時（以前會永遠等）。
++受影響消費專案：動能（改釘後才生效，並需把結清工具 reconcile_apply 改成也認「一致但有超時標記」）；其他策略不釘則無影響。
++部署入口：無（函式庫）。
++版本驗證／服務驗證／部署時間：待動能改釘並部署後補記。
++交易安全：未啟用真倉、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index b50f386..257a174 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -100,9 +100,9 @@
+   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>59 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    四支策略目前所有已知的「出問題」情況，共 <b>60 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>37 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>38 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -1781,6 +1781,39 @@
+    "tier": "R2",
+    "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
+    "what": "加密策略的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但這支策略那一列的累計資金費（G 欄）沒有更新。"
++  },
++  {
++   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼平倉標記一直沒結清：讀 audit/ledger_status.json 的 evidence.pending_expired（交易編號、symbol、event_time、expired_reason），對照 audit/trading_ledger.jsonl 裡這些 trade_id 的全部紀錄（trade_open、position_reconciliation_pending 與有沒有 trade_close），再用只讀的方式到交易所查這些商品的持倉與歷史成交；判斷是交易所真的沒有成交證據（可以用 src/reconcile_apply.py 結清）、還是有成交但帳本沒補（要走 fetch_verified_close_evidence 與 append_reconciled_close），並找出平倉時為什麼沒有拿到成交證據，提出治本修正與回歸測試。注意 src/reconcile_apply.py 預覽與結清都需要使用者先到交易所確認已平倉並自己下 --exchange-verified。",
++   "behaviour": {
++    "phase": "f-28b",
++    "reason": "2026-10-10 f-30 開發中：共用庫的位置對帳標記上限與逾時通知已實作，動能升級共用庫、設定上限並部署後才會發，上正式機後改已做。",
++    "state": "pending"
++   },
++   "bot": "momentum",
++   "bot_label": "動能策略",
++   "code": "MOM.LEDGER_PENDING_EXPIRED",
++   "direction": "確認交易所確實已平倉後，用結清工具結清標記，讓帳本有定論。交易所如果還有部位，不要結清，把追查指令貼給 Claude。",
++   "emits_event": {
++    "phase": "f-28b",
++    "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。",
++    "state": "pending"
++   },
++   "error_id": "ERR-060",
++   "notes": [
++    "行為未做 — 2026-10-10 f-30 開發中：共用庫的位置對帳標記上限與逾時通知已實作，動能升級共用庫、設定上限並部署後才會發，上正式機後改已做。（預定：f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1））",
++    "寫進事件日誌未做 — 同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。（預定：f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1））"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡列出的交易編號、商品與標記時間。",
++    "到交易所確認這些商品確實沒有持倉（結清工具不會替你查交易所）。",
++    "在 A1 正式機（新）以服務帳號進入 /opt/mexc-4h-momentum-trailing-stop，先預覽：sudo -u mexc-momentum .venv/bin/python src/reconcile_apply.py --ledger-status audit/ledger_status.json --exchange-state audit/exchange_state.json --ledger audit/trading_ledger.jsonl --state state/state.json（不寫入，印出確認碼與建議補列）。",
++    "確認預覽內容無誤後，再加上 --apply --confirm <確認碼> --exchange-verified 執行結清；這個聲明會寫進帳本。",
++    "交易所其實還有部位，或結清工具拒絕：不要硬做，把下方「給 AI 的追查指令」整段貼給 Claude。"
++   ],
++   "tier": "R3",
++   "title": "對帳標記超過 24 小時沒結清，系統已不再等待",
++   "what": "動能策略的帳本裡有「位置對帳標記」超過 24 小時沒結清（平倉時交易所查不到成交證據，帳本先留下標記等著補）。系統已不再等：交易所和帳本的部位與成交現在對得上，所以對帳狀態是「一致」。但標記還在，那筆平倉在帳本裡可能仍是估算的損益。"
+   }
+  ],
+  "tiers": [
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 2c418b2..150f63b 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,7 +177,7 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>57</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-pending" href="#group-pending"><b>58</b><span>項未完成——還有策略沒做到</span></a>
+     <a class="c-done" href="#group-done"><b>33</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+@@ -193,7 +193,7 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">57 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">58 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+@@ -5295,6 +5295,41 @@
+    ],
+    "sub": "ERR-059 · MYC.FUNDING_SHEET_WRITE_FAILED",
+    "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
++  },
++  {
++   "added_recent": false,
++   "anchor": "rule-MOM.LEDGER_PENDING_EXPIRED",
++   "complete": false,
++   "dots": {
++    "btc-competition": "none",
++    "momentum": "pending",
++    "mycrypto": "none",
++    "seykota": "none"
++   },
++   "has_recent": false,
++   "id": "MOM.LEDGER_PENDING_EXPIRED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "動能策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
++       "state": "pending",
++       "text": "2026-10-10 f-30 開發中：共用庫的位置對帳標記上限與逾時通知已實作，動能升級共用庫、設定上限並部署後才會發，上正式機後改已做。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
++       "state": "pending",
++       "text": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-060 · MOM.LEDGER_PENDING_EXPIRED",
++   "title": "R3｜對帳標記超過 24 小時沒結清，系統已不再等待"
+   }
+  ],
+  "phase_counts": {
+@@ -5308,7 +5343,7 @@
+   "f-12": 12,
+   "f-16": 3,
+   "f-26a": 0,
+-  "f-28b": 1,
++  "f-28b": 3,
+   "h4-trade-correction": 0,
+   "hotfix-btc-order-resend": 0,
+   "hotfix-seykota-order-resend": 0,
+@@ -5410,7 +5445,7 @@
+   "momentum": {
+    "done": 46,
+    "n/a": 11,
+-   "pending": 12
++   "pending": 14
+   },
+   "mycrypto": {
+    "done": 17,
+diff --git a/pyproject.toml b/pyproject.toml
+index 84e6f47..93ea0d3 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.29.1"
++version = "0.30.0"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 751c1b6..065ae88 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -343,4 +343,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.29.1"
++__version__ = "0.30.0"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 63a7506..9836736 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -36,7 +36,7 @@
+     "btc-competition": "btc-bull-market-competition",
+     "fleet": "(cross-repo: same condition implemented in every strategy)"
+   },
+-  "error_ids_issued": 59,
++  "error_ids_issued": 60,
+   "entries": [
+     {
+       "error_id": "ERR-001",
+@@ -574,7 +574,7 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:369"
++        "trade-alerts/src/trade_alerts/repair_runner.py:406"
+       ],
+       "current": {
+         "latch": null,
+@@ -604,7 +604,7 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:434"
++        "trade-alerts/src/trade_alerts/repair_runner.py:471"
+       ],
+       "current": {
+         "latch": null,
+@@ -636,8 +636,8 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:402",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:416"
++        "trade-alerts/src/trade_alerts/repair_runner.py:439",
++        "trade-alerts/src/trade_alerts/repair_runner.py:453"
+       ],
+       "current": {
+         "latch": null,
+@@ -1044,7 +1044,7 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:369"
++        "trade-alerts/src/trade_alerts/repair_runner.py:406"
+       ],
+       "current": {
+         "latch": null,
+@@ -1074,8 +1074,8 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:402",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:416"
++        "trade-alerts/src/trade_alerts/repair_runner.py:439",
++        "trade-alerts/src/trade_alerts/repair_runner.py:453"
+       ],
+       "current": {
+         "latch": null,
+@@ -1106,7 +1106,7 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:434"
++        "trade-alerts/src/trade_alerts/repair_runner.py:471"
+       ],
+       "current": {
+         "latch": null,
+@@ -1715,7 +1715,7 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:276"
++        "trade-alerts/src/trade_alerts/repair_runner.py:282"
+       ],
+       "current": {
+         "latch": null,
+@@ -1746,7 +1746,7 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:276"
++        "trade-alerts/src/trade_alerts/repair_runner.py:282"
+       ],
+       "current": {
+         "latch": null,
+@@ -1896,6 +1896,39 @@
+         ],
+         "ai_prompt": "請在 my-crypto-bot（主機上的 /opt/my-crypto-bot）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 my-crypto-bot-funding-sync.service 最近幾次執行的 journal（程式在 sync_funding_fees_entry.py 的 publish_total／sync_funding_total_to_sheet）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。"
+       }
++    },
++    {
++      "error_id": "ERR-060",
++      "code": "MOM.LEDGER_PENDING_EXPIRED",
++      "title": "對帳標記超過 24 小時沒結清，系統已不再等待",
++      "project": "momentum",
++      "sources": [
++        "trade-alerts/src/trade_alerts/repair_runner.py:310"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不動帳本、不暫停。帳本對交易所的對帳在部位與成交都對得上之後，若還有「位置對帳標記」（平倉時交易所查不到成交證據而留下的標記）超過 24 小時沒結清，就不再把狀態停在「核對進行中」，改成按實際比對判斷（部位或成交對不上會變成「對帳不一致」並照原本的告警通知）；對得上時狀態是「一致」，並把這些標記列在證據裡。修復機器人每輪讀這份證據，對每一筆還沒通知過的標記寫一筆事件日誌，由匯出檔通知一次（同一筆標記不重發，之後才超時的標記各自再通知一次）。標記的時間讀不出來、或比現在還晚，也視為超時，不會因此永遠等下去。",
++      "human_action": "狀態雖然是「一致」，但那筆平倉在帳本裡還沒有經過驗證的成交證據，損益可能還是估算值。到交易所確認這些部位確實已平倉後，用結清工具結清標記，讓帳本有定論；如果交易所其實還有部位，不要結清，改查原因。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-10-10 使用者核可（f-30）：動能走共用庫的位置對帳標記沒人結清就會一直回「核對進行中」，期間不比對餘額，沒有時間上限（競賽策略同類問題在開發機卡了 8 天，f-28 已加 24 小時上限）。上限一到就改按實際比對判斷，但「一致」會讓人以為沒事，所以對一致的情況也要通知一次，附結清步驟（使用者選「通知你一次」）。不一致的情況本來就會走「對帳不一致」告警，不再重複發這則。因為帳本與交易所部位已經對得上，這是請人補上驗證與結清，不是帳本壞了，所以是 R3 事件通知而不是請求（不開請求、不鎖機）。",
++      "operator_message": {
++        "what": "動能策略的帳本裡有「位置對帳標記」超過 24 小時沒結清（平倉時交易所查不到成交證據，帳本先留下標記等著補）。系統已不再等：交易所和帳本的部位與成交現在對得上，所以對帳狀態是「一致」。但標記還在，那筆平倉在帳本裡可能仍是估算的損益。",
++        "direction": "確認交易所確實已平倉後，用結清工具結清標記，讓帳本有定論。交易所如果還有部位，不要結清，把追查指令貼給 Claude。",
++        "steps": [
++          "看訊息裡列出的交易編號、商品與標記時間。",
++          "到交易所確認這些商品確實沒有持倉（結清工具不會替你查交易所）。",
++          "在 A1 正式機（新）以服務帳號進入 /opt/mexc-4h-momentum-trailing-stop，先預覽：sudo -u mexc-momentum .venv/bin/python src/reconcile_apply.py --ledger-status audit/ledger_status.json --exchange-state audit/exchange_state.json --ledger audit/trading_ledger.jsonl --state state/state.json（不寫入，印出確認碼與建議補列）。",
++          "確認預覽內容無誤後，再加上 --apply --confirm <確認碼> --exchange-verified 執行結清；這個聲明會寫進帳本。",
++          "交易所其實還有部位，或結清工具拒絕：不要硬做，把下方「給 AI 的追查指令」整段貼給 Claude。"
++        ],
++        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼平倉標記一直沒結清：讀 audit/ledger_status.json 的 evidence.pending_expired（交易編號、symbol、event_time、expired_reason），對照 audit/trading_ledger.jsonl 裡這些 trade_id 的全部紀錄（trade_open、position_reconciliation_pending 與有沒有 trade_close），再用只讀的方式到交易所查這些商品的持倉與歷史成交；判斷是交易所真的沒有成交證據（可以用 src/reconcile_apply.py 結清）、還是有成交但帳本沒補（要走 fetch_verified_close_evidence 與 append_reconciled_close），並找出平倉時為什麼沒有拿到成交證據，提出治本修正與回歸測試。注意 src/reconcile_apply.py 預覽與結清都需要使用者先到交易所確認已平倉並自己下 --exchange-verified。"
++      }
+     }
+   ],
+   "retired_codes": [
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 5aaa1b7..9cdf123 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1936,6 +1936,23 @@
+           "reason": "加密仍釘共用庫 v0.15.0，沒有匯出檔與修復機器人，事件日誌的通知到不了手機；換 Binance（x3）升級共用庫後才會有白話通知。在那之前只有服務失敗（ERR-046）一條路。"
+         }
+       }
++    },
++    {
++      "code": "MOM.LEDGER_PENDING_EXPIRED",
++      "behaviour": {
++        "momentum": {
++          "state": "pending",
++          "phase": "f-28b",
++          "reason": "2026-10-10 f-30 開發中：共用庫的位置對帳標記上限與逾時通知已實作，動能升級共用庫、設定上限並部署後才會發，上正式機後改已做。"
++        }
++      },
++      "emits_event": {
++        "momentum": {
++          "state": "pending",
++          "phase": "f-28b",
++          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
+diff --git a/src/trade_alerts/ledger_reconcile.py b/src/trade_alerts/ledger_reconcile.py
+index fca13c4..4c68e8c 100644
+--- a/src/trade_alerts/ledger_reconcile.py
++++ b/src/trade_alerts/ledger_reconcile.py
+@@ -111,6 +111,16 @@ DEFAULT_SHEET_PROJECTION_GRACE_SECONDS = 3600
+ _PROJECTION_FUTURE_SKEW_MS = 5 * 60 * 1000
+ 
+ _FILL_GRACE_MS = 5 * 60 * 1000
++
++#: f-30 (2026-10-10): how long a ``position_reconciliation_pending`` marker may keep the ledger
++#: axis at PENDING.  Past it the compare stops waiting and judges by the positions and fills it
++#: already compared (same 24 h as the competition's batch limit, f-28).  A marker nobody settles
++#: used to hold PENDING for ever and hide a real mismatch behind "settling".
++DEFAULT_PENDING_MAX_SECONDS = 24 * 3600
++
++#: How far ahead of the reconcile's clock a marker's time may be before it is a bad timestamp
++#: rather than "just written" (clock jitter between the writer and the reconcile on one host).
++_PENDING_CLOCK_SKEW_SECONDS = 300
+ _PUBLISHED_MODE = 0o644
+ 
+ 
+@@ -567,6 +577,44 @@ def _ledger_positions(
+     return {s: q for s, q in pos.items() if not abs(q) <= 1e-9}  # NaN is kept: it must not read as flat
+ 
+ 
++def split_expired_pending_markers(
++    markers: list[dict[str, Any]],
++    *,
++    now: datetime,
++    max_seconds: float = DEFAULT_PENDING_MAX_SECONDS,
++) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
++    """Split open markers into ``(still worth waiting for, expired)``.
++
++    A marker is expired when it has waited longer than ``max_seconds``, **or** when its time
++    cannot be shown to be young: no readable time, or one further ahead of ``now`` than clock
++    skew explains.  Such a marker is never waited for -- an unreadable time must not be able to
++    keep the axis at PENDING for ever.  Each expired entry is a copy of the marker plus
++    ``expired_reason`` (``waited_over_limit`` / ``time_unreadable`` / ``time_in_future``) and,
++    when the time is readable, ``since`` (UTC) and ``age_hours``.
++    """
++    if not (max_seconds >= 0):  # also rejects NaN
++        raise ValueError(f"max_seconds must be a number >= 0, got {max_seconds!r}")
++    waiting: list[dict[str, Any]] = []
++    expired: list[dict[str, Any]] = []
++    for marker in markers:
++        moment = parse_iso(marker.get("event_time"))
++        if moment is None:
++            reason = "time_unreadable"
++        elif (moment - now).total_seconds() > _PENDING_CLOCK_SKEW_SECONDS:
++            reason = "time_in_future"
++        elif (now - moment).total_seconds() > max_seconds:
++            reason = "waited_over_limit"
++        else:
++            waiting.append(marker)
++            continue
++        entry = {**marker, "expired_reason": reason}
++        if reason == "waited_over_limit":
++            entry["since"] = utc_now_iso(moment)
++            entry["age_hours"] = round((now - moment).total_seconds() / 3600, 1)
++        expired.append(entry)
++    return waiting, expired
++
++
+ def exchange_ledger_compare(
+     exchange_state: Any,
+     ledger_events: list[dict[str, Any]],
+@@ -578,10 +626,17 @@ def exchange_ledger_compare(
+     include_pending_markers: bool = True,
+     now: datetime | None = None,
+     stale_after_seconds: int = 3600,
++    pending_max_seconds: float = DEFAULT_PENDING_MAX_SECONDS,
+ ) -> dict[str, Any]:
+     """Pure verdict function for the ledger-vs-exchange layer.  Returns a
+     ``ledger_status.json`` document (``RECONCILED`` / ``PENDING`` / ``DIVERGED``
+-    / ``UNKNOWN`` + evidence)."""
++    / ``UNKNOWN`` + evidence).
++
++    ``pending_max_seconds`` (f-30): a ``position_reconciliation_pending`` marker older than this
++    no longer holds the verdict at PENDING.  Positions and fills are compared first, so by the
++    time a marker is the only thing left the two sides already agree; the document is then
++    ``RECONCILED`` with ``evidence["pending_expired"]`` listing the markers that were not waited
++    for, so the caller can tell the operator."""
+     now = now or datetime.now(timezone.utc)
+     checked_at = utc_now_iso(now)
+     base = {"checked_at": checked_at, "scope": scope, "last_reconciled_at": None, "source": None}
+@@ -650,6 +705,9 @@ def exchange_ledger_compare(
+         unsettled_pending_markers(ledger_events, is_paper=is_paper)
+         if include_pending_markers else []
+     )
++    pending_waiting, pending_expired = split_expired_pending_markers(
++        pending_recs, now=now, max_seconds=pending_max_seconds,
++    )
+ 
+     evidence: dict[str, Any] = {
+         "position_agreement": "mismatch" if position_diffs else "match",
+@@ -661,6 +719,11 @@ def exchange_ledger_compare(
+         evidence["fills_matched_to_adopted_events"] = fills_matched_to_adopted_events
+     if include_pending_markers:
+         evidence["pending_reconciliations"] = pending_recs
++        if pending_expired:
++            evidence["pending_expired"] = {
++                "max_hours": round(pending_max_seconds / 3600, 1),
++                "markers": pending_expired,
++            }
+     if exchange_state.get("symbols_queried") is not None:
+         evidence["symbols_queried"] = exchange_state.get("symbols_queried")
+ 
+@@ -672,14 +735,18 @@ def exchange_ledger_compare(
+             parts.append(f"{len(position_diffs)} symbol position mismatch(es)")
+         return {**base, "value": "DIVERGED", "note": "; ".join(parts), "evidence": evidence}
+ 
+-    if events_after or pending_recs:
++    if events_after or pending_waiting:
+         return {**base, "value": "PENDING",
+                 "note": (f"{events_after} ledger event(s) newer than the snapshot; "
+-                         f"{len(pending_recs)} pending reconciliation(s)"),
++                         f"{len(pending_waiting)} pending reconciliation(s)"),
+                 "evidence": evidence}
+ 
++    note = "the real ledger agrees with the exchange"
++    if pending_expired:
++        note += (f" ({len(pending_expired)} pending reconciliation marker(s) unsettled for more than "
++                 f"{round(pending_max_seconds / 3600, 1)} h were not waited for)")
+     return {**base, "value": "RECONCILED", "last_reconciled_at": checked_at,
+-            "note": "the real ledger agrees with the exchange", "evidence": evidence}
++            "note": note, "evidence": evidence}
+ 
+ 
+ # --------------------------------------------------------------------------- #
+diff --git a/src/trade_alerts/pending_expired_notice.py b/src/trade_alerts/pending_expired_notice.py
+new file mode 100644
+index 0000000..44daf37
+--- /dev/null
++++ b/src/trade_alerts/pending_expired_notice.py
+@@ -0,0 +1,94 @@
++"""Tell the operator, once per marker, that a pending reconciliation gave up waiting (f-30).
++
++``ledger_reconcile.exchange_ledger_compare`` stops holding the ledger axis at ``PENDING`` once a
++``position_reconciliation_pending`` marker is older than its limit (24 h): it judges by the
++comparison it already made and lists the markers it stopped waiting for under
++``evidence["pending_expired"]``.  When the two sides agree the verdict is a plain ``RECONCILED``,
++which says nothing about the unsettled marker -- the close it stands for still has no verified
++fill, so its P&L may still be an estimate.  This module turns that evidence into one R3 fleet
++event so the operator is told, with the steps to settle it.
++
++Stateless and idempotent: whether a marker was already announced is read from the fleet event log
++itself (``evidence["trade_ids"]`` of earlier events with the same code), so a killed run, a
++restarted timer or a second caller can never announce the same marker twice, and a marker that
++expires later gets its own notice.
++"""
++from __future__ import annotations
++
++from collections.abc import Mapping
++from typing import Any
++
++CODE_PENDING_EXPIRED = "LEDGER_PENDING_EXPIRED"
++
++_REASON_TEXT = {
++    "waited_over_limit": "超過上限仍沒結清",
++    "time_unreadable": "標記的時間讀不出來，無法證明它是新的",
++    "time_in_future": "標記的時間比現在還晚（時鐘或帳本有問題），無法證明它是新的",
++}
++
++
++def expired_markers(ledger_status: Any) -> list[dict[str, Any]]:
++    """The markers the compare stopped waiting for, or ``[]`` for any other document shape."""
++    # Only a verdict that says the two sides agree: a DIVERGED / UNKNOWN / PENDING document keeps the
++    # evidence but must not be announced as "matches, only the marker is left" (review #162 B2).
++    if not isinstance(ledger_status, Mapping) or ledger_status.get("value") != "RECONCILED":
++        return []
++    evidence = ledger_status.get("evidence")
++    block = evidence.get("pending_expired") if isinstance(evidence, Mapping) else None
++    markers = block.get("markers") if isinstance(block, Mapping) else None
++    if not isinstance(markers, list):
++        return []
++    out: list[dict[str, Any]] = []
++    seen: set[str] = set()
++    for m in markers:
++        trade_id = str(m.get("trade_id") or "") if isinstance(m, Mapping) else ""
++        if trade_id and trade_id not in seen:   # one entry per trade, whatever the document repeats (review #162 B3)
++            seen.add(trade_id)
++            out.append(dict(m))
++    return out
++
++
++def _announced_trade_ids(events: list[dict[str, Any]], project: str) -> set[str]:
++    seen: set[str] = set()
++    for event in events:
++        if event.get("project") != project or event.get("code") != CODE_PENDING_EXPIRED:
++            continue
++        evidence = event.get("evidence")
++        ids = evidence.get("trade_ids") if isinstance(evidence, Mapping) else None
++        if isinstance(ids, list):
++            seen.update(str(i) for i in ids)
++    return seen
++
++
++def plan_pending_expired_notice(
++    ledger_status: Any, fleet_events: list[dict[str, Any]], *, project: str,
++) -> dict[str, Any] | None:
++    """The fields of the next event to write (``summary`` / ``evidence`` / ``details``), or ``None``.
++
++    ``None`` when the verdict carries no ``pending_expired`` evidence or every marker in it was
++    announced before.  The caller appends the event itself (``append_fleet_event`` with
++    ``code=CODE_PENDING_EXPIRED`` and the tier it resolved from the error catalog), so the catalog
++    entry can cite the one call that emits the code.
++    """
++    markers = expired_markers(ledger_status)
++    if not markers:
++        return None
++    seen = _announced_trade_ids(fleet_events, project)
++    fresh = [m for m in markers if str(m["trade_id"]) not in seen]
++    if not fresh:
++        return None
++
++    max_hours = ledger_status["evidence"]["pending_expired"].get("max_hours")
++    lines = [f"對帳等了超過 {max_hours} 小時，下面 {len(fresh)} 筆標記還沒結清；系統已不再等，改按實際比對判斷"
++             f"（比對結果：{ledger_status.get('value')}）。"]
++    for m in fresh:
++        why = _REASON_TEXT.get(str(m.get("expired_reason")), str(m.get("expired_reason")))
++        age = f"，已等 {m['age_hours']} 小時" if m.get("age_hours") is not None else ""
++        lines.append(f"- 交易編號：{m['trade_id']}　商品：{m.get('symbol')}　數量：{m.get('volume')}"
++                     f"　標記時間：{m.get('event_time')}{age}（{why}）")
++    return {
++        "summary": f"{len(fresh)} pending reconciliation marker(s) unsettled past the limit",
++        "evidence": {"trade_ids": sorted(str(m["trade_id"]) for m in fresh)},
++        "details": {"ledger_value": ledger_status.get("value"), "max_hours": max_hours,
++                    "markers": fresh, "notice_text": "\n".join(lines)},
++    }
+diff --git a/src/trade_alerts/repair_runner.py b/src/trade_alerts/repair_runner.py
+index cd00814..2599ad3 100644
+--- a/src/trade_alerts/repair_runner.py
++++ b/src/trade_alerts/repair_runner.py
+@@ -55,9 +55,12 @@ from typing import Any, Callable, Mapping
+ 
+ from .atomic_ledger_append import append_lines_atomically, stage_lines
+ from .error_request_queue import open_error_request, outstanding_error_requests, record_request_outcome
+-from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for, utc_now_iso
++from .fleet_event_log import (
++    append_fleet_event, exclusive_log_lock, load_error_catalog, read_fleet_events, risk_tier_for, utc_now_iso,
++)
+ from .ledger_reconcile import atomic_write, norm_symbol_plain, read_json, read_ledger
+ from .notice_replay import replay_unannounced_requests
++from .pending_expired_notice import CODE_PENDING_EXPIRED, plan_pending_expired_notice
+ from .ops_export import build_ops_export, write_ops_export
+ from .verified_close_backfill import (
+     HALT,
+@@ -163,11 +166,12 @@ def run_repair_round(
+     result: dict[str, Any] = {
+         "project": adapter.project, "paused": paused, "candidates": [], "repaired": [], "failed": [],
+         "escalated": [], "blocked": [], "still_open": [], "awaiting_human": [], "deferred": [],
+-        "closed_requests": [], "replayed": [], "recurring": None, "ops_export_written": False,
++        "closed_requests": [], "replayed": [], "recurring": None, "pending_expired": None,
++        "pending_expired_error": None, "ops_export_written": False,
+     }
+     try:
+         if not paused:
+-            _Round(adapter, paths, tiers, escalate_after, result, now=now).run()
++            _Round(adapter, paths, tiers, escalate_after, result, now=now, catalog=catalog).run()
+     finally:
+         result["ops_export_written"] = _refresh_ops_export(adapter.project, paths, catalog)
+     return result
+@@ -189,7 +193,7 @@ def _refresh_ops_export(project: str, paths: RepairPaths, catalog: Mapping[str,
+ class _Round:
+     def __init__(
+         self, adapter: RepairAdapter, paths: RepairPaths, tiers: dict[str, str], escalate_after: int,
+-        result: dict[str, Any], *, now: datetime | None = None,
++        result: dict[str, Any], *, now: datetime | None = None, catalog: Mapping[str, Any],
+     ) -> None:
+         self.now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+         self.adapter = adapter
+@@ -197,6 +201,7 @@ class _Round:
+         self.paths = paths
+         self.tiers = tiers
+         self.escalate_after = escalate_after
++        self.catalog = catalog
+         self.result = result
+         self.fleet_events: list[dict[str, Any]] = []
+ 
+@@ -224,6 +229,7 @@ class _Round:
+                 continue
+             write_attempted = self._handle(trade_id, ledger_events, request)
+         self._check_recurring()
++        self._check_pending_expired()
+ 
+     def _replay_unannounced(self) -> None:
+         """A kill between opening a request and writing its fleet event leaves a
+@@ -283,6 +289,37 @@ class _Round:
+         )
+         self.result["recurring"] = {"count": len(repairs), "trade_ids": trade_ids, "fleet_event_id": event["event_id"]}
+ 
++    def _check_pending_expired(self) -> None:
++        """f-30: tell the operator once per marker that the reconcile stopped waiting for it.
++
++        The ledger compare writes the markers it gave up on into ``ledger_status.json``
++        (``evidence.pending_expired``); the verdict itself is a plain RECONCILED then, which says
++        nothing about the unsettled close.  Evaluated every round and idempotent (what was announced
++        is read back from the event log), so a kill between the compare and this check loses nothing.
++        """
++        try:
++            # The read of "what was announced" and the append share one lock: two rounds on the same
++            # host cannot both see the old log and each write the notice (review #162 B1).
++            with exclusive_log_lock(self.paths.fleet_event_log):
++                plan = plan_pending_expired_notice(
++                    read_json(self.paths.ledger_status), read_fleet_events(self.paths.fleet_event_log),
++                    project=self.project,
++                )
++                if plan is None:
++                    return
++                event = append_fleet_event(
++                    self.paths.fleet_event_log, project=self.project, code=CODE_PENDING_EXPIRED,
++                    risk_tier=risk_tier_for(self.catalog, self.project, CODE_PENDING_EXPIRED),
++                    recorded_at=utc_now_iso(self.now), **plan,
++                )
++        except Exception as exc:  # noqa: BLE001 -- a notice that cannot be written must not stop the repair round
++            # An unreadable event log or a failed write loses nothing: the evidence stays in
++            # ledger_status.json and the next round tries again (nothing was announced).
++            LOGGER.warning("pending_expired_notice_failed error=%s: %s", type(exc).__name__, exc)
++            self.result["pending_expired_error"] = f"{type(exc).__name__}: {exc}"
++            return
++        self.result["pending_expired"] = {"trade_ids": plan["evidence"]["trade_ids"], "fleet_event_id": event["event_id"]}
++
+     # -- one candidate ------------------------------------------------------ #
+     def _handle(
+         self, trade_id: str, ledger_events: list[dict[str, Any]], escalated_request: dict[str, Any] | None,
+diff --git a/tests/test_ledger_reconcile.py b/tests/test_ledger_reconcile.py
+index ffe0a91..4f014be 100644
+--- a/tests/test_ledger_reconcile.py
++++ b/tests/test_ledger_reconcile.py
+@@ -235,7 +235,7 @@ def test_exchange_compare_include_pending_markers_toggle():
+          "volume": 10, "event_epoch_ms": FETCHED_MS - 10_000},
+         {"event_type": "trade_close", "symbol": "GPS_USDT", "order_id": "o2",
+          "exit_volume": 10, "event_epoch_ms": FETCHED_MS - 5_000},
+-        _pending("orphan"),
++        _pending("orphan", event_time="2026-09-01T11:00:00Z"),
+     ]
+     on = exchange_ledger_compare(_snapshot(), ledger, is_paper=_paper,
+                                  norm_symbol=norm_symbol_plain, now=NOW)
+@@ -1260,3 +1260,107 @@ def test_both_sides_nan_is_still_not_proven_equal():
+ def test_a_small_real_difference_inside_the_tolerance_is_still_fine():
+     doc = _sheet_compare_exit(100.0, 0.5, "100.05", "0.505")   # 0.05 % price, 0.005 pnl: inside the defaults
+     assert doc["value"] == "RECONCILED"
++
++
++# --------------------------------------------------------------------------- #
++# f-30: a pending marker is waited for at most pending_max_seconds
++# --------------------------------------------------------------------------- #
++
++def _flat_ledger(*markers):
++    return [
++        {"event_type": "trade_open", "symbol": "GPS_USDT", "order_id": "o1",
++         "volume": 10, "event_epoch_ms": FETCHED_MS - 10_000},
++        {"event_type": "trade_close", "symbol": "GPS_USDT", "order_id": "o2",
++         "exit_volume": 10, "event_epoch_ms": FETCHED_MS - 5_000},
++        *markers,
++    ]
++
++
++def _compare(ledger, **kw):
++    return exchange_ledger_compare(_snapshot(), ledger, is_paper=_paper, norm_symbol=norm_symbol_plain,
++                                   now=NOW, **kw)
++
++
++def test_young_pending_marker_still_holds_pending():
++    doc = _compare(_flat_ledger(_pending("t1", event_time="2026-08-31T13:00:00Z")))  # 23 h old
++    assert doc["value"] == "PENDING"
++    assert "pending_expired" not in doc["evidence"]
++
++
++def test_old_pending_marker_expires_and_the_verdict_is_judged_by_the_comparison():
++    doc = _compare(_flat_ledger(_pending("t1", event_time="2026-08-31T11:00:00Z")))  # 25 h old
++    assert doc["value"] == "RECONCILED"
++    assert doc["last_reconciled_at"] is not None
++    expired = doc["evidence"]["pending_expired"]
++    assert expired["max_hours"] == 24.0
++    [marker] = expired["markers"]
++    assert marker["trade_id"] == "t1"
++    assert marker["expired_reason"] == "waited_over_limit"
++    assert marker["since"] == "2026-08-31T11:00:00Z" and marker["age_hours"] == 25.0
++    assert "1 pending reconciliation marker(s) unsettled for more than 24.0 h" in doc["note"]
++    # the full list stays in the evidence as before
++    assert [m["trade_id"] for m in doc["evidence"]["pending_reconciliations"]] == ["t1"]
++
++
++@pytest.mark.parametrize("event_time, reason", [
++    (None, "time_unreadable"),
++    ("not a time", "time_unreadable"),
++    (12345, "time_unreadable"),
++    ("2026-09-01T12:10:00Z", "time_in_future"),   # 10 min ahead: beyond the 5 min skew
++])
++def test_a_marker_time_that_cannot_be_believed_is_not_waited_for(event_time, reason):
++    marker = _pending("t1", **({} if event_time is None else {"event_time": event_time}))
++    doc = _compare(_flat_ledger(marker))
++    assert doc["value"] == "RECONCILED"
++    [entry] = doc["evidence"]["pending_expired"]["markers"]
++    assert entry["expired_reason"] == reason and "since" not in entry
++
++
++def test_a_marker_a_little_ahead_within_clock_skew_is_still_young():
++    doc = _compare(_flat_ledger(_pending("t1", event_time="2026-09-01T12:03:00Z")))
++    assert doc["value"] == "PENDING"
++
++
++def test_expiry_never_hides_a_real_mismatch():
++    ledger = [{"event_type": "trade_open", "symbol": "GPS_USDT", "order_id": "o1",
++               "volume": 10, "event_epoch_ms": FETCHED_MS - 10_000},
++              _pending("t1", event_time="2026-08-01T00:00:00Z")]
++    doc = _compare(ledger)  # the ledger holds 10 GPS, the exchange none
++    assert doc["value"] == "DIVERGED"
++
++
++def test_one_young_marker_keeps_pending_even_when_another_expired():
++    doc = _compare(_flat_ledger(_pending("old", event_time="2026-08-01T00:00:00Z"),
++                                _pending("new", event_time="2026-09-01T11:50:00Z")))
++    assert doc["value"] == "PENDING"
++    assert "1 pending reconciliation(s)" in doc["note"]
++    assert [m["trade_id"] for m in doc["evidence"]["pending_expired"]["markers"]] == ["old"]
++
++
++def test_the_limit_is_configurable_and_validated():
++    marker = _pending("t1", event_time="2026-09-01T11:00:00Z")  # 1 h old
++    assert _compare(_flat_ledger(marker), pending_max_seconds=1800)["value"] == "RECONCILED"
++    assert _compare(_flat_ledger(marker), pending_max_seconds=7200)["value"] == "PENDING"
++    for bad in (-1, float("nan")):
++        with pytest.raises(ValueError):
++            _compare(_flat_ledger(marker), pending_max_seconds=bad)
++
++
++def test_expiry_is_skipped_when_markers_are_not_tracked():
++    doc = _compare(_flat_ledger(_pending("t1")), include_pending_markers=False)
++    assert doc["value"] == "RECONCILED" and "pending_expired" not in doc["evidence"]
++
++
++def test_exactly_at_the_limit_is_still_waited_for_and_one_second_over_is_not():
++    at = _pending("t1", event_time="2026-08-31T12:00:00Z")      # exactly 24 h
++    over = _pending("t1", event_time="2026-08-31T11:59:59Z")    # 24 h + 1 s
++    assert _compare(_flat_ledger(at))["value"] == "PENDING"
++    assert _compare(_flat_ledger(over))["value"] == "RECONCILED"
++
++
++def test_expiry_never_hides_an_unmatched_exchange_fill():
++    snap = _snapshot(fills=[{"order_id": "x9", "symbol": "GPS_USDT", "time_ms": FETCHED_MS - 3_600_000,
++                             "quantity": 1, "price": 1, "side": "sell"}])
++    doc = exchange_ledger_compare(snap, _flat_ledger(_pending("t1", event_time="2026-08-01T00:00:00Z")),
++                                  is_paper=_paper, norm_symbol=norm_symbol_plain, now=NOW)
++    assert doc["value"] == "DIVERGED" and doc["evidence"]["unmatched_exchange_fills"]
+diff --git a/tests/test_repair_runner.py b/tests/test_repair_runner.py
+index 6d46641..79d6388 100644
+--- a/tests/test_repair_runner.py
++++ b/tests/test_repair_runner.py
+@@ -537,7 +537,8 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
+             cited += 1
+     # 4 runner codes x 2 strategies; FAILED is emitted from two call sites.
+     # g1: UNRECORDED_FILL_CORRECTED for 3 strategies, UNRESOLVED for all 4.
+-    assert cited == 10 + 7
++    # f-30: the pending-expired notice is emitted from one call site.
++    assert cited == 10 + 7 + 1
+ 
+ 
+ # --------------------------------------------------------------------------- #
+@@ -709,3 +710,158 @@ def test_the_quiet_week_holds_under_an_injected_clock_across_rounds(host):
+     assert _round(exchange, host, now=now)["recurring"] is None            # same clock: still quiet
+     assert [e["recorded_at"] for e in _events(host, RECURRING)] == [utc_now_iso(now)]
+     assert _round(exchange, host, now=now + timedelta(days=7))["recurring"] is None   # repairs aged out of the window
++
++
++# --------------------------------------------------------------------------- #
++# f-30: a pending marker the compare stopped waiting for is announced once
++# --------------------------------------------------------------------------- #
++PENDING_EXPIRED = "LEDGER_PENDING_EXPIRED"
++
++
++def _expired_status(host, *markers, value="RECONCILED"):
++    Path(host.ledger_status).write_text(json.dumps({
++        "value": value,
++        "evidence": {"pending_expired": {"max_hours": 24.0, "markers": [
++            {"trade_id": t, "symbol": "AAA_USDT", "volume": 1, "event_time": "2026-10-08T00:00:00Z",
++             "expired_reason": "waited_over_limit", "since": "2026-10-08T00:00:00Z", "age_hours": 60.0}
++            for t in markers]}},
++    }), encoding="utf-8")
++
++
++def test_an_expired_marker_is_announced_once_with_the_steps(host):
++    _seed(host)
++    _expired_status(host, "T1")
++    exchange = _Exchange(host.ledger, {})
++    first = _round(exchange, host)
++    assert first["pending_expired"]["trade_ids"] == ["T1"]
++    [event] = _events(host, PENDING_EXPIRED)
++    assert (event["risk_tier"], event["evidence"]) == ("R3", {"trade_ids": ["T1"]})
++    assert outstanding_error_requests(host.request_queue) == []     # a notice, not a request
++    [notice] = _export(host)["notices"]
++    assert notice["code"] == "MOM.LEDGER_PENDING_EXPIRED" and notice["risk_tier"] == "R3"
++    assert "交易編號：T1" in notice["text"] and "reconcile_apply.py" in notice["text"]
++    assert "給 AI 的追查指令" in notice["text"]
++    # the next rounds, the same status: nothing more
++    assert _round(exchange, host)["pending_expired"] is None
++    assert len(_events(host, PENDING_EXPIRED)) == 1
++
++
++def test_a_marker_that_expires_later_gets_its_own_notice(host):
++    _seed(host)
++    _expired_status(host, "T1")
++    exchange = _Exchange(host.ledger, {})
++    _round(exchange, host)
++    _expired_status(host, "T1", "T2")
++    second = _round(exchange, host)
++    assert second["pending_expired"]["trade_ids"] == ["T2"]
++    assert [e["evidence"]["trade_ids"] for e in _events(host, PENDING_EXPIRED)] == [["T1"], ["T2"]]
++
++
++def test_no_expired_evidence_means_no_notice_and_no_catalog_lookup(host):
++    _seed(host)
++    Path(host.ledger_status).write_text(json.dumps({"value": "RECONCILED", "evidence": {}}), encoding="utf-8")
++    # a strategy whose catalog has no such code (seykota) must not be disturbed
++    result = _round(_Exchange(host.ledger, {}), host)
++    assert result["pending_expired"] is None and _events(host, PENDING_EXPIRED) == []
++    for bad in ({}, {"evidence": []}, {"evidence": {"pending_expired": []}},
++                {"evidence": {"pending_expired": {"markers": [{"trade_id": ""}, "junk", 5]}}}):
++        Path(host.ledger_status).write_text(json.dumps(bad), encoding="utf-8")
++        assert _round(_Exchange(host.ledger, {}), host)["pending_expired"] is None
++
++
++def test_the_notice_names_a_marker_whose_time_cannot_be_read(host):
++    _seed(host)
++    Path(host.ledger_status).write_text(json.dumps({"value": "RECONCILED", "evidence": {"pending_expired": {
++        "max_hours": 24.0, "markers": [{"trade_id": "T9", "symbol": "AAA_USDT", "volume": 1,
++                                        "expired_reason": "time_unreadable"}]}}}), encoding="utf-8")
++    _round(_Exchange(host.ledger, {}), host)
++    [notice] = _export(host)["notices"]
++    assert "時間讀不出來" in notice["text"] and "交易編號：T9" in notice["text"]
++
++
++# review #162: failure isolation, concurrency, and when the notice may be written
++def test_a_log_that_becomes_unreadable_in_the_notice_step_does_not_stop_the_round(host, monkeypatch):
++    """The round as a whole still fails loudly on a corrupt event log (the log is evidence; that is
++    the existing contract and is untouched).  What this step adds must never be the reason a round
++    dies: a read failure inside it is logged and retried next round."""
++    import trade_alerts.repair_runner as rr
++    from trade_alerts.fleet_event_log import FleetEventLogError
++    _seed(host)
++    _expired_status(host, "T1")
++    real = rr.plan_pending_expired_notice
++    monkeypatch.setattr(rr, "plan_pending_expired_notice",
++                        lambda *a, **k: (_ for _ in ()).throw(FleetEventLogError("malformed JSON at line 1")))
++    result = _round(_Exchange(host.ledger, {}), host)         # must not raise
++    assert result["pending_expired"] is None and "FleetEventLogError" in result["pending_expired_error"]
++    assert result["ops_export_written"] is True               # the export refresh still ran
++    monkeypatch.setattr(rr, "plan_pending_expired_notice", real)
++    assert _round(_Exchange(host.ledger, {}), host)["pending_expired"]["trade_ids"] == ["T1"]
++
++
++def test_a_failed_append_is_isolated_and_retried(host, monkeypatch):
++    import trade_alerts.repair_runner as rr
++    _seed(host)
++    _expired_status(host, "T1")
++    real = rr.append_fleet_event
++
++    def boom(*a, **k):
++        if k.get("code") == PENDING_EXPIRED:
++            raise OSError("disk full")
++        return real(*a, **k)
++
++    monkeypatch.setattr(rr, "append_fleet_event", boom)
++    failed = _round(_Exchange(host.ledger, {}), host)
++    assert failed["pending_expired"] is None and "disk full" in failed["pending_expired_error"]
++    monkeypatch.setattr(rr, "append_fleet_event", real)
++    assert _round(_Exchange(host.ledger, {}), host)["pending_expired"]["trade_ids"] == ["T1"]
++    assert len(_events(host, PENDING_EXPIRED)) == 1
++
++
++def test_concurrent_rounds_announce_a_marker_exactly_once(host):
++    import threading
++    _seed(host)
++    _expired_status(host, "T1", "T2")
++    start = threading.Barrier(8)
++    errors = []
++
++    def worker():
++        try:
++            start.wait()
++            _round(_Exchange(host.ledger, {}), host)
++        except Exception as exc:  # noqa: BLE001
++            errors.append(exc)
++
++    threads = [threading.Thread(target=worker) for _ in range(8)]
++    [t.start() for t in threads]
++    [t.join() for t in threads]
++    assert errors == []
++    assert [e["evidence"]["trade_ids"] for e in _events(host, PENDING_EXPIRED)] == [["T1", "T2"]]
++
++
++@pytest.mark.parametrize("value", ["DIVERGED", "PENDING", "UNKNOWN"])
++def test_only_a_reconciled_verdict_announces_expired_markers(host, value):
++    _seed(host)
++    _expired_status(host, "T1", value=value)
++    result = _round(_Exchange(host.ledger, {}), host)
++    assert result["pending_expired"] is None and _events(host, PENDING_EXPIRED) == []
++
++
++def test_a_repeated_trade_id_in_one_status_is_announced_once(host):
++    _seed(host)
++    _expired_status(host, "T1", "T1")
++    assert _round(_Exchange(host.ledger, {}), host)["pending_expired"]["trade_ids"] == ["T1"]
++    [event] = _events(host, PENDING_EXPIRED)
++    assert event["evidence"]["trade_ids"] == ["T1"] and len(event["details"]["markers"]) == 1
++
++
++def test_an_export_failure_after_the_event_does_not_repeat_the_notice(host, monkeypatch):
++    import trade_alerts.repair_runner as rr
++    _seed(host)
++    _expired_status(host, "T1")
++    monkeypatch.setattr(rr, "write_ops_export", lambda *a, **k: (_ for _ in ()).throw(OSError("ro fs")))
++    first = _round(_Exchange(host.ledger, {}), host)
++    assert first["pending_expired"]["trade_ids"] == ["T1"] and first["ops_export_written"] is False
++    monkeypatch.undo()
++    again = _round(_Exchange(host.ledger, {}), host)
++    assert again["pending_expired"] is None and len(_events(host, PENDING_EXPIRED)) == 1
++    assert len(_export(host)["notices"]) == 1                 # the export catches up from the log
