@@ -1,0 +1,486 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index c62de85..709d375 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -1000,3 +1000,14 @@ trade-alerts：v0.30.0（對帳標記最多等 24 小時，逾時通知一次；
+ 版本驗證／服務驗證／部署時間：待動能改釘並部署後補記。
+ 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.30.1（競賽的調倉批次逾時通知；f-30）
++變更摘要：1. 新增 pending_expired_notice.announce_batch_expired：競賽的對帳（f-28）超過 24 小時不再等未結算的調倉批次，把 evidence.pending_expired（單一字典）記下來；對帳狀態是「一致」時，每一段卡住的期間寫一筆事件日誌（期間身分：開始等的時間 since；讀不出時間時用呼叫端附的 episode_ids＝等待中的帳本事件編號；兩者都沒有就同一個 UTC 日最多一筆）（LEDGER_PENDING_EXPIRED，R3）並由匯出檔通知一次。讀「已通知過」與追加事件放在同一把 exclusive_log_lock 內；讀取或寫入失敗會拋出，由呼叫端隔離；evidence.pending_expired 必須有已知的 reason 與有限的正數 max_hours，空字典或半成品不通知。
++          2. 錯誤清單新增 ERR-061（BTC.LEDGER_PENDING_EXPIRED），登記冊新增對應列（競賽＝未做，階段 f-28b）。沒有改 v0.30.0 的任何行為。
++向後相容：只新增；沒釘此版的專案不受影響。
++受影響消費專案：競賽（改釘後才生效）。
++部署入口：無（函式庫）。
++版本驗證／服務驗證／部署時間：待競賽改釘並部署後補記。
++交易安全：未啟用真倉、未下單、未修改秘密或保護單。
++```
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 257a174..61088f2 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -100,9 +100,9 @@
+   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
+   <h1>機隊風險登記冊</h1>
+   <p class="lede">
+-    四支策略目前所有已知的「出問題」情況，共 <b>60 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
++    四支策略目前所有已知的「出問題」情況，共 <b>61 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
+-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>38 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
++    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>39 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+   </p>
+   <div class="legend">
+     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
+@@ -1814,6 +1814,38 @@
+    "tier": "R3",
+    "title": "對帳標記超過 24 小時沒結清，系統已不再等待",
+    "what": "動能策略的帳本裡有「位置對帳標記」超過 24 小時沒結清（平倉時交易所查不到成交證據，帳本先留下標記等著補）。系統已不再等：交易所和帳本的部位與成交現在對得上，所以對帳狀態是「一致」。但標記還在，那筆平倉在帳本裡可能仍是估算的損益。"
++  },
++  {
++   "ai_prompt": "請在 btc-bull-market-competition 追查調倉批次為什麼沒有持倉快照就結束：讀 audit/ledger_status.json 的 evidence.pending_expired（since、rebalance_batch_without_snapshot、spot_fills_after_last_snapshot），對照 audit/trading_ledger.jsonl 從 since 前後的事件（rebalance 開始、order_attempt、spot_fill、holdings_snapshot），以及該時段 btc-competition-daily.service 的 journal（是否被殺、逾時、例外），判斷是批次中途被中斷（graceful_stop／interrupted_orders 有沒有處理）、還是快照寫入失敗；提出治本修正與回歸測試。注意這是現貨策略，不要下單或修改帳本。",
++   "behaviour": {
++    "phase": "f-28b",
++    "reason": "2026-10-10 f-30 開發中：競賽的對帳超過 24 小時改按比對判斷（f-28，已在 A1 正式機）；逾時後通知一次尚未部署，上正式機後改已做。",
++    "state": "pending"
++   },
++   "bot": "btc-competition",
++   "bot_label": "競賽策略",
++   "code": "BTC.LEDGER_PENDING_EXPIRED",
++   "direction": "餘額沒有問題，不需要立刻動作。要追出當天每日調整為什麼沒有寫持倉快照，免得下一次又卡住。",
++   "emits_event": {
++    "phase": "f-28b",
++    "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由 unrecorded-fill 作業匯出，等升級共用庫並部署。",
++    "state": "pending"
++   },
++   "error_id": "ERR-061",
++   "notes": [
++    "行為未做 — 2026-10-10 f-30 開發中：競賽的對帳超過 24 小時改按比對判斷（f-28，已在 A1 正式機）；逾時後通知一次尚未部署，上正式機後改已做。（預定：f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1））",
++    "寫進事件日誌未做 — 同上：事件寫進 audit/fleet_event_log.jsonl 由 unrecorded-fill 作業匯出，等升級共用庫並部署。（預定：f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1））"
++   ],
++   "open": true,
++   "steps": [
++    "看訊息裡的開始等的時間，對照那天台北 08:10 前後每日調整（btc-competition-daily）的 journal。",
++    "到交易所確認現貨餘額和預期相符（對帳已經說一致，這一步只是人工再確認）。",
++    "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼沒寫持倉快照並提出修正。",
++    "下一次每日調整正常收尾後，狀態不再有逾時證據；若又出現，會是另一段期間、再通知一次。"
++   ],
++   "tier": "R3",
++   "title": "調倉批次或現貨成交超過 24 小時沒結算，系統已不再等待",
++   "what": "競賽策略有一個調倉批次沒有寫下持倉快照就結束了（或最後一份持倉快照之後還有現貨成交沒結算），已經超過 24 小時。系統不再等：交易所餘額和帳本現在對得上，所以對帳狀態是「一致」。但那一段一直沒有正常收尾。"
+   }
+  ],
+  "tiers": [
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 150f63b..0b1d1a0 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -177,7 +177,7 @@
+     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
+   </p>
+   <div class="big">
+-    <a class="c-pending" href="#group-pending"><b>58</b><span>項未完成——還有策略沒做到</span></a>
++    <a class="c-pending" href="#group-pending"><b>59</b><span>項未完成——還有策略沒做到</span></a>
+     <a class="c-done" href="#group-done"><b>33</b><span>項已完成——四支都到位，不用再動</span></a>
+   </div>
+   <div class="summary" id="summary"></div>
+@@ -193,7 +193,7 @@
+   </div>
+   <nav class="toc" id="toc" aria-label="目錄"></nav>
+ 
+-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">58 項</span></div>
++  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">59 項</span></div>
+   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+   <div id="pending"></div>
+ 
+@@ -5330,6 +5330,41 @@
+    ],
+    "sub": "ERR-060 · MOM.LEDGER_PENDING_EXPIRED",
+    "title": "R3｜對帳標記超過 24 小時沒結清，系統已不再等待"
++  },
++  {
++   "added_recent": false,
++   "anchor": "rule-BTC.LEDGER_PENDING_EXPIRED",
++   "complete": false,
++   "dots": {
++    "btc-competition": "pending",
++    "momentum": "none",
++    "mycrypto": "none",
++    "seykota": "none"
++   },
++   "has_recent": false,
++   "id": "BTC.LEDGER_PENDING_EXPIRED",
++   "kind": "rule",
++   "rows": [
++    {
++     "label": "競賽策略",
++     "lines": [
++      {
++       "aspect": "行為",
++       "phase": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
++       "state": "pending",
++       "text": "2026-10-10 f-30 開發中：競賽的對帳超過 24 小時改按比對判斷（f-28，已在 A1 正式機）；逾時後通知一次尚未部署，上正式機後改已做。"
++      },
++      {
++       "aspect": "寫進事件日誌",
++       "phase": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
++       "state": "pending",
++       "text": "同上：事件寫進 audit/fleet_event_log.jsonl 由 unrecorded-fill 作業匯出，等升級共用庫並部署。"
++      }
++     ]
++    }
++   ],
++   "sub": "ERR-061 · BTC.LEDGER_PENDING_EXPIRED",
++   "title": "R3｜調倉批次或現貨成交超過 24 小時沒結算，系統已不再等待"
+   }
+  ],
+  "phase_counts": {
+@@ -5343,7 +5378,7 @@
+   "f-12": 12,
+   "f-16": 3,
+   "f-26a": 0,
+-  "f-28b": 3,
++  "f-28b": 5,
+   "h4-trade-correction": 0,
+   "hotfix-btc-order-resend": 0,
+   "hotfix-seykota-order-resend": 0,
+@@ -5440,7 +5475,7 @@
+   "btc-competition": {
+    "done": 30,
+    "n/a": 19,
+-   "pending": 16
++   "pending": 18
+   },
+   "momentum": {
+    "done": 46,
+diff --git a/pyproject.toml b/pyproject.toml
+index 93ea0d3..12b1c3e 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.0"
++version = "0.30.1"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 065ae88..43843ed 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -343,4 +343,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.0"
++__version__ = "0.30.1"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 9836736..ce83d1e 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -36,7 +36,7 @@
+     "btc-competition": "btc-bull-market-competition",
+     "fleet": "(cross-repo: same condition implemented in every strategy)"
+   },
+-  "error_ids_issued": 60,
++  "error_ids_issued": 61,
+   "entries": [
+     {
+       "error_id": "ERR-001",
+@@ -1929,6 +1929,38 @@
+         ],
+         "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼平倉標記一直沒結清：讀 audit/ledger_status.json 的 evidence.pending_expired（交易編號、symbol、event_time、expired_reason），對照 audit/trading_ledger.jsonl 裡這些 trade_id 的全部紀錄（trade_open、position_reconciliation_pending 與有沒有 trade_close），再用只讀的方式到交易所查這些商品的持倉與歷史成交；判斷是交易所真的沒有成交證據（可以用 src/reconcile_apply.py 結清）、還是有成交但帳本沒補（要走 fetch_verified_close_evidence 與 append_reconciled_close），並找出平倉時為什麼沒有拿到成交證據，提出治本修正與回歸測試。注意 src/reconcile_apply.py 預覽與結清都需要使用者先到交易所確認已平倉並自己下 --exchange-verified。"
+       }
++    },
++    {
++      "error_id": "ERR-061",
++      "code": "BTC.LEDGER_PENDING_EXPIRED",
++      "title": "調倉批次或現貨成交超過 24 小時沒結算，系統已不再等待",
++      "project": "btc-competition",
++      "sources": [
++        "src/btc_competition/unrecorded_fill.py:234"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R3",
++      "auto_action": "不動帳本、不暫停、不下單。帳本對交易所的對帳在「有調倉批次沒有持倉快照就結束、或最後一份持倉快照之後還有現貨成交」的狀態超過 24 小時（環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS）後，不再把狀態停在「核對進行中」，改成按交易所餘額與帳本的實際比對判斷：對不上變成「對帳不一致」並照原本的告警通知；對得上時狀態是「一致」，並由 unrecorded-fill 作業對這一段卡住的期間寫一筆事件日誌、由匯出檔通知一次（同一段期間不重發，之後另一段卡住才再通知）。開始等的時間讀不出來或比現在晚，也視為超時。",
++      "human_action": "餘額現在對得上，但那個調倉批次或現貨成交一直沒有被結算，代表當天的每日調整沒有正常收尾。要追出為什麼沒有寫持倉快照，確認下一次每日調整後不再卡住。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "2026-10-10 使用者核可（f-30）：競賽的「核對進行中」曾在開發機卡 8 天（f-28 已加 24 小時上限）；上限一到改按比對判斷，但「一致」會讓人以為沒事，所以一致時也通知一次（使用者選「通知你一次」）。因為餘額已經對得上，這是請人追查為什麼沒收尾，不是帳本壞了，所以是 R3 事件通知而不是請求。",
++      "operator_message": {
++        "what": "競賽策略有一個調倉批次沒有寫下持倉快照就結束了（或最後一份持倉快照之後還有現貨成交沒結算），已經超過 24 小時。系統不再等：交易所餘額和帳本現在對得上，所以對帳狀態是「一致」。但那一段一直沒有正常收尾。",
++        "direction": "餘額沒有問題，不需要立刻動作。要追出當天每日調整為什麼沒有寫持倉快照，免得下一次又卡住。",
++        "steps": [
++          "看訊息裡的開始等的時間，對照那天台北 08:10 前後每日調整（btc-competition-daily）的 journal。",
++          "到交易所確認現貨餘額和預期相符（對帳已經說一致，這一步只是人工再確認）。",
++          "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼沒寫持倉快照並提出修正。",
++          "下一次每日調整正常收尾後，狀態不再有逾時證據；若又出現，會是另一段期間、再通知一次。"
++        ],
++        "ai_prompt": "請在 btc-bull-market-competition 追查調倉批次為什麼沒有持倉快照就結束：讀 audit/ledger_status.json 的 evidence.pending_expired（since、rebalance_batch_without_snapshot、spot_fills_after_last_snapshot），對照 audit/trading_ledger.jsonl 從 since 前後的事件（rebalance 開始、order_attempt、spot_fill、holdings_snapshot），以及該時段 btc-competition-daily.service 的 journal（是否被殺、逾時、例外），判斷是批次中途被中斷（graceful_stop／interrupted_orders 有沒有處理）、還是快照寫入失敗；提出治本修正與回歸測試。注意這是現貨策略，不要下單或修改帳本。"
++      }
+     }
+   ],
+   "retired_codes": [
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 9cdf123..1230f5c 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1953,6 +1953,23 @@
+           "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+         }
+       }
++    },
++    {
++      "code": "BTC.LEDGER_PENDING_EXPIRED",
++      "behaviour": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "f-28b",
++          "reason": "2026-10-10 f-30 開發中：競賽的對帳超過 24 小時改按比對判斷（f-28，已在 A1 正式機）；逾時後通知一次尚未部署，上正式機後改已做。"
++        }
++      },
++      "emits_event": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "f-28b",
++          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由 unrecorded-fill 作業匯出，等升級共用庫並部署。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
+diff --git a/src/trade_alerts/pending_expired_notice.py b/src/trade_alerts/pending_expired_notice.py
+index 44daf37..eb9be02 100644
+--- a/src/trade_alerts/pending_expired_notice.py
++++ b/src/trade_alerts/pending_expired_notice.py
+@@ -16,8 +16,12 @@ expires later gets its own notice.
+ from __future__ import annotations
+ 
+ from collections.abc import Mapping
++from datetime import datetime, timezone
++from pathlib import Path
+ from typing import Any
+ 
++from .fleet_event_log import append_fleet_event, exclusive_log_lock, read_fleet_events, utc_now_iso
++
+ CODE_PENDING_EXPIRED = "LEDGER_PENDING_EXPIRED"
+ 
+ _REASON_TEXT = {
+@@ -92,3 +96,88 @@ def plan_pending_expired_notice(
+         "details": {"ledger_value": ledger_status.get("value"), "max_hours": max_hours,
+                     "markers": fresh, "notice_text": "\n".join(lines)},
+     }
++
++
++# --------------------------------------------------------------------------- #
++# btc-competition: one unsettled rebalance batch / fills after the last snapshot
++# --------------------------------------------------------------------------- #
++_MAX_EPISODE_IDS = 50
++
++
++def _valid_batch_block(block: Any) -> bool:
++    """A usable competition ``pending_expired`` block: a known reason and a finite, positive limit.
++    An empty or half-filled dict is not evidence of anything and must not become an R3 event."""
++    if not isinstance(block, Mapping) or "markers" in block or block.get("reason") not in _REASON_TEXT:
++        return False
++    limit = block.get("max_hours")
++    return isinstance(limit, (int, float)) and not isinstance(limit, bool) and 0 < limit < float("inf")
++
++
++def _batch_episode(block: Mapping[str, Any], moment: datetime) -> str:
++    """Identity of one stuck period, strongest first:
++
++    1. ``since`` -- when the oldest waiting thing began (readable times only);
++    2. ``episode_ids`` -- the ledger event ids of the waiting rows (the competition supplies them when a
++       time cannot be read): a different stuck period has different rows;
++    3. neither: nothing identifies the period, so it is announced at most once per UTC day while it lasts.
++       Never silently once-for-ever: a later, different period must not be swallowed by an old notice.
++    """
++    since = block.get("since")
++    if isinstance(since, str) and since:
++        return f"since:{since}"
++    ids = block.get("episode_ids")
++    if isinstance(ids, list):
++        clean = sorted({str(i) for i in ids if isinstance(i, (str, int)) and str(i)})[:_MAX_EPISODE_IDS]
++        if clean:
++            return "ids:" + "|".join(clean)
++    return f"unidentified:{block.get('reason')}:{moment.strftime('%Y-%m-%d')}"
++
++
++def announce_batch_expired(
++    ledger_status: Any,
++    *,
++    project: str,
++    fleet_event_log: str | Path,
++    risk_tier: str,
++    now: datetime | None = None,
++) -> dict[str, Any] | None:
++    """The competition's version of the notice: its compare gives up waiting for an unsettled rebalance
++    batch (or spot fills after the last holdings snapshot) after 24 h and records ONE
++    ``evidence["pending_expired"]`` dict (not a marker list).  Written once per episode, only when the
++    verdict is ``RECONCILED`` (balances agree); a DIVERGED verdict already has its own alert.
++
++    The read of "already announced" and the append share one lock.  Returns the stored event, or
++    ``None`` when there is nothing new.  Raises on an unreadable log or a failed write -- the caller
++    isolates that, nothing has been announced then and the next round tries again.
++    """
++    if not isinstance(ledger_status, Mapping) or ledger_status.get("value") != "RECONCILED":
++        return None
++    evidence = ledger_status.get("evidence")
++    block = evidence.get("pending_expired") if isinstance(evidence, Mapping) else None
++    if not _valid_batch_block(block):
++        return None
++    moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
++    episode = _batch_episode(block, moment)
++    with exclusive_log_lock(fleet_event_log):
++        for event in read_fleet_events(fleet_event_log):
++            ev = event.get("evidence")
++            if (event.get("project") == project and event.get("code") == CODE_PENDING_EXPIRED
++                    and isinstance(ev, Mapping) and ev.get("episode") == episode):
++                return None
++        age = f"，已等 {block['age_hours']} 小時" if block.get("age_hours") is not None else ""
++        why = _REASON_TEXT.get(str(block.get("reason")), str(block.get("reason")))
++        text = "\n".join([
++            f"對帳等了超過 {block.get('max_hours')} 小時，有調倉批次或快照之後的現貨成交還沒結算；系統已不再等，"
++            f"改按交易所餘額與帳本比對（比對結果：{ledger_status.get('value')}）。",
++            f"- 開始等的時間：{block.get('since')}{age}（{why}）",
++            f"- 沒有持倉快照就結束的調倉批次：{'有' if block.get('rebalance_batch_without_snapshot') else '沒有'}；"
++            f"最後一份持倉快照之後的現貨成交：{block.get('spot_fills_after_last_snapshot')} 筆",
++        ])
++        return append_fleet_event(
++            fleet_event_log, project=project, code=CODE_PENDING_EXPIRED, risk_tier=risk_tier,
++            recorded_at=utc_now_iso(moment),
++            summary="rebalance batch or spot fills unsettled past the limit",
++            evidence={"episode": episode},
++            details={"pending_expired": dict(block), "ledger_value": ledger_status.get("value"),
++                     "notice_text": text},
++        )
+diff --git a/tests/test_pending_expired_notice.py b/tests/test_pending_expired_notice.py
+new file mode 100644
+index 0000000..833e574
+--- /dev/null
++++ b/tests/test_pending_expired_notice.py
+@@ -0,0 +1,115 @@
++"""f-30: the competition-shaped announcer (one ``pending_expired`` dict, not a marker list)."""
++from __future__ import annotations
++
++import json
++import threading
++
++import pytest
++
++from trade_alerts.fleet_event_log import read_fleet_events
++from trade_alerts.pending_expired_notice import (
++    CODE_PENDING_EXPIRED,
++    announce_batch_expired,
++    expired_markers,
++    plan_pending_expired_notice,
++)
++
++BLOCK = {"reason": "waited_over_limit", "since": "2026-10-02T08:10:00Z", "age_hours": 50.0, "max_hours": 24.0,
++         "rebalance_batch_without_snapshot": True, "spot_fills_after_last_snapshot": 1}
++
++
++def _status(block=BLOCK, value="RECONCILED"):
++    return {"value": value, "evidence": {"pending_expired": block}}
++
++
++def _announce(log, status, **kw):
++    return announce_batch_expired(status, project="btc-competition", fleet_event_log=log, risk_tier="R3", **kw)
++
++
++def test_announced_once_per_episode(tmp_path):
++    log = tmp_path / "log.jsonl"
++    first = _announce(log, _status())
++    assert first["code"] == CODE_PENDING_EXPIRED and first["evidence"] == {"episode": "since:2026-10-02T08:10:00Z"}
++    assert _announce(log, _status()) is None
++    assert _announce(log, _status({**BLOCK, "since": "2026-10-09T08:10:00Z"}))["evidence"]["episode"].startswith("since:2026-10-09")
++    assert len(read_fleet_events(log)) == 2
++
++
++def test_other_projects_events_do_not_suppress_it(tmp_path):
++    log = tmp_path / "log.jsonl"
++    announce_batch_expired(_status(), project="momentum", fleet_event_log=log, risk_tier="R3")
++    assert _announce(log, _status()) is not None
++
++
++@pytest.mark.parametrize("status", [
++    None, [], "x", {}, _status(value="DIVERGED"), _status(value="PENDING"), {"value": "RECONCILED", "evidence": []},
++    {"value": "RECONCILED", "evidence": {"pending_expired": []}},
++    {"value": "RECONCILED", "evidence": {"pending_expired": {}}},                                   # review #164
++    {"value": "RECONCILED", "evidence": {"pending_expired": {"reason": "waited_over_limit"}}},     # no limit
++    {"value": "RECONCILED", "evidence": {"pending_expired": {"reason": "bogus", "max_hours": 24.0}}},
++    {"value": "RECONCILED", "evidence": {"pending_expired": {"reason": "time_unreadable", "max_hours": 0}}},
++    {"value": "RECONCILED", "evidence": {"pending_expired": {"reason": "time_unreadable", "max_hours": float("nan")}}},
++    {"value": "RECONCILED", "evidence": {"pending_expired": {"reason": "time_unreadable", "max_hours": True}}},
++    {"value": "RECONCILED", "evidence": {"pending_expired": {"markers": [{"trade_id": "T1"}]}}},   # momentum's shape
++])
++def test_nothing_to_announce(tmp_path, status):
++    assert _announce(tmp_path / "log.jsonl", status) is None
++    assert not (tmp_path / "log.jsonl").exists()
++
++
++def test_concurrent_rounds_write_one_event(tmp_path):
++    log = tmp_path / "log.jsonl"
++    barrier, errors = threading.Barrier(8), []
++
++    def work():
++        try:
++            barrier.wait()
++            _announce(log, _status())
++        except Exception as exc:  # noqa: BLE001
++            errors.append(exc)
++
++    threads = [threading.Thread(target=work) for _ in range(8)]
++    [t.start() for t in threads]
++    [t.join() for t in threads]
++    assert errors == [] and len(read_fleet_events(log)) == 1
++
++
++def test_an_unreadable_log_raises_for_the_caller_to_isolate(tmp_path):
++    log = tmp_path / "log.jsonl"
++    log.write_text("{broken\n", encoding="utf-8")
++    with pytest.raises(ValueError):
++        _announce(log, _status())
++
++
++def test_the_marker_planner_ignores_the_batch_shape():
++    assert expired_markers(_status()) == []
++    assert plan_pending_expired_notice(_status(), [], project="btc-competition") is None
++
++
++UNREADABLE = {"reason": "time_unreadable", "since": None, "age_hours": None, "max_hours": 24.0,
++              "rebalance_batch_without_snapshot": True, "spot_fills_after_last_snapshot": 1}
++
++
++def test_two_unreadable_periods_with_different_rows_are_announced_separately(tmp_path):
++    """Review #164 BLOCK-01: same reason and same counts, but different ledger rows."""
++    log = tmp_path / "log.jsonl"
++    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["a1", "f1"]})) is not None
++    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["f1", "a1"]})) is None      # same rows, any order
++    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["b2", "g2"]})) is not None  # a later, different period
++    assert len(read_fleet_events(log)) == 2
++
++
++def test_an_unidentifiable_period_is_announced_at_most_once_per_utc_day(tmp_path):
++    from datetime import datetime, timezone
++    log = tmp_path / "log.jsonl"
++    day = lambda d, h: datetime(2026, 10, d, h, 0, tzinfo=timezone.utc)  # noqa: E731
++    assert _announce(log, _status(UNREADABLE), now=day(10, 1)) is not None
++    assert _announce(log, _status(UNREADABLE), now=day(10, 23)) is None       # same UTC day: quiet
++    assert _announce(log, _status(UNREADABLE), now=day(15, 1)) is not None    # a later day is never swallowed
++    assert len(read_fleet_events(log)) == 2
++
++
++def test_junk_episode_ids_fall_back_instead_of_crashing(tmp_path):
++    for n, bad in enumerate(("x", 5, [None, {}, ""], [])):
++        event = _announce(tmp_path / f"log{n}.jsonl", _status({**UNREADABLE, "episode_ids": bad}))
++        assert event["evidence"]["episode"].startswith("unidentified:time_unreadable:")
