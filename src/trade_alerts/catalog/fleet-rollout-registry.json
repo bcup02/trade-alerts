@@ -32,7 +32,8 @@
     "f-16": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
     "x3-crypto-binance": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
     "t9-competition-retry": "t9：競賽策略失敗時當天重試（同一程序內每 15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.6 錯誤清單已改；競賽程式在 PR #45（審閱中，合併後上開發機實測），之後才部署 A1 正式機（新）",
-    "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）"
+    "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+    "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）"
   },
   "sources": {
     "momentum": {
@@ -53,7 +54,7 @@
     "btc-competition": {
       "repo": "AI-for-column/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "70630a11f84dd28425511e41fe80fcc61167c1f2"
+      "commit": "0025f3c658e4337cdc4f711815de93c3894b4a0d"
     }
   },
   "capabilities": [
@@ -772,6 +773,30 @@
         "btc-competition": {
           "state": "done",
           "evidence": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：部署後競賽還沒有新的成交，第一次實際用 append_fill_v2 送出要等下一次每日調整（2026-10-09 台北 08:10）有成交；接收端的收單只用非機密探測驗證過（回簽章檢查，不是寫入）。"
+        }
+      }
+    },
+    {
+      "id": "reconcile.pending_age_cap",
+      "title": "帳本↔交易所對帳：「收斂中」最多等 24 小時，之後比對餘額",
+      "description": "對帳回「收斂中」（PENDING）時程式不比對餘額，所以一個一直不會收尾的批次或快照後的成交，會讓這條軸 PENDING 很久、餘額從沒被比過（開發機競賽 2026-10-02 起 PENDING 8 天）。現在未收尾的項目最多等 24 小時（可用環境變數調整）；超過就比對餘額：不同判對不上（發 ERR-043）、相同判一致，證據寫明是真的等超時，還是時間讀不出或不可信所以沒有等。2026-10-10 f-28。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-28b",
+          "reason": "動能走共用庫的對帳：「帳本事件比交易所快照新」那條路徑下一輪抓快照就自己恢復，不用改；但共用庫還有一條「位置對帳標記（position_reconciliation_pending）沒被結清就一直回 PENDING」的路徑，沒有時間上限。預定另開共用庫 PR 加上同樣的 24 小時上限，動能改釘新版後上 A1 正式機（新）。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "趨勢策略的對帳（src/seykota_bot/reconcile/compare.py）只在「帳本事件比交易所快照新」時回 PENDING，下一輪抓快照就恢復；沒有未收尾的批次或標記的路徑，不會卡住。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "加密策略的對帳（reconcile_compare.py，走共用庫）不帶位置對帳標記（include_pending_markers=False），PENDING 只在「帳本事件比交易所快照新」時出現，下一輪抓快照就恢復；沒有未收尾批次的路徑，不會卡住。"
+        },
+        "btc-competition": {
+          "state": "done",
+          "evidence": "src/btc_competition/reconcile_compare.py:65 _PENDING_MAX_SECONDS（24 小時）；:207 回 PENDING 只在「剛到的交易所成交還沒進帳本」或「未收尾的批次／快照後成交還沒過期」；:179 起算與過期判定（時間讀不出，或比現在晚超過 :258 _CLOCK_SKEW_SECONDS 的 300 秒，視為已過期、不再等）；:294 環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS；過期後比對餘額，證據帶 pending_expired（:188 reason：waited_over_limit／time_unreadable／time_in_future）。A1 正式機（新）執行環境（唯讀查證）：operations 0025f3c 於 2026-10-10 台北 21:10（A1 日誌 JST 22:10）部署（AI-for-column/btc-bull-market-competition#53，審閱三輪 PASS）；/opt 的 src/btc_competition/reconcile_compare.py（blob 1b4ff00）的 blob 與該 commit 同檔相同；部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED。限制：A1 的競賽目前沒有未收尾的項目，超過 24 小時的行為在 A1 沒有實際被觸發過；只在測試與開發機實測（開發機 8 天的 PENDING 在 2026-10-10 台北 20:35 部署後恢復為 RECONCILED，證據記的是等了 197.6 小時）。"
         }
       }
     }
@@ -1916,53 +1941,16 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "latch.restart_only_clear",
-      "project": "seykota",
-      "type": "updated",
-      "note": "f-27：理由裡引用的 safe_halt_resume.py 行號從 :103 改成 :134（原本指到不相干的 if；f-18 的新檢查回測發現，不是狀態變動）。"
+      "id": "reconcile.pending_age_cap",
+      "type": "added",
+      "note": "f-28：新增「對帳『收斂中』最多等 24 小時，之後比對餘額」；趨勢、加密不適用，動能未做（預定另開共用庫 PR），競賽已做。"
     },
     {
       "kind": "cap",
-      "id": "reconcile.funding_fee_sync",
-      "project": "momentum",
-      "type": "updated",
-      "note": "f-27：sources 換到 A1 現行版 ac378ed，A1 執行環境逐檔雜湊重查（四個檔案 blob 都沒變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.funding_fee_sync",
-      "project": "seykota",
-      "type": "updated",
-      "note": "f-27：sources 換到 A1 現行版 489bbcd，A1 執行環境逐檔雜湊重查（三個檔案 blob 都沒變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.requeue_parked",
+      "id": "reconcile.pending_age_cap",
       "project": "btc-competition",
-      "type": "updated",
-      "note": "f-27：sources 換到 70630a1；A1 共用庫已是 0.29.1，說明與模組雜湊重查（ledger_integrity 變成 d11ef39）。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.spot_fill_row",
-      "project": "btc-competition",
-      "type": "updated",
-      "note": "f-27：google_ledger_provenance.py 因 f-26b 改了分頁名稱常數（blob d0a5bb2），引用三處文字不變；共用庫 0.29.1 說明重查。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.units_axis",
-      "project": "mycrypto",
-      "type": "updated",
-      "note": "f-27：加密「盯背景服務」不再寫「還沒決定」：照現狀只盯資金費同步（使用者 2026-10-10 選 A），換 Binance（x3）時補齊；階段改 x3-crypto-binance。仍是未做。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_UNIT_FAILED",
-      "project": "mycrypto",
-      "aspect": "behaviour",
-      "type": "updated",
-      "note": "f-27：同上，加密只盯資金費同步，換 Binance（x3）時補齊；仍是未做。"
+      "type": "completed",
+      "note": "f-28 競賽：2026-10-10 台北 21:10 上 A1（operations 0025f3c）、手動一輪對帳 RECONCILED，改已做；sources 換到 0025f3c。"
     }
   ]
 }
