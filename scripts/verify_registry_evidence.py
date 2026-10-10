@@ -32,24 +32,26 @@ sit in the same function (found with ``ast``: nested functions, same-named
 methods of different classes, decorators and multi-line signatures included) --
 at the old commit (old line number) as at the new commit (new line number).
 
-Citations of a cell are paired old-to-new first by what they cite (the new
-citation in the same file whose line reads the same and sits in the same
-function, preferring the same line number), then, per file, in order when the
-leftovers are equally many (the author re-pointed them).  A paired citation
-that no longer reads the same is:
+Citations of a cell are paired old-to-new by position: per cited file, in
+reading order, when the old and new cell cite that file equally often (the
+author re-pointed each citation in place).  Nothing is paired by what a line
+says -- two citations that read alike are not interchangeable, and swapping
+them must not look clean.  A paired citation that no longer reads the same is:
 
 * ``shifted`` -- the old line's text appears exactly once in that function at
   the old commit and exactly once at the new one, so the citation now points at
   the wrong code.  Always fails.
 * ``changed`` -- the old line was edited or removed, moved to another function,
-  has several equal lines to choose from, a file could not be read or parsed, or
-  the old citation was already invalid.  Nothing can say whether the citation is
+  has several equal lines in the function and is not the same one of them, sits
+  in a function whose name is not unique in its file (or in a multi-line
+  lambda), a file could not be read or parsed, or the old citation was already
+  invalid.  Nothing can say whether the citation is
   still right, so it fails and prints both lines for a human to read;
   ``--accept-changed`` turns those into notes once someone has (put the printed
   list in the review attachment).
 
-A citation that cannot be paired (a cell gained, lost or re-filed citations) is
-``unpaired``: it fails too, printing the old and new citations of the cell;
+A citation that cannot be paired (a cell cites a file more or less often than
+before, or a new file) is ``unpaired``: it fails too, printing the old and new citations of the cell;
 ``--accept-unpaired`` turns those into notes once a human has compared them.
 A cited file that exists at neither commit is left to the checks below.
 
@@ -57,6 +59,10 @@ A cited file that exists at neither commit is left to the checks below.
 holding the same text in the same function at the new commit and rewrites the
 registry JSON (only when something moved); it never guesses between several
 equal lines.  ``--no-compare`` skips the baseline comparison.
+
+Lines are numbered by ``\\n`` only (as ``grep -n`` and ``ast`` do); the earlier
+``str.splitlines`` also split on form feeds and Unicode separators, so a file
+holding one counts fewer lines than before.
 """
 from __future__ import annotations
 
@@ -144,28 +150,45 @@ def _status_text(status: dict) -> str:
 UNPARSABLE = "<unparsable>"
 
 
+DUPLICATE = "#dup"  # appended to a scope name that cannot identify one definition
+
+
 @lru_cache(maxsize=512)
 def _scope_table(text: str) -> tuple[str, ...] | None:
     """For each line of a Python file the qualified name of the innermost function or class that
-    holds it (decorators and a multi-line signature belong to it), ``<module>`` outside any."""
+    holds it (decorators and a multi-line signature belong to it), ``<module>`` outside any.  A name
+    shared by several definitions in the file (``if``/``else`` branches defining the same function) and
+    the body of a multi-line lambda carry ``#dup``: they cannot tell one definition from another."""
     try:
         tree = ast.parse(text)
     except (SyntaxError, ValueError, RecursionError):
         return None
-    table = ["<module>"] * (text.count("\n") + 2)
+    found: list[tuple[str, int, int]] = []
 
     def visit(node: ast.AST, qual: str) -> None:
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 name = f"{qual}.{child.name}" if qual else child.name
                 start = min([child.lineno] + [d.lineno for d in child.decorator_list])
-                for number in range(start, (child.end_lineno or child.lineno) + 1):
-                    table[number - 1] = name
-                visit(child, name)  # inner definitions overwrite the outer range: innermost wins
+                found.append((name, start, child.end_lineno or child.lineno))
+                visit(child, name)
+            elif isinstance(child, ast.Lambda) and (child.end_lineno or child.lineno) > child.lineno:
+                name = f"{qual}.<lambda>" if qual else "<lambda>"
+                found.append((name + DUPLICATE, child.lineno, child.end_lineno or child.lineno))
+                visit(child, name)
             else:
                 visit(child, qual)
 
     visit(tree, "")
+    counts: dict[str, int] = {}
+    for name, _start, _end in found:
+        counts[name] = counts.get(name, 0) + 1
+    table = ["<module>"] * (text.count("\n") + 2)
+    # outer definitions first, so inner ones (later in ``found``) overwrite them: innermost wins
+    for name, start, end in found:
+        label = name if counts[name] == 1 or name.endswith(DUPLICATE) else name + DUPLICATE
+        for number in range(start, end + 1):
+            table[number - 1] = label
     return tuple(table)
 
 
@@ -193,6 +216,8 @@ def _relocate(old_lines: list[str], old_line: int, new_lines: list[str], path: s
     scope = _scope(old_lines, old_line, path)
     if scope == UNPARSABLE or _scope(new_lines, 1, path) == UNPARSABLE:
         return None, "a file cannot be parsed to find the function"
+    if scope is not None and scope.endswith(DUPLICATE):
+        return None, f"{scope[:-len(DUPLICATE)]} is not a unique definition in the file"
     anywhere = [n for n, line in enumerate(new_lines, 1) if line.strip() == text]
     if not anywhere:
         return None, "no line with that text at the new commit"
@@ -217,33 +242,22 @@ def baseline_registry(ref: str) -> dict | None:
 
 
 Reader = Callable[[str, str, str], "list[str] | None"]  # (project, commit, path) -> lines
-Cite = tuple  # (path, line, span)
 
 
-def _pair(old: list, new: list, same: Callable[[tuple, tuple], bool]) -> tuple[list, list, list]:
-    """Pair old and new citations of one cell.  First by what they cite: an old citation goes to the new
-    citation of the same file whose line reads the same (``same``), preferring the same line number, then
-    the closest one -- so an author who re-pointed every line is paired correctly even when old and new line
-    numbers overlap.  Then, per file, the leftovers go in reading order when equally many (a citation the
-    author re-pointed at something else, to be compared).  Returns ``(pairs, old_left, new_left)``."""
-    old_left, new_left, pairs = list(old), [], []
-    for cite in new:
-        candidates = [i for i, o in enumerate(old_left) if o[0] == cite[0] and same(o, cite)]
-        if not candidates:
-            new_left.append(cite)
-            continue
-        best = min(candidates, key=lambda i: (old_left[i][1] != cite[1], abs(old_left[i][1] - cite[1])))
-        pairs.append((old_left.pop(best), cite))
-    still_old, still_new = [], []
-    for path in dict.fromkeys([c[0] for c in old_left] + [c[0] for c in new_left]):
-        o = [c for c in old_left if c[0] == path]
-        n = [c for c in new_left if c[0] == path]
+def _pair(old: list, new: list) -> tuple[list, list, list]:
+    """Pair old and new citations of one cell by position: per cited file, in reading order, when the
+    file is cited equally often in both.  Returns ``(pairs, old_left, new_left)``; a file cited a
+    different number of times (or only on one side) leaves all its citations unpaired."""
+    pairs, old_left, new_left = [], [], []
+    for path in dict.fromkeys([c[0] for c in old] + [c[0] for c in new]):
+        o = [c for c in old if c[0] == path]
+        n = [c for c in new if c[0] == path]
         if len(o) == len(n):
             pairs.extend(zip(o, n))
         else:
-            still_old += o
-            still_new += n
-    return pairs, still_old, still_new
+            old_left += o
+            new_left += n
+    return pairs, old_left, new_left
 
 
 def _check_pair(project: str, path: str, old_commit: str, new_commit: str, old_line: int, new_line: int,
@@ -269,8 +283,17 @@ def _check_pair(project: str, path: str, old_commit: str, new_commit: str, old_l
         return "changed", f"{path} cannot be parsed to tell which function the line is in; compare by hand", old_lines, new_lines
     elif old_scope != new_scope:
         reason = f"same text but in {new_scope} (was {old_scope})"
+    elif old_scope is not None and old_scope.endswith(DUPLICATE):
+        return ("changed", f"{old_scope[:-len(DUPLICATE)]} is not a unique definition in {path} (same-named branches or a "
+                           "multi-line lambda); compare by hand", old_lines, new_lines)
     else:
-        return "ok"
+        old_same = _same_text_lines(old_lines, old_text, old_scope, path)
+        new_same = _same_text_lines(new_lines, new_text, new_scope, path)
+        if (len(old_same) == 1 and len(new_same) == 1) or (
+                len(old_same) == len(new_same) and old_same.index(old_line) == new_same.index(new_line)):
+            return "ok"
+        return ("changed", f"the same text appears {len(old_same)}x in {old_scope} at the old commit and {len(new_same)}x at the "
+                           "new one, and this is not the same one of them; compare by hand", old_lines, new_lines)
     target, _why = _relocate(old_lines, old_line, new_lines, path)
     # The old code is at one known place in the same function and the citation does not point there:
     # wrong.  Anything else needs a human to read it.
@@ -294,9 +317,7 @@ def drift(old: dict, new: dict, read: Reader) -> dict:
             continue
         old_cites = [c for c in citation_spans(_status_text(old_status)) if c[1] is not None]
         new_cites = [c for c in citation_spans(_status_text(status)) if c[1] is not None]
-        pairs, left_old, left_new = _pair(
-            old_cites, new_cites,
-            lambda o, n: _check_pair(project, o[0], old_commit, new_commit, o[1], n[1], read) == "ok")
+        pairs, left_old, left_new = _pair(old_cites, new_cites)
         if left_old or left_new:
             result["unpaired"].append({"where": where, "project": project,
                                        "old": [f"{p}:{n}" for p, n, _ in left_old],

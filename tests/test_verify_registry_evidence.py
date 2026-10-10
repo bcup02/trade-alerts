@@ -97,7 +97,7 @@ def _registry(commit: str, evidence: str, reason: str | None = None) -> dict:
 def _reader(root: Path, registry: dict):
     def read(project, commit, path):
         content = script._show(root / registry["sources"][project]["repo"].split("/", 1)[1], commit, path)
-        return content.splitlines() if content is not None else None
+        return script._lines(content) if content is not None else None
     return read
 
 
@@ -298,11 +298,13 @@ def test_a_wrong_citation_cannot_hide_behind_an_extra_citation_in_the_same_cell(
     root, old, new = _make(tmp_path, "def alpha():\n    send()\n", "# inserted\ndef alpha():\n    send()\n")
     old_reg, new_reg = _registry(old, "src/bot.py:2"), _registry(new, "src/bot.py:2 src/bot.py:3")
     report = _drift(root, old_reg, new_reg)
-    # send() is paired with :3 by what it cites; the stale :2 (now "def alpha():") is left over, not waved through
-    assert report["mismatches"] == [] and report["unpaired"][0]["new"] == ["src/bot.py:2"]
+    # the file is cited once before and twice now: nothing is guessed, the whole cell is left for a human
+    assert report["mismatches"] == []
+    assert report["unpaired"] == [{"where": "capability cap.x", "project": "p", "old": ["src/bot.py:2"],
+                                   "new": ["src/bot.py:2", "src/bot.py:3"]}]
     monkeypatch.setattr(script, "baseline_registry", lambda ref: old_reg)
     monkeypatch.setattr(script, "load_rollout_registry", lambda: new_reg)
-    assert script.main(["--repos-root", str(root), "--accept-changed"]) == 1  # needs a human, with no flag that does it silently
+    assert script.main(["--repos-root", str(root), "--accept-changed"]) == 1  # no flag but a human's own waves it through
     assert "FAIL [unpaired]" in capsys.readouterr().out
 
 
@@ -382,3 +384,62 @@ def test_relocate_rewrites_the_registry_file_only_when_something_moved(clones, m
 def test_lines_split_on_newline_only_like_grep_and_ast():
     assert script._lines("a\x0c\nb\u2028c\r\nd\n") == ["a\x0c", "b\u2028c", "d"]
     assert script._lines("") == []
+
+
+# --- review of #156, second round: citations keep their identity -------------------------------------
+
+BUY_SELL = "def f():\n    buy()\n    sell()\n"
+BUY_SELL_SHIFTED = "def f():\n    zero()\n    buy()\n    sell()\n"
+
+
+def test_two_citations_are_relocated_each_to_its_own_line_never_swapped(tmp_path):
+    root, old, new = _make(tmp_path, BUY_SELL, BUY_SELL_SHIFTED)
+    old_reg = _registry(old, "買入見 src/bot.py:2；賣出見 src/bot.py:3")
+    new_reg = _registry(new, "買入見 src/bot.py:2；賣出見 src/bot.py:3")
+    report = _drift(root, old_reg, new_reg)
+    assert _kinds(report) == [("shifted", 3), ("shifted", 4)]
+    moved, unresolved = script.apply_relocation(report)
+    assert new_reg["capabilities"][0]["status"]["p"]["evidence"] == "買入見 src/bot.py:3；賣出見 src/bot.py:4"
+    assert len(moved) == 2 and unresolved == []
+    assert _drift(root, old_reg, new_reg)["mismatches"] == []
+
+
+def test_citations_that_were_swapped_are_caught_not_waved_through(tmp_path):
+    root, old, new = _make(tmp_path, BUY_SELL, BUY_SELL_SHIFTED)
+    report = _drift(root, _registry(old, "買入見 src/bot.py:2；賣出見 src/bot.py:3"),
+                    _registry(new, "買入見 src/bot.py:4；賣出見 src/bot.py:3"))
+    assert len(report["mismatches"]) == 2  # buy now points at sell(), sell at buy()
+
+
+def test_same_named_functions_in_different_branches_are_not_one_function(tmp_path):
+    src = ("def outer():\n    if buy:\n        def inner():\n            buy_only()\n            send()\n"
+           "    else:\n        def inner():\n            sell_only()\n            send()\n")
+    root, old, new = _make(tmp_path, src, "# inserted\n" + src)
+    # old :5 is the buy branch's send(); new :10 is the sell branch's
+    report = _drift(root, _registry(old, "src/bot.py:5"), _registry(new, "src/bot.py:10"))
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"] and "not a unique definition" in report["mismatches"][0]["reason"]
+    assert [m["kind"] for m in _drift(root, _registry(old, "src/bot.py:5"), _registry(new, "src/bot.py:6"))["mismatches"]] == ["changed"]
+
+
+def test_the_bodies_of_different_multi_line_lambdas_are_not_the_module(tmp_path):
+    src = "buy = (lambda:\n    send()\n)\nsell = (lambda:\n    send()\n)\n"
+    root, old, new = _make(tmp_path, src, "# inserted\n" + src)
+    report = _drift(root, _registry(old, "src/bot.py:2"), _registry(new, "src/bot.py:6"))  # buy's send() -> sell's send()
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"]
+
+
+def test_a_citation_that_slid_onto_another_equal_line_of_the_function_is_caught(tmp_path):
+    root, old, new = _make(tmp_path, EQUAL_BRANCHES, "# inserted\n" + EQUAL_BRANCHES)
+    # old :3 is the buy branch's send(); new :4 is still the buy branch's, new :6 is the sell branch's
+    assert _drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:4"))["mismatches"] == []
+    report = _drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:6"))
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"]
+    assert "not the same one of them" in report["mismatches"][0]["reason"]
+
+
+def test_no_compare_numbers_lines_by_newline_only_through_the_real_reader(tmp_path, monkeypatch, capsys):
+    root, _old, new = _make(tmp_path, "# a\nx = 1\n", "# a\u2028b\nx = 1\n")
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(new, "src/bot.py:3"))
+    # the file has two lines (a U+2028 is not a line break for grep or ast); str.splitlines used to say three
+    assert script.main(["--repos-root", str(root), "--no-compare"]) == 1
+    assert "line past end of file (2 lines)" in capsys.readouterr().out
