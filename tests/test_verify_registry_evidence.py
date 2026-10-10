@@ -130,13 +130,14 @@ def test_same_text_in_a_different_function_is_flagged(clones):
 def test_unchanged_commit_is_not_compared(clones):
     root, old, _new = clones
     report = _drift(root, _registry(old, "src/bot.py:5"), _registry(old, "src/bot.py:5"))
-    assert report == {"mismatches": [], "rewritten": [], "compared": 0, "unreadable": 0}
+    assert report == {"mismatches": [], "unpaired": [], "compared": 0, "skipped": 0}
 
 
-def test_rewritten_cell_is_listed_not_compared(clones):
+def test_a_citation_that_gains_a_partner_in_another_file_is_unpaired_but_the_rest_still_compare(clones):
     root, old, new = clones
     report = _drift(root, _registry(old, "src/bot.py:5"), _registry(new, "src/bot.py:7 以及 src/other.py:3"))
-    assert report["mismatches"] == [] and report["rewritten"] == ["capability cap.x / p"]
+    assert report["mismatches"] == [] and report["compared"] == 1
+    assert report["unpaired"] == [{"where": "capability cap.x", "project": "p", "old": [], "new": ["src/other.py:3"]}]
 
 
 def test_bare_line_shorthand_and_reason_text_are_compared(clones):
@@ -238,3 +239,146 @@ def test_several_equal_lines_in_the_function_is_for_a_human_not_a_wrong_citation
     # old :11 is beta()'s only "return None"; beta() now holds three, and :11 is "log()": no single place to move it to.
     report = _drift(root, _registry(old, "src/bot.py:11"), _registry(repeated, "src/bot.py:11"))
     assert [m["kind"] for m in report["mismatches"]] == ["changed"]
+
+
+# --- review of #156 (BLOCK): scopes, unpaired cells, unreadable sources, relocation -------------------
+
+
+def _make(tmp_path, old_src, new_src):
+    clone = tmp_path / "bot-repo"
+    clone.mkdir()
+    _git(clone, "init", "-q")
+    (clone / "src").mkdir()
+    (clone / "src" / "bot.py").write_text(old_src, encoding="utf-8")
+    _git(clone, "add", "-A")
+    _git(clone, "commit", "-q", "-m", "old")
+    old = _git(clone, "rev-parse", "HEAD")
+    (clone / "src" / "bot.py").write_text(new_src, encoding="utf-8")
+    _git(clone, "commit", "-q", "-am", "new")
+    return tmp_path, old, _git(clone, "rev-parse", "HEAD")
+
+
+def _kinds(report):
+    return [(m["kind"], m["target"]) for m in report["mismatches"]]
+
+
+def test_same_named_methods_of_different_classes_are_different_scopes(tmp_path):
+    old_src = "class A:\n    def run(self):\n        send()\nclass B:\n    def run(self):\n        send()\n"
+    root, old, new = _make(tmp_path, old_src, "# inserted\n" + old_src)
+    # old :3 is A.run's send(); new :7 is B.run's send() -- the same text in the same method *name*.
+    report = _drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:7"))
+    assert report["mismatches"][0]["reason"] == "same text but in B.run (was A.run)"
+    assert _kinds(report) == [("shifted", 4)]
+    assert _drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:4"))["mismatches"] == []
+
+
+def test_a_citation_after_a_nested_function_ends_stays_in_the_outer_function(tmp_path):
+    root, old, new = _make(tmp_path, "def outer():\n    if active:\n        send()\n",
+                           "def outer():\n    def inner():\n        other()\n    if active:\n        send()\n")
+    report = _drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:5"))
+    assert report["compared"] == 1 and report["mismatches"] == []
+
+
+def test_a_multi_line_signature_and_a_decorator_belong_to_their_function(tmp_path):
+    sig = "def alpha(\n    a,\n):\n    pass\n\ndef beta(\n    b,\n):\n    pass\n"
+    root, old, new = _make(tmp_path, sig, "# x\n" + sig)
+    # the closing "):" of alpha moved from :3 to :4; :9 is beta's
+    assert _drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:4"))["mismatches"] == []
+    assert _kinds(_drift(root, _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:9"))) == [("shifted", 4)]
+
+
+def test_a_decorator_line_belongs_to_the_function_it_decorates(tmp_path):
+    deco = "@dec\ndef alpha():\n    pass\n\n@dec\ndef beta():\n    pass\n"
+    root, old, new = _make(tmp_path, deco, "# x\n" + deco)
+    # old :1 is alpha's "@dec"; new :6 is beta's "@dec"
+    assert _kinds(_drift(root, _registry(old, "src/bot.py:1"), _registry(new, "src/bot.py:6"))) == [("shifted", 2)]
+
+
+def test_a_wrong_citation_cannot_hide_behind_an_extra_citation_in_the_same_cell(tmp_path, monkeypatch, capsys):
+    root, old, new = _make(tmp_path, "def alpha():\n    send()\n", "# inserted\ndef alpha():\n    send()\n")
+    old_reg, new_reg = _registry(old, "src/bot.py:2"), _registry(new, "src/bot.py:2 src/bot.py:3")
+    report = _drift(root, old_reg, new_reg)
+    # send() is paired with :3 by what it cites; the stale :2 (now "def alpha():") is left over, not waved through
+    assert report["mismatches"] == [] and report["unpaired"][0]["new"] == ["src/bot.py:2"]
+    monkeypatch.setattr(script, "baseline_registry", lambda ref: old_reg)
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: new_reg)
+    assert script.main(["--repos-root", str(root), "--accept-changed"]) == 1  # needs a human, with no flag that does it silently
+    assert "FAIL [unpaired]" in capsys.readouterr().out
+
+
+def test_overlapping_old_and_new_line_numbers_are_paired_by_what_they_cite(tmp_path):
+    # Lines were inserted above; the author re-pointed :2 -> :3 and :3 -> :4.  Pairing identical numbers first
+    # would compare old :3 with new :3 (the old :2 statement) and call a correct registry wrong.
+    root, old, new = _make(tmp_path, "def f():\n    first()\n    second()\n", "def f():\n    zero()\n    first()\n    second()\n")
+    report = _drift(root, _registry(old, "src/bot.py:2 src/bot.py:3"), _registry(new, "src/bot.py:3 src/bot.py:4"))
+    assert report["compared"] == 2 and report["mismatches"] == [] and report["unpaired"] == []
+
+
+def test_unpaired_cells_fail_until_a_human_accepts_them(tmp_path, monkeypatch, capsys):
+    root, old, new = _make(tmp_path, "def alpha():\n    send()\n", "def alpha():\n    send()\n# tail\n")
+    old_reg, new_reg = _registry(old, "src/bot.py:2"), _registry(new, "src/bot.py:2 src/bot.py:1")
+    monkeypatch.setattr(script, "baseline_registry", lambda ref: old_reg)
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: new_reg)
+    assert script.main(["--repos-root", str(root)]) == 1
+    assert "FAIL [unpaired]" in capsys.readouterr().out
+    assert script.main(["--repos-root", str(root), "--accept-unpaired"]) == 0
+    assert "note [unpaired, accepted]" in capsys.readouterr().out
+
+
+def test_an_old_commit_that_cannot_be_read_is_not_a_success(clones, monkeypatch, capsys):
+    root, _old, new = clones
+    missing = "0" * 40
+    report = _drift(root, _registry(missing, "src/bot.py:3"), _registry(new, "src/bot.py:3"))
+    assert [m["kind"] for m in report["mismatches"]] == ["changed"]
+    assert "not readable at the old commit" in report["mismatches"][0]["reason"]
+    monkeypatch.setattr(script, "baseline_registry", lambda ref: _registry(missing, "src/bot.py:3"))
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(new, "src/bot.py:3"))
+    assert script.main(["--repos-root", str(root)]) == 1
+    assert script.main(["--repos-root", str(root), "--accept-changed"]) == 0
+    capsys.readouterr()
+
+
+def test_a_file_at_neither_commit_is_skipped_for_the_other_checks_to_report(clones):
+    root, old, new = clones
+    report = _drift(root, _registry(old, "src/nowhere.py:3"), _registry(new, "src/nowhere.py:3"))
+    assert report["skipped"] == 1 and report["mismatches"] == []
+
+
+EQUAL_BRANCHES = "def f():\n    if buy:\n        send()\n    if sell:\n        send()\n"
+
+
+@pytest.mark.parametrize("new_src", [
+    "def f():\n    if sell:\n        audit()\n        send()\n",                          # two equal lines become one
+    "def f():\n    if sell:\n        audit()\n        send()\n    if buy:\n        send()\n",  # equally many, branches reordered
+])
+def test_equal_lines_in_different_branches_are_never_relocated(tmp_path, new_src, monkeypatch):
+    root, old, new = _make(tmp_path, EQUAL_BRANCHES, new_src)
+    old_reg, new_reg = _registry(old, "src/bot.py:3"), _registry(new, "src/bot.py:3")
+    report = _drift(root, old_reg, new_reg)
+    assert _kinds(report) == [("changed", None)]
+    assert script.apply_relocation(report) == ([], [])
+    assert new_reg["capabilities"][0]["status"]["p"]["evidence"] == "src/bot.py:3"
+    # and through main(): nothing is written, and the run does not come out clean
+    registry_file = tmp_path / "registry.json"
+    registry_file.write_text("sentinel", encoding="utf-8")
+    monkeypatch.setattr(script, "REGISTRY_PATH", registry_file)
+    monkeypatch.setattr(script, "baseline_registry", lambda ref: old_reg)
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: new_reg)
+    assert script.main(["--repos-root", str(root), "--relocate"]) == 1
+    assert registry_file.read_text(encoding="utf-8") == "sentinel"
+
+
+def test_relocate_rewrites_the_registry_file_only_when_something_moved(clones, monkeypatch):
+    root, old, new = clones
+    registry_file = root / "registry.json"
+    registry_file.write_text("sentinel", encoding="utf-8")
+    monkeypatch.setattr(script, "REGISTRY_PATH", registry_file)
+    monkeypatch.setattr(script, "baseline_registry", lambda ref: _registry(old, "src/bot.py:5"))
+    monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(new, "src/bot.py:5"))
+    assert script.main(["--repos-root", str(root), "--relocate"]) == 0
+    assert '"evidence": "src/bot.py:7"' in registry_file.read_text(encoding="utf-8")
+
+
+def test_lines_split_on_newline_only_like_grep_and_ast():
+    assert script._lines("a\x0c\nb\u2028c\r\nd\n") == ["a\x0c", "b\u2028c", "d"]
+    assert script._lines("") == []
