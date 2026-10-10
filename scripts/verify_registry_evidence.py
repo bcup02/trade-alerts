@@ -217,7 +217,7 @@ def drift(old: dict, new: dict, read: Reader) -> dict:
             # several equal lines to choose from) needs a human to read it.
             shifted = target is not None
             result["mismatches"].append({
-                "kind": "shifted" if shifted else "changed",
+                "kind": "shifted" if shifted else "changed", "target": target,
                 "status": status, "where": where, "project": project, "path": path,
                 "old_line": old_line, "new_line": new_line, "span": span, "reason": reason,
                 "old_lines": old_lines, "new_lines": new_lines})
@@ -285,6 +285,8 @@ def _compare_with_baseline(registry: dict, args: argparse.Namespace) -> int:
     for item in report["mismatches"]:
         line = (f"{item['where']} / {item['project']}: {item['path']}:{item['old_line']}"
                 f" (baseline) -> :{item['new_line']} -- {item['reason']}")
+        if item["kind"] == "shifted":
+            line += f"; the old line is now :{item['target']}"
         if item["kind"] == "changed" and args.accept_changed:
             print(f"note [changed, accepted] {line}")
         else:

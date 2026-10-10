@@ -194,7 +194,8 @@ def test_main_exits_nonzero_on_moved_code_and_zero_when_clean(clones, monkeypatc
     monkeypatch.setattr(script, "baseline_registry", lambda ref: _registry(old, "src/bot.py:5"))
     monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(new, "src/bot.py:5"))
     assert script.main(["--repos-root", str(root)]) == 1
-    assert "FAIL [shifted]" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "FAIL [shifted]" in out and "the old line is now :7" in out
     monkeypatch.setattr(script, "load_rollout_registry", lambda: _registry(new, "src/bot.py:7"))
     assert script.main(["--repos-root", str(root)]) == 0
     assert "1 citation(s) compared, 0 shifted, 0 changed" in capsys.readouterr().out
