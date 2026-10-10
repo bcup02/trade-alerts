@@ -2766,12 +2766,12 @@
    "anchor": "cap-reconcile.pending_age_cap",
    "complete": false,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "done",
     "momentum": "pending",
     "mycrypto": "na",
     "seykota": "na"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "reconcile.pending_age_cap",
    "kind": "cap",
    "rows": [
@@ -2793,7 +2793,7 @@
        "aspect": null,
        "phase": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
        "state": "pending",
-       "text": "動能走共用庫的對帳：「帳本事件比交易所快照新」那條路徑下一輪抓快照就自己恢復，不用改；但共用庫還有一條「位置對帳標記（position_reconciliation_pending）沒被結清就一直回 PENDING」的路徑，沒有時間上限。預定另開共用庫 PR 加上同樣的 24 小時上限，動能改釘新版後上 A1 正式機（新）。"
+       "text": "動能走共用庫的對帳：「帳本事件比交易所快照新」那條路徑下一輪抓快照就自己恢復，不用改；另一條「位置對帳標記（position_reconciliation_pending）沒被結清就一直回 PENDING」的路徑原本沒有時間上限。f-30 已做完並合併：共用庫 v0.30.0（bcup02/trade-alerts#162，審閱兩輪 PASS）加上同樣的 24 小時上限（標記時間讀不出或不可信也視為逾時）與逾時通知一次（ERR-060），動能改釘並讓結清工具認逾時標記（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）。2026-10-11 台北 00:10 已部署開發機（testing 53e04ce），A1 正式機（新）要等使用者同意部署，部署後改已做。"
       }
      ]
     },
@@ -5297,7 +5297,7 @@
    "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "rule-MOM.LEDGER_PENDING_EXPIRED",
    "complete": false,
    "dots": {
@@ -5332,7 +5332,7 @@
    "title": "R3｜對帳標記超過 24 小時沒結清，系統已不再等待"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "rule-BTC.LEDGER_PENDING_EXPIRED",
    "complete": false,
    "dots": {
@@ -5459,15 +5459,21 @@
  },
  "recent_summary": [
   {
-   "anchor": "cap-reconcile.pending_age_cap",
-   "note": "f-28：新增「對帳『收斂中』最多等 24 小時，之後比對餘額」；趨勢、加密不適用，動能未做（預定另開共用庫 PR），競賽已做。",
+   "anchor": "rule-MOM.LEDGER_PENDING_EXPIRED",
+   "note": "f-30：動能的位置對帳標記超過 24 小時沒結清時，通知一次（ERR-060）並附結清步驟；未做，等動能 A1 部署。",
    "project": null,
-   "title": "帳本↔交易所對帳：「收斂中」最多等 24 小時，之後比對餘額"
+   "title": "R3｜對帳標記超過 24 小時沒結清，系統已不再等待"
+  },
+  {
+   "anchor": "rule-BTC.LEDGER_PENDING_EXPIRED",
+   "note": "f-30：競賽的調倉批次或現貨成交超過 24 小時沒結算（對帳已改按餘額比對）且一致時，通知一次（ERR-061）；未做，等競賽 A1 部署。",
+   "project": null,
+   "title": "R3｜調倉批次或現貨成交超過 24 小時沒結算，系統已不再等待"
   },
   {
    "anchor": "cap-reconcile.pending_age_cap",
-   "note": "f-28 競賽：2026-10-10 台北 21:10 上 A1（operations 0025f3c）、手動一輪對帳 RECONCILED，改已做；sources 換到 0025f3c。",
-   "project": "競賽策略",
+   "note": "f-30：動能的標記上限與結清工具調整已合併並部署開發機；A1 正式機（新）未部署，仍是未做。",
+   "project": "動能策略",
    "title": "帳本↔交易所對帳：「收斂中」最多等 24 小時，之後比對餘額"
   }
  ],
