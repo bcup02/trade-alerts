@@ -537,7 +537,8 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
             cited += 1
     # 4 runner codes x 2 strategies; FAILED is emitted from two call sites.
     # g1: UNRECORDED_FILL_CORRECTED for 3 strategies, UNRESOLVED for all 4.
-    assert cited == 10 + 7
+    # f-30: the pending-expired notice is emitted from one call site.
+    assert cited == 10 + 7 + 1
 
 
 # --------------------------------------------------------------------------- #
@@ -709,3 +710,158 @@ def test_the_quiet_week_holds_under_an_injected_clock_across_rounds(host):
     assert _round(exchange, host, now=now)["recurring"] is None            # same clock: still quiet
     assert [e["recorded_at"] for e in _events(host, RECURRING)] == [utc_now_iso(now)]
     assert _round(exchange, host, now=now + timedelta(days=7))["recurring"] is None   # repairs aged out of the window
+
+
+# --------------------------------------------------------------------------- #
+# f-30: a pending marker the compare stopped waiting for is announced once
+# --------------------------------------------------------------------------- #
+PENDING_EXPIRED = "LEDGER_PENDING_EXPIRED"
+
+
+def _expired_status(host, *markers, value="RECONCILED"):
+    Path(host.ledger_status).write_text(json.dumps({
+        "value": value,
+        "evidence": {"pending_expired": {"max_hours": 24.0, "markers": [
+            {"trade_id": t, "symbol": "AAA_USDT", "volume": 1, "event_time": "2026-10-08T00:00:00Z",
+             "expired_reason": "waited_over_limit", "since": "2026-10-08T00:00:00Z", "age_hours": 60.0}
+            for t in markers]}},
+    }), encoding="utf-8")
+
+
+def test_an_expired_marker_is_announced_once_with_the_steps(host):
+    _seed(host)
+    _expired_status(host, "T1")
+    exchange = _Exchange(host.ledger, {})
+    first = _round(exchange, host)
+    assert first["pending_expired"]["trade_ids"] == ["T1"]
+    [event] = _events(host, PENDING_EXPIRED)
+    assert (event["risk_tier"], event["evidence"]) == ("R3", {"trade_ids": ["T1"]})
+    assert outstanding_error_requests(host.request_queue) == []     # a notice, not a request
+    [notice] = _export(host)["notices"]
+    assert notice["code"] == "MOM.LEDGER_PENDING_EXPIRED" and notice["risk_tier"] == "R3"
+    assert "交易編號：T1" in notice["text"] and "reconcile_apply.py" in notice["text"]
+    assert "給 AI 的追查指令" in notice["text"]
+    # the next rounds, the same status: nothing more
+    assert _round(exchange, host)["pending_expired"] is None
+    assert len(_events(host, PENDING_EXPIRED)) == 1
+
+
+def test_a_marker_that_expires_later_gets_its_own_notice(host):
+    _seed(host)
+    _expired_status(host, "T1")
+    exchange = _Exchange(host.ledger, {})
+    _round(exchange, host)
+    _expired_status(host, "T1", "T2")
+    second = _round(exchange, host)
+    assert second["pending_expired"]["trade_ids"] == ["T2"]
+    assert [e["evidence"]["trade_ids"] for e in _events(host, PENDING_EXPIRED)] == [["T1"], ["T2"]]
+
+
+def test_no_expired_evidence_means_no_notice_and_no_catalog_lookup(host):
+    _seed(host)
+    Path(host.ledger_status).write_text(json.dumps({"value": "RECONCILED", "evidence": {}}), encoding="utf-8")
+    # a strategy whose catalog has no such code (seykota) must not be disturbed
+    result = _round(_Exchange(host.ledger, {}), host)
+    assert result["pending_expired"] is None and _events(host, PENDING_EXPIRED) == []
+    for bad in ({}, {"evidence": []}, {"evidence": {"pending_expired": []}},
+                {"evidence": {"pending_expired": {"markers": [{"trade_id": ""}, "junk", 5]}}}):
+        Path(host.ledger_status).write_text(json.dumps(bad), encoding="utf-8")
+        assert _round(_Exchange(host.ledger, {}), host)["pending_expired"] is None
+
+
+def test_the_notice_names_a_marker_whose_time_cannot_be_read(host):
+    _seed(host)
+    Path(host.ledger_status).write_text(json.dumps({"value": "RECONCILED", "evidence": {"pending_expired": {
+        "max_hours": 24.0, "markers": [{"trade_id": "T9", "symbol": "AAA_USDT", "volume": 1,
+                                        "expired_reason": "time_unreadable"}]}}}), encoding="utf-8")
+    _round(_Exchange(host.ledger, {}), host)
+    [notice] = _export(host)["notices"]
+    assert "時間讀不出來" in notice["text"] and "交易編號：T9" in notice["text"]
+
+
+# review #162: failure isolation, concurrency, and when the notice may be written
+def test_a_log_that_becomes_unreadable_in_the_notice_step_does_not_stop_the_round(host, monkeypatch):
+    """The round as a whole still fails loudly on a corrupt event log (the log is evidence; that is
+    the existing contract and is untouched).  What this step adds must never be the reason a round
+    dies: a read failure inside it is logged and retried next round."""
+    import trade_alerts.repair_runner as rr
+    from trade_alerts.fleet_event_log import FleetEventLogError
+    _seed(host)
+    _expired_status(host, "T1")
+    real = rr.plan_pending_expired_notice
+    monkeypatch.setattr(rr, "plan_pending_expired_notice",
+                        lambda *a, **k: (_ for _ in ()).throw(FleetEventLogError("malformed JSON at line 1")))
+    result = _round(_Exchange(host.ledger, {}), host)         # must not raise
+    assert result["pending_expired"] is None and "FleetEventLogError" in result["pending_expired_error"]
+    assert result["ops_export_written"] is True               # the export refresh still ran
+    monkeypatch.setattr(rr, "plan_pending_expired_notice", real)
+    assert _round(_Exchange(host.ledger, {}), host)["pending_expired"]["trade_ids"] == ["T1"]
+
+
+def test_a_failed_append_is_isolated_and_retried(host, monkeypatch):
+    import trade_alerts.repair_runner as rr
+    _seed(host)
+    _expired_status(host, "T1")
+    real = rr.append_fleet_event
+
+    def boom(*a, **k):
+        if k.get("code") == PENDING_EXPIRED:
+            raise OSError("disk full")
+        return real(*a, **k)
+
+    monkeypatch.setattr(rr, "append_fleet_event", boom)
+    failed = _round(_Exchange(host.ledger, {}), host)
+    assert failed["pending_expired"] is None and "disk full" in failed["pending_expired_error"]
+    monkeypatch.setattr(rr, "append_fleet_event", real)
+    assert _round(_Exchange(host.ledger, {}), host)["pending_expired"]["trade_ids"] == ["T1"]
+    assert len(_events(host, PENDING_EXPIRED)) == 1
+
+
+def test_concurrent_rounds_announce_a_marker_exactly_once(host):
+    import threading
+    _seed(host)
+    _expired_status(host, "T1", "T2")
+    start = threading.Barrier(8)
+    errors = []
+
+    def worker():
+        try:
+            start.wait()
+            _round(_Exchange(host.ledger, {}), host)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert errors == []
+    assert [e["evidence"]["trade_ids"] for e in _events(host, PENDING_EXPIRED)] == [["T1", "T2"]]
+
+
+@pytest.mark.parametrize("value", ["DIVERGED", "PENDING", "UNKNOWN"])
+def test_only_a_reconciled_verdict_announces_expired_markers(host, value):
+    _seed(host)
+    _expired_status(host, "T1", value=value)
+    result = _round(_Exchange(host.ledger, {}), host)
+    assert result["pending_expired"] is None and _events(host, PENDING_EXPIRED) == []
+
+
+def test_a_repeated_trade_id_in_one_status_is_announced_once(host):
+    _seed(host)
+    _expired_status(host, "T1", "T1")
+    assert _round(_Exchange(host.ledger, {}), host)["pending_expired"]["trade_ids"] == ["T1"]
+    [event] = _events(host, PENDING_EXPIRED)
+    assert event["evidence"]["trade_ids"] == ["T1"] and len(event["details"]["markers"]) == 1
+
+
+def test_an_export_failure_after_the_event_does_not_repeat_the_notice(host, monkeypatch):
+    import trade_alerts.repair_runner as rr
+    _seed(host)
+    _expired_status(host, "T1")
+    monkeypatch.setattr(rr, "write_ops_export", lambda *a, **k: (_ for _ in ()).throw(OSError("ro fs")))
+    first = _round(_Exchange(host.ledger, {}), host)
+    assert first["pending_expired"]["trade_ids"] == ["T1"] and first["ops_export_written"] is False
+    monkeypatch.undo()
+    again = _round(_Exchange(host.ledger, {}), host)
+    assert again["pending_expired"] is None and len(_events(host, PENDING_EXPIRED)) == 1
+    assert len(_export(host)["notices"]) == 1                 # the export catches up from the log

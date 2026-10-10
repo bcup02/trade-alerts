@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 59,
+  "error_ids_issued": 60,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -574,7 +574,7 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:369"
+        "trade-alerts/src/trade_alerts/repair_runner.py:406"
       ],
       "current": {
         "latch": null,
@@ -604,7 +604,7 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:434"
+        "trade-alerts/src/trade_alerts/repair_runner.py:471"
       ],
       "current": {
         "latch": null,
@@ -636,8 +636,8 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:402",
-        "trade-alerts/src/trade_alerts/repair_runner.py:416"
+        "trade-alerts/src/trade_alerts/repair_runner.py:439",
+        "trade-alerts/src/trade_alerts/repair_runner.py:453"
       ],
       "current": {
         "latch": null,
@@ -1044,7 +1044,7 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:369"
+        "trade-alerts/src/trade_alerts/repair_runner.py:406"
       ],
       "current": {
         "latch": null,
@@ -1074,8 +1074,8 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:402",
-        "trade-alerts/src/trade_alerts/repair_runner.py:416"
+        "trade-alerts/src/trade_alerts/repair_runner.py:439",
+        "trade-alerts/src/trade_alerts/repair_runner.py:453"
       ],
       "current": {
         "latch": null,
@@ -1106,7 +1106,7 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:434"
+        "trade-alerts/src/trade_alerts/repair_runner.py:471"
       ],
       "current": {
         "latch": null,
@@ -1715,7 +1715,7 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:276"
+        "trade-alerts/src/trade_alerts/repair_runner.py:282"
       ],
       "current": {
         "latch": null,
@@ -1746,7 +1746,7 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:276"
+        "trade-alerts/src/trade_alerts/repair_runner.py:282"
       ],
       "current": {
         "latch": null,
@@ -1895,6 +1895,39 @@
           "文字相同、或是連線類失敗：把下方「給 AI 的追查指令」整段貼給 Claude，追查原因並提出修正。"
         ],
         "ai_prompt": "請在 my-crypto-bot（主機上的 /opt/my-crypto-bot）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 my-crypto-bot-funding-sync.service 最近幾次執行的 journal（程式在 sync_funding_fees_entry.py 的 publish_total／sync_funding_total_to_sheet）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。"
+      }
+    },
+    {
+      "error_id": "ERR-060",
+      "code": "MOM.LEDGER_PENDING_EXPIRED",
+      "title": "對帳標記超過 24 小時沒結清，系統已不再等待",
+      "project": "momentum",
+      "sources": [
+        "trade-alerts/src/trade_alerts/repair_runner.py:310"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不動帳本、不暫停。帳本對交易所的對帳在部位與成交都對得上之後，若還有「位置對帳標記」（平倉時交易所查不到成交證據而留下的標記）超過 24 小時沒結清，就不再把狀態停在「核對進行中」，改成按實際比對判斷（部位或成交對不上會變成「對帳不一致」並照原本的告警通知）；對得上時狀態是「一致」，並把這些標記列在證據裡。修復機器人每輪讀這份證據，對每一筆還沒通知過的標記寫一筆事件日誌，由匯出檔通知一次（同一筆標記不重發，之後才超時的標記各自再通知一次）。標記的時間讀不出來、或比現在還晚，也視為超時，不會因此永遠等下去。",
+      "human_action": "狀態雖然是「一致」，但那筆平倉在帳本裡還沒有經過驗證的成交證據，損益可能還是估算值。到交易所確認這些部位確實已平倉後，用結清工具結清標記，讓帳本有定論；如果交易所其實還有部位，不要結清，改查原因。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-10 使用者核可（f-30）：動能走共用庫的位置對帳標記沒人結清就會一直回「核對進行中」，期間不比對餘額，沒有時間上限（競賽策略同類問題在開發機卡了 8 天，f-28 已加 24 小時上限）。上限一到就改按實際比對判斷，但「一致」會讓人以為沒事，所以對一致的情況也要通知一次，附結清步驟（使用者選「通知你一次」）。不一致的情況本來就會走「對帳不一致」告警，不再重複發這則。因為帳本與交易所部位已經對得上，這是請人補上驗證與結清，不是帳本壞了，所以是 R3 事件通知而不是請求（不開請求、不鎖機）。",
+      "operator_message": {
+        "what": "動能策略的帳本裡有「位置對帳標記」超過 24 小時沒結清（平倉時交易所查不到成交證據，帳本先留下標記等著補）。系統已不再等：交易所和帳本的部位與成交現在對得上，所以對帳狀態是「一致」。但標記還在，那筆平倉在帳本裡可能仍是估算的損益。",
+        "direction": "確認交易所確實已平倉後，用結清工具結清標記，讓帳本有定論。交易所如果還有部位，不要結清，把追查指令貼給 Claude。",
+        "steps": [
+          "看訊息裡列出的交易編號、商品與標記時間。",
+          "到交易所確認這些商品確實沒有持倉（結清工具不會替你查交易所）。",
+          "在 A1 正式機（新）以服務帳號進入 /opt/mexc-4h-momentum-trailing-stop，先預覽：sudo -u mexc-momentum .venv/bin/python src/reconcile_apply.py --ledger-status audit/ledger_status.json --exchange-state audit/exchange_state.json --ledger audit/trading_ledger.jsonl --state state/state.json（不寫入，印出確認碼與建議補列）。",
+          "確認預覽內容無誤後，再加上 --apply --confirm <確認碼> --exchange-verified 執行結清；這個聲明會寫進帳本。",
+          "交易所其實還有部位，或結清工具拒絕：不要硬做，把下方「給 AI 的追查指令」整段貼給 Claude。"
+        ],
+        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼平倉標記一直沒結清：讀 audit/ledger_status.json 的 evidence.pending_expired（交易編號、symbol、event_time、expired_reason），對照 audit/trading_ledger.jsonl 裡這些 trade_id 的全部紀錄（trade_open、position_reconciliation_pending 與有沒有 trade_close），再用只讀的方式到交易所查這些商品的持倉與歷史成交；判斷是交易所真的沒有成交證據（可以用 src/reconcile_apply.py 結清）、還是有成交但帳本沒補（要走 fetch_verified_close_evidence 與 append_reconciled_close），並找出平倉時為什麼沒有拿到成交證據，提出治本修正與回歸測試。注意 src/reconcile_apply.py 預覽與結清都需要使用者先到交易所確認已平倉並自己下 --exchange-verified。"
       }
     }
   ],

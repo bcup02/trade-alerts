@@ -988,3 +988,15 @@ trade-alerts：v0.29.1（Google 表逐筆分頁名稱允許中文；f-26b）
 版本驗證／服務驗證／部署時間：待策略改釘並部署後補記。
 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
 ```
+
+```text
+trade-alerts：v0.30.0（對帳標記最多等 24 小時，逾時通知一次；f-30）
+變更摘要：1. ledger_reconcile.exchange_ledger_compare 新增 pending_max_seconds（預設 24 小時）：位置對帳標記（position_reconciliation_pending）超過上限、或時間讀不出來／比現在晚超過 5 分鐘，就不再讓對帳狀態停在「核對進行中」。部位與成交先比對（對不上仍是「對帳不一致」），所以標記是最後剩下的東西時兩邊已經對得上，狀態改為「一致」，並把這些標記列在 evidence.pending_expired（含 expired_reason、since、age_hours）。新增 split_expired_pending_markers。
+          2. 新增 pending_expired_notice.plan_pending_expired_notice：把 evidence.pending_expired 變成一筆事件日誌內容，同一筆標記只通知一次（已通知過的交易編號從事件日誌自己讀回，不另存狀態）。repair_runner 每輪呼叫，事件代號 LEDGER_PENDING_EXPIRED（動能 ERR-060，R3，附結清步驟與給 AI 的追查指令）。
+          3. 有跟 include_pending_markers=False 搭配的呼叫端（加密、趨勢自己的比對）不受影響；動能要升級共用庫才會有上限與通知。
+向後相容：舊呼叫端不傳新參數就套預設 24 小時；原本沒有時間的標記現在會被視為超時（以前會永遠等）。
+受影響消費專案：動能（改釘後才生效，並需把結清工具 reconcile_apply 改成也認「一致但有超時標記」）；其他策略不釘則無影響。
+部署入口：無（函式庫）。
+版本驗證／服務驗證／部署時間：待動能改釘並部署後補記。
+交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+```
