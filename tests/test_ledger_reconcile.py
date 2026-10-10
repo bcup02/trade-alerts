@@ -235,7 +235,7 @@ def test_exchange_compare_include_pending_markers_toggle():
          "volume": 10, "event_epoch_ms": FETCHED_MS - 10_000},
         {"event_type": "trade_close", "symbol": "GPS_USDT", "order_id": "o2",
          "exit_volume": 10, "event_epoch_ms": FETCHED_MS - 5_000},
-        _pending("orphan"),
+        _pending("orphan", event_time="2026-09-01T11:00:00Z"),
     ]
     on = exchange_ledger_compare(_snapshot(), ledger, is_paper=_paper,
                                  norm_symbol=norm_symbol_plain, now=NOW)
@@ -1260,3 +1260,92 @@ def test_both_sides_nan_is_still_not_proven_equal():
 def test_a_small_real_difference_inside_the_tolerance_is_still_fine():
     doc = _sheet_compare_exit(100.0, 0.5, "100.05", "0.505")   # 0.05 % price, 0.005 pnl: inside the defaults
     assert doc["value"] == "RECONCILED"
+
+
+# --------------------------------------------------------------------------- #
+# f-30: a pending marker is waited for at most pending_max_seconds
+# --------------------------------------------------------------------------- #
+
+def _flat_ledger(*markers):
+    return [
+        {"event_type": "trade_open", "symbol": "GPS_USDT", "order_id": "o1",
+         "volume": 10, "event_epoch_ms": FETCHED_MS - 10_000},
+        {"event_type": "trade_close", "symbol": "GPS_USDT", "order_id": "o2",
+         "exit_volume": 10, "event_epoch_ms": FETCHED_MS - 5_000},
+        *markers,
+    ]
+
+
+def _compare(ledger, **kw):
+    return exchange_ledger_compare(_snapshot(), ledger, is_paper=_paper, norm_symbol=norm_symbol_plain,
+                                   now=NOW, **kw)
+
+
+def test_young_pending_marker_still_holds_pending():
+    doc = _compare(_flat_ledger(_pending("t1", event_time="2026-08-31T13:00:00Z")))  # 23 h old
+    assert doc["value"] == "PENDING"
+    assert "pending_expired" not in doc["evidence"]
+
+
+def test_old_pending_marker_expires_and_the_verdict_is_judged_by_the_comparison():
+    doc = _compare(_flat_ledger(_pending("t1", event_time="2026-08-31T11:00:00Z")))  # 25 h old
+    assert doc["value"] == "RECONCILED"
+    assert doc["last_reconciled_at"] is not None
+    expired = doc["evidence"]["pending_expired"]
+    assert expired["max_hours"] == 24.0
+    [marker] = expired["markers"]
+    assert marker["trade_id"] == "t1"
+    assert marker["expired_reason"] == "waited_over_limit"
+    assert marker["since"] == "2026-08-31T11:00:00Z" and marker["age_hours"] == 25.0
+    assert "1 pending reconciliation marker(s) unsettled for more than 24.0 h" in doc["note"]
+    # the full list stays in the evidence as before
+    assert [m["trade_id"] for m in doc["evidence"]["pending_reconciliations"]] == ["t1"]
+
+
+@pytest.mark.parametrize("event_time, reason", [
+    (None, "time_unreadable"),
+    ("not a time", "time_unreadable"),
+    (12345, "time_unreadable"),
+    ("2026-09-01T12:10:00Z", "time_in_future"),   # 10 min ahead: beyond the 5 min skew
+])
+def test_a_marker_time_that_cannot_be_believed_is_not_waited_for(event_time, reason):
+    marker = _pending("t1", **({} if event_time is None else {"event_time": event_time}))
+    doc = _compare(_flat_ledger(marker))
+    assert doc["value"] == "RECONCILED"
+    [entry] = doc["evidence"]["pending_expired"]["markers"]
+    assert entry["expired_reason"] == reason and "since" not in entry
+
+
+def test_a_marker_a_little_ahead_within_clock_skew_is_still_young():
+    doc = _compare(_flat_ledger(_pending("t1", event_time="2026-09-01T12:03:00Z")))
+    assert doc["value"] == "PENDING"
+
+
+def test_expiry_never_hides_a_real_mismatch():
+    ledger = [{"event_type": "trade_open", "symbol": "GPS_USDT", "order_id": "o1",
+               "volume": 10, "event_epoch_ms": FETCHED_MS - 10_000},
+              _pending("t1", event_time="2026-08-01T00:00:00Z")]
+    doc = _compare(ledger)  # the ledger holds 10 GPS, the exchange none
+    assert doc["value"] == "DIVERGED"
+
+
+def test_one_young_marker_keeps_pending_even_when_another_expired():
+    doc = _compare(_flat_ledger(_pending("old", event_time="2026-08-01T00:00:00Z"),
+                                _pending("new", event_time="2026-09-01T11:50:00Z")))
+    assert doc["value"] == "PENDING"
+    assert "1 pending reconciliation(s)" in doc["note"]
+    assert [m["trade_id"] for m in doc["evidence"]["pending_expired"]["markers"]] == ["old"]
+
+
+def test_the_limit_is_configurable_and_validated():
+    marker = _pending("t1", event_time="2026-09-01T11:00:00Z")  # 1 h old
+    assert _compare(_flat_ledger(marker), pending_max_seconds=1800)["value"] == "RECONCILED"
+    assert _compare(_flat_ledger(marker), pending_max_seconds=7200)["value"] == "PENDING"
+    for bad in (-1, float("nan")):
+        with pytest.raises(ValueError):
+            _compare(_flat_ledger(marker), pending_max_seconds=bad)
+
+
+def test_expiry_is_skipped_when_markers_are_not_tracked():
+    doc = _compare(_flat_ledger(_pending("t1")), include_pending_markers=False)
+    assert doc["value"] == "RECONCILED" and "pending_expired" not in doc["evidence"]

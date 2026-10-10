@@ -177,7 +177,7 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>57</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-pending" href="#group-pending"><b>58</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>33</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
@@ -193,7 +193,7 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">57 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">58 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
@@ -5295,6 +5295,41 @@
    ],
    "sub": "ERR-059 · MYC.FUNDING_SHEET_WRITE_FAILED",
    "title": "R2｜資金費同步寫不進 Google 表的「帳戶餘額總表」分頁"
+  },
+  {
+   "added_recent": false,
+   "anchor": "rule-MOM.LEDGER_PENDING_EXPIRED",
+   "complete": false,
+   "dots": {
+    "btc-competition": "none",
+    "momentum": "pending",
+    "mycrypto": "none",
+    "seykota": "none"
+   },
+   "has_recent": false,
+   "id": "MOM.LEDGER_PENDING_EXPIRED",
+   "kind": "rule",
+   "rows": [
+    {
+     "label": "動能策略",
+     "lines": [
+      {
+       "aspect": "行為",
+       "phase": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
+       "state": "pending",
+       "text": "2026-10-10 f-30 開發中：共用庫的位置對帳標記上限與逾時通知已實作，動能升級共用庫、設定上限並部署後才會發，上正式機後改已做。"
+      },
+      {
+       "aspect": "寫進事件日誌",
+       "phase": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
+       "state": "pending",
+       "text": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+      }
+     ]
+    }
+   ],
+   "sub": "ERR-060 · MOM.LEDGER_PENDING_EXPIRED",
+   "title": "R3｜對帳標記超過 24 小時沒結清，系統已不再等待"
   }
  ],
  "phase_counts": {
@@ -5308,7 +5343,7 @@
   "f-12": 12,
   "f-16": 3,
   "f-26a": 0,
-  "f-28b": 1,
+  "f-28b": 3,
   "h4-trade-correction": 0,
   "hotfix-btc-order-resend": 0,
   "hotfix-seykota-order-resend": 0,
@@ -5410,7 +5445,7 @@
   "momentum": {
    "done": 46,
    "n/a": 11,
-   "pending": 12
+   "pending": 14
   },
   "mycrypto": {
    "done": 17,

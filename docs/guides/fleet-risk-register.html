@@ -100,9 +100,9 @@
   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>59 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    四支策略目前所有已知的「出問題」情況，共 <b>60 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>37 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>38 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -1781,6 +1781,39 @@
    "tier": "R2",
    "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
    "what": "加密策略的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但這支策略那一列的累計資金費（G 欄）沒有更新。"
+  },
+  {
+   "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼平倉標記一直沒結清：讀 audit/ledger_status.json 的 evidence.pending_expired（交易編號、symbol、event_time、expired_reason），對照 audit/trading_ledger.jsonl 裡這些 trade_id 的全部紀錄（trade_open、position_reconciliation_pending 與有沒有 trade_close），再用只讀的方式到交易所查這些商品的持倉與歷史成交；判斷是交易所真的沒有成交證據（可以用 src/reconcile_apply.py 結清）、還是有成交但帳本沒補（要走 fetch_verified_close_evidence 與 append_reconciled_close），並找出平倉時為什麼沒有拿到成交證據，提出治本修正與回歸測試。注意 src/reconcile_apply.py 預覽與結清都需要使用者先到交易所確認已平倉並自己下 --exchange-verified。",
+   "behaviour": {
+    "phase": "f-28b",
+    "reason": "2026-10-10 f-30 開發中：共用庫的位置對帳標記上限與逾時通知已實作，動能升級共用庫、設定上限並部署後才會發，上正式機後改已做。",
+    "state": "pending"
+   },
+   "bot": "momentum",
+   "bot_label": "動能策略",
+   "code": "MOM.LEDGER_PENDING_EXPIRED",
+   "direction": "確認交易所確實已平倉後，用結清工具結清標記，讓帳本有定論。交易所如果還有部位，不要結清，把追查指令貼給 Claude。",
+   "emits_event": {
+    "phase": "f-28b",
+    "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。",
+    "state": "pending"
+   },
+   "error_id": "ERR-060",
+   "notes": [
+    "行為未做 — 2026-10-10 f-30 開發中：共用庫的位置對帳標記上限與逾時通知已實作，動能升級共用庫、設定上限並部署後才會發，上正式機後改已做。（預定：f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1））",
+    "寫進事件日誌未做 — 同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。（預定：f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1））"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡列出的交易編號、商品與標記時間。",
+    "到交易所確認這些商品確實沒有持倉（結清工具不會替你查交易所）。",
+    "在 A1 正式機（新）以服務帳號進入 /opt/mexc-4h-momentum-trailing-stop，先預覽：sudo -u mexc-momentum .venv/bin/python src/reconcile_apply.py --ledger-status audit/ledger_status.json --exchange-state audit/exchange_state.json --ledger audit/trading_ledger.jsonl --state state/state.json（不寫入，印出確認碼與建議補列）。",
+    "確認預覽內容無誤後，再加上 --apply --confirm <確認碼> --exchange-verified 執行結清；這個聲明會寫進帳本。",
+    "交易所其實還有部位，或結清工具拒絕：不要硬做，把下方「給 AI 的追查指令」整段貼給 Claude。"
+   ],
+   "tier": "R3",
+   "title": "對帳標記超過 24 小時沒結清，系統已不再等待",
+   "what": "動能策略的帳本裡有「位置對帳標記」超過 24 小時沒結清（平倉時交易所查不到成交證據，帳本先留下標記等著補）。系統已不再等：交易所和帳本的部位與成交現在對得上，所以對帳狀態是「一致」。但標記還在，那筆平倉在帳本裡可能仍是估算的損益。"
   }
  ],
  "tiers": [

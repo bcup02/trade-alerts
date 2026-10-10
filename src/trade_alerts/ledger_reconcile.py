@@ -111,6 +111,16 @@ DEFAULT_SHEET_PROJECTION_GRACE_SECONDS = 3600
 _PROJECTION_FUTURE_SKEW_MS = 5 * 60 * 1000
 
 _FILL_GRACE_MS = 5 * 60 * 1000
+
+#: f-30 (2026-10-10): how long a ``position_reconciliation_pending`` marker may keep the ledger
+#: axis at PENDING.  Past it the compare stops waiting and judges by the positions and fills it
+#: already compared (same 24 h as the competition's batch limit, f-28).  A marker nobody settles
+#: used to hold PENDING for ever and hide a real mismatch behind "settling".
+DEFAULT_PENDING_MAX_SECONDS = 24 * 3600
+
+#: How far ahead of the reconcile's clock a marker's time may be before it is a bad timestamp
+#: rather than "just written" (clock jitter between the writer and the reconcile on one host).
+_PENDING_CLOCK_SKEW_SECONDS = 300
 _PUBLISHED_MODE = 0o644
 
 
@@ -567,6 +577,44 @@ def _ledger_positions(
     return {s: q for s, q in pos.items() if not abs(q) <= 1e-9}  # NaN is kept: it must not read as flat
 
 
+def split_expired_pending_markers(
+    markers: list[dict[str, Any]],
+    *,
+    now: datetime,
+    max_seconds: float = DEFAULT_PENDING_MAX_SECONDS,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split open markers into ``(still worth waiting for, expired)``.
+
+    A marker is expired when it has waited longer than ``max_seconds``, **or** when its time
+    cannot be shown to be young: no readable time, or one further ahead of ``now`` than clock
+    skew explains.  Such a marker is never waited for -- an unreadable time must not be able to
+    keep the axis at PENDING for ever.  Each expired entry is a copy of the marker plus
+    ``expired_reason`` (``waited_over_limit`` / ``time_unreadable`` / ``time_in_future``) and,
+    when the time is readable, ``since`` (UTC) and ``age_hours``.
+    """
+    if not (max_seconds >= 0):  # also rejects NaN
+        raise ValueError(f"max_seconds must be a number >= 0, got {max_seconds!r}")
+    waiting: list[dict[str, Any]] = []
+    expired: list[dict[str, Any]] = []
+    for marker in markers:
+        moment = parse_iso(marker.get("event_time"))
+        if moment is None:
+            reason = "time_unreadable"
+        elif (moment - now).total_seconds() > _PENDING_CLOCK_SKEW_SECONDS:
+            reason = "time_in_future"
+        elif (now - moment).total_seconds() > max_seconds:
+            reason = "waited_over_limit"
+        else:
+            waiting.append(marker)
+            continue
+        entry = {**marker, "expired_reason": reason}
+        if reason == "waited_over_limit":
+            entry["since"] = utc_now_iso(moment)
+            entry["age_hours"] = round((now - moment).total_seconds() / 3600, 1)
+        expired.append(entry)
+    return waiting, expired
+
+
 def exchange_ledger_compare(
     exchange_state: Any,
     ledger_events: list[dict[str, Any]],
@@ -578,10 +626,17 @@ def exchange_ledger_compare(
     include_pending_markers: bool = True,
     now: datetime | None = None,
     stale_after_seconds: int = 3600,
+    pending_max_seconds: float = DEFAULT_PENDING_MAX_SECONDS,
 ) -> dict[str, Any]:
     """Pure verdict function for the ledger-vs-exchange layer.  Returns a
     ``ledger_status.json`` document (``RECONCILED`` / ``PENDING`` / ``DIVERGED``
-    / ``UNKNOWN`` + evidence)."""
+    / ``UNKNOWN`` + evidence).
+
+    ``pending_max_seconds`` (f-30): a ``position_reconciliation_pending`` marker older than this
+    no longer holds the verdict at PENDING.  Positions and fills are compared first, so by the
+    time a marker is the only thing left the two sides already agree; the document is then
+    ``RECONCILED`` with ``evidence["pending_expired"]`` listing the markers that were not waited
+    for, so the caller can tell the operator."""
     now = now or datetime.now(timezone.utc)
     checked_at = utc_now_iso(now)
     base = {"checked_at": checked_at, "scope": scope, "last_reconciled_at": None, "source": None}
@@ -650,6 +705,9 @@ def exchange_ledger_compare(
         unsettled_pending_markers(ledger_events, is_paper=is_paper)
         if include_pending_markers else []
     )
+    pending_waiting, pending_expired = split_expired_pending_markers(
+        pending_recs, now=now, max_seconds=pending_max_seconds,
+    )
 
     evidence: dict[str, Any] = {
         "position_agreement": "mismatch" if position_diffs else "match",
@@ -661,6 +719,11 @@ def exchange_ledger_compare(
         evidence["fills_matched_to_adopted_events"] = fills_matched_to_adopted_events
     if include_pending_markers:
         evidence["pending_reconciliations"] = pending_recs
+        if pending_expired:
+            evidence["pending_expired"] = {
+                "max_hours": round(pending_max_seconds / 3600, 1),
+                "markers": pending_expired,
+            }
     if exchange_state.get("symbols_queried") is not None:
         evidence["symbols_queried"] = exchange_state.get("symbols_queried")
 
@@ -672,14 +735,18 @@ def exchange_ledger_compare(
             parts.append(f"{len(position_diffs)} symbol position mismatch(es)")
         return {**base, "value": "DIVERGED", "note": "; ".join(parts), "evidence": evidence}
 
-    if events_after or pending_recs:
+    if events_after or pending_waiting:
         return {**base, "value": "PENDING",
                 "note": (f"{events_after} ledger event(s) newer than the snapshot; "
-                         f"{len(pending_recs)} pending reconciliation(s)"),
+                         f"{len(pending_waiting)} pending reconciliation(s)"),
                 "evidence": evidence}
 
+    note = "the real ledger agrees with the exchange"
+    if pending_expired:
+        note += (f" ({len(pending_expired)} pending reconciliation marker(s) unsettled for more than "
+                 f"{round(pending_max_seconds / 3600, 1)} h were not waited for)")
     return {**base, "value": "RECONCILED", "last_reconciled_at": checked_at,
-            "note": "the real ledger agrees with the exchange", "evidence": evidence}
+            "note": note, "evidence": evidence}
 
 
 # --------------------------------------------------------------------------- #

@@ -58,6 +58,7 @@ from .error_request_queue import open_error_request, outstanding_error_requests,
 from .fleet_event_log import append_fleet_event, load_error_catalog, read_fleet_events, risk_tier_for, utc_now_iso
 from .ledger_reconcile import atomic_write, norm_symbol_plain, read_json, read_ledger
 from .notice_replay import replay_unannounced_requests
+from .pending_expired_notice import CODE_PENDING_EXPIRED, plan_pending_expired_notice
 from .ops_export import build_ops_export, write_ops_export
 from .verified_close_backfill import (
     HALT,
@@ -163,11 +164,12 @@ def run_repair_round(
     result: dict[str, Any] = {
         "project": adapter.project, "paused": paused, "candidates": [], "repaired": [], "failed": [],
         "escalated": [], "blocked": [], "still_open": [], "awaiting_human": [], "deferred": [],
-        "closed_requests": [], "replayed": [], "recurring": None, "ops_export_written": False,
+        "closed_requests": [], "replayed": [], "recurring": None, "pending_expired": None,
+        "ops_export_written": False,
     }
     try:
         if not paused:
-            _Round(adapter, paths, tiers, escalate_after, result, now=now).run()
+            _Round(adapter, paths, tiers, escalate_after, result, now=now, catalog=catalog).run()
     finally:
         result["ops_export_written"] = _refresh_ops_export(adapter.project, paths, catalog)
     return result
@@ -189,7 +191,7 @@ def _refresh_ops_export(project: str, paths: RepairPaths, catalog: Mapping[str, 
 class _Round:
     def __init__(
         self, adapter: RepairAdapter, paths: RepairPaths, tiers: dict[str, str], escalate_after: int,
-        result: dict[str, Any], *, now: datetime | None = None,
+        result: dict[str, Any], *, now: datetime | None = None, catalog: Mapping[str, Any],
     ) -> None:
         self.now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
         self.adapter = adapter
@@ -197,6 +199,7 @@ class _Round:
         self.paths = paths
         self.tiers = tiers
         self.escalate_after = escalate_after
+        self.catalog = catalog
         self.result = result
         self.fleet_events: list[dict[str, Any]] = []
 
@@ -224,6 +227,7 @@ class _Round:
                 continue
             write_attempted = self._handle(trade_id, ledger_events, request)
         self._check_recurring()
+        self._check_pending_expired()
 
     def _replay_unannounced(self) -> None:
         """A kill between opening a request and writing its fleet event leaves a
@@ -282,6 +286,27 @@ class _Round:
                      "notice_text": notice},
         )
         self.result["recurring"] = {"count": len(repairs), "trade_ids": trade_ids, "fleet_event_id": event["event_id"]}
+
+    def _check_pending_expired(self) -> None:
+        """f-30: tell the operator once per marker that the reconcile stopped waiting for it.
+
+        The ledger compare writes the markers it gave up on into ``ledger_status.json``
+        (``evidence.pending_expired``); the verdict itself is a plain RECONCILED then, which says
+        nothing about the unsettled close.  Evaluated every round and idempotent (what was announced
+        is read back from the event log), so a kill between the compare and this check loses nothing.
+        """
+        plan = plan_pending_expired_notice(
+            read_json(self.paths.ledger_status), read_fleet_events(self.paths.fleet_event_log),
+            project=self.project,
+        )
+        if plan is None:
+            return
+        event = append_fleet_event(
+            self.paths.fleet_event_log, project=self.project, code=CODE_PENDING_EXPIRED,
+            risk_tier=risk_tier_for(self.catalog, self.project, CODE_PENDING_EXPIRED),
+            recorded_at=utc_now_iso(self.now), **plan,
+        )
+        self.result["pending_expired"] = {"trade_ids": plan["evidence"]["trade_ids"], "fleet_event_id": event["event_id"]}
 
     # -- one candidate ------------------------------------------------------ #
     def _handle(

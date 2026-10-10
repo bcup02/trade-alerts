@@ -1936,6 +1936,23 @@
           "reason": "加密仍釘共用庫 v0.15.0，沒有匯出檔與修復機器人，事件日誌的通知到不了手機；換 Binance（x3）升級共用庫後才會有白話通知。在那之前只有服務失敗（ERR-046）一條路。"
         }
       }
+    },
+    {
+      "code": "MOM.LEDGER_PENDING_EXPIRED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-28b",
+          "reason": "2026-10-10 f-30 開發中：共用庫的位置對帳標記上限與逾時通知已實作，動能升級共用庫、設定上限並部署後才會發，上正式機後改已做。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-28b",
+          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+        }
+      }
     }
   ],
   "recent_changes": [
