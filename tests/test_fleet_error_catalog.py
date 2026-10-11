@@ -235,3 +235,66 @@ def test_retiring_an_entry_keeps_its_error_id_in_retired_codes(catalog):
     assert valid(cat)
     cat["entries"].append({**cat["entries"][0], "code": "FLEET.TEST_REUSE", "error_id": gone["error_id"]})
     assert not valid(cat), "reusing a retired number must fail"
+
+
+# --- f-35: the steps an operator pastes into a terminal must run as written on the production host ----------------
+#
+# 2026-10-11: the A1 controlled test showed notices telling the operator to run `python src/...`,
+# `seykota-resume preview` or `systemctl start ...`.  On A1 there is no `python`, the resume tools live only in each
+# strategy's .venv/bin (not on PATH) and must run as the strategy's service account from /opt/<repo> (root/ubuntu would
+# change the state file's owner), and systemctl needs sudo.
+
+import re  # noqa: E402
+
+_TOOL_HOMES = {
+    "seykota": ("ed-seykota-systematic-trend-following", "seykota"),
+    "momentum": ("mexc-4h-momentum-trailing-stop", "mexc-momentum"),
+    "btc-competition": ("btc-bull-market-competition", "btc-competition"),
+}
+_TOOL_WORDS = re.compile(r"resume|safe_halt_resume\.py|append_trade_correction\.py|reconcile_apply\.py")
+
+
+def _command_spans(entry):
+    for number, step in enumerate(entry["operator_message"]["steps"], start=1):
+        for span in re.findall(r"`([^`]+)`", step):
+            yield number, span
+
+
+def _allowed_homes(entry):
+    # the fleet-level "strategy halted" entry (ERR-045) lists every strategy's own tool
+    homes = list(_TOOL_HOMES.values()) if entry["project"] == "fleet" else [_TOOL_HOMES.get(entry["project"])]
+    return [h for h in homes if h]
+
+
+def test_pasted_commands_run_as_the_service_account_from_the_repo_directory(catalog):
+    problems = []
+    for entry in catalog["entries"]:
+        for number, span in _command_spans(entry):
+            where = f"{entry['error_id']} step {number}"
+            if span.startswith("python ") or span.startswith("python3 "):
+                problems.append(f"{where}: bare python (no such command on A1; use the repo's .venv/bin/python): {span[:70]}")
+            if span.startswith("systemctl"):
+                problems.append(f"{where}: systemctl without sudo: {span[:70]}")
+            if not _TOOL_WORDS.search(span):
+                continue
+            homes = _allowed_homes(entry)
+            ok = any(
+                span.startswith(f"cd /opt/{repo} && sudo -u {svc} .venv/bin/")
+                or span.startswith(f"sudo -u {svc} bash -c 'cd /opt/{repo} && ")
+                for repo, svc in homes
+            )
+            if not ok:
+                problems.append(f"{where}: tool command is not `cd /opt/<repo> && sudo -u <service account> .venv/bin/...`: {span[:80]}")
+    assert not problems, "\n".join(problems)
+
+
+def test_steps_name_the_host_with_the_glossary_wording(catalog):
+    # Until trading-main is retired the glossary forbids a bare 「正式機」 for a host (fleet-glossary.json).
+    problems = []
+    for entry in catalog["entries"]:
+        text = json.dumps(entry["operator_message"], ensure_ascii=False)
+        for found in re.finditer("正式機", text):
+            around = text[max(0, found.start() - 14):found.end() + 4]
+            if "A1 正式機（新）" not in around and "trading-main 正式機（舊）" not in around:
+                problems.append(f"{entry['error_id']}: {around!r}")
+    assert not problems, "\n".join(problems)
