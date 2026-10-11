@@ -113,3 +113,53 @@ def test_junk_episode_ids_fall_back_instead_of_crashing(tmp_path):
     for n, bad in enumerate(("x", 5, [None, {}, ""], [])):
         event = _announce(tmp_path / f"log{n}.jsonl", _status({**UNREADABLE, "episode_ids": bad}))
         assert event["evidence"]["episode"].startswith("unidentified:time_unreadable:")
+
+
+def test_episode_identity_covers_every_row_not_just_the_first_fifty(tmp_path):
+    """f-32: ids beyond the 50th used to be dropped, so two periods sharing their first 50 rows were one."""
+    log = tmp_path / "log.jsonl"
+    base = [f"r{n:03d}" for n in range(60)]
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": base})) is not None
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": list(reversed(base))})) is None
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": base + ["r999"]})) is not None
+    assert len(read_fleet_events(log)) == 2
+
+
+def test_bool_is_not_an_episode_id(tmp_path):
+    for n, bad in enumerate(([True], [False, True], [True, ""])):
+        event = _announce(tmp_path / f"log{n}.jsonl", _status({**UNREADABLE, "episode_ids": bad}))
+        assert event["evidence"]["episode"].startswith("unidentified:time_unreadable:")
+    event = _announce(tmp_path / "mixed.jsonl", _status({**UNREADABLE, "episode_ids": [True, "a1"]}))
+    assert event["evidence"]["episode"].startswith("ids:1:")
+
+
+def test_ids_containing_separator_characters_still_give_different_periods(tmp_path):
+    """Review #169 BLOCK-01: ["a", "b\\nc"] and ["a\\nb", "c"] must not share an identity."""
+    from datetime import datetime, timezone
+    from trade_alerts.pending_expired_notice import _batch_episode
+    now = datetime(2026, 10, 11, tzinfo=timezone.utc)
+    common = {"reason": "time_unreadable", "since": None}
+    pairs = [(["a", "b\nc"], ["a\nb", "c"]), (["a|b", "c"], ["a", "b|c"]), (["ab", "c"], ["a", "bc"]),
+             (["a", "b"], ["a\nb"]), (['a","b'], ["a", "b"])]
+    for left, right in pairs:
+        assert (_batch_episode({**common, "episode_ids": left}, now)
+                != _batch_episode({**common, "episode_ids": right}, now)), (left, right)
+    log = tmp_path / "log.jsonl"
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["a", "b\nc"]})) is not None
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["a\nb", "c"]})) is not None
+    assert len(read_fleet_events(log)) == 2
+
+
+def test_ids_with_surrogates_stay_distinct_in_the_identity(tmp_path):
+    """Review #169 rounds 2-3: lone surrogates must encode, and one astral character must not equal its explicit
+    surrogate pair (ASCII-escaped JSON wrote both as the same bytes).  Scope: the identity computation only --
+    the event-log write still rejects surrogates, which is outside this change."""
+    from datetime import datetime, timezone
+    from trade_alerts.pending_expired_notice import _batch_episode
+    now = datetime(2026, 10, 11, tzinfo=timezone.utc)
+    common = {"reason": "time_unreadable", "since": None}
+    ids = [["\ud800"], ["\ud801"], ["\\ud800"], ["\U0001F600"], ["\ud83d\ude00"], ["\ud83d", "\ude00"],
+           ["\U0001F600", "\ud83d\ude00"]]
+    episodes = [_batch_episode({**common, "episode_ids": x}, now) for x in ids]
+    assert all(e.startswith("ids:") for e in episodes)
+    assert len(set(episodes)) == len(ids)
