@@ -134,8 +134,9 @@ def _batch_episode(block: Mapping[str, Any], moment: datetime) -> str:
             # The WHOLE set identifies the period (no cut-off): a different stuck period shares its first rows
             # only by accident, and truncating would swallow it.  Hashed so the log line stays short.
             # JSON, not a separator join: ids may contain any character, and an unambiguous encoding of the sorted
-            # list is what makes two different sets hash different inputs.
-            digest = hashlib.sha256(json.dumps(clean, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
+            # list is what makes two different sets hash different inputs.  ASCII-escaped on purpose: it also encodes lone
+            # surrogates (which UTF-8 cannot), so no id string can make the notice raise.
+            digest = hashlib.sha256(json.dumps(clean).encode("ascii")).hexdigest()[:16]
             return f"ids:{len(clean)}:{digest}"
     return f"unidentified:{block.get('reason')}:{moment.strftime('%Y-%m-%d')}"
 

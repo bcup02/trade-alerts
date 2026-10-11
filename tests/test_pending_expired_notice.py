@@ -148,3 +148,15 @@ def test_ids_containing_separator_characters_still_give_different_periods(tmp_pa
     assert _announce(log, _status({**UNREADABLE, "episode_ids": ["a", "b\nc"]})) is not None
     assert _announce(log, _status({**UNREADABLE, "episode_ids": ["a\nb", "c"]})) is not None
     assert len(read_fleet_events(log)) == 2
+
+
+def test_ids_with_lone_surrogates_do_not_break_the_notice_and_stay_distinct(tmp_path):
+    """Review #169 round 2: json.dumps(..., ensure_ascii=False).encode("utf-8") raised on a lone surrogate."""
+    from datetime import datetime, timezone
+    from trade_alerts.pending_expired_notice import _batch_episode
+    now = datetime(2026, 10, 11, tzinfo=timezone.utc)
+    common = {"reason": "time_unreadable", "since": None}
+    one = _batch_episode({**common, "episode_ids": ["\ud800"]}, now)
+    two = _batch_episode({**common, "episode_ids": ["\ud801"]}, now)
+    literal = _batch_episode({**common, "episode_ids": ["\\ud800"]}, now)
+    assert one.startswith("ids:1:") and len({one, two, literal}) == 3
