@@ -298,3 +298,38 @@ def test_steps_name_the_host_with_the_glossary_wording(catalog):
             if "A1 正式機（新）" not in around and "trading-main 正式機（舊）" not in around:
                 problems.append(f"{entry['error_id']}: {around!r}")
     assert not problems, "\n".join(problems)
+
+
+def test_bash_c_commands_carry_their_flags_inside_the_quotes(catalog):
+    # Review #173 BLOCK-173-01: "append --apply --confirm to the same command" after a `bash -c '...'` preview puts the
+    # flags after the closing quote, where bash hands them to the shell ($0, $1), not to the tool -- the tool then
+    # silently previews again.  A span that wraps the tool in `bash -c '...'` must end with the closing quote, and a
+    # step may not tell the operator to "add to the end of the same command".
+    problems = []
+    for entry in catalog["entries"]:
+        for number, step in enumerate(entry["operator_message"]["steps"], start=1):
+            where = f"{entry['error_id']} step {number}"
+            if "同一個指令最後加上" in step or "同一個指令最後加" in step:
+                problems.append(f"{where}: tells the operator to append flags to a command; give the full command")
+            for span in re.findall(r"`([^`]+)`", step):
+                if "bash -c '" in span and not span.endswith("'"):
+                    problems.append(f"{where}: bash -c span has text after the closing quote: ...{span[-40:]}")
+    assert not problems, "\n".join(problems)
+
+
+def test_correction_tool_steps_give_both_the_preview_and_the_apply_command_and_say_closed_only(catalog):
+    # append_trade_correction.py only accepts a CLOSED trade that has a trade_open (trade_alerts.trade_correction):
+    # an operator on an open position must be told not to run it (review #173 BLOCK-173-02).
+    for error_id in ("ERR-007", "ERR-037"):
+        entry = next(e for e in catalog["entries"] if e["error_id"] == error_id)
+        text = " ".join(entry["operator_message"]["steps"])
+        spans = [s for s in re.findall(r"`([^`]+)`", text) if "append_trade_correction.py" in s]
+        assert len(spans) == 2, (error_id, spans)
+        preview, apply_ = spans
+        assert "--apply" not in preview and "--confirm" not in preview
+        assert apply_.endswith(" --apply --confirm <確認碼>'")          # inside the closing quote
+        assert apply_.replace(" --apply --confirm <確認碼>", "") == preview
+        assert "已平倉" in text
+    err037 = next(e for e in catalog["entries"] if e["error_id"] == "ERR-037")
+    text037 = " ".join(err037["operator_message"]["steps"])
+    assert "trade_close" in text037 and "還開著" in text037 and "不要硬做" in text037

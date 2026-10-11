@@ -342,7 +342,7 @@
     "在 A1 正式機（新）用服務帳號執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview` 看暫停證據：有 client_order_id／submitted_at 就是某張市價單送出後查不到。",
     "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）；有 client id 就用它在訂單紀錄找那張單，確認有沒有成交、成交幾張。",
     "如果有不該存在的倉位（例如手動開的、或重複成交多出來的），先處理掉。",
-    "確認後解除暫停：執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume resume --confirm <確認碼> --exchange-verified`（用服務帳號，不要用 root）。帳本若少記了成交，交易平倉後用帳本更正工具補上：先預覽 `sudo -u seykota bash -c 'cd /opt/ed-seykota-systematic-trend-following && set -a && . /etc/seykota/seykota.env && set +a && .venv/bin/python scripts/append_trade_correction.py --trade-id <交易編號> --reason-code UNRECORDED_FILL --reason \"<原因>\" --add-order-id <訂單編號>'`，核對 previous → corrected 無誤後，同一個指令最後加上 `--apply --confirm <確認碼>`（流程見趨勢策略操作文件 docs/operations-modes.md「帳本更正」）。",
+    "確認後解除暫停：執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume resume --confirm <確認碼> --exchange-verified`（用服務帳號，不要用 root）。帳本若少記了成交，交易平倉後用帳本更正工具補上：先預覽 `sudo -u seykota bash -c 'cd /opt/ed-seykota-systematic-trend-following && set -a && . /etc/seykota/seykota.env && set +a && .venv/bin/python scripts/append_trade_correction.py --trade-id <交易編號> --reason-code UNRECORDED_FILL --reason \"<原因>\" --add-order-id <訂單編號>'`，核對 previous → corrected 無誤後，再執行套用指令 `sudo -u seykota bash -c 'cd /opt/ed-seykota-systematic-trend-following && set -a && . /etc/seykota/seykota.env && set +a && .venv/bin/python scripts/append_trade_correction.py --trade-id <交易編號> --reason-code UNRECORDED_FILL --reason \"<原因>\" --add-order-id <訂單編號> --apply --confirm <確認碼>'`（更正工具只接受已平倉的交易；流程見趨勢策略操作文件 docs/operations-modes.md「帳本更正」）。",
     "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
    ],
    "tier": "R3",
@@ -1168,7 +1168,7 @@
    "steps": [
     "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
     "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
-    "如果是策略下的單：到電腦前、在 A1 正式機（新）用帳本更正工具把這筆交易改成跟交易所一致。先預覽：`sudo -u seykota bash -c 'cd /opt/ed-seykota-systematic-trend-following && set -a && . /etc/seykota/seykota.env && set +a && .venv/bin/python scripts/append_trade_correction.py --trade-id <交易編號> --reason-code UNRECORDED_FILL --reason \"<原因>\" --add-order-id <訂單編號>'`（單號用訊息裡列的；若是同一張單被送了兩次，原因代碼改 DUPLICATE_ENTRY_UNRECORDED）；核對無誤後，同一個指令最後加上 `--apply --confirm <確認碼>`。完成後下一輪會自動撤回這個請求。",
+    "如果是策略下的單：先看帳本裡這筆交易有沒有平倉（有 trade_close）。已平倉：到電腦前、在 A1 正式機（新）用帳本更正工具改成跟交易所一致——先預覽 `sudo -u seykota bash -c 'cd /opt/ed-seykota-systematic-trend-following && set -a && . /etc/seykota/seykota.env && set +a && .venv/bin/python scripts/append_trade_correction.py --trade-id <交易編號> --reason-code UNRECORDED_FILL --reason \"<原因>\" --add-order-id <訂單編號>'`（單號用訊息裡列的；若是同一張單被送了兩次，原因代碼改 DUPLICATE_ENTRY_UNRECORDED），核對無誤後再執行套用指令 `sudo -u seykota bash -c 'cd /opt/ed-seykota-systematic-trend-following && set -a && . /etc/seykota/seykota.env && set +a && .venv/bin/python scripts/append_trade_correction.py --trade-id <交易編號> --reason-code UNRECORDED_FILL --reason \"<原因>\" --add-order-id <訂單編號> --apply --confirm <確認碼>'`，完成後下一輪會自動撤回這個請求。部位還開著、或帳本根本沒有這筆交易的開倉紀錄：更正工具會拒絕（它只接受已平倉的交易），不要硬做——先到交易所處理部位（需要的話平倉），等平倉後再更正，或直接把下方「給 AI 的追查指令」貼給 Claude。",
     "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
    ],
    "tier": "R3",
