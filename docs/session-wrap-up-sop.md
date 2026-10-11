@@ -27,7 +27,7 @@ done
 
 ## 2. 審閱歸檔
 
-- [ ] 這次每一個經過 Perplexity 審閱的 PR，都在該 repo `archive/reviews/` 有 `YYYYMMDD-<名稱>.md`（PR、head、base、
+- [ ] 這次每一個經過審閱 AI 審閱的 PR，都在該 repo `archive/reviews/` 有 `YYYYMMDD-<名稱>.md`（PR、head、base、
       squash commit、審閱結論與輪數、CI run、重點、隔離聲明）＋同名 `.patch`（`git show --format= <squash commit>`）。
 - [ ] 純文件豁免的 PR 不用歸檔，但要能在 PR 說明裡看出它是純文件。
 

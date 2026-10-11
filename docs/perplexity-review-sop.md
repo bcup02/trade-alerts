@@ -1,6 +1,7 @@
-# Perplexity（Debug／審閱 AI）審閱 SOP
+# ChatGPT（Debug／審閱 AI）審閱 SOP
 
-> 這份給 Perplexity 讀。Claude 負責開發，Perplexity 負責獨立審閱與測試。
+> 這份給 ChatGPT 讀。Claude 負責開發，ChatGPT 負責獨立審閱與測試。
+> （檔名 `perplexity-review-sop.md` 是歷史遺留：2026-10-11 前審閱 AI 是 Perplexity；沒有改名，免得弄壞既有引用。）
 > 兩者不共用工作樹，只透過 PR 內容與這份流程溝通。
 
 ## 你的角色與界線
