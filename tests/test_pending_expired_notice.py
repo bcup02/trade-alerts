@@ -131,3 +131,20 @@ def test_bool_is_not_an_episode_id(tmp_path):
         assert event["evidence"]["episode"].startswith("unidentified:time_unreadable:")
     event = _announce(tmp_path / "mixed.jsonl", _status({**UNREADABLE, "episode_ids": [True, "a1"]}))
     assert event["evidence"]["episode"].startswith("ids:1:")
+
+
+def test_ids_containing_separator_characters_still_give_different_periods(tmp_path):
+    """Review #169 BLOCK-01: ["a", "b\\nc"] and ["a\\nb", "c"] must not share an identity."""
+    from datetime import datetime, timezone
+    from trade_alerts.pending_expired_notice import _batch_episode
+    now = datetime(2026, 10, 11, tzinfo=timezone.utc)
+    common = {"reason": "time_unreadable", "since": None}
+    pairs = [(["a", "b\nc"], ["a\nb", "c"]), (["a|b", "c"], ["a", "b|c"]), (["ab", "c"], ["a", "bc"]),
+             (["a", "b"], ["a\nb"]), (['a","b'], ["a", "b"])]
+    for left, right in pairs:
+        assert (_batch_episode({**common, "episode_ids": left}, now)
+                != _batch_episode({**common, "episode_ids": right}, now)), (left, right)
+    log = tmp_path / "log.jsonl"
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["a", "b\nc"]})) is not None
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["a\nb", "c"]})) is not None
+    assert len(read_fleet_events(log)) == 2

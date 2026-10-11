@@ -16,6 +16,7 @@ expires later gets its own notice.
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
@@ -132,7 +133,9 @@ def _batch_episode(block: Mapping[str, Any], moment: datetime) -> str:
         if clean:
             # The WHOLE set identifies the period (no cut-off): a different stuck period shares its first rows
             # only by accident, and truncating would swallow it.  Hashed so the log line stays short.
-            digest = hashlib.sha256("\n".join(clean).encode("utf-8")).hexdigest()[:16]
+            # JSON, not a separator join: ids may contain any character, and an unambiguous encoding of the sorted
+            # list is what makes two different sets hash different inputs.
+            digest = hashlib.sha256(json.dumps(clean, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
             return f"ids:{len(clean)}:{digest}"
     return f"unidentified:{block.get('reason')}:{moment.strftime('%Y-%m-%d')}"
 
