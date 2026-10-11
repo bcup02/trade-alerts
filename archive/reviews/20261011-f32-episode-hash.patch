@@ -1,0 +1,147 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 709d375..f08acdc 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -1011,3 +1011,11 @@ trade-alerts：v0.30.1（競賽的調倉批次逾時通知；f-30）
+ 版本驗證／服務驗證／部署時間：待競賽改釘並部署後補記。
+ 交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+ ```
++
++```text
++trade-alerts：v0.30.2（逾時通知的期間身分改用完整事件編號集合的雜湊；f-32）
++變更摘要：1. pending_expired_notice 的期間身分（開始等的時間讀不出時用 episode_ids）原本只取排序後前 50 個編號，第 50 個之後的編號不算身分；改成「編號個數＋完整排序清單（JSON 序列化後以 UTF-8＋surrogatepass 編碼，字串內任何字元都不會與分隔混淆，孤立 surrogate 也能編碼，單一非 BMP 字元與顯式 surrogate pair 也不同）的 SHA-256 前 16 碼」（ids:<個數>:<雜湊>），並明確排除 bool（True／False 不是編號）。
++向後相容：舊格式的期間身分（ids:a|b|…）不會再被認出，所以升級當下若同一段卡住的期間已經通知過、且是用 episode_ids 當身分，會再通知一次（之後不再重複）；用 since 或同日身分的不受影響。其他行為與 v0.30.1 相同。
++受影響消費專案：競賽（改釘後才生效）。
++部署入口：無（函式庫）。
++```
+diff --git a/pyproject.toml b/pyproject.toml
+index 12b1c3e..0818ca9 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.1"
++version = "0.30.2"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 43843ed..e05ec70 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -343,4 +343,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.1"
++__version__ = "0.30.2"
+diff --git a/src/trade_alerts/pending_expired_notice.py b/src/trade_alerts/pending_expired_notice.py
+index eb9be02..e5f3662 100644
+--- a/src/trade_alerts/pending_expired_notice.py
++++ b/src/trade_alerts/pending_expired_notice.py
+@@ -15,6 +15,8 @@ expires later gets its own notice.
+ """
+ from __future__ import annotations
+ 
++import hashlib
++import json
+ from collections.abc import Mapping
+ from datetime import datetime, timezone
+ from pathlib import Path
+@@ -101,7 +103,6 @@ def plan_pending_expired_notice(
+ # --------------------------------------------------------------------------- #
+ # btc-competition: one unsettled rebalance batch / fills after the last snapshot
+ # --------------------------------------------------------------------------- #
+-_MAX_EPISODE_IDS = 50
+ 
+ 
+ def _valid_batch_block(block: Any) -> bool:
+@@ -118,7 +119,8 @@ def _batch_episode(block: Mapping[str, Any], moment: datetime) -> str:
+ 
+     1. ``since`` -- when the oldest waiting thing began (readable times only);
+     2. ``episode_ids`` -- the ledger event ids of the waiting rows (the competition supplies them when a
+-       time cannot be read): a different stuck period has different rows;
++       time cannot be read): a different stuck period has different rows.  Identity = count + hash of the
++       full sorted set (bools are not ids);
+     3. neither: nothing identifies the period, so it is announced at most once per UTC day while it lasts.
+        Never silently once-for-ever: a later, different period must not be swallowed by an old notice.
+     """
+@@ -127,9 +129,16 @@ def _batch_episode(block: Mapping[str, Any], moment: datetime) -> str:
+         return f"since:{since}"
+     ids = block.get("episode_ids")
+     if isinstance(ids, list):
+-        clean = sorted({str(i) for i in ids if isinstance(i, (str, int)) and str(i)})[:_MAX_EPISODE_IDS]
++        clean = sorted({str(i) for i in ids if isinstance(i, (str, int)) and not isinstance(i, bool) and str(i)})
+         if clean:
+-            return "ids:" + "|".join(clean)
++            # The WHOLE set identifies the period (no cut-off): a different stuck period shares its first rows
++            # only by accident, and truncating would swallow it.  Hashed so the log line stays short.
++            # JSON, not a separator join: ids may contain any character, and an unambiguous encoding of the sorted
++            # list is what makes two different sets hash different inputs.  "surrogatepass" encodes every code point
++            # on its own, so a lone surrogate encodes too and U+1F600 differs from the pair U+D83D U+DE00 (an
++            # ASCII-escaped JSON would write both as the same \ud83d\ude00).
++            digest = hashlib.sha256(json.dumps(clean, ensure_ascii=False).encode("utf-8", "surrogatepass")).hexdigest()[:16]
++            return f"ids:{len(clean)}:{digest}"
+     return f"unidentified:{block.get('reason')}:{moment.strftime('%Y-%m-%d')}"
+ 
+ 
+diff --git a/tests/test_pending_expired_notice.py b/tests/test_pending_expired_notice.py
+index 833e574..2c160e7 100644
+--- a/tests/test_pending_expired_notice.py
++++ b/tests/test_pending_expired_notice.py
+@@ -113,3 +113,53 @@ def test_junk_episode_ids_fall_back_instead_of_crashing(tmp_path):
+     for n, bad in enumerate(("x", 5, [None, {}, ""], [])):
+         event = _announce(tmp_path / f"log{n}.jsonl", _status({**UNREADABLE, "episode_ids": bad}))
+         assert event["evidence"]["episode"].startswith("unidentified:time_unreadable:")
++
++
++def test_episode_identity_covers_every_row_not_just_the_first_fifty(tmp_path):
++    """f-32: ids beyond the 50th used to be dropped, so two periods sharing their first 50 rows were one."""
++    log = tmp_path / "log.jsonl"
++    base = [f"r{n:03d}" for n in range(60)]
++    assert _announce(log, _status({**UNREADABLE, "episode_ids": base})) is not None
++    assert _announce(log, _status({**UNREADABLE, "episode_ids": list(reversed(base))})) is None
++    assert _announce(log, _status({**UNREADABLE, "episode_ids": base + ["r999"]})) is not None
++    assert len(read_fleet_events(log)) == 2
++
++
++def test_bool_is_not_an_episode_id(tmp_path):
++    for n, bad in enumerate(([True], [False, True], [True, ""])):
++        event = _announce(tmp_path / f"log{n}.jsonl", _status({**UNREADABLE, "episode_ids": bad}))
++        assert event["evidence"]["episode"].startswith("unidentified:time_unreadable:")
++    event = _announce(tmp_path / "mixed.jsonl", _status({**UNREADABLE, "episode_ids": [True, "a1"]}))
++    assert event["evidence"]["episode"].startswith("ids:1:")
++
++
++def test_ids_containing_separator_characters_still_give_different_periods(tmp_path):
++    """Review #169 BLOCK-01: ["a", "b\\nc"] and ["a\\nb", "c"] must not share an identity."""
++    from datetime import datetime, timezone
++    from trade_alerts.pending_expired_notice import _batch_episode
++    now = datetime(2026, 10, 11, tzinfo=timezone.utc)
++    common = {"reason": "time_unreadable", "since": None}
++    pairs = [(["a", "b\nc"], ["a\nb", "c"]), (["a|b", "c"], ["a", "b|c"]), (["ab", "c"], ["a", "bc"]),
++             (["a", "b"], ["a\nb"]), (['a","b'], ["a", "b"])]
++    for left, right in pairs:
++        assert (_batch_episode({**common, "episode_ids": left}, now)
++                != _batch_episode({**common, "episode_ids": right}, now)), (left, right)
++    log = tmp_path / "log.jsonl"
++    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["a", "b\nc"]})) is not None
++    assert _announce(log, _status({**UNREADABLE, "episode_ids": ["a\nb", "c"]})) is not None
++    assert len(read_fleet_events(log)) == 2
++
++
++def test_ids_with_surrogates_stay_distinct_in_the_identity(tmp_path):
++    """Review #169 rounds 2-3: lone surrogates must encode, and one astral character must not equal its explicit
++    surrogate pair (ASCII-escaped JSON wrote both as the same bytes).  Scope: the identity computation only --
++    the event-log write still rejects surrogates, which is outside this change."""
++    from datetime import datetime, timezone
++    from trade_alerts.pending_expired_notice import _batch_episode
++    now = datetime(2026, 10, 11, tzinfo=timezone.utc)
++    common = {"reason": "time_unreadable", "since": None}
++    ids = [["\ud800"], ["\ud801"], ["\\ud800"], ["\U0001F600"], ["\ud83d\ude00"], ["\ud83d", "\ude00"],
++           ["\U0001F600", "\ud83d\ude00"]]
++    episodes = [_batch_episode({**common, "episode_ids": x}, now) for x in ids]
++    assert all(e.startswith("ids:") for e in episodes)
++    assert len(set(episodes)) == len(ids)
