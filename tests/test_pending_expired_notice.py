@@ -113,3 +113,21 @@ def test_junk_episode_ids_fall_back_instead_of_crashing(tmp_path):
     for n, bad in enumerate(("x", 5, [None, {}, ""], [])):
         event = _announce(tmp_path / f"log{n}.jsonl", _status({**UNREADABLE, "episode_ids": bad}))
         assert event["evidence"]["episode"].startswith("unidentified:time_unreadable:")
+
+
+def test_episode_identity_covers_every_row_not_just_the_first_fifty(tmp_path):
+    """f-32: ids beyond the 50th used to be dropped, so two periods sharing their first 50 rows were one."""
+    log = tmp_path / "log.jsonl"
+    base = [f"r{n:03d}" for n in range(60)]
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": base})) is not None
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": list(reversed(base))})) is None
+    assert _announce(log, _status({**UNREADABLE, "episode_ids": base + ["r999"]})) is not None
+    assert len(read_fleet_events(log)) == 2
+
+
+def test_bool_is_not_an_episode_id(tmp_path):
+    for n, bad in enumerate(([True], [False, True], [True, ""])):
+        event = _announce(tmp_path / f"log{n}.jsonl", _status({**UNREADABLE, "episode_ids": bad}))
+        assert event["evidence"]["episode"].startswith("unidentified:time_unreadable:")
+    event = _announce(tmp_path / "mixed.jsonl", _status({**UNREADABLE, "episode_ids": [True, "a1"]}))
+    assert event["evidence"]["episode"].startswith("ids:1:")

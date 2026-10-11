@@ -15,6 +15,7 @@ expires later gets its own notice.
 """
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
@@ -101,7 +102,6 @@ def plan_pending_expired_notice(
 # --------------------------------------------------------------------------- #
 # btc-competition: one unsettled rebalance batch / fills after the last snapshot
 # --------------------------------------------------------------------------- #
-_MAX_EPISODE_IDS = 50
 
 
 def _valid_batch_block(block: Any) -> bool:
@@ -118,7 +118,8 @@ def _batch_episode(block: Mapping[str, Any], moment: datetime) -> str:
 
     1. ``since`` -- when the oldest waiting thing began (readable times only);
     2. ``episode_ids`` -- the ledger event ids of the waiting rows (the competition supplies them when a
-       time cannot be read): a different stuck period has different rows;
+       time cannot be read): a different stuck period has different rows.  Identity = count + hash of the
+       full sorted set (bools are not ids);
     3. neither: nothing identifies the period, so it is announced at most once per UTC day while it lasts.
        Never silently once-for-ever: a later, different period must not be swallowed by an old notice.
     """
@@ -127,9 +128,12 @@ def _batch_episode(block: Mapping[str, Any], moment: datetime) -> str:
         return f"since:{since}"
     ids = block.get("episode_ids")
     if isinstance(ids, list):
-        clean = sorted({str(i) for i in ids if isinstance(i, (str, int)) and str(i)})[:_MAX_EPISODE_IDS]
+        clean = sorted({str(i) for i in ids if isinstance(i, (str, int)) and not isinstance(i, bool) and str(i)})
         if clean:
-            return "ids:" + "|".join(clean)
+            # The WHOLE set identifies the period (no cut-off): a different stuck period shares its first rows
+            # only by accident, and truncating would swallow it.  Hashed so the log line stays short.
+            digest = hashlib.sha256("\n".join(clean).encode("utf-8")).hexdigest()[:16]
+            return f"ids:{len(clean)}:{digest}"
     return f"unidentified:{block.get('reason')}:{moment.strftime('%Y-%m-%d')}"
 
 
