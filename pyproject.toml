@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trade-alerts"
-version = "0.30.4"
+version = "0.30.5"
 description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["requests>=2.31"]
 
 [project.optional-dependencies]
-test = ["pytest>=8.0", "responses>=0.25", "jsonschema>=4.0"]
+test = ["pytest>=8.0", "responses>=0.25", "jsonschema>=4.0", "quickjs>=1.19"]   # quickjs: runs the generated pages' script in tests/test_risk_register_page.py
 
 [tool.setuptools.packages.find]
 where = ["src"]
