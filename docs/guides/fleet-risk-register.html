@@ -90,6 +90,15 @@
   }
   .foot{margin-top:36px;font-size:12px;color:var(--ink-faint);line-height:1.7;border-block-start:1px solid var(--line);padding-top:16px;}
 
+  .jump{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 14px;}
+  .jump label{font-size:13px;font-weight:700;color:var(--ink-soft);}
+  .jump select{font:inherit;font-size:14px;color:var(--ink);background:var(--paper-raised);border:1px solid var(--accent-line);border-radius:3px;padding:7px 10px;max-width:100%;min-width:min(100%,360px);}
+  .jump select:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .row-side{display:flex;flex-direction:column;gap:6px;align-items:stretch;align-self:start;}
+  .row-tier{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;font-weight:700;padding:3px 8px;border:1px solid var(--tc);border-radius:999px;color:var(--tc);background:var(--tb);text-align:center;white-space:nowrap;}
+  .row.flash{outline:2px solid var(--accent);outline-offset:-2px;background:var(--accent-bg);}
+  .row{scroll-margin-top:16px;}
+  @media (max-width:560px){ .row-side{flex-direction:row;flex-wrap:wrap;} }
   #totop{position:fixed;right:20px;bottom:20px;width:46px;height:46px;border-radius:50%;border:1px solid var(--accent-line);background:var(--accent-bg);color:var(--accent);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:0;pointer-events:none;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility 0s linear .2s;}
   #totop.show{opacity:1;pointer-events:auto;visibility:visible;transform:none;transition:opacity .2s,transform .2s,visibility 0s;}
   #totop:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
@@ -1881,6 +1890,7 @@ function chipGroup(host, values, onPick){
 var register=document.getElementById("register"), filters=document.getElementById("filters");
 var pick={tier:"all",bot:"all",open:"all"};
 var rows=[];
+var TIER_TITLE={}; DATA.tiers.forEach(function(t){ TIER_TITLE[t.id]=t.title; });
 DATA.tiers.forEach(function(t){
   var entries=DATA.entries.filter(function(e){return e.tier===t.id;});
   var section=el("section"); section.dataset.tier=t.id;
@@ -1890,7 +1900,12 @@ DATA.tiers.forEach(function(t){
   var box=el("div","rows");
   entries.forEach(function(e){
     var row=el("div","row"); row.dataset.bot=e.bot; row.dataset.open=e.open?"yes":"no";
-    row.appendChild(el("span","row-bot",e.bot_label));
+    row.id=e.error_id;
+    var side=el("div","row-side");
+    side.appendChild(el("span","row-bot",e.bot_label));
+    var tier=el("span","row-tier",e.tier); tier.title=e.tier+" "+TIER_TITLE[e.tier]; tier.style.setProperty("--tc","var(--"+e.tier+")"); tier.style.setProperty("--tb","var(--"+e.tier+"-bg)");
+    side.appendChild(tier);
+    row.appendChild(side);
     var body=el("div","row-body");
     body.appendChild(el("p","row-title",e.title));
     body.appendChild(el("p","code",e.error_id+" · "+e.code));
@@ -1928,6 +1943,26 @@ filters.appendChild(tierHost); filters.appendChild(botHost); filters.appendChild
 chipGroup(tierHost,[{id:"all",label:"全部等級",n:DATA.entries.length}].concat(DATA.tiers.map(function(t){return {id:t.id,label:t.id+" "+t.title,n:count(function(e){return e.tier===t.id;})};})),function(v){pick.tier=v;apply();});
 chipGroup(botHost,[{id:"all",label:"全部策略",n:DATA.entries.length}].concat(DATA.bots.map(function(b){return {id:b.id,label:b.label,n:count(function(e){return e.bot===b.id;})};})),function(v){pick.bot=v;apply();});
 chipGroup(openHost,[{id:"all",label:"全部",n:DATA.entries.length},{id:"open",label:"只看還沒做完的",n:count(function(e){return e.open;})}],function(v){pick.open=v;apply();});
+// Jump by error number: pick ERR-044 and the page scrolls to that block, opens its steps and highlights it.
+var jumpHost=el("div","jump"), jumpLabel=el("label",null,"依錯誤編號快速跳到："), jumpSel=el("select"); jumpSel.id="jump"; jumpLabel.htmlFor="jump";
+jumpSel.appendChild(el("option",null,"選擇錯誤編號…")).value="";
+DATA.entries.slice().sort(function(a,b){return a.error_id<b.error_id?-1:a.error_id>b.error_id?1:0;}).forEach(function(e){
+  var o=el("option",null,e.error_id+"｜"+e.tier+"｜"+e.bot_label+"｜"+e.title); o.value=e.error_id; jumpSel.appendChild(o);
+});
+jumpHost.appendChild(jumpLabel); jumpHost.appendChild(jumpSel); filters.parentNode.insertBefore(jumpHost, filters);
+function showError(id, push){
+  var row=document.getElementById(id); if(!row||row.className.indexOf("row")<0) return;
+  if(row.hidden||row.parentNode.parentNode.hidden){           // a filter is hiding it: clear the filters first
+    [tierHost,botHost,openHost].forEach(function(h){ h.firstChild.click(); });
+  }
+  var d=row.querySelector("details"); if(d) d.open=true;
+  jumpSel.value=id;
+  row.scrollIntoView({block:"start"});
+  row.classList.add("flash"); setTimeout(function(){ row.classList.remove("flash"); },2500);
+  if(push&&history.replaceState) history.replaceState(null,"","#"+id);
+}
+jumpSel.addEventListener("change",function(){ if(jumpSel.value) showError(jumpSel.value,true); });
+if(/^#ERR-\d+$/.test(location.hash)) showError(location.hash.slice(1),false);
 var toTop=document.getElementById("totop");
 toTop.addEventListener("click",function(){ window.scrollTo(0,0); var h=document.querySelector("h1"); if(h){ h.setAttribute("tabindex","-1"); h.focus({preventScroll:true}); } });
 function syncTop(){ toTop.classList.toggle("show", filters.getBoundingClientRect().bottom<0); }
