@@ -327,9 +327,108 @@ def test_correction_tool_steps_give_both_the_preview_and_the_apply_command_and_s
         assert len(spans) == 2, (error_id, spans)
         preview, apply_ = spans
         assert "--apply" not in preview and "--confirm" not in preview
-        assert apply_.endswith(" --apply --confirm <確認碼>'")          # inside the closing quote
-        assert apply_.replace(" --apply --confirm <確認碼>", "") == preview
+        assert apply_.endswith(' --apply --confirm "<確認碼>"\'')        # inside the closing quote
+        assert apply_.replace(' --apply --confirm "<確認碼>"', "") == preview
         assert "已平倉" in text
     err037 = next(e for e in catalog["entries"] if e["error_id"] == "ERR-037")
     text037 = " ".join(err037["operator_message"]["steps"])
     assert "trade_close" in text037 and "還開著" in text037 and "不要硬做" in text037
+
+
+# --- f-37: a placeholder the operator must replace is ONE quoted word -------------------------------------------------
+#
+# 2026-10-12 (ops-notify #49 review): an unquoted `<確認碼>` is an input redirection in bash -- pasting it as written
+# fails with "No such file or directory".  The f-35 tests only split the command with shlex, which does not judge that.
+
+import subprocess  # noqa: E402
+
+
+def _outside_quotes(script):
+    """Characters of ``script`` that bash sees outside any quote (backslash escapes honoured)."""
+    out, quote, i = [], None, 0
+    while i < len(script):
+        c = script[i]
+        if quote:
+            if c == "\\" and quote == '"' and i + 1 < len(script):
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c == "\\" and i + 1 < len(script):
+            i += 2                                       # an escaped character is a literal, not syntax
+            continue
+        elif c in "'\"":
+            quote = c
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def _inner_script(span):
+    """The script handed to ``bash -c '...'`` (the outer quotes are single), or None."""
+    if "bash -c '" not in span or not span.endswith("'"):
+        return None
+    return span.split("bash -c '", 1)[1][:-1]
+
+
+def _placeholder_problems(span):
+    problems = []
+    for text in (span, _inner_script(span)):
+        if text is None:
+            continue
+        bare = _outside_quotes(text)
+        # a `bash -c '...'` span: everything inside the outer single quotes is the inner script, checked on its own
+        if "<" in bare or ">" in bare:
+            problems.append(f"unquoted < or > (a redirection in bash): {span[:90]}")
+        parsed = subprocess.run(["bash", "-n", "-c", text], capture_output=True, text=True)
+        if parsed.returncode != 0:
+            problems.append(f"bash -n refuses it ({parsed.stderr.strip()[:60]}): {span[:90]}")
+    return problems
+
+
+def test_every_pasted_command_is_valid_bash_and_has_no_unquoted_placeholder(catalog):
+    problems = []
+    for entry in catalog["entries"]:
+        for number, span in _command_spans(entry):
+            if re.search(r"sudo|\.venv/bin|cd /opt|systemctl|journalctl", span):
+                problems += [f"{entry['error_id']} step {number}: {p}" for p in _placeholder_problems(span)]
+    assert not problems, "\n".join(problems)
+
+
+def test_the_catalog_does_have_quoted_placeholders_to_check(catalog):
+    # a guard that sees no placeholder at all would pass for the wrong reason
+    spans = [s for e in catalog["entries"] for _n, s in _command_spans(e) if "<" in s]
+    assert len(spans) >= 10 and all("<確認碼>" in s or "<交易編號>" in s for s in spans)
+    assert any(_inner_script(s) is not None for s in spans)
+
+
+@pytest.mark.parametrize("span", [
+    "cd /opt/x && sudo -u u .venv/bin/t resume --confirm <確認碼> --exchange-verified",                  # the f-35 mistake
+    "cd /opt/x && sudo -u u .venv/bin/t --confirm <確認碼>",
+    "sudo -u u bash -c 'cd /opt/x && .venv/bin/python s.py --trade-id <交易編號> --reason \"r\"'",       # nested, unquoted
+    "cd /opt/x && sudo -u u .venv/bin/t --confirm '<確認碼>",                                          # unbalanced quote
+    "cd /opt/x && sudo -u u .venv/bin/t --out > /tmp/x",                                              # a real redirection
+    "cd /opt/x && sudo -u u .venv/bin/t --a \\<b\\> <c>",
+])
+def test_the_placeholder_check_rejects_what_fails_in_bash(span):
+    assert _placeholder_problems(span) != []
+
+
+@pytest.mark.parametrize("span", [
+    'cd /opt/x && sudo -u u .venv/bin/t resume --confirm "<確認碼>" --exchange-verified',
+    "cd /opt/x && sudo -u u .venv/bin/t resume --confirm '<確認碼>'",
+    "sudo -u u bash -c 'cd /opt/x && .venv/bin/python s.py --trade-id \"<交易編號>\" --reason \"<原因>\"'",
+    "cd /opt/x && sudo -u u .venv/bin/t --a \\<b\\>",
+])
+def test_the_placeholder_check_accepts_quoted_or_escaped_placeholders(span):
+    assert _placeholder_problems(span) == []
+
+
+def test_a_quoted_placeholder_reaches_the_tool_as_one_argument():
+    # run the real shell on the shape the catalog now uses, with printf in place of the tool
+    out = subprocess.run(["bash", "-c", 'printf "%s\\n" resume --confirm "<確認碼>" --exchange-verified'],
+                         capture_output=True, text=True)
+    assert out.returncode == 0 and out.stdout.split("\n")[:4] == ["resume", "--confirm", "<確認碼>", "--exchange-verified"]
+    bad = subprocess.run(["bash", "-c", "printf %s resume --confirm <確認碼>"], capture_output=True, text=True)
+    assert bad.returncode != 0
