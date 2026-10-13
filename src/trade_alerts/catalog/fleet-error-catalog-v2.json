@@ -1380,7 +1380,7 @@
           "等下一輪對帳（約 15 分鐘）；若修復機器人已自動補好，會收到「已恢復」。",
           "仍然對不上：把下方「給 AI 的追查指令」整段貼給 Claude，列出差異並提出以交易所為準的更正步驟（先給你確認再執行）。"
         ],
-        "ai_prompt": "請追查這支策略為什麼帳本跟交易所對不上：讀該策略 audit/ledger_status.json 的 position_diffs 與 unmatched_exchange_fills，對照 audit/trading_ledger.jsonl 與交易所成交（唯讀查詢），判斷是漏記平倉、重複送單、手動下單還是記錄錯誤，提出以交易所為準、只追加的更正步驟（先給我確認再執行），並追查根本原因。"
+        "ai_prompt": "請追查這支策略為什麼帳本跟交易所對不上：讀該策略 audit/ledger_status.json 的 position_diffs 與 unmatched_exchange_fills，對照 audit/trading_ledger.jsonl 與交易所成交（唯讀查詢），判斷是漏記平倉、重複送單、手動下單還是記錄錯誤，提出以交易所為準、只追加的更正步驟（先給我確認再執行），並追查根本原因。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo cat /opt/ed-seykota-systematic-trend-following/audit/ledger_status.json`\n動能 `sudo cat /opt/mexc-4h-momentum-trailing-stop/audit/ledger_status.json`\n加密 `sudo cat /opt/my-crypto-bot/audit/ledger_status.json`\n競賽 `sudo cat /opt/btc-bull-market-competition/audit/ledger_status.json`"
       }
     },
     {
@@ -1413,7 +1413,7 @@
           "等下一兩輪對帳，若自動恢復會收到「已恢復」。",
           "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，追查 Google 表同步為什麼卡住。"
         ],
-        "ai_prompt": "請追查這支策略的帳本為什麼跟 Google 表對不上：讀 audit/google_reconcile_status.json 的差異清單、Google 表同步佇列與 google-projection 背景工作的日誌，判斷是送出失敗、接收端錯誤還是資料格式問題，並提出讓兩邊一致的做法與治本修正。"
+        "ai_prompt": "請追查這支策略的帳本為什麼跟 Google 表對不上：讀 audit/google_reconcile_status.json 的差異清單、Google 表同步佇列與 google-projection 背景工作的日誌，判斷是送出失敗、接收端錯誤還是資料格式問題，並提出讓兩邊一致的做法與治本修正。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo cat /opt/ed-seykota-systematic-trend-following/audit/google_reconcile_status.json`\n動能 `sudo cat /opt/mexc-4h-momentum-trailing-stop/audit/google_reconcile_status.json`\n加密 `sudo cat /opt/my-crypto-bot/audit/google_reconcile_status.json`\n競賽 `sudo cat /opt/btc-bull-market-competition/audit/google_reconcile_status.json`\n同步佇列的背景工作日誌：趨勢 `sudo journalctl -u seykota-google-projection.service -n 30 --no-pager`；動能 `sudo journalctl -u mexc-momentum-google-projection.service -n 30 --no-pager`；競賽 `sudo journalctl -u btc-competition-google-projection.service -n 30 --no-pager`。"
       }
     },
     {
@@ -1478,7 +1478,7 @@
           "等下一輪；恢復會收到「已恢復」。",
           "一直失敗：把下方「給 AI 的追查指令」整段貼給 Claude，查服務日誌並修正。"
         ],
-        "ai_prompt": "請追查這個背景服務為什麼失敗：在該主機用 journalctl -u <服務> 看最近幾次執行的錯誤（例如 226/NAMESPACE、203/EXEC、Python 例外），判斷是環境、權限、設定還是程式問題，並提出治本修正；若是部署造成的暫時失敗，說明並確認已恢復。"
+        "ai_prompt": "請追查這個背景服務為什麼失敗：在該主機用 journalctl -u <服務> 看最近幾次執行的錯誤（例如 226/NAMESPACE、203/EXEC、Python 例外），判斷是環境、權限、設定還是程式問題，並提出治本修正；若是部署造成的暫時失敗，說明並確認已恢復。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上）：\n目前失敗的服務 `sudo systemctl list-units --state=failed --no-pager`\n最近的錯誤日誌 `sudo journalctl -p err -n 50 --no-pager`"
       }
     },
     {
@@ -1510,7 +1510,7 @@
           "等下一輪；恢復會收到「已恢復」。",
           "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，查寫匯出檔的背景工作。"
         ],
-        "ai_prompt": "請追查這支策略的 audit/ops_export.json 為什麼讀不到或沒更新：看寫它的背景工作（修復機器人或帳本少記成交計時器）的 journal、檔案權限與 generated_at，判斷是背景工作沒跑、失敗還是權限問題，並提出治本修正。"
+        "ai_prompt": "請追查這支策略的 audit/ops_export.json 為什麼讀不到或沒更新：看寫它的背景工作（修復機器人或帳本少記成交計時器）的 journal、檔案權限與 generated_at，判斷是背景工作沒跑、失敗還是權限問題，並提出治本修正。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo ls -l --time-style=full-iso /opt/ed-seykota-systematic-trend-following/audit/ops_export.json`\n動能 `sudo ls -l --time-style=full-iso /opt/mexc-4h-momentum-trailing-stop/audit/ops_export.json`\n競賽 `sudo ls -l --time-style=full-iso /opt/btc-bull-market-competition/audit/ops_export.json`\n寫它的背景工作日誌：趨勢 `sudo journalctl -u seykota-repair-shadow.service -n 20 --no-pager`；動能 `sudo journalctl -u mexc-momentum-ops-export-refresh.service -n 20 --no-pager`；競賽 `sudo journalctl -u btc-competition-unrecorded-fill.service -n 20 --no-pager`。"
       }
     },
     {
@@ -1544,7 +1544,7 @@
           "確認這支策略是不是被刻意停用（例如搬家期間凍結）；是的話可忽略。",
           "不是的話，把下方「給 AI 的追查指令」整段貼給 Claude，查服務為什麼沒在回報。"
         ],
-        "ai_prompt": "請追查這支策略為什麼停止回報：確認主程式與對帳、快照背景工作的 systemctl 狀態與最近 journal，看狀態檔（audit/ledger_status.json、google_reconcile_status.json、/var/lib/portfolio-query/<策略>/current.json）的 checked_at，判斷是服務停了、卡住還是權限問題，並提出治本修正。"
+        "ai_prompt": "請追查這支策略為什麼停止回報：確認主程式與對帳、快照背景工作的 systemctl 狀態與最近 journal，看狀態檔（audit/ledger_status.json、google_reconcile_status.json、/var/lib/portfolio-query/<策略>/current.json）的 checked_at，判斷是服務停了、卡住還是權限問題，並提出治本修正。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo systemctl status seykota-bot.service --no-pager`\n動能 `sudo systemctl status mexc-momentum-bot.service --no-pager`\n加密 `sudo systemctl status my-crypto-bot.service --no-pager`\n競賽（每日調整，不是常駐程式）`sudo systemctl status btc-competition-daily.timer --no-pager`\n各背景工作最近一次執行 `sudo systemctl list-timers --no-pager`"
       }
     },
     {
@@ -1576,7 +1576,7 @@
           "到那台主機確認 chrony 是否在跑、時間是否同步（chronyc tracking）。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，找出是什麼把時間同步換掉並修正。"
         ],
-        "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。"
+        "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在這台主機用 ubuntu 帳號貼上）：\n時間同步狀態 `sudo chronyc tracking`\n時間同步服務 `sudo systemctl status chrony --no-pager`\n時鐘檢查的狀態檔 `sudo cat /var/lib/clock-health/clock_status.json`\n時鐘檢查的日誌 `sudo journalctl -u clock-health.service -n 20 --no-pager`"
       }
     },
     {

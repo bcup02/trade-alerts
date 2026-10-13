@@ -432,3 +432,71 @@ def test_a_quoted_placeholder_reaches_the_tool_as_one_argument():
     assert out.returncode == 0 and out.stdout.split("\n")[:4] == ["resume", "--confirm", "<確認碼>", "--exchange-verified"]
     bad = subprocess.run(["bash", "-c", "printf %s resume --confirm <確認碼>"], capture_output=True, text=True)
     assert bad.returncode != 0
+
+
+# --- f-41: the status alerts' second message carries read-only commands that run as pasted on A1 --------------------
+#
+# 2026-10-13: the main message of ERR-043/044/046/047/048/049 only says "look at which strategy / service"; the pasteable
+# commands that ops-notify used to hardcode (f-36) were lost when f-40 switched it to the catalog's text.  The operator
+# decided the commands belong in the SECOND message (the paste-to-AI one), so they live in `ai_prompt`.
+
+_STATUS_AI_CODES = ("ERR-043", "ERR-044", "ERR-046", "ERR-047", "ERR-048", "ERR-049")
+_FLEET_REPOS = {"ed-seykota-systematic-trend-following", "mexc-4h-momentum-trailing-stop", "my-crypto-bot",
+                "btc-bull-market-competition"}
+# Anything not on this list is not a read-only command we vouch for: only look, never change.
+_READ_ONLY_SPAN = re.compile(
+    r"^sudo (?:"
+    r"cat /opt/(?P<cat_repo>[a-z0-9-]+)/audit/(?:ledger_status|google_reconcile_status)\.json"
+    r"|ls -l --time-style=full-iso /opt/(?P<ls_repo>[a-z0-9-]+)/audit/ops_export\.json"
+    r"|cat /var/lib/clock-health/clock_status\.json"
+    r"|journalctl (?:-u [a-z0-9-]+\.service -n \d{1,3}|-p err -n \d{1,3}) --no-pager"
+    r"|systemctl (?:status [a-z0-9-]+(?:\.(?:service|timer))?|list-timers|list-units --state=failed) --no-pager"
+    r"|chronyc tracking)$")
+
+
+def _ai_spans(entry):
+    return re.findall(r"`([^`]+)`", entry["operator_message"].get("ai_prompt") or "")
+
+
+def test_status_alert_second_messages_carry_commands(catalog):
+    by_id = {e["error_id"]: e for e in catalog["entries"]}
+    for error_id in _STATUS_AI_CODES:
+        assert _ai_spans(by_id[error_id]), f"{error_id}: the paste-to-AI message has no pasteable command"
+
+
+def test_status_alert_commands_are_read_only_and_name_real_paths(catalog):
+    problems = []
+    for entry in catalog["entries"]:
+        if entry["error_id"] not in _STATUS_AI_CODES:
+            continue
+        for span in _ai_spans(entry):
+            matched = _READ_ONLY_SPAN.match(span)
+            if not matched:
+                problems.append(f"{entry['error_id']}: not a vouched read-only command: {span[:90]}")
+                continue
+            repo = matched.group("cat_repo") or matched.group("ls_repo")
+            if repo and repo not in _FLEET_REPOS:
+                problems.append(f"{entry['error_id']}: unknown repo directory /opt/{repo}")
+    assert not problems, "\n".join(problems)
+
+
+def test_status_alert_commands_are_valid_bash_with_no_unquoted_placeholder(catalog):
+    problems = []
+    for entry in catalog["entries"]:
+        if entry["error_id"] in _STATUS_AI_CODES:
+            problems += [f"{entry['error_id']}: {p}" for span in _ai_spans(entry) for p in _placeholder_problems(span)]
+    assert not problems, "\n".join(problems)
+
+
+def test_other_ai_prompts_are_not_loaded_with_unvetted_commands(catalog):
+    # Only the six status alerts were given commands; a command appearing in any other prompt must come with its own review.
+    for entry in catalog["entries"]:
+        if entry["error_id"] not in _STATUS_AI_CODES:
+            assert not _ai_spans(entry), f"{entry['error_id']}: a command in ai_prompt needs its own vetting"
+
+
+def test_second_message_renders_the_commands():
+    from trade_alerts.ops_export import render_ai_text
+    entry = [e for e in json.loads((CATALOG_PATH).read_text(encoding="utf-8"))["entries"] if e["error_id"] == "ERR-046"][0]
+    text = render_ai_text({"project": "fleet", "code": "FLEET.OPS_UNIT_FAILED", "event_id": "e1", "evidence": {}}, entry)
+    assert "sudo systemctl list-units --state=failed --no-pager" in text and text.splitlines()[0].startswith("【ERR-046】")
