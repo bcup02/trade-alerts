@@ -1,0 +1,404 @@
+"""f-43 observation watcher: each check sees its event, judges it mechanically, and tells once.
+
+A fake ``Remote`` serves files and journals from dicts, so nothing here touches ssh, a host or Telegram.
+"""
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+_ROOT = Path(__file__).resolve().parents[1]
+_spec = importlib.util.spec_from_file_location("observation_watch", _ROOT / "scripts" / "observation_watch.py")
+ow = importlib.util.module_from_spec(_spec)
+sys.modules["observation_watch"] = ow     # dataclasses look the module up by name
+_spec.loader.exec_module(ow)
+
+NOW = datetime(2026, 10, 14, 6, 0, tzinfo=timezone.utc)
+
+
+def iso(moment: datetime) -> str:
+    return moment.isoformat(timespec="seconds")
+
+
+class FakeRemote(ow.Remote):
+    def __init__(self, files=None, journals=None):
+        super().__init__("unused")
+        self.files = dict(files or {})
+        self.journals = dict(journals or {})
+
+    def read(self, host, path):
+        if not ow._PATH_RE.match(path):
+            raise ow.RemoteError("whitelist: " + path)
+        try:
+            return self.files[(host, path)]
+        except KeyError:
+            raise ow.RemoteError(f"missing {host}:{path}") from None
+
+    def journal(self, host, unit, since_utc):
+        return self.journals.get((host, unit), "")
+
+
+def put(remote, host, key, name, content, *, jsonl=False):
+    text = "\n".join(json.dumps(r) for r in content) + "\n" if jsonl else json.dumps(content)
+    remote.files[(host, ow.audit(key, name))] = text
+
+
+def ctx(remote, previous=None):
+    return ow.Context(remote, NOW, previous or {})
+
+
+def hours_ago(n):
+    return iso(NOW - timedelta(hours=n))
+
+
+# --- read whitelist -------------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("path", [
+    "/etc/passwd", "/opt/my-crypto-bot/audit/../../../etc/shadow", "/opt/my-crypto-bot/audit/x.json; rm -rf /",
+    "/opt/other-repo/audit/ledger_status.json", "/var/lib/ops-notify/../x.json", "/opt/my-crypto-bot/audit/a b.json",
+    "/opt/my-crypto-bot/state/state.json", "/var/lib/portfolio-query/my-crypto-bot/current.json\n",
+])
+def test_remote_refuses_paths_off_the_whitelist(path):
+    with pytest.raises(ow.RemoteError):
+        ow.Remote("k").read("a1", path)
+
+
+@pytest.mark.parametrize("unit, since", [("ops-notify", "2026-10-13 04:28:00"), ("a b.service", "2026-10-13 04:28:00"),
+                                          ("ops-notify.service", "yesterday"), ("ops-notify.service; id", "2026-10-13 04:28:00")])
+def test_remote_refuses_odd_journal_arguments(unit, since):
+    with pytest.raises(ow.RemoteError):
+        ow.Remote("k").journal("a1", unit, since)
+
+
+def test_the_ssh_command_is_quoted_and_read_only(monkeypatch):
+    calls = []
+
+    class Done:
+        returncode, stdout, stderr = 0, "{}", ""
+
+    monkeypatch.setattr(ow.subprocess, "run", lambda argv, **kw: calls.append(argv) or Done())
+    ow.Remote("/k").read("a1", "/opt/my-crypto-bot/audit/ledger_status.json")
+    ow.Remote("/k").journal("a1", "ops-notify.service", "2026-10-13 04:28:00")
+    ow.Remote("/k").read("dev", "/var/lib/ops-notify/state.json")
+    assert calls[0][-1] == "sudo cat /opt/my-crypto-bot/audit/ledger_status.json"
+    assert calls[1][-1] == "sudo journalctl -u ops-notify.service --since '2026-10-13 04:28:00 UTC' --utc --no-pager -q"
+    assert calls[2] == ["sudo", "-n", "cat", "/var/lib/ops-notify/state.json"]
+    assert "-o" in calls[0] and "BatchMode=yes" in calls[0]
+
+
+# --- crypto flat (x1) ---------------------------------------------------------------------------------------------
+
+def crypto_remote(*, snapshot_flat=True, positions=(), fetched=None, recon="RECONCILED"):
+    r = FakeRemote()
+    r.files[("a1", "/var/lib/portfolio-query/my-crypto-bot/current.json")] = json.dumps(
+        {"position": {"status": "FLAT"} if snapshot_flat else {"status": "LONG"}})
+    put(r, "a1", "mycrypto", "exchange_state.json", {"positions": list(positions), "fetch_status": {"complete": True, "errors": []},
+                                                      "fetched_at": fetched or iso(NOW - timedelta(minutes=5)),
+                                                      "balance": {"equity": 9.5}})
+    put(r, "a1", "mycrypto", "ledger_status.json", {"value": recon})
+    put(r, "a1", "mycrypto", "trading_ledger.jsonl",
+        [{"event_type": "trade_close", "event_time": hours_ago(3), "event_id": "close-1"}], jsonl=True)
+    return r
+
+
+def test_crypto_flat_is_observed_when_every_source_agrees():
+    result = ow.check_crypto_flat(ctx(crypto_remote()))
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and result.key == "close-1"
+    assert "x1" in result.summary
+
+
+def test_crypto_with_a_position_keeps_waiting():
+    r = crypto_remote(snapshot_flat=False, positions=[{"symbol": "BTC_USDT"}])
+    assert ow.check_crypto_flat(ctx(r)).state == ow.WAITING
+
+
+def test_crypto_snapshot_and_exchange_disagreeing_is_a_failure_not_a_pass():
+    result = ow.check_crypto_flat(ctx(crypto_remote(snapshot_flat=True, positions=[{"symbol": "BTC_USDT"}])))
+    assert result.state == ow.FAILED
+
+
+def test_crypto_stale_exchange_read_or_unreconciled_ledger_does_not_count_as_flat():
+    assert ow.check_crypto_flat(ctx(crypto_remote(fetched=hours_ago(3)))).state == ow.WAITING
+    assert ow.check_crypto_flat(ctx(crypto_remote(recon="DIVERGED"))).state == ow.WAITING
+
+
+# --- sheet tab names (f-26) -----------------------------------------------------------------------------------------
+
+def trade(hours, kind="trade_close", **extra):
+    return {"event_type": kind, "event_time": hours_ago(hours), "event_id": f"e{hours}{kind}", **extra}
+
+
+def tabs_remote(*, trades=None, status=None):
+    r = FakeRemote()
+    for key in ow.REPOS:
+        name = ow.SHEET_NAMES[key]
+        put(r, "a1", key, "google_reconcile_status.json",
+            (status or {}).get(key, {"sheet_name": name, "value": "RECONCILED", "checked_at": iso(NOW - timedelta(minutes=10)), "note": "ok"}))
+        put(r, "a1", key, "trading_ledger.jsonl", (trades or {}).get(key, []), jsonl=True)
+    return r
+
+
+def test_tabs_all_four_with_new_trades_and_reconciled_is_closable():
+    r = tabs_remote(trades={k: [trade(5)] for k in ow.REPOS})
+    result = ow.check_sheet_tab_names(ctx(r))
+    assert result.state == ow.OBSERVED and result.closable and not result.needs_human
+
+
+def test_tabs_partial_progress_is_reported_but_keeps_waiting():
+    r = tabs_remote(trades={"mycrypto": [trade(5)], "momentum": [trade(4)]})
+    result = ow.check_sheet_tab_names(ctx(r))
+    assert result.state == ow.WAITING and "加密策略" in result.summary and "動能策略" in result.summary and "競賽策略" in result.summary
+
+
+def test_tabs_old_trades_before_the_switch_do_not_count():
+    old = {"event_type": "trade_close", "event_time": "2026-10-01T00:00:00+00:00"}
+    assert ow.check_sheet_tab_names(ctx(tabs_remote(trades={k: [old] for k in ow.REPOS}))).state == ow.WAITING
+
+
+def test_tabs_wrong_sheet_name_fails_at_once():
+    bad = {"mycrypto": {"sheet_name": "my-crypto-bot", "value": "RECONCILED", "checked_at": iso(NOW)}}
+    result = ow.check_sheet_tab_names(ctx(tabs_remote(status=bad)))
+    assert result.state == ow.FAILED and "加密策略" in result.summary
+
+
+def test_tabs_diverged_is_tolerated_for_two_hours_then_fails():
+    div = {"momentum": {"sheet_name": "動能策略", "value": "DIVERGED", "checked_at": iso(NOW), "note": "x"}}
+    assert ow.check_sheet_tab_names(ctx(tabs_remote(trades={"momentum": [trade(1)]}, status=div))).state == ow.WAITING
+    assert ow.check_sheet_tab_names(ctx(tabs_remote(trades={"momentum": [trade(5)]}, status=div))).state == ow.FAILED
+
+
+def test_tabs_demo_trades_are_not_real_trades():
+    r = tabs_remote(trades={k: [trade(5, execution_mode="DEMO")] for k in ow.REPOS})
+    assert ow.check_sheet_tab_names(ctx(r)).state == ow.WAITING
+
+
+# --- competition fill (e-2), trend add-on (e-5), dev entry (f-7) ----------------------------------------------------------
+
+def test_competition_fill_waits_then_closes_when_the_sheet_agrees():
+    r = tabs_remote()
+    assert ow.check_competition_fill(ctx(r)).state == ow.WAITING
+    put(r, "a1", "btc-competition", "trading_ledger.jsonl", [trade(5, "spot_fill", execution_mode="LIVE")], jsonl=True)
+    result = ow.check_competition_fill(ctx(r))
+    assert result.state == ow.OBSERVED and result.closable
+
+
+def test_trend_addon_needs_a_human_to_look_at_the_sheet():
+    r = tabs_remote()
+    put(r, "a1", "seykota", "trading_ledger.jsonl",
+        [trade(9, "trade_open", trade_id="T1"), trade(5, "trade_open", trade_id="T1"), trade(4, "trade_open", trade_id="T2")], jsonl=True)
+    result = ow.check_trend_addon(ctx(r))
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and "T1" in result.evidence[0]
+
+
+def test_trend_without_an_add_keeps_waiting():
+    r = tabs_remote()
+    put(r, "a1", "seykota", "trading_ledger.jsonl", [trade(9, "trade_open", trade_id="T1")], jsonl=True)
+    assert ow.check_trend_addon(ctx(r)).state == ow.WAITING
+
+
+def test_dev_entry_must_come_from_a_signal_not_a_manual_test():
+    r = FakeRemote()
+    put(r, "dev", "seykota", "google_reconcile_status.json", {"value": "RECONCILED", "note": "ok"})
+    put(r, "dev", "seykota", "trading_ledger.jsonl", [trade(6, "trade_open", source="add", trade_id="T")], jsonl=True)
+    assert ow.check_dev_trend_entry(ctx(r)).state == ow.WAITING
+    put(r, "dev", "seykota", "trading_ledger.jsonl", [trade(6, "trade_open", source="entry_signal", trade_id="T")], jsonl=True)
+    result = ow.check_dev_trend_entry(ctx(r))
+    assert result.state == ow.OBSERVED and result.closable
+
+
+# --- status alerts (f-23 / f-40 / f-41) and reminders (f-39) --------------------------------------------------------
+
+def line(notices, attempted, sent, failures=0, stamp="Oct 14 03:10:01"):
+    return (f"{stamp} fleet ops-notify[1]: 2026-10-14 03:10:01,000 INFO ops_notify.watch ops_notify_watch readings=20 "
+            f"notices={notices} attempted={attempted} sent={sent} consecutive_send_failures={failures} state_written=True")
+
+
+def journal_remote(*lines):
+    return FakeRemote(journals={("a1", "ops-notify.service"): "\n".join(lines)})
+
+
+def test_status_alerts_wait_while_every_poll_is_quiet():
+    assert ow.check_status_alerts(ctx(journal_remote(line(0, 0, 0), line(0, 0, 0)))).state == ow.WAITING
+
+
+def test_a_delivered_real_alert_is_observed_but_still_needs_the_phone():
+    result = ow.check_status_alerts(ctx(journal_remote(line(0, 0, 0), line(1, 1, 1))))
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable
+    assert result.key == "Oct 14 03:10:01"
+
+
+def test_an_undelivered_alert_or_send_warning_is_a_failure():
+    assert ow.check_status_alerts(ctx(journal_remote(line(1, 1, 0)))).state == ow.FAILED
+    assert ow.check_status_alerts(ctx(journal_remote(line(0, 0, 0, failures=2)))).state == ow.FAILED
+    assert ow.check_status_alerts(ctx(journal_remote(line(1, 1, 1), "WARNING status_ai_send_failed key=x error=Timeout"))).state == ow.FAILED
+
+
+def reminder_remote(reminders, *journal):
+    r = FakeRemote(journals={("a1", "ops-notify.service"): "\n".join(journal)})
+    r.files[("a1", "/var/lib/ops-notify/state.json")] = json.dumps({"_reminders": reminders})
+    return r
+
+
+def test_reminders_wait_until_one_has_gone_out_then_remember_it_ended():
+    assert ow.check_reminders(ctx(reminder_remote({}))).state == ow.WAITING
+    first = ow.check_reminders(ctx(reminder_remote({"momentum:ledger": {"since": "t", "count": 2, "last_at": "t2"}})))
+    assert first.state == ow.OBSERVED and first.needs_human and "還在提醒" in first.evidence[0]
+    # the alert recovers: the entry disappears, the watcher still remembers it sent 2
+    ended = ow.check_reminders(ow.Context(reminder_remote({}), NOW, first.extra))
+    assert ended.state == ow.OBSERVED and "已恢復並停止" in ended.evidence[0] and ended.key.endswith(":ended")
+
+
+def test_a_reminder_send_failure_is_a_failure():
+    result = ow.check_reminders(ctx(reminder_remote({}, "WARNING reminder_send_failed channel=telegram error=Timeout")))
+    assert result.state == ow.FAILED
+
+
+# --- event-log checks (f-30, g2, f-35/f-37) -------------------------------------------------------------------------------
+
+def event(code, tier="R3", hours=3, test=False, event_id=None):
+    row = {"code": code, "risk_tier": tier, "recorded_at": hours_ago(hours), "event_id": event_id or f"{code}-{hours}"}
+    if test:
+        row["details"] = {"test": True}
+    return row
+
+
+def events_remote(**by_strategy):
+    r = FakeRemote()
+    for key in ("seykota", "momentum", "btc-competition"):
+        put(r, "a1", key, "fleet_event_log.jsonl", by_strategy.get(key, []), jsonl=True)
+    return r
+
+
+def test_controlled_test_events_never_count():
+    r = events_remote(momentum=[event("LEDGER_PENDING_EXPIRED", test=True), event("PROTECTION_UNVERIFIED", test=True)])
+    assert ow.check_pending_expired(ctx(r)).state == ow.WAITING
+    assert ow.check_safe_halt_notice(ctx(r)).state == ow.WAITING
+
+
+def test_pending_expired_and_recurring_are_seen_when_real():
+    r = events_remote(momentum=[event("LEDGER_PENDING_EXPIRED")], seykota=[event("VERIFIED_CLOSE_REPAIR_RECURRING")])
+    assert ow.check_pending_expired(ctx(r)).state == ow.OBSERVED
+    assert ow.check_repair_recurring(ctx(r)).state == ow.OBSERVED
+
+
+def test_safe_halt_notice_ignores_the_other_two_codes_and_lower_tiers():
+    r = events_remote(momentum=[event("LEDGER_PENDING_EXPIRED"), event("VERIFIED_CLOSE_REPAIR_RECURRING"), event("X", tier="R2")])
+    assert ow.check_safe_halt_notice(ctx(r)).state == ow.WAITING
+    r = events_remote(**{"btc-competition": [event("ORDER_STATUS_UNKNOWN")]})
+    result = ow.check_safe_halt_notice(ctx(r))
+    assert result.state == ow.OBSERVED and result.needs_human and "競賽策略" in result.evidence[0]
+
+
+# --- state and notification --------------------------------------------------------------------------------------------
+
+def one_check(result_for):
+    calls = {"n": 0}
+
+    def run(_ctx):
+        calls["n"] += 1
+        value = result_for(calls["n"])
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    return ow.Check("demo", "示範", ("f-x",), run)
+
+
+def test_an_observation_is_announced_once_and_again_only_after_it_went_back_to_waiting():
+    seq = [ow.Result(ow.WAITING, "w"), ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k"), ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k"),
+           ow.Result(ow.WAITING, "w"), ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k")]
+    check, sent, state = one_check(lambda n: seq[n - 1]), [], {}
+    for _ in seq:
+        state = {"items": ow.run_checks(ow.Remote("k"), NOW, state, [check])}
+        ow.notify(state["items"], lambda text: sent.append(text) or True)
+    assert len(sent) == 2 and all("可以結案" in text and "f-x" in text for text in sent)
+
+
+def test_a_failed_send_is_retried_on_the_next_run():
+    check = one_check(lambda n: ow.Result(ow.FAILED, "不符", key="k"))
+    state = {"items": ow.run_checks(ow.Remote("k"), NOW, {}, [check])}
+    assert ow.notify(state["items"], lambda t: False) == []
+    state = {"items": ow.run_checks(ow.Remote("k"), NOW, state, [check])}
+    assert ow.notify(state["items"], lambda t: True) == ["demo"]
+
+
+def test_human_confirmation_is_asked_for_not_assumed():
+    entry = ow.run_checks(ow.Remote("k"), NOW, {}, [one_check(lambda n: ow.Result(ow.OBSERVED, "到了", needs_human=True, key="k"))])["demo"]
+    text = ow.notice_for(entry)
+    assert "需要你確認" in text and "可以結案" not in text
+
+
+def test_a_broken_check_is_an_error_and_only_announced_after_three_in_a_row():
+    check = one_check(lambda n: RuntimeError("boom"))
+    state, sent = {}, []
+    for _ in range(4):
+        state = {"items": ow.run_checks(ow.Remote("k"), NOW, state, [check])}
+        ow.notify(state["items"], lambda t: sent.append(t) or True)
+    assert state["items"]["demo"]["consecutive_errors"] == 4 and len(sent) == 1 and "壞了" in sent[0]
+
+
+def test_one_broken_check_does_not_stop_the_others():
+    broken = ow.Check("broken", "壞的", ("f-b",), lambda c: (_ for _ in ()).throw(ow.RemoteError("ssh down")))
+    fine = ow.Check("fine", "好的", ("f-f",), lambda c: ow.Result(ow.WAITING, "等"))
+    items = ow.run_checks(ow.Remote("k"), NOW, {}, [broken, fine])
+    assert items["broken"]["state"] == ow.ERROR and items["fine"]["state"] == ow.WAITING
+
+
+def test_the_telegram_token_is_never_sent_without_both_variables():
+    assert ow.send_telegram("x", {}) is False and ow.send_telegram("x", {"TELEGRAM_BOT_TOKEN": "t"}) is False
+
+
+# --- command line -----------------------------------------------------------------------------------------------------
+
+def test_run_report_and_ack_round_trip(tmp_path, capsys):
+    r = crypto_remote(fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))     # main() uses the real clock
+    state, sent = tmp_path / "state.json", []
+    only = ["--state", str(state), "--only", "crypto-flat"]
+    assert ow.main(["run", *only], remote=r, send=lambda t: sent.append(t) or True) == 0
+    assert len(sent) == 1 and "需要你確認" in sent[0]
+    saved = json.loads(state.read_text(encoding="utf-8"))
+    assert saved["items"]["crypto-flat"]["state"] == ow.OBSERVED and saved["items"]["crypto-flat"]["notified_key"]
+    assert ow.main(["run", *only], remote=r, send=lambda t: sent.append(t) or True) == 0 and len(sent) == 1
+    capsys.readouterr()
+    assert ow.main(["report", "--state", str(state)]) == 0
+    assert "需要你確認" in capsys.readouterr().out
+    assert ow.main(["ack", "crypto-flat", "--state", str(state)]) == 0
+    capsys.readouterr()
+    ow.main(["report", "--state", str(state)])
+    assert "已處理" in capsys.readouterr().out
+    assert ow.main(["ack", "nope", "--state", str(state)]) == 2
+
+
+def test_dry_run_neither_sends_nor_saves(tmp_path):
+    state, sent = tmp_path / "state.json", []
+    ow.main(["run", "--dry-run", "--state", str(state), "--only", "crypto-flat"],
+            remote=crypto_remote(fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5))), send=lambda t: sent.append(t) or True)
+    assert sent == [] and not state.exists()
+
+
+def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
+    ids = [c.id for c in ow.CHECKS]
+    assert len(ids) == len(set(ids))
+    assert all(c.covers and c.title for c in ow.CHECKS)
+    covered = {i for c in ow.CHECKS for i in c.covers}
+    assert {"f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x1"} <= covered
+
+
+# --- deployment files ----------------------------------------------------------------------------------------------
+
+def test_the_service_has_no_secret_and_the_installer_never_prints_one():
+    service = (_ROOT / "deploy" / "observation-watch" / "observation-watch.service").read_text(encoding="utf-8")
+    installer = (_ROOT / "deploy" / "observation-watch" / "install.sh").read_text(encoding="utf-8")
+    timer = (_ROOT / "deploy" / "observation-watch" / "observation-watch.timer").read_text(encoding="utf-8")
+    assert "EnvironmentFile=/etc/observation-watch/watch.env" in service and "TELEGRAM" not in service
+    assert "ExecStart=/usr/bin/python3 /opt/observation-watch/observation_watch.py run" in service
+    assert "NoNewPrivileges=true" not in service          # sudo needs it; the reason is written next to the unit
+    assert "OnCalendar=*:0/30" in timer
+    # the token is copied by grep into a root-only file; no echo/cat of its value anywhere
+    assert "umask 077" in installer and "chmod 600 /etc/observation-watch/watch.env" in installer
+    assert not any(w in installer for w in ("echo $TELEGRAM", 'echo "$TELEGRAM', "cat /etc/ops-notify"))
