@@ -1,0 +1,38 @@
+diff --git a/tests/test_fleet_error_catalog.py b/tests/test_fleet_error_catalog.py
+index 0489793..42c2c5a 100644
+--- a/tests/test_fleet_error_catalog.py
++++ b/tests/test_fleet_error_catalog.py
+@@ -454,6 +454,11 @@ _READ_ONLY_SPAN = re.compile(
+     r"|chronyc tracking)$")
+ 
+ 
++def _read_only_match(span):
++    """The one place a span is judged against the whitelist: the WHOLE span must match (f-42: fullmatch, not `match` + `$`)."""
++    return _READ_ONLY_SPAN.fullmatch(span)
++
++
+ def _ai_spans(entry):
+     return re.findall(r"`([^`]+)`", entry["operator_message"].get("ai_prompt") or "")
+ 
+@@ -470,7 +475,7 @@ def test_status_alert_commands_are_read_only_and_name_real_paths(catalog):
+         if entry["error_id"] not in _STATUS_AI_CODES:
+             continue
+         for span in _ai_spans(entry):
+-            matched = _READ_ONLY_SPAN.match(span)
++            matched = _read_only_match(span)
+             if not matched:
+                 problems.append(f"{entry['error_id']}: not a vouched read-only command: {span[:90]}")
+                 continue
+@@ -500,3 +505,12 @@ def test_second_message_renders_the_commands():
+     entry = [e for e in json.loads((CATALOG_PATH).read_text(encoding="utf-8"))["entries"] if e["error_id"] == "ERR-046"][0]
+     text = render_ai_text({"project": "fleet", "code": "FLEET.OPS_UNIT_FAILED", "event_id": "e1", "evidence": {}}, entry)
+     assert "sudo systemctl list-units --state=failed --no-pager" in text and text.splitlines()[0].startswith("【ERR-046】")
++
++
++def test_the_read_only_whitelist_matches_the_whole_span_not_a_prefix_with_a_trailing_newline():
++    # f-42 (review of #180): `$` also matches just before a final newline, so `re.match(... $)` would let
++    # "sudo cat /opt/x/audit/ledger_status.json\n" through.  fullmatch must reject it, and still accept the plain command.
++    good = "sudo cat /opt/mexc-4h-momentum-trailing-stop/audit/ledger_status.json"
++    assert _read_only_match(good)
++    assert not _read_only_match(good + "\n")
++    assert not _read_only_match(good + " ; rm -rf /")
