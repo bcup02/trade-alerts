@@ -475,7 +475,7 @@
       "en": [
         "ops-control"
       ],
-      "definition": "用 Telegram 查狀態、預覽和解除安全暫停的工具（目前只接動能策略）。",
+      "definition": "用 Telegram 查狀態、預覽和解除安全暫停的工具（目前只接動能策略）。2026-10-12 已停用，repo 封存。",
       "retired": [
         "Telegram 中繼"
       ]

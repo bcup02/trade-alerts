@@ -144,8 +144,8 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `MOM.FUNDING_SHEET_WRITE_FAILED` | 未發出（f-26a；同上，ERR-058） | JUDGEMENT | R2 | P8（v2） |
 | `MYC.FUNDING_SHEET_WRITE_FAILED` | 未發出（f-26a；同上，但加密沒有事件日誌的通知管道，只有服務失敗一條路，ERR-059） | JUDGEMENT | R2 | P8（v2） |
 
-momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume + Telegram
-中繼），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
+momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume；當時還有 Telegram
+中繼，已於 2026-10-12 停用），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
 正是 seykota 要改成的樣子。
 
 `VERIFIED_CLOSE_*` 四條是 verified-close-backfill 修復機器人（Phase 6 的 `scripts/repair_bot.py`；v2 起由共用修復執行器發出，見 §4.9）。v2 起：無歧義 → R1 自動寫、不通知；
@@ -220,7 +220,7 @@ LINE 以外的任何決策，而且紅 unit 會在下次部署的健康檢查裡
 |---|---|---|---|---|
 | latch 型別 | 4 個扁平欄位 | 單一 dict | **字串 `state.status`**（與其他狀態共用欄位） | 無 |
 | 原因種類 | 2（自由字串） | 1 個 code，3 觸發點 | 8 種字串、無 code | 無 |
-| resume | 本機 CLI | 本機 CLI + Telegram | **無** | N/A |
+| resume | 本機 CLI | 本機 CLI（Telegram 遙控已於 2026-10-12 停用） | **無** | N/A |
 | resume 帳本冪等 | ✗ | ✓ | N/A | N/A |
 | catch-all → latch | ✗ | ✗ | **✓ 唯一一支** | ✗ |
 
@@ -331,7 +331,8 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
 （只重述問題的通知，等於把機器能做的分析丟回給讀的人做）。
 
 - 佇列放策略的 `audit/`，**刻意不放 `/var/lib/*-control`**——後者是 2770 setgid、ops-control
-  可寫，放那裡等於讓 Telegram relay 能偽造待處理項目給修復機器人 去執行。
+  可寫，放那裡等於讓 Telegram relay 能偽造待處理項目給修復機器人 去執行（ops-control 已於 2026-10-12
+  停用，這條放置規則照舊保留）。
 - **R0／R1 永遠不能開請求**，這條規則寫在函式裡而不是留給每個呼叫端自律。R0 的意思是偵測之後的動作
   是固定的、R1 是已經自動做完，所以沒有東西可以讓一張請求「關於」它——那些只進 §4.5 的事件日誌。這與本目錄
   「MECHANICAL 判定不得落在會通知的等級」是同一條判準的兩個執行點。
@@ -364,7 +365,7 @@ venv 競態事故實際 latch 的地方（見 rationale），單次失敗就停�
   - 事件日誌或佇列有壞行時直接拋錯（同 §4.5），不輸出一份看起來完整其實缺一塊的匯出；呼叫端
     best-effort 寫檔，匯出停止更新時由 ops-notify 報 `STALE`。
 - **`write_ops_export(path, export)`**：整份原子替換、`0644`。檔案由策略自己的服務帳號寫進
-  `audit/`；ops-notify／ops-control 只有群組讀權限，relay 端無法偽造要送的項目（與 §4.6 佇列放
+  `audit/`；ops-notify（與已停用的 ops-control）只有群組讀權限，relay 端無法偽造要送的項目（與 §4.6 佇列放
   `audit/` 同一個理由）。
 - 格式在 `schemas/fleet-ops-export-v2.schema.json`。
 

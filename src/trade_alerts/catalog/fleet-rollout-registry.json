@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-10",
+  "updated_at": "2026-10-13",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
   "projects": {
     "momentum": "動能策略",
@@ -20,7 +20,7 @@
     "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
     "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
     "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
-    "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）",
+    "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）——2026-10-12 使用者決定取消：停用 Telegram 遙控，持續提醒改由維運通知發送（f-39），不做按鈕",
     "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
     "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
     "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
@@ -345,7 +345,7 @@
     {
       "id": "notify.line_first_notice",
       "title": "需要人處理的通知真的送到 LINE（只發第一則）",
-      "description": "維運通知讀策略的匯出檔後，把需要人處理的事送一則到 LINE。LINE 有每月額度，所以刻意只發第一則、不重複提醒；重複提醒是 Telegram 的工作（見下一列）。兩台主機都要有這條路。",
+      "description": "維運通知讀策略的匯出檔後，把需要人處理的事送一則到 LINE。LINE 有每月額度，所以刻意只發第一則、不重複提醒；重複提醒由維運通知在 Telegram 發（見下一列，f-39）。兩台主機都要有這條路。",
       "status": {
         "seykota": {
           "state": "done",
@@ -358,39 +358,35 @@
         "mycrypto": {
           "state": "pending",
           "phase": "8-mycrypto",
-          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。　這支策略目前還沒有任何會通知人的事件來源。"
+          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定；7e 已取消（2026-10-12），開發機維運通知保留 Telegram 單向發送是否沿用，另議。　這支策略目前還沒有任何會通知人的事件來源。"
         },
         "btc-competition": {
           "state": "pending",
           "phase": "8-btc-competition",
-          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定，不是設計，7e 做完要移除。　這支策略目前還沒有任何會通知人的事件來源。"
+          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定；7e 已取消（2026-10-12），開發機維運通知保留 Telegram 單向發送是否沿用，另議。　這支策略目前還沒有任何會通知人的事件來源。"
         }
       }
     },
     {
       "id": "notify.telegram_repeat",
-      "title": "需要人處理的通知在 Telegram 持續提醒（含兩顆按鈕）",
-      "description": "Telegram 沒有額度問題，所以從第一則起持續提醒到有人處理，並附「開始處理」「處理完成」兩顆按鈕；由 Telegram 遙控（ops-control）負責發送。兩台主機都要有這條路。",
+      "title": "需要人處理的通知在 Telegram 持續提醒，並附「開始處理」「處理完成」按鈕（已取消）",
+      "description": "原計畫：Telegram 沒有額度問題，從第一則起持續提醒到有人處理，並附兩顆按鈕，由 Telegram 遙控（ops-control）發送。2026-10-12 使用者決定停用 Telegram 遙控，這個做法取消。替代做法（f-39）在維運通知裡，不屬於任何一支策略：維運通知自己的狀態告警（含策略安全暫停）未恢復前，前 3 小時每 30 分鐘、之後每 3 小時，只在 Telegram 重發提醒，恢復就停；不含按鈕，也不重發策略事件通知（匯出檔轉送）。A1 於 2026-10-13 開啟。",
       "status": {
         "seykota": {
-          "state": "pending",
-          "phase": "7e",
-          "reason": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+          "state": "n/a",
+          "reason": "2026-10-12 使用者決定停用 Telegram 遙控（ops-control）：「開始處理」「處理完成」按鈕與由 ops-control 發送的持續提醒都取消，安全暫停改在電腦前或請 Claude 代跑各策略自己的解除工具。需要人處理的狀態告警改由維運通知（不是策略 repo）在 Telegram 持續提醒（f-39，A1 正式機 2026-10-13 台北 10:54 開啟）；這裡不為此記已做，因為沒有策略 repo 的程式可引用。"
         },
         "momentum": {
-          "state": "pending",
-          "phase": "7e",
-          "reason": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+          "state": "n/a",
+          "reason": "2026-10-12 使用者決定停用 Telegram 遙控（ops-control）：「開始處理」「處理完成」按鈕與由 ops-control 發送的持續提醒都取消，安全暫停改在電腦前或請 Claude 代跑各策略自己的解除工具。需要人處理的狀態告警改由維運通知（不是策略 repo）在 Telegram 持續提醒（f-39，A1 正式機 2026-10-13 台北 10:54 開啟）；這裡不為此記已做，因為沒有策略 repo 的程式可引用。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "7e",
-          "reason": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+          "state": "n/a",
+          "reason": "2026-10-12 使用者決定停用 Telegram 遙控（ops-control）：「開始處理」「處理完成」按鈕與由 ops-control 發送的持續提醒都取消，安全暫停改在電腦前或請 Claude 代跑各策略自己的解除工具。需要人處理的狀態告警改由維運通知（不是策略 repo）在 Telegram 持續提醒（f-39，A1 正式機 2026-10-13 台北 10:54 開啟）；這裡不為此記已做，因為沒有策略 repo 的程式可引用。"
         },
         "btc-competition": {
-          "state": "pending",
-          "phase": "7e",
-          "reason": "計畫（phase7-foundation.md §7e）：Telegram 沒有額度限制，要從第一則起持續提醒，並帶「開始處理」「處理完成」兩顆按鈕，由 ops-control 發（唯一持有 Telegram token 的元件）。2026-09-22 實查：兩台主機的 ops-control 都有 Telegram 憑證、服務也在跑，但只做遙控工具轉送，完全沒有警報轉送這條路；開發機看似收得到 Telegram，是 ops-notify 的權宜設定送的，不是這條路。"
+          "state": "n/a",
+          "reason": "2026-10-12 使用者決定停用 Telegram 遙控（ops-control）：「開始處理」「處理完成」按鈕與由 ops-control 發送的持續提醒都取消，安全暫停改在電腦前或請 Claude 代跑各策略自己的解除工具。需要人處理的狀態告警改由維運通知（不是策略 repo）在 Telegram 持續提醒（f-39，A1 正式機 2026-10-13 台北 10:54 開啟）；這裡不為此記已做，因為沒有策略 repo 的程式可引用。"
         }
       }
     },
@@ -1970,42 +1966,37 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "reconcile.pending_age_cap",
+      "id": "notify.telegram_repeat",
       "project": "momentum",
       "type": "completed",
-      "note": "f-30 動能：2026-10-11 台北 00:24 上 A1（operations 53e04ce），位置對帳標記 24 小時上限與結清工具調整改已做；sources 換到 53e04ce。"
+      "note": "f-38 第二階段：2026-10-12 使用者決定停用 Telegram 遙控（ops-control），按鈕與其持續提醒取消，這格改不適用；替代做法在維運通知（f-39），不屬於策略 repo。"
     },
     {
-      "kind": "rule",
-      "id": "MOM.LEDGER_PENDING_EXPIRED",
-      "project": "momentum",
-      "aspect": "behaviour",
+      "kind": "cap",
+      "id": "notify.telegram_repeat",
+      "project": "seykota",
       "type": "completed",
-      "note": "f-30 動能：逾時標記通知一次（ERR-060）隨動能上 A1（2026-10-11 台北 00:24），改已做。"
+      "note": "f-38 第二階段：2026-10-12 使用者決定停用 Telegram 遙控（ops-control），按鈕與其持續提醒取消，這格改不適用；替代做法在維運通知（f-39），不屬於策略 repo。"
     },
     {
-      "kind": "rule",
-      "id": "MOM.LEDGER_PENDING_EXPIRED",
-      "project": "momentum",
-      "aspect": "emits_event",
+      "kind": "cap",
+      "id": "notify.telegram_repeat",
+      "project": "mycrypto",
       "type": "completed",
-      "note": "f-30 動能：逾時標記通知一次（ERR-060）隨動能上 A1（2026-10-11 台北 00:24），改已做。"
+      "note": "f-38 第二階段：2026-10-12 使用者決定停用 Telegram 遙控（ops-control），按鈕與其持續提醒取消，這格改不適用；替代做法在維運通知（f-39），不屬於策略 repo。"
     },
     {
-      "kind": "rule",
-      "id": "BTC.LEDGER_PENDING_EXPIRED",
+      "kind": "cap",
+      "id": "notify.telegram_repeat",
       "project": "btc-competition",
-      "aspect": "behaviour",
       "type": "completed",
-      "note": "f-30 競賽：調倉批次逾時通知一次（ERR-061）隨競賽上 A1（2026-10-11 台北約 00:22），改已做；sources 換到 7d499bb。"
+      "note": "f-38 第二階段：2026-10-12 使用者決定停用 Telegram 遙控（ops-control），按鈕與其持續提醒取消，這格改不適用；替代做法在維運通知（f-39），不屬於策略 repo。"
     },
     {
-      "kind": "rule",
-      "id": "BTC.LEDGER_PENDING_EXPIRED",
-      "project": "btc-competition",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "f-30 競賽：調倉批次逾時通知一次（ERR-061）隨競賽上 A1（2026-10-11 台北約 00:22），改已做；sources 換到 7d499bb。"
+      "kind": "cap",
+      "id": "notify.line_first_notice",
+      "type": "updated",
+      "note": "f-38：說明改指向維運通知的 Telegram 持續提醒（f-39）；加密、競賽兩格理由裡「7e 做完要移除」改成 7e 已取消。"
     }
   ]
 }
