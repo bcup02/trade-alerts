@@ -528,3 +528,46 @@ def test_a_state_file_that_cannot_be_saved_is_reported_and_the_repeat_is_documen
     monkeypatch.setattr(ow, "save_state", lambda *a: (_ for _ in ()).throw(OSError("disk full")))
     code = ow.main(["run", "--state", str(state), "--only", "crypto-flat"], remote=r, send=lambda t: sent.append(t) or True)
     assert code == 1 and len(sent) == 1 and "下一輪可能重複發送" in capsys.readouterr().err
+
+
+# --- the state is read only after the lock is held (review of #183 round 3) ----------------------------------------------
+
+@pytest.mark.parametrize("argv", [["run", "--only", "crypto-flat"], ["ack", "crypto-flat"]])
+def test_the_state_is_loaded_while_the_lock_is_held(tmp_path, monkeypatch, argv):
+    import fcntl
+    state = tmp_path / "state.json"
+    ow.save_state(state, {"items": {"crypto-flat": {"state": ow.WAITING, "key": "k"}}})
+    seen = []
+    real_load = ow.load_state
+
+    def probe(path):
+        # if the lock were free here, another run could save between this read and our own lock
+        with open(state.with_suffix(".lock"), "w") as other:
+            try:
+                fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                seen.append("lock was free")
+            except OSError:
+                seen.append("lock held")
+        return real_load(path)
+
+    monkeypatch.setattr(ow, "load_state", probe)
+    ow.main([*argv, "--state", str(state)], remote=crypto_remote(), send=lambda t: True)
+    assert seen == ["lock held"]
+
+
+def test_a_run_that_waited_behind_another_decides_from_what_that_one_saved(tmp_path):
+    # ack blocks on the lock; the holder saves a newer state before letting go; ack must act on the newer one
+    import fcntl, threading, time
+    state = tmp_path / "state.json"
+    ow.save_state(state, {"items": {"crypto-flat": {"state": ow.WAITING, "key": "old"}}})
+    held = open(state.with_suffix(".lock"), "w")
+    fcntl.flock(held, fcntl.LOCK_EX)
+    codes = []
+    t = threading.Thread(target=lambda: codes.append(ow.main(["ack", "crypto-flat", "--state", str(state)])))
+    t.start()
+    time.sleep(0.3)                                    # ack is now waiting for the lock
+    ow.save_state(state, {"items": {"crypto-flat": {"state": ow.WAITING, "key": "new"}}})
+    fcntl.flock(held, fcntl.LOCK_UN)
+    held.close()
+    t.join(5)
+    assert codes == [0] and ow.load_state(state)["items"]["crypto-flat"]["acked_key"] == f"{ow.WAITING}:new"

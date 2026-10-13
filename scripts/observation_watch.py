@@ -620,25 +620,28 @@ def main(argv: list[str] | None = None, remote: Remote | None = None, send: Call
     parser.add_argument("--only", help="run only this check id")
     parser.add_argument("--json", action="store_true", help="report: print the state as JSON")
     args = parser.parse_args(argv)
-    previous = load_state(args.state)
-    if args.command == "ack":
-        entry = (previous.get("items") or {}).get(args.check_id or "")
-        if not entry:
-            print(f"沒有這個檢查：{args.check_id}", file=sys.stderr)
-            return 2
-        entry["acked_key"] = f"{entry['state']}:{entry.get('key', '')}"
-        save_state(args.state, previous)
-        print(f"已標記處理完：{args.check_id}（{entry['acked_key']}）")
-        return 0
     if args.command == "report":
+        previous = load_state(args.state)
         print(json.dumps(previous, ensure_ascii=False, indent=2) if args.json else report(previous))
         return 0
     args.state.parent.mkdir(parents=True, exist_ok=True)
+    # The state is read only after the lock is held: a run that waited behind another one must decide from what
+    # that run saved, not from what it read earlier (otherwise a message already sent could be sent again).
     with open(args.state.with_suffix(".lock"), "w") as lock:
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(lock, fcntl.LOCK_EX | (0 if args.command == "ack" else fcntl.LOCK_NB))
         except OSError:
             print("另一個偵測正在跑，這一輪略過。")
+            return 0
+        previous = load_state(args.state)
+        if args.command == "ack":
+            entry = (previous.get("items") or {}).get(args.check_id or "")
+            if not entry:
+                print(f"沒有這個檢查：{args.check_id}", file=sys.stderr)
+                return 2
+            entry["acked_key"] = f"{entry['state']}:{entry.get('key', '')}"
+            save_state(args.state, previous)
+            print(f"已標記處理完：{args.check_id}（{entry['acked_key']}）")
             return 0
         now = datetime.now(timezone.utc)
         state = {"checked_at": now.isoformat(timespec="seconds"),

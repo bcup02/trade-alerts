@@ -37,3 +37,5 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項�
 ## 新增一個檢查
 在 `scripts/observation_watch.py` 寫一個 `check_xxx(ctx) -> Result`，加進 `CHECKS`（`covers` 填進度頁項目編號），
 在 `tests/test_observation_watch.py` 用 `FakeRemote` 寫：等待、通過、失敗各一個測試。判斷不到的事（手機上看到的樣子）設 `needs_human=True`，不要假裝能自動驗證。
+
+- 狀態檔在取得檔案鎖「之後」才讀（`run` 與 `ack` 都是）：排在另一輪後面的那一輪，依前一輪存下的結果決定要不要通知，不會用鎖之前讀到的舊狀態重複發送。`ack` 會等鎖（等到前一輪結束），`run` 遇到鎖仍是略過這一輪。
