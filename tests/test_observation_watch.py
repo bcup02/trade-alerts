@@ -279,11 +279,12 @@ def event(code, tier="R3", hours=3, test=False, event_id=None):
     return row
 
 
-def events_remote(delivered=None, ai_pending=None, **by_strategy):
+def events_remote(delivered=None, ai_pending=None, baseline=None, **by_strategy):
     r = FakeRemote()
     for key in ("seykota", "momentum", "btc-competition"):
         put(r, "a1", key, "fleet_event_log.jsonl", by_strategy.get(key, []), jsonl=True)
-    export = {key: {"delivered": {e: iso(NOW - timedelta(hours=1)) for e in (delivered or {}).get(key, [])},
+    export = {key: {"baseline_at": (baseline or {}).get(key, "2026-09-23T19:10:05+00:00"),
+                    "delivered": {e: iso(NOW - timedelta(hours=1)) for e in (delivered or {}).get(key, [])},
                     **({"ai_pending": ai_pending[key]} if ai_pending and key in ai_pending else {})}
               for key in ("seykota", "momentum", "btc-competition")}
     r.files[("a1", "/var/lib/ops-notify/state.json")] = json.dumps({"_export": export})
@@ -305,6 +306,24 @@ def test_a_logged_event_is_not_a_delivered_notice():
     done = ow.check_pending_expired(ctx(events_remote(momentum=[e], delivered={"momentum": ["p1"]})))
     assert done.state == ow.OBSERVED and done.needs_human and not done.closable
     assert "第一則已送出" in done.evidence[0] and "送達要你確認" in done.evidence[0]
+
+
+def test_a_delivered_mark_from_the_first_baseline_is_not_proof_of_a_send():
+    """Review round 2 of #183: when ops-notify first sees a target it marks the notices that already exist as 'delivered'
+    WITHOUT sending them.  An event older than that baseline must not be reported as 'first message sent'."""
+    e = event("LEDGER_PENDING_EXPIRED", hours=3, event_id="old1")
+    after_baseline = events_remote(momentum=[e], delivered={"momentum": ["old1"]},
+                                   baseline={"momentum": iso(NOW - timedelta(hours=1))})        # baseline made AFTER the event
+    result = ow.check_pending_expired(ctx(after_baseline))
+    assert result.state == ow.OBSERVED and result.needs_human and result.key.startswith("unproven:")
+    assert "無法證明有送出" in result.evidence[0] and "第一則已送出" not in result.evidence[0]
+    assert "請你確認有沒有收到" in result.summary
+    # the same event with the baseline made BEFORE it is a genuine delivery
+    before = events_remote(momentum=[e], delivered={"momentum": ["old1"]}, baseline={"momentum": iso(NOW - timedelta(hours=5))})
+    assert "第一則已送出" in ow.check_pending_expired(ctx(before)).evidence[0]
+    # no baseline recorded at all: cannot tell, so it is not claimed either
+    no_baseline = events_remote(momentum=[e], delivered={"momentum": ["old1"]}, baseline={"momentum": None})
+    assert "無法證明有送出" in ow.check_pending_expired(ctx(no_baseline)).evidence[0]
 
 
 def test_a_second_message_that_stays_owed_for_over_70_minutes_is_a_failure():

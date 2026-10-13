@@ -440,14 +440,21 @@ def _strategy_event_result(ctx: Context, events: list[tuple[str, dict[str, Any]]
     the event, the delivery evidence, and what only the operator can confirm."""
     state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
     exported = state.get("_export") if isinstance(state.get("_export"), Mapping) else {}
-    evidence, overdue, undelivered = [], [], []
+    evidence, overdue, undelivered, unproven = [], [], [], []
     for key, event in events[:5]:
         target = exported.get(key) if isinstance(exported.get(key), Mapping) else {}
         delivered = (target.get("delivered") or {}).get(event.get("event_id"))
         owed = (target.get("ai_pending") or {}).get(event.get("event_id"))
         at = parse_time(event.get("recorded_at"))
+        baseline = parse_time(target.get("baseline_at"))
         label = f"{LABELS[key]}：{event.get('code')}（事件 {taipei(at)} 台北）"
-        if not delivered:
+        if delivered and (baseline is None or at <= baseline):
+            # ops-notify marks every notice that already exists when it first sees a target as 'delivered' WITHOUT sending
+            # (export_relay.py, to avoid re-sending old notices); such a mark is not evidence that anything went out.
+            unproven.append(label)
+            evidence.append(label + "；第一則：無法證明有送出（這則事件早於維運通知首次建立基準的時間，"
+                                    "送出紀錄是當時的略過標記，不是實際送出）")
+        elif not delivered:
             (overdue if ctx.now - at > EVENT_NOTICE_OVERDUE else undelivered).append(label)
             evidence.append(label + "；第一則：維運通知還沒有送出紀錄")
         elif owed and ctx.now - (parse_time(owed) or ctx.now) > SECOND_MESSAGE_OVERDUE:
@@ -460,6 +467,8 @@ def _strategy_event_result(ctx: Context, events: list[tuple[str, dict[str, Any]]
         return Result(FAILED, "事件已記錄，但維運通知超過預期時間沒有送出（或第二則一直送不出去）。", evidence, key="overdue:" + key)
     if undelivered:
         return Result(WAITING, "事件已記錄，等維運通知下一輪送出。", evidence)
+    if unproven:
+        return Result(OBSERVED, seen + "但維運通知有沒有送出無法從紀錄證明，請你確認有沒有收到。", evidence, needs_human=True, key="unproven:" + key)
     return Result(OBSERVED, seen + ask, evidence, needs_human=True, key=key)
 
 
