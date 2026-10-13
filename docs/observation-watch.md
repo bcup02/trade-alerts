@@ -21,8 +21,15 @@ python3 /opt/observation-watch/observation_watch.py run --dry-run   # 現在檢�
 python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項處理完了（報告不再提醒）
 ```
 
+## 它能證明什麼、不能證明什麼
+- 「事件發生」「第一則送出」「第二則送達」是三件事，分開寫在證據裡：事件看帳本與事件日誌；第一則看維運通知的狀態檔（`delivered`／`notified_at`）與日誌的 `sent=attempted`；
+  **第二則的成功維運通知不記錄**（只記失敗），所以永遠不宣稱它送達，一律問人。
+- Google 對帳的 `RECONCILED` 只有在**對帳時間晚於那筆新交易的 61 分鐘寬限之後**才算數（新交易 60 分鐘內本來就可以還沒上表）；之前的 RECONCILED、寬限內的 RECONCILED、過期（超過 90 分鐘）的都不算，只會繼續等待。
+- 已知限制：Telegram 送出但狀態檔存不進去時，下一輪可能重複發送（會印出錯誤並以結束碼 1 結束）；同時只會有一個在跑（檔案鎖）。
+- 受控測試事件靠 `details.test`／`evidence.test` 排除；維運通知日誌本身分不出測試與真實，所以狀態告警那一項一律要人確認。
+
 ## 唯讀與安全
-- 只讀固定清單內的檔案與日誌（`Remote` 的路徑與服務名白名單；不接受 `..`、空白、分號）。A1 用 `ssh … sudo cat／journalctl`，開發機用 `sudo -n cat`。
+- 只讀固定清單內的檔案與日誌（`Remote` 的白名單是**確切的路徑清單**與 `ops-notify.service`，時間用 `fullmatch`；不是「符合某種樣式的任何檔案」）。A1 用 `ssh … sudo cat／journalctl`，開發機用 `sudo -n cat`。注意：主機上該帳號能 `sudo` 什麼是另一層、比這個工具寬的權限，這個工具靠白名單把自己限制在清單內。
 - Telegram 設定放在 `/etc/observation-watch/watch.env`（root 0600，只有 token 與 chat id）；程式不印出、不寫入日誌。
 - 測試用的受控事件（`details.test` / `evidence.test`）一律不算。
 

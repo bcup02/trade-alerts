@@ -24,6 +24,7 @@ Everything here is standard library only and runs unprivileged on the dev host; 
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import re
@@ -66,18 +67,28 @@ class RemoteError(RuntimeError):
     """A read failed (host unreachable, file missing, path not on the whitelist)."""
 
 
-_PATH_RE = re.compile(
-    r"^/opt/(?:%s)/audit/[a-z0-9_.-]+\.jsonl?$|^/var/lib/portfolio-query/[a-z0-9-]+/current\.json$|^/var/lib/ops-notify/state\.json$"
-    % "|".join(map(re.escape, REPOS.values())))
-_UNIT_RE = re.compile(r"^[a-z0-9-]+\.service$")
-_SINCE_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")
+def _allowed_paths() -> frozenset[str]:
+    """Exactly the files the checks below read -- nothing else under /opt, /var/lib or anywhere is readable."""
+    paths = {"/var/lib/portfolio-query/my-crypto-bot/current.json", "/var/lib/ops-notify/state.json",
+             audit("mycrypto", "exchange_state.json")}
+    for key in REPOS:
+        paths |= {audit(key, name) for name in ("ledger_status.json", "google_reconcile_status.json", "trading_ledger.jsonl")}
+    paths |= {audit(key, "fleet_event_log.jsonl") for key in ("seykota", "momentum", "btc-competition")}
+    return frozenset(paths)
+
+
+ALLOWED_PATHS = _allowed_paths()
+ALLOWED_UNITS = frozenset({"ops-notify.service"})
+_SINCE_RE = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
 
 class Remote:
     """Reads files and journals on ``a1`` (over ssh) or ``dev`` (this machine, through ``sudo -n``).
 
-    Only whitelisted, validated arguments ever reach a shell: a path must match ``_PATH_RE`` (no ``..``, no spaces),
-    a unit ``_UNIT_RE``, a time ``_SINCE_RE``; the remote command is built with ``shlex.quote`` from those parts."""
+    Only whitelisted arguments ever reach a shell: a path must be one of ``ALLOWED_PATHS`` (exact strings), a unit one of
+    ``ALLOWED_UNITS``, a time must ``fullmatch`` ``_SINCE_RE``; the remote command is built with ``shlex.quote``.
+    (What the unprivileged ssh user may ``sudo`` is a separate, wider permission on the hosts; this class is what keeps
+    this tool inside the list above.)"""
 
     def __init__(self, ssh_key: str | None = None, timeout: int = 60):
         self.ssh_key = ssh_key or os.environ.get("OBSERVATION_WATCH_SSH_KEY") or str(Path.home() / ".ssh" / "oci_a1_key")
@@ -100,12 +111,12 @@ class Remote:
         return done.stdout
 
     def read(self, host: str, path: str) -> str:
-        if not _PATH_RE.match(path) or ".." in path:
+        if path not in ALLOWED_PATHS:
             raise RemoteError(f"path not on the read whitelist: {path!r}")
         return self._run(host, ["cat", path])
 
     def journal(self, host: str, unit: str, since_utc: str) -> str:
-        if not _UNIT_RE.match(unit) or not _SINCE_RE.match(since_utc):
+        if unit not in ALLOWED_UNITS or not _SINCE_RE.fullmatch(since_utc):
             raise RemoteError(f"journal arguments not allowed: {unit!r} {since_utc!r}")
         return self._run(host, ["journalctl", "-u", unit, "--since", since_utc + " UTC", "--utc", "--no-pager", "-q"])
 
@@ -186,6 +197,22 @@ def _fresh(moment: datetime | None, now: datetime, minutes: int) -> bool:
     return moment is not None and abs((now - moment).total_seconds()) <= minutes * 60
 
 
+RECONCILE_GRACE = timedelta(minutes=61)   # a new trade may legitimately be missing from the sheet for 60 minutes
+
+
+def reconcile_covers(status: Mapping[str, Any], last_trade: datetime, now: datetime) -> str:
+    """Did the ledger-vs-sheet check run AFTER the grace period of the newest trade had passed?
+
+    ``covered``  -- it did, and found everything on the sheet (RECONCILED);
+    ``diverged`` -- it did, and the sheet disagrees;
+    ``pending``  -- it has not (yet) looked at this trade with the grace expired, or its answer is unknown/stale.
+    A RECONCILED that predates the trade (or is still inside its grace) proves nothing about it."""
+    checked = parse_time(status.get("checked_at"))
+    if checked is None or checked < last_trade + RECONCILE_GRACE or not _fresh(checked, now, 90):
+        return "pending"
+    return {"RECONCILED": "covered", "DIVERGED": "diverged"}.get(str(status.get("value")), "pending")
+
+
 def check_crypto_flat(ctx: Context) -> Result:
     """x1: the crypto strategy is flat -- the signal to start the Binance move (the user asked to be told)."""
     snap = load_json(ctx.remote, "a1", "/var/lib/portfolio-query/my-crypto-bot/current.json")
@@ -244,13 +271,13 @@ def check_sheet_tab_names(ctx: Context) -> Result:
             waiting.append(name)
             continue
         last = max(parse_time(t["event_time"]) for t in trades)
-        value = status.get("value")
-        if value == "RECONCILED" and _fresh(parse_time(status.get("checked_at")), ctx.now, 90):
+        verdict = reconcile_covers(status, last, ctx.now)
+        if verdict == "covered":
             ok.append(name)
-            evidence.append(f"{name}：{len(trades)} 筆新交易（最近 {taipei(last)} 台北），Google 表對帳一致")
-        elif value == "DIVERGED" and ctx.now - last > timedelta(hours=2):
+            evidence.append(f"{name}：{len(trades)} 筆新交易（最近 {taipei(last)} 台北），之後的 Google 表對帳（{taipei(parse_time(status['checked_at']))}）一致")
+        elif verdict == "diverged":
             bad.append(name)
-            evidence.append(f"{name}：新交易已超過 2 小時，Google 表對帳仍是 DIVERGED")
+            evidence.append(f"{name}：最近一筆新交易已過 60 分鐘寬限，之後的 Google 表對帳仍是 DIVERGED")
         else:
             waiting.append(name)
     if bad:
@@ -269,12 +296,14 @@ def check_competition_fill(ctx: Context) -> Result:
         return Result(WAITING, "競賽策略還沒有新的現貨成交。")
     status = load_json(ctx.remote, "a1", audit("btc-competition", "google_reconcile_status.json"))
     last = max(parse_time(f["event_time"]) for f in fills)
-    if status.get("value") == "RECONCILED" and _fresh(parse_time(status.get("checked_at")), ctx.now, 90):
-        return Result(OBSERVED, "競賽策略有新的現貨成交，Google 表上每一筆成交都對得上。",
-                      [f"{len(fills)} 筆新成交，最近 {taipei(last)}（台北）；對帳：{status.get('note')}"], closable=True, key=str(len(fills)))
-    if status.get("value") == "DIVERGED" and ctx.now - last > timedelta(hours=2):
-        return Result(FAILED, "競賽策略有新的現貨成交，但超過 2 小時 Google 表仍對不上。", [f"對帳：{status.get('note')}"])
-    return Result(WAITING, "競賽策略有新成交，等 Google 表對帳。", [f"對帳={status.get('value')}"])
+    verdict = reconcile_covers(status, last, ctx.now)
+    if verdict == "covered":
+        return Result(OBSERVED, "競賽策略有新的現貨成交，成交後的 Google 表對帳一致。",
+                      [f"{len(fills)} 筆新成交，最近 {taipei(last)}（台北）；對帳（{taipei(parse_time(status['checked_at']))}）：{status.get('note')}"],
+                      closable=True, key=str(len(fills)))
+    if verdict == "diverged":
+        return Result(FAILED, "競賽策略有新的現貨成交，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"])
+    return Result(WAITING, "競賽策略有新成交，等成交寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {status.get('checked_at')}"])
 
 
 def check_trend_addon(ctx: Context) -> Result:
@@ -287,7 +316,9 @@ def check_trend_addon(ctx: Context) -> Result:
     if not added:
         return Result(WAITING, "A1 趨勢策略還沒有加碼的交易。")
     status = load_json(ctx.remote, "a1", audit("seykota", "google_reconcile_status.json"))
-    ok = status.get("value") == "RECONCILED"
+    last = max(parse_time(e["event_time"]) for e in _trades_after(jsonl(ctx.remote.read("a1", audit("seykota", "trading_ledger.jsonl"))),
+                                                               datetime(2026, 10, 8, 12, 30, tzinfo=timezone.utc), ("trade_open",)))
+    ok = reconcile_covers(status, last, ctx.now) == "covered"
     return Result(OBSERVED if ok else WAITING, "A1 趨勢策略出現加碼的交易：請到 Google 表確認進場價與數量是整筆加權值（機器只能確認對帳一致）。",
                   [f"加碼交易：{', '.join(added)}", f"對帳：{status.get('value')}"], needs_human=True, key=",".join(added))
 
@@ -301,12 +332,14 @@ def check_dev_trend_entry(ctx: Context) -> Result:
         return Result(WAITING, "開發機趨勢策略還沒有因進場訊號而下的測試網單。")
     status = load_json(ctx.remote, "dev", audit("seykota", "google_reconcile_status.json"))
     last = max(parse_time(e["event_time"]) for e in entries)
-    if status.get("value") == "RECONCILED":
-        return Result(OBSERVED, "開發機趨勢策略依進場訊號在測試網下單，帳本與 Google 表一致。",
-                      [f"{len(entries)} 筆進場；最近 {taipei(last)}（台北）；對帳：{status.get('note')}"], closable=True, key=str(len(entries)))
-    if status.get("value") == "DIVERGED" and ctx.now - last > timedelta(hours=2):
-        return Result(FAILED, "開發機趨勢策略有進場，但超過 2 小時 Google 表仍對不上。", [f"對帳：{status.get('note')}"])
-    return Result(WAITING, "開發機趨勢策略有進場，等 Google 表對帳。", [f"對帳={status.get('value')}"])
+    verdict = reconcile_covers(status, last, ctx.now)
+    if verdict == "covered":
+        return Result(OBSERVED, "開發機趨勢策略依進場訊號在測試網下單，進場後的帳本對 Google 表對帳一致。",
+                      [f"{len(entries)} 筆進場；最近 {taipei(last)}（台北）；對帳（{taipei(parse_time(status['checked_at']))}）：{status.get('note')}"],
+                      closable=True, key=str(len(entries)))
+    if verdict == "diverged":
+        return Result(FAILED, "開發機趨勢策略有進場，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"])
+    return Result(WAITING, "開發機趨勢策略有進場，等進場寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {status.get('checked_at')}"])
 
 
 _NOTICE_LINE = re.compile(r"notices=(\d+) attempted=(\d+) sent=(\d+) consecutive_send_failures=(\d+)")
@@ -315,7 +348,12 @@ _A1_STATUS_BASELINE = "2026-10-13 04:28:00"   # f-41 deployed to A1 at 台北 12
 
 
 def check_status_alerts(ctx: Context) -> Result:
-    """f-23 / f-40 / f-41: the first real status alert on A1 is delivered with its second message and no send failure."""
+    """f-23 / f-40 / f-41: the first real status alert on A1.
+
+    Three different things are kept apart: the EVENT (a poll with notices>0), the FIRST message's delivery (the poll's
+    sent=attempted and the state file's notified_at) and the SECOND message, whose success ops-notify does not log at all
+    (only failures) -- so it is never claimed delivered; the operator confirms it on the phone."""
+    base = parse_time(_A1_STATUS_BASELINE.replace(" ", "T") + "+00:00")
     text = ctx.remote.journal("a1", "ops-notify.service", _A1_STATUS_BASELINE)
     real, failures = [], []
     for line in text.splitlines():
@@ -332,9 +370,15 @@ def check_status_alerts(ctx: Context) -> Result:
         return Result(FAILED, "A1 的維運通知有送不出去的紀錄。", failures[:4], key="failures:" + str(len(failures)))
     if not real:
         return Result(WAITING, "A1 自 f-41 部署後還沒有真實的狀態告警。")
+    state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
+    told = sorted((k, v["notified_at"]) for k, v in state.items()
+                  if not k.startswith("_") and isinstance(v, Mapping) and (parse_time(v.get("notified_at")) or base) > base)
     first = real[0]
-    return Result(OBSERVED, "A1 出現真實的狀態告警，送出數與嘗試數一致、沒有第二則送失敗的紀錄。請在手機確認第二則帶著指令、貼上能跑。",
-                  [f"{len(real)} 輪有通知；第一輪 {first[0]}（日誌時間，UTC）：通知 {first[1]}、嘗試 {first[2]}、送出 {first[3]}"],
+    return Result(OBSERVED, "A1 出現真實的狀態告警。第一則送出有日誌與狀態檔證據；第二則的送達沒有證據，要你在手機確認第二則帶著指令、貼上能跑。",
+                  [f"事件：{len(real)} 輪日誌有通知（第一輪 {first[0]}，UTC）",
+                   f"第一則：該輪通知 {first[1]}、嘗試 {first[2]}、送出 {first[3]}；" + (
+                       "狀態檔送出時間 " + "、".join(f"{k}@{t}" for k, t in told[:3]) if told else "狀態檔已沒有送出時間（可能已恢復清除）"),
+                   "第二則：日誌沒有送失敗的紀錄，但成功不會被記錄，所以沒有送達證據"],
                   needs_human=True, key=first[0])
 
 
@@ -386,14 +430,45 @@ def _real_events(ctx: Context, after: datetime, *, codes: set[str] | None = None
     return found
 
 
+EVENT_NOTICE_OVERDUE = timedelta(minutes=40)    # ops-notify polls every 10 minutes
+SECOND_MESSAGE_OVERDUE = timedelta(minutes=70)
+
+
+def _strategy_event_result(ctx: Context, events: list[tuple[str, dict[str, Any]]], *, seen: str, ask: str) -> Result:
+    """A real strategy event is not 'notified' because it is in the event log: ops-notify's ``_export[...]['delivered']``
+    says when the first message went out and ``ai_pending`` that a second one is still owed.  Keeps the three stages apart:
+    the event, the delivery evidence, and what only the operator can confirm."""
+    state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
+    exported = state.get("_export") if isinstance(state.get("_export"), Mapping) else {}
+    evidence, overdue, undelivered = [], [], []
+    for key, event in events[:5]:
+        target = exported.get(key) if isinstance(exported.get(key), Mapping) else {}
+        delivered = (target.get("delivered") or {}).get(event.get("event_id"))
+        owed = (target.get("ai_pending") or {}).get(event.get("event_id"))
+        at = parse_time(event.get("recorded_at"))
+        label = f"{LABELS[key]}：{event.get('code')}（事件 {taipei(at)} 台北）"
+        if not delivered:
+            (overdue if ctx.now - at > EVENT_NOTICE_OVERDUE else undelivered).append(label)
+            evidence.append(label + "；第一則：維運通知還沒有送出紀錄")
+        elif owed and ctx.now - (parse_time(owed) or ctx.now) > SECOND_MESSAGE_OVERDUE:
+            overdue.append(label)
+            evidence.append(label + f"；第二則送失敗重試中，自 {owed} 起")
+        else:
+            evidence.append(label + f"；第一則已送出（維運通知記錄 {delivered}）" + ("；第二則還在重試" if owed else "；第二則沒有欠送紀錄，但送達要你確認"))
+    key = str(events[0][1].get("event_id"))
+    if overdue:
+        return Result(FAILED, "事件已記錄，但維運通知超過預期時間沒有送出（或第二則一直送不出去）。", evidence, key="overdue:" + key)
+    if undelivered:
+        return Result(WAITING, "事件已記錄，等維運通知下一輪送出。", evidence)
+    return Result(OBSERVED, seen + ask, evidence, needs_human=True, key=key)
+
+
 def check_pending_expired(ctx: Context) -> Result:
     """f-30: a reconcile marker/batch older than 24 h is announced once (ERR-060 / ERR-061) with usable steps."""
     events = _real_events(ctx, datetime(2026, 10, 10, 15, 0, tzinfo=timezone.utc), codes={"LEDGER_PENDING_EXPIRED"})
     if not events:
         return Result(WAITING, "A1 還沒有超過 24 小時沒結清的對帳標記或調倉批次。")
-    return Result(OBSERVED, "A1 出現了「對帳標記超過 24 小時」的通知事件：請確認通知只來一次、結清步驟可用。",
-                  [f"{LABELS[k]}：{e.get('code')} {e.get('recorded_at')}" for k, e in events[:5]], needs_human=True,
-                  key=str(events[0][1].get("event_id")))
+    return _strategy_event_result(ctx, events, seen="A1 出現了「對帳標記超過 24 小時」的通知事件。", ask="請確認通知只來一次、結清步驟可用。")
 
 
 def check_repair_recurring(ctx: Context) -> Result:
@@ -401,9 +476,7 @@ def check_repair_recurring(ctx: Context) -> Result:
     events = _real_events(ctx, datetime(2026, 10, 4, 0, 0, tzinfo=timezone.utc), codes={"VERIFIED_CLOSE_REPAIR_RECURRING"})
     if not events:
         return Result(WAITING, "A1 還沒有「自動補寫一直在發生」的通知事件。")
-    return Result(OBSERVED, "A1 出現了「自動補寫一直在發生」的通知事件：請確認通知內容與只發一次。",
-                  [f"{LABELS[k]}：{e.get('recorded_at')}" for k, e in events[:5]], needs_human=True,
-                  key=str(events[0][1].get("event_id")))
+    return _strategy_event_result(ctx, events, seen="A1 出現了「自動補寫一直在發生」的通知事件。", ask="請確認通知內容與只發一次。")
 
 
 def check_safe_halt_notice(ctx: Context) -> Result:
@@ -412,9 +485,7 @@ def check_safe_halt_notice(ctx: Context) -> Result:
                           not_codes={"LEDGER_PENDING_EXPIRED", "VERIFIED_CLOSE_REPAIR_RECURRING"})
     if not events:
         return Result(WAITING, "A1 自 f-37 部署後還沒有真實的 R3 策略通知。")
-    return Result(OBSERVED, "A1 出現真實的 R3 策略通知：請照通知步驟貼一次確認指令，確認能跑（只用預覽，不要解除）。",
-                  [f"{LABELS[k]}：{e.get('code')} {e.get('recorded_at')}" for k, e in events[:5]], needs_human=True,
-                  key=str(events[0][1].get("event_id")))
+    return _strategy_event_result(ctx, events, seen="A1 出現真實的 R3 策略通知。", ask="請照通知步驟貼一次確認指令，確認能跑（只用預覽，不要解除）。")
 
 
 CHECKS: tuple[Check, ...] = (
@@ -553,15 +624,27 @@ def main(argv: list[str] | None = None, remote: Remote | None = None, send: Call
     if args.command == "report":
         print(json.dumps(previous, ensure_ascii=False, indent=2) if args.json else report(previous))
         return 0
-    now = datetime.now(timezone.utc)
-    state = {"checked_at": now.isoformat(timespec="seconds"),
-             "items": run_checks(remote or Remote(), now, previous, only=args.only)}
-    if args.only:   # keep the other checks' stored results
-        state["items"] = {**(previous.get("items") or {}), **state["items"]}
-    if not args.dry_run:
-        notify(state["items"], send or send_telegram)
-        save_state(args.state, state)
-    print(report(state))
+    args.state.parent.mkdir(parents=True, exist_ok=True)
+    with open(args.state.with_suffix(".lock"), "w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print("另一個偵測正在跑，這一輪略過。")
+            return 0
+        now = datetime.now(timezone.utc)
+        state = {"checked_at": now.isoformat(timespec="seconds"),
+                 "items": run_checks(remote or Remote(), now, previous, only=args.only)}
+        if args.only:   # keep the other checks' stored results
+            state["items"] = {**(previous.get("items") or {}), **state["items"]}
+        if not args.dry_run:
+            notify(state["items"], send or send_telegram)
+            try:
+                save_state(args.state, state)
+            except OSError as exc:
+                # Known limit: a message already sent is not remembered, so the next run may send it again.
+                print(f"狀態檔存不進去（{exc}）：已發出的通知沒有記下來，下一輪可能重複發送。", file=sys.stderr)
+                return 1
+        print(report(state))
     return 0
 
 

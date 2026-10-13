@@ -32,7 +32,7 @@ class FakeRemote(ow.Remote):
         self.journals = dict(journals or {})
 
     def read(self, host, path):
-        if not ow._PATH_RE.match(path):
+        if path not in ow.ALLOWED_PATHS:
             raise ow.RemoteError("whitelist: " + path)
         try:
             return self.files[(host, path)]
@@ -62,6 +62,10 @@ def hours_ago(n):
     "/etc/passwd", "/opt/my-crypto-bot/audit/../../../etc/shadow", "/opt/my-crypto-bot/audit/x.json; rm -rf /",
     "/opt/other-repo/audit/ledger_status.json", "/var/lib/ops-notify/../x.json", "/opt/my-crypto-bot/audit/a b.json",
     "/opt/my-crypto-bot/state/state.json", "/var/lib/portfolio-query/my-crypto-bot/current.json\n",
+    # shaped like an allowed file but not one the checks read (review of #183: the whitelist must be the exact list)
+    "/opt/my-crypto-bot/audit/private.json", "/opt/ed-seykota-systematic-trend-following/audit/error_requests.jsonl",
+    "/var/lib/portfolio-query/seykota-btcusdt-4h/current.json", "/var/lib/ops-notify/other.json",
+    "/opt/my-crypto-bot/audit/ledger_status.json\n",
 ])
 def test_remote_refuses_paths_off_the_whitelist(path):
     with pytest.raises(ow.RemoteError):
@@ -69,7 +73,9 @@ def test_remote_refuses_paths_off_the_whitelist(path):
 
 
 @pytest.mark.parametrize("unit, since", [("ops-notify", "2026-10-13 04:28:00"), ("a b.service", "2026-10-13 04:28:00"),
-                                          ("ops-notify.service", "yesterday"), ("ops-notify.service; id", "2026-10-13 04:28:00")])
+                                          ("ops-notify.service", "yesterday"), ("ops-notify.service; id", "2026-10-13 04:28:00"),
+                                          ("unrelated.service", "2026-10-13 04:28:00"), ("ssh.service", "2026-10-13 04:28:00"),
+                                          ("ops-notify.service", "2026-10-13 04:28:00\n"), ("ops-notify.service", "2026-10-13 04:28:00 --vacuum-size=1")])
 def test_remote_refuses_odd_journal_arguments(unit, since):
     with pytest.raises(ow.RemoteError):
         ow.Remote("k").journal("a1", unit, since)
@@ -203,7 +209,7 @@ def test_trend_without_an_add_keeps_waiting():
 
 def test_dev_entry_must_come_from_a_signal_not_a_manual_test():
     r = FakeRemote()
-    put(r, "dev", "seykota", "google_reconcile_status.json", {"value": "RECONCILED", "note": "ok"})
+    put(r, "dev", "seykota", "google_reconcile_status.json", {"value": "RECONCILED", "note": "ok", "checked_at": iso(NOW - timedelta(minutes=10))})
     put(r, "dev", "seykota", "trading_ledger.jsonl", [trade(6, "trade_open", source="add", trade_id="T")], jsonl=True)
     assert ow.check_dev_trend_entry(ctx(r)).state == ow.WAITING
     put(r, "dev", "seykota", "trading_ledger.jsonl", [trade(6, "trade_open", source="entry_signal", trade_id="T")], jsonl=True)
@@ -218,8 +224,10 @@ def line(notices, attempted, sent, failures=0, stamp="Oct 14 03:10:01"):
             f"notices={notices} attempted={attempted} sent={sent} consecutive_send_failures={failures} state_written=True")
 
 
-def journal_remote(*lines):
-    return FakeRemote(journals={("a1", "ops-notify.service"): "\n".join(lines)})
+def journal_remote(*lines, state=None):
+    r = FakeRemote(journals={("a1", "ops-notify.service"): "\n".join(lines)})
+    r.files[("a1", "/var/lib/ops-notify/state.json")] = json.dumps(state if state is not None else {"_export": {}})
+    return r
 
 
 def test_status_alerts_wait_while_every_poll_is_quiet():
@@ -227,9 +235,13 @@ def test_status_alerts_wait_while_every_poll_is_quiet():
 
 
 def test_a_delivered_real_alert_is_observed_but_still_needs_the_phone():
-    result = ow.check_status_alerts(ctx(journal_remote(line(0, 0, 0), line(1, 1, 1))))
+    state = {"momentum:ledger": {"notified_at": "2026-10-14T03:10:02+00:00", "notified_severity": "alert"}, "_export": {}}
+    result = ow.check_status_alerts(ctx(journal_remote(line(0, 0, 0), line(1, 1, 1), state=state)))
     assert result.state == ow.OBSERVED and result.needs_human and not result.closable
     assert result.key == "Oct 14 03:10:01"
+    # three stages kept apart: the event, the first message's delivery, and the second message that is NOT claimed delivered
+    assert result.evidence[0].startswith("事件：") and result.evidence[1].startswith("第一則：") and "momentum:ledger@" in result.evidence[1]
+    assert result.evidence[2].startswith("第二則：") and "沒有送達證據" in result.evidence[2]
 
 
 def test_an_undelivered_alert_or_send_warning_is_a_failure():
@@ -267,10 +279,14 @@ def event(code, tier="R3", hours=3, test=False, event_id=None):
     return row
 
 
-def events_remote(**by_strategy):
+def events_remote(delivered=None, ai_pending=None, **by_strategy):
     r = FakeRemote()
     for key in ("seykota", "momentum", "btc-competition"):
         put(r, "a1", key, "fleet_event_log.jsonl", by_strategy.get(key, []), jsonl=True)
+    export = {key: {"delivered": {e: iso(NOW - timedelta(hours=1)) for e in (delivered or {}).get(key, [])},
+                    **({"ai_pending": ai_pending[key]} if ai_pending and key in ai_pending else {})}
+              for key in ("seykota", "momentum", "btc-competition")}
+    r.files[("a1", "/var/lib/ops-notify/state.json")] = json.dumps({"_export": export})
     return r
 
 
@@ -280,16 +296,31 @@ def test_controlled_test_events_never_count():
     assert ow.check_safe_halt_notice(ctx(r)).state == ow.WAITING
 
 
-def test_pending_expired_and_recurring_are_seen_when_real():
-    r = events_remote(momentum=[event("LEDGER_PENDING_EXPIRED")], seykota=[event("VERIFIED_CLOSE_REPAIR_RECURRING")])
-    assert ow.check_pending_expired(ctx(r)).state == ow.OBSERVED
-    assert ow.check_repair_recurring(ctx(r)).state == ow.OBSERVED
+def test_a_logged_event_is_not_a_delivered_notice():
+    """Review of #183: an event in the log proves the event, not that ops-notify sent it."""
+    e = event("LEDGER_PENDING_EXPIRED", hours=3, event_id="p1")
+    assert ow.check_pending_expired(ctx(events_remote(momentum=[e]))).state == ow.FAILED          # 3 h old, never delivered
+    young = event("LEDGER_PENDING_EXPIRED", hours=0, event_id="p2")
+    assert ow.check_pending_expired(ctx(events_remote(momentum=[young]))).state == ow.WAITING     # give ops-notify its poll
+    done = ow.check_pending_expired(ctx(events_remote(momentum=[e], delivered={"momentum": ["p1"]})))
+    assert done.state == ow.OBSERVED and done.needs_human and not done.closable
+    assert "第一則已送出" in done.evidence[0] and "送達要你確認" in done.evidence[0]
+
+
+def test_a_second_message_that_stays_owed_for_over_70_minutes_is_a_failure():
+    e = event("VERIFIED_CLOSE_REPAIR_RECURRING", hours=5, event_id="r1")
+    owed_long = {"momentum": {"r1": hours_ago(3)}}
+    assert ow.check_repair_recurring(ctx(events_remote(momentum=[e], delivered={"momentum": ["r1"]}, ai_pending=owed_long))).state == ow.FAILED
+    owed_now = {"momentum": {"r1": iso(NOW - timedelta(minutes=10))}}
+    still = ow.check_repair_recurring(ctx(events_remote(momentum=[e], delivered={"momentum": ["r1"]}, ai_pending=owed_now)))
+    assert still.state == ow.OBSERVED and "第二則還在重試" in still.evidence[0]
 
 
 def test_safe_halt_notice_ignores_the_other_two_codes_and_lower_tiers():
     r = events_remote(momentum=[event("LEDGER_PENDING_EXPIRED"), event("VERIFIED_CLOSE_REPAIR_RECURRING"), event("X", tier="R2")])
     assert ow.check_safe_halt_notice(ctx(r)).state == ow.WAITING
-    r = events_remote(**{"btc-competition": [event("ORDER_STATUS_UNKNOWN")]})
+    e = event("ORDER_STATUS_UNKNOWN", event_id="b1")
+    r = events_remote(delivered={"btc-competition": ["b1"]}, **{"btc-competition": [e]})
     result = ow.check_safe_halt_notice(ctx(r))
     assert result.state == ow.OBSERVED and result.needs_human and "競賽策略" in result.evidence[0]
 
@@ -402,3 +433,79 @@ def test_the_service_has_no_secret_and_the_installer_never_prints_one():
     # the token is copied by grep into a root-only file; no echo/cat of its value anywhere
     assert "umask 077" in installer and "chmod 600 /etc/observation-watch/watch.env" in installer
     assert not any(w in installer for w in ("echo $TELEGRAM", 'echo "$TELEGRAM', "cat /etc/ops-notify"))
+
+
+# --- the reconcile must come AFTER the trade's grace period (review of #183, BLOCK-01/02) -------------------------------
+
+def _status(checked_minutes_ago, value="RECONCILED", name="動能策略"):
+    return {"sheet_name": name, "value": value, "checked_at": iso(NOW - timedelta(minutes=checked_minutes_ago)), "note": "ok"}
+
+
+@pytest.mark.parametrize("trade_minutes_ago, checked_minutes_ago", [
+    (30, 5),      # the reconcile ran 25 minutes AFTER the trade, still inside its 60-minute grace: proves nothing yet
+    (30, 40),     # a RECONCILED from before the trade
+])
+def test_tabs_a_reconcile_that_predates_the_grace_of_the_trade_is_not_evidence(trade_minutes_ago, checked_minutes_ago):
+    r = tabs_remote(trades={"momentum": [{"event_type": "trade_close", "event_time": iso(NOW - timedelta(minutes=trade_minutes_ago))}]},
+                    status={"momentum": _status(checked_minutes_ago)})
+    out = ow.check_sheet_tab_names(ctx(r))
+    assert out.state == ow.WAITING and not out.summary.startswith("已確認：動能策略")
+    assert not any(line.startswith("動能策略") for line in out.evidence)        # no 'confirmed' line was written for it
+
+
+def test_tabs_the_example_from_the_review_does_not_close():
+    # 12:00 reconcile ok; 12:10 a trade; 12:15 the watcher runs: the old RECONCILED must not count for the new trade
+    now = datetime(2026, 10, 14, 12, 15, tzinfo=timezone.utc)
+    r = FakeRemote()
+    for key in ow.REPOS:
+        trade_time = datetime(2026, 10, 14, 12, 10, tzinfo=timezone.utc)
+        put(r, "a1", key, "trading_ledger.jsonl", [{"event_type": "trade_close", "event_time": iso(trade_time)}], jsonl=True)
+        put(r, "a1", key, "google_reconcile_status.json",
+            {"sheet_name": ow.SHEET_NAMES[key], "value": "RECONCILED", "checked_at": "2026-10-14T12:00:00+00:00", "note": "ok"})
+    result = ow.check_sheet_tab_names(ow.Context(r, now, {}))
+    assert result.state == ow.WAITING and not result.closable
+
+
+def test_tabs_closes_only_after_a_reconcile_that_ran_past_the_grace_of_the_newest_trade():
+    t = NOW - timedelta(hours=3)
+    good = {"momentum": _status(30), "seykota": _status(30, name="趨勢策略"), "mycrypto": _status(30, name="加密策略"),
+            "btc-competition": _status(30, name="競賽策略")}
+    r = tabs_remote(trades={k: [{"event_type": "trade_close", "event_time": iso(t)}] for k in ow.REPOS}, status=good)
+    assert ow.check_sheet_tab_names(ctx(r)).closable
+    assert ow.reconcile_covers(_status(30), t, NOW) == "covered"
+    assert ow.reconcile_covers(_status(30, "DIVERGED"), t, NOW) == "diverged"
+    assert ow.reconcile_covers(_status(30, "UNKNOWN"), t, NOW) == "pending"
+    assert ow.reconcile_covers({"value": "RECONCILED"}, t, NOW) == "pending"                    # no checked_at
+    assert ow.reconcile_covers(_status(300), t, NOW) == "pending"                               # stale (older than 90 min)
+    assert ow.reconcile_covers(_status(30), NOW - timedelta(minutes=50), NOW) == "pending"      # trade still inside its grace
+
+
+def test_competition_and_dev_entry_also_wait_for_a_reconcile_after_the_grace():
+    r = tabs_remote()
+    put(r, "a1", "btc-competition", "trading_ledger.jsonl", [trade(0, "spot_fill", execution_mode="LIVE")], jsonl=True)
+    put(r, "a1", "btc-competition", "google_reconcile_status.json", _status(5, name="競賽策略"))
+    assert ow.check_competition_fill(ctx(r)).state == ow.WAITING                                # RECONCILED, but older than the grace
+    d = FakeRemote()
+    put(d, "dev", "seykota", "trading_ledger.jsonl", [trade(0, "trade_open", source="entry_signal", trade_id="T")], jsonl=True)
+    put(d, "dev", "seykota", "google_reconcile_status.json", _status(5, name="趨勢策略"))
+    assert ow.check_dev_trend_entry(ctx(d)).state == ow.WAITING
+
+
+# --- one run at a time; a message that was sent but not remembered (review of #183) -----------------------------------------
+
+def test_a_second_run_while_one_is_running_does_nothing(tmp_path, capsys):
+    import fcntl
+    state = tmp_path / "state.json"
+    with open(state.with_suffix(".lock"), "w") as held:
+        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        sent = []
+        assert ow.main(["run", "--state", str(state), "--only", "crypto-flat"], remote=crypto_remote(), send=lambda t: sent.append(t) or True) == 0
+    assert sent == [] and not state.exists() and "另一個偵測正在跑" in capsys.readouterr().out
+
+
+def test_a_state_file_that_cannot_be_saved_is_reported_and_the_repeat_is_documented(tmp_path, monkeypatch, capsys):
+    state, sent = tmp_path / "state.json", []
+    r = crypto_remote(fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))
+    monkeypatch.setattr(ow, "save_state", lambda *a: (_ for _ in ()).throw(OSError("disk full")))
+    code = ow.main(["run", "--state", str(state), "--only", "crypto-flat"], remote=r, send=lambda t: sent.append(t) or True)
+    assert code == 1 and len(sent) == 1 and "下一輪可能重複發送" in capsys.readouterr().err
