@@ -1,0 +1,18 @@
+[Unit]
+Description=Observation watcher (f-43): read-only check of what the progress page's observation area is waiting for
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=@WATCH_USER@
+# Telegram token + chat id only (a copy made by install.sh; root-only file, read by systemd before the user switch).
+EnvironmentFile=/etc/observation-watch/watch.env
+ExecStart=/usr/bin/python3 /opt/observation-watch/observation_watch.py run
+TimeoutStartSec=300
+# NoNewPrivileges is deliberately NOT set: the watcher reads production with `ssh ... sudo cat` and this host's files
+# with `sudo -n cat`, which need the setuid sudo.  What it may read is a fixed whitelist in observation_watch.py (Remote).
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/@WATCH_USER@/.local/state/observation-watch
