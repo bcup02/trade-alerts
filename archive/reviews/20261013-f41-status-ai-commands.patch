@@ -1,0 +1,232 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index e9924f1..b9a9a39 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -1047,3 +1047,12 @@ trade-alerts：v0.30.5（風險登記冊頁面：錯誤編號下拉選單＋每
+ 受影響消費專案：無（不需要改釘、不需要部署；頁面重新發布即可）。
+ 部署入口：無（函式庫）。
+ ```
++
++```text
++trade-alerts：v0.30.6（狀態告警第二則加上可貼上的唯讀指令；f-41）
++變更摘要：1. 錯誤清單 ERR-043／044／046／047／048／049 的「給 AI 的追查指令」（第二則訊息）加上 A1 上可直接貼的唯讀指令（sudo cat／ls／journalctl／systemctl status／chronyc tracking，不改任何東西）；第一則的處理步驟不變。
++          2. 新增守門測試：這六條都要有指令、每條指令必須在唯讀白名單內（含路徑與 repo 目錄名）、通過 bash -n 且引號外沒有 < 或 >、其他錯誤的追查指令不得夾帶未審的指令；第二則實際渲染得出指令。
++向後相容：只改文字（錯誤清單資料），欄位與編號不變；沒釘此版的專案不受影響。
++受影響消費專案：維運通知（改釘並部署後，A1 與開發機的狀態告警第二則才會換成新文字）。
++部署入口：無（函式庫）。
++```
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index e76138a..0bd9e8c 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -1321,7 +1321,7 @@
+    "what": "加密策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。"
+   },
+   {
+-   "ai_prompt": "請追查這支策略為什麼帳本跟交易所對不上：讀該策略 audit/ledger_status.json 的 position_diffs 與 unmatched_exchange_fills，對照 audit/trading_ledger.jsonl 與交易所成交（唯讀查詢），判斷是漏記平倉、重複送單、手動下單還是記錄錯誤，提出以交易所為準、只追加的更正步驟（先給我確認再執行），並追查根本原因。",
++   "ai_prompt": "請追查這支策略為什麼帳本跟交易所對不上：讀該策略 audit/ledger_status.json 的 position_diffs 與 unmatched_exchange_fills，對照 audit/trading_ledger.jsonl 與交易所成交（唯讀查詢），判斷是漏記平倉、重複送單、手動下單還是記錄錯誤，提出以交易所為準、只追加的更正步驟（先給我確認再執行），並追查根本原因。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo cat /opt/ed-seykota-systematic-trend-following/audit/ledger_status.json`\n動能 `sudo cat /opt/mexc-4h-momentum-trailing-stop/audit/ledger_status.json`\n加密 `sudo cat /opt/my-crypto-bot/audit/ledger_status.json`\n競賽 `sudo cat /opt/btc-bull-market-competition/audit/ledger_status.json`",
+    "behaviour": {
+     "state": "done"
+    },
+@@ -1345,7 +1345,7 @@
+    "what": "某支策略的本地帳本跟交易所的成交或部位對不上。"
+   },
+   {
+-   "ai_prompt": "請追查這支策略的帳本為什麼跟 Google 表對不上：讀 audit/google_reconcile_status.json 的差異清單、Google 表同步佇列與 google-projection 背景工作的日誌，判斷是送出失敗、接收端錯誤還是資料格式問題，並提出讓兩邊一致的做法與治本修正。",
++   "ai_prompt": "請追查這支策略的帳本為什麼跟 Google 表對不上：讀 audit/google_reconcile_status.json 的差異清單、Google 表同步佇列與 google-projection 背景工作的日誌，判斷是送出失敗、接收端錯誤還是資料格式問題，並提出讓兩邊一致的做法與治本修正。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo cat /opt/ed-seykota-systematic-trend-following/audit/google_reconcile_status.json`\n動能 `sudo cat /opt/mexc-4h-momentum-trailing-stop/audit/google_reconcile_status.json`\n加密 `sudo cat /opt/my-crypto-bot/audit/google_reconcile_status.json`\n競賽 `sudo cat /opt/btc-bull-market-competition/audit/google_reconcile_status.json`\n同步佇列的背景工作日誌：趨勢 `sudo journalctl -u seykota-google-projection.service -n 30 --no-pager`；動能 `sudo journalctl -u mexc-momentum-google-projection.service -n 30 --no-pager`；競賽 `sudo journalctl -u btc-competition-google-projection.service -n 30 --no-pager`。",
+    "behaviour": {
+     "state": "done"
+    },
+@@ -1392,7 +1392,7 @@
+    "what": "某支策略回報自己出錯（ERROR）或已安全暫停（SAFE_HALT）。"
+   },
+   {
+-   "ai_prompt": "請追查這個背景服務為什麼失敗：在該主機用 journalctl -u <服務> 看最近幾次執行的錯誤（例如 226/NAMESPACE、203/EXEC、Python 例外），判斷是環境、權限、設定還是程式問題，並提出治本修正；若是部署造成的暫時失敗，說明並確認已恢復。",
++   "ai_prompt": "請追查這個背景服務為什麼失敗：在該主機用 journalctl -u <服務> 看最近幾次執行的錯誤（例如 226/NAMESPACE、203/EXEC、Python 例外），判斷是環境、權限、設定還是程式問題，並提出治本修正；若是部署造成的暫時失敗，說明並確認已恢復。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上）：\n目前失敗的服務 `sudo systemctl list-units --state=failed --no-pager`\n最近的錯誤日誌 `sudo journalctl -p err -n 50 --no-pager`",
+    "behaviour": {
+     "state": "pending"
+    },
+@@ -1418,7 +1418,7 @@
+    "what": "維運通知盯的某個背景服務（systemd unit）狀態是失敗。"
+   },
+   {
+-   "ai_prompt": "請追查這支策略的 audit/ops_export.json 為什麼讀不到或沒更新：看寫它的背景工作（修復機器人或帳本少記成交計時器）的 journal、檔案權限與 generated_at，判斷是背景工作沒跑、失敗還是權限問題，並提出治本修正。",
++   "ai_prompt": "請追查這支策略的 audit/ops_export.json 為什麼讀不到或沒更新：看寫它的背景工作（修復機器人或帳本少記成交計時器）的 journal、檔案權限與 generated_at，判斷是背景工作沒跑、失敗還是權限問題，並提出治本修正。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo ls -l --time-style=full-iso /opt/ed-seykota-systematic-trend-following/audit/ops_export.json`\n動能 `sudo ls -l --time-style=full-iso /opt/mexc-4h-momentum-trailing-stop/audit/ops_export.json`\n競賽 `sudo ls -l --time-style=full-iso /opt/btc-bull-market-competition/audit/ops_export.json`\n寫它的背景工作日誌：趨勢 `sudo journalctl -u seykota-repair-shadow.service -n 20 --no-pager`；動能 `sudo journalctl -u mexc-momentum-ops-export-refresh.service -n 20 --no-pager`；競賽 `sudo journalctl -u btc-competition-unrecorded-fill.service -n 20 --no-pager`。",
+    "behaviour": {
+     "state": "pending"
+    },
+@@ -1444,7 +1444,7 @@
+    "what": "維運通知讀不到某支策略的匯出檔，或匯出檔太久沒更新。"
+   },
+   {
+-   "ai_prompt": "請追查這支策略為什麼停止回報：確認主程式與對帳、快照背景工作的 systemctl 狀態與最近 journal，看狀態檔（audit/ledger_status.json、google_reconcile_status.json、/var/lib/portfolio-query/<策略>/current.json）的 checked_at，判斷是服務停了、卡住還是權限問題，並提出治本修正。",
++   "ai_prompt": "請追查這支策略為什麼停止回報：確認主程式與對帳、快照背景工作的 systemctl 狀態與最近 journal，看狀態檔（audit/ledger_status.json、google_reconcile_status.json、/var/lib/portfolio-query/<策略>/current.json）的 checked_at，判斷是服務停了、卡住還是權限問題，並提出治本修正。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo systemctl status seykota-bot.service --no-pager`\n動能 `sudo systemctl status mexc-momentum-bot.service --no-pager`\n加密 `sudo systemctl status my-crypto-bot.service --no-pager`\n競賽（每日調整，不是常駐程式）`sudo systemctl status btc-competition-daily.timer --no-pager`\n各背景工作最近一次執行 `sudo systemctl list-timers --no-pager`",
+    "behaviour": {
+     "state": "done"
+    },
+@@ -1468,7 +1468,7 @@
+    "what": "某支策略的狀態檔（對帳結果或運行狀態）不見了或太久沒更新，看起來像是停止回報。"
+   },
+   {
+-   "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。",
++   "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在這台主機用 ubuntu 帳號貼上）：\n時間同步狀態 `sudo chronyc tracking`\n時間同步服務 `sudo systemctl status chrony --no-pager`\n時鐘檢查的狀態檔 `sudo cat /var/lib/clock-health/clock_status.json`\n時鐘檢查的日誌 `sudo journalctl -u clock-health.service -n 20 --no-pager`",
+    "behaviour": {
+     "state": "n/a"
+    },
+diff --git a/pyproject.toml b/pyproject.toml
+index 1e138b5..4f4da67 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.5"
++version = "0.30.6"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index e55e5c2..711c5f9 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -343,4 +343,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.5"
++__version__ = "0.30.6"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 430da85..f8b73f8 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -1380,7 +1380,7 @@
+           "等下一輪對帳（約 15 分鐘）；若修復機器人已自動補好，會收到「已恢復」。",
+           "仍然對不上：把下方「給 AI 的追查指令」整段貼給 Claude，列出差異並提出以交易所為準的更正步驟（先給你確認再執行）。"
+         ],
+-        "ai_prompt": "請追查這支策略為什麼帳本跟交易所對不上：讀該策略 audit/ledger_status.json 的 position_diffs 與 unmatched_exchange_fills，對照 audit/trading_ledger.jsonl 與交易所成交（唯讀查詢），判斷是漏記平倉、重複送單、手動下單還是記錄錯誤，提出以交易所為準、只追加的更正步驟（先給我確認再執行），並追查根本原因。"
++        "ai_prompt": "請追查這支策略為什麼帳本跟交易所對不上：讀該策略 audit/ledger_status.json 的 position_diffs 與 unmatched_exchange_fills，對照 audit/trading_ledger.jsonl 與交易所成交（唯讀查詢），判斷是漏記平倉、重複送單、手動下單還是記錄錯誤，提出以交易所為準、只追加的更正步驟（先給我確認再執行），並追查根本原因。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo cat /opt/ed-seykota-systematic-trend-following/audit/ledger_status.json`\n動能 `sudo cat /opt/mexc-4h-momentum-trailing-stop/audit/ledger_status.json`\n加密 `sudo cat /opt/my-crypto-bot/audit/ledger_status.json`\n競賽 `sudo cat /opt/btc-bull-market-competition/audit/ledger_status.json`"
+       }
+     },
+     {
+@@ -1413,7 +1413,7 @@
+           "等下一兩輪對帳，若自動恢復會收到「已恢復」。",
+           "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，追查 Google 表同步為什麼卡住。"
+         ],
+-        "ai_prompt": "請追查這支策略的帳本為什麼跟 Google 表對不上：讀 audit/google_reconcile_status.json 的差異清單、Google 表同步佇列與 google-projection 背景工作的日誌，判斷是送出失敗、接收端錯誤還是資料格式問題，並提出讓兩邊一致的做法與治本修正。"
++        "ai_prompt": "請追查這支策略的帳本為什麼跟 Google 表對不上：讀 audit/google_reconcile_status.json 的差異清單、Google 表同步佇列與 google-projection 背景工作的日誌，判斷是送出失敗、接收端錯誤還是資料格式問題，並提出讓兩邊一致的做法與治本修正。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo cat /opt/ed-seykota-systematic-trend-following/audit/google_reconcile_status.json`\n動能 `sudo cat /opt/mexc-4h-momentum-trailing-stop/audit/google_reconcile_status.json`\n加密 `sudo cat /opt/my-crypto-bot/audit/google_reconcile_status.json`\n競賽 `sudo cat /opt/btc-bull-market-competition/audit/google_reconcile_status.json`\n同步佇列的背景工作日誌：趨勢 `sudo journalctl -u seykota-google-projection.service -n 30 --no-pager`；動能 `sudo journalctl -u mexc-momentum-google-projection.service -n 30 --no-pager`；競賽 `sudo journalctl -u btc-competition-google-projection.service -n 30 --no-pager`。"
+       }
+     },
+     {
+@@ -1478,7 +1478,7 @@
+           "等下一輪；恢復會收到「已恢復」。",
+           "一直失敗：把下方「給 AI 的追查指令」整段貼給 Claude，查服務日誌並修正。"
+         ],
+-        "ai_prompt": "請追查這個背景服務為什麼失敗：在該主機用 journalctl -u <服務> 看最近幾次執行的錯誤（例如 226/NAMESPACE、203/EXEC、Python 例外），判斷是環境、權限、設定還是程式問題，並提出治本修正；若是部署造成的暫時失敗，說明並確認已恢復。"
++        "ai_prompt": "請追查這個背景服務為什麼失敗：在該主機用 journalctl -u <服務> 看最近幾次執行的錯誤（例如 226/NAMESPACE、203/EXEC、Python 例外），判斷是環境、權限、設定還是程式問題，並提出治本修正；若是部署造成的暫時失敗，說明並確認已恢復。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上）：\n目前失敗的服務 `sudo systemctl list-units --state=failed --no-pager`\n最近的錯誤日誌 `sudo journalctl -p err -n 50 --no-pager`"
+       }
+     },
+     {
+@@ -1510,7 +1510,7 @@
+           "等下一輪；恢復會收到「已恢復」。",
+           "一直沒恢復：把下方「給 AI 的追查指令」整段貼給 Claude，查寫匯出檔的背景工作。"
+         ],
+-        "ai_prompt": "請追查這支策略的 audit/ops_export.json 為什麼讀不到或沒更新：看寫它的背景工作（修復機器人或帳本少記成交計時器）的 journal、檔案權限與 generated_at，判斷是背景工作沒跑、失敗還是權限問題，並提出治本修正。"
++        "ai_prompt": "請追查這支策略的 audit/ops_export.json 為什麼讀不到或沒更新：看寫它的背景工作（修復機器人或帳本少記成交計時器）的 journal、檔案權限與 generated_at，判斷是背景工作沒跑、失敗還是權限問題，並提出治本修正。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo ls -l --time-style=full-iso /opt/ed-seykota-systematic-trend-following/audit/ops_export.json`\n動能 `sudo ls -l --time-style=full-iso /opt/mexc-4h-momentum-trailing-stop/audit/ops_export.json`\n競賽 `sudo ls -l --time-style=full-iso /opt/btc-bull-market-competition/audit/ops_export.json`\n寫它的背景工作日誌：趨勢 `sudo journalctl -u seykota-repair-shadow.service -n 20 --no-pager`；動能 `sudo journalctl -u mexc-momentum-ops-export-refresh.service -n 20 --no-pager`；競賽 `sudo journalctl -u btc-competition-unrecorded-fill.service -n 20 --no-pager`。"
+       }
+     },
+     {
+@@ -1544,7 +1544,7 @@
+           "確認這支策略是不是被刻意停用（例如搬家期間凍結）；是的話可忽略。",
+           "不是的話，把下方「給 AI 的追查指令」整段貼給 Claude，查服務為什麼沒在回報。"
+         ],
+-        "ai_prompt": "請追查這支策略為什麼停止回報：確認主程式與對帳、快照背景工作的 systemctl 狀態與最近 journal，看狀態檔（audit/ledger_status.json、google_reconcile_status.json、/var/lib/portfolio-query/<策略>/current.json）的 checked_at，判斷是服務停了、卡住還是權限問題，並提出治本修正。"
++        "ai_prompt": "請追查這支策略為什麼停止回報：確認主程式與對帳、快照背景工作的 systemctl 狀態與最近 journal，看狀態檔（audit/ledger_status.json、google_reconcile_status.json、/var/lib/portfolio-query/<策略>/current.json）的 checked_at，判斷是服務停了、卡住還是權限問題，並提出治本修正。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在 A1 正式機（新）用 ubuntu 帳號貼上，看訊息裡是哪支策略就用那一支）：\n趨勢 `sudo systemctl status seykota-bot.service --no-pager`\n動能 `sudo systemctl status mexc-momentum-bot.service --no-pager`\n加密 `sudo systemctl status my-crypto-bot.service --no-pager`\n競賽（每日調整，不是常駐程式）`sudo systemctl status btc-competition-daily.timer --no-pager`\n各背景工作最近一次執行 `sudo systemctl list-timers --no-pager`"
+       }
+     },
+     {
+@@ -1576,7 +1576,7 @@
+           "到那台主機確認 chrony 是否在跑、時間是否同步（chronyc tracking）。",
+           "把下方「給 AI 的追查指令」整段貼給 Claude，找出是什麼把時間同步換掉並修正。"
+         ],
+-        "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。"
++        "ai_prompt": "請追查這台主機的時間同步為什麼被改掉：讀 /var/lib/clock-health/clock_status.json 與 clock-health 的 journal，檢查 chrony／systemd-timesyncd 的狀態與最近的 apt 紀錄，確認目前時間偏差，提出恢復 chrony 的步驟與防止再被改掉的做法。\n\n你也可以直接執行下面的唯讀指令取得證據（只看、不改任何東西；在這台主機用 ubuntu 帳號貼上）：\n時間同步狀態 `sudo chronyc tracking`\n時間同步服務 `sudo systemctl status chrony --no-pager`\n時鐘檢查的狀態檔 `sudo cat /var/lib/clock-health/clock_status.json`\n時鐘檢查的日誌 `sudo journalctl -u clock-health.service -n 20 --no-pager`"
+       }
+     },
+     {
+diff --git a/tests/test_fleet_error_catalog.py b/tests/test_fleet_error_catalog.py
+index f2a051b..0489793 100644
+--- a/tests/test_fleet_error_catalog.py
++++ b/tests/test_fleet_error_catalog.py
+@@ -432,3 +432,71 @@ def test_a_quoted_placeholder_reaches_the_tool_as_one_argument():
+     assert out.returncode == 0 and out.stdout.split("\n")[:4] == ["resume", "--confirm", "<確認碼>", "--exchange-verified"]
+     bad = subprocess.run(["bash", "-c", "printf %s resume --confirm <確認碼>"], capture_output=True, text=True)
+     assert bad.returncode != 0
++
++
++# --- f-41: the status alerts' second message carries read-only commands that run as pasted on A1 --------------------
++#
++# 2026-10-13: the main message of ERR-043/044/046/047/048/049 only says "look at which strategy / service"; the pasteable
++# commands that ops-notify used to hardcode (f-36) were lost when f-40 switched it to the catalog's text.  The operator
++# decided the commands belong in the SECOND message (the paste-to-AI one), so they live in `ai_prompt`.
++
++_STATUS_AI_CODES = ("ERR-043", "ERR-044", "ERR-046", "ERR-047", "ERR-048", "ERR-049")
++_FLEET_REPOS = {"ed-seykota-systematic-trend-following", "mexc-4h-momentum-trailing-stop", "my-crypto-bot",
++                "btc-bull-market-competition"}
++# Anything not on this list is not a read-only command we vouch for: only look, never change.
++_READ_ONLY_SPAN = re.compile(
++    r"^sudo (?:"
++    r"cat /opt/(?P<cat_repo>[a-z0-9-]+)/audit/(?:ledger_status|google_reconcile_status)\.json"
++    r"|ls -l --time-style=full-iso /opt/(?P<ls_repo>[a-z0-9-]+)/audit/ops_export\.json"
++    r"|cat /var/lib/clock-health/clock_status\.json"
++    r"|journalctl (?:-u [a-z0-9-]+\.service -n \d{1,3}|-p err -n \d{1,3}) --no-pager"
++    r"|systemctl (?:status [a-z0-9-]+(?:\.(?:service|timer))?|list-timers|list-units --state=failed) --no-pager"
++    r"|chronyc tracking)$")
++
++
++def _ai_spans(entry):
++    return re.findall(r"`([^`]+)`", entry["operator_message"].get("ai_prompt") or "")
++
++
++def test_status_alert_second_messages_carry_commands(catalog):
++    by_id = {e["error_id"]: e for e in catalog["entries"]}
++    for error_id in _STATUS_AI_CODES:
++        assert _ai_spans(by_id[error_id]), f"{error_id}: the paste-to-AI message has no pasteable command"
++
++
++def test_status_alert_commands_are_read_only_and_name_real_paths(catalog):
++    problems = []
++    for entry in catalog["entries"]:
++        if entry["error_id"] not in _STATUS_AI_CODES:
++            continue
++        for span in _ai_spans(entry):
++            matched = _READ_ONLY_SPAN.match(span)
++            if not matched:
++                problems.append(f"{entry['error_id']}: not a vouched read-only command: {span[:90]}")
++                continue
++            repo = matched.group("cat_repo") or matched.group("ls_repo")
++            if repo and repo not in _FLEET_REPOS:
++                problems.append(f"{entry['error_id']}: unknown repo directory /opt/{repo}")
++    assert not problems, "\n".join(problems)
++
++
++def test_status_alert_commands_are_valid_bash_with_no_unquoted_placeholder(catalog):
++    problems = []
++    for entry in catalog["entries"]:
++        if entry["error_id"] in _STATUS_AI_CODES:
++            problems += [f"{entry['error_id']}: {p}" for span in _ai_spans(entry) for p in _placeholder_problems(span)]
++    assert not problems, "\n".join(problems)
++
++
++def test_other_ai_prompts_are_not_loaded_with_unvetted_commands(catalog):
++    # Only the six status alerts were given commands; a command appearing in any other prompt must come with its own review.
++    for entry in catalog["entries"]:
++        if entry["error_id"] not in _STATUS_AI_CODES:
++            assert not _ai_spans(entry), f"{entry['error_id']}: a command in ai_prompt needs its own vetting"
++
++
++def test_second_message_renders_the_commands():
++    from trade_alerts.ops_export import render_ai_text
++    entry = [e for e in json.loads((CATALOG_PATH).read_text(encoding="utf-8"))["entries"] if e["error_id"] == "ERR-046"][0]
++    text = render_ai_text({"project": "fleet", "code": "FLEET.OPS_UNIT_FAILED", "event_id": "e1", "evidence": {}}, entry)
++    assert "sudo systemctl list-units --state=failed --no-pager" in text and text.splitlines()[0].startswith("【ERR-046】")
