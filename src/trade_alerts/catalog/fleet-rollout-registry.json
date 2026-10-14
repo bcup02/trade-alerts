@@ -637,7 +637,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:1061 ENTRY_PENDING；mexc_futures_bot.py:1897 開倉前先存 entry_pending 狀態（含 trade_id、external_id）；mexc_futures_bot.py:1487 _adopt_pending_entry 重啟後接管開到一半的部位並沿用 trade_id、補掛停損。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。限制：加密沒有通知管道，接管只寫稽核日誌；A1 正式機沒有發生過被中斷的進場。這支要搬到 Binance（進度頁 x 系列），這份 MEXC 版程式碼之後會重寫。"
+          "evidence": "mexc_futures_bot.py:1061 ENTRY_PENDING；mexc_futures_bot.py:1897 開倉前先存 entry_pending 狀態（含 trade_id、external_id）；mexc_futures_bot.py:1487 _adopt_pending_entry 重啟後接管開到一半的部位並沿用 trade_id、補掛停損。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。接管通知：2026-10-14 台北約 17:27 隨 A1 正式機分支 operations 2ee102c 上線，接管會寫 R3 事件並通知（ERR-066，見 MYC.POSITION_ADOPTED_AFTER_INTERRUPTION 的格子；mexc_futures_bot.py:1092、:1534 就是這條接管路徑的通知點）。限制：A1 正式機沒有發生過被中斷的進場，接管與通知都沒有實機觸發過。這支要搬到 Binance（進度頁 x 系列），這份 MEXC 版程式碼之後會重寫。"
         },
         "btc-competition": {
           "state": "done",
@@ -1899,7 +1899,7 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "sync_funding_fees_entry.py:66 EXIT_SHEET_FAILED = 3；:447 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:97 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations aba9569，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=加密策略 row=5 total=-0.01784778）。my-crypto-bot-funding-sync.service／.timer 已於同日加進 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（備份 ops-notify.env.bak-f26a-*），尚未實際收到過這個單元的失敗通知。限制：沒有事件管道（見 emits_event 格）。"
+          "evidence": "sync_funding_fees_entry.py:66 EXIT_SHEET_FAILED = 3；:447 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:97 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations aba9569，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=加密策略 row=5 total=-0.01784778）。my-crypto-bot-funding-sync.service／.timer 已於同日加進 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（備份 ops-notify.env.bak-f26a-*），尚未實際收到過這個單元的失敗通知。限制：放棄分支沒有在 A1 真實觸發過；事件管道已在 2026-10-14 台北 12:05 隨 x3c 上 A1（見 emits_event 格）。"
         }
       },
       "emits_event": {
@@ -2146,6 +2146,13 @@
       "aspect": "emits_event",
       "type": "completed",
       "note": "x3d：加密的接管通知（ERR-066）與少記成交通知（ERR-042）上 A1。"
+    },
+    {
+      "kind": "cap",
+      "id": "recovery.interrupted_order",
+      "project": "mycrypto",
+      "type": "updated",
+      "note": "x3d：接管通知（ERR-066）已上 A1，更正這格過時的『接管只寫稽核日誌』。"
     }
   ]
 }
