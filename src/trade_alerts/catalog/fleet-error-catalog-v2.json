@@ -1968,7 +1968,6 @@
       "title": "無歧義的漏記平倉已自動補寫進帳本",
       "project": "mycrypto",
       "sources": [
-        "scripts/repair_bot.py:1",
         "trade-alerts/src/trade_alerts/repair_runner.py:406"
       ],
       "current": {
@@ -1998,7 +1997,6 @@
       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
       "project": "mycrypto",
       "sources": [
-        "scripts/repair_bot.py:1",
         "trade-alerts/src/trade_alerts/repair_runner.py:471"
       ],
       "current": {
@@ -2021,7 +2019,7 @@
           "確認修正步驟後請 Claude 照做（只追加、以交易所成交紀錄為準）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
           "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
         ],
-        "ai_prompt": "請在 my-crypto-bot（主機上的 /opt/my-crypto-bot）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/repair_bot.py 的證據抓取（唯讀，只查交易所成交）對照帳本，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
+        "ai_prompt": "請在 my-crypto-bot（主機上的 /opt/my-crypto-bot）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，唯讀向交易所查這筆交易的成交紀錄（只查不下單）對照帳本，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
       }
     },
     {
@@ -2030,7 +2028,6 @@
       "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
       "project": "mycrypto",
       "sources": [
-        "scripts/repair_bot.py:1",
         "trade-alerts/src/trade_alerts/repair_runner.py:439",
         "trade-alerts/src/trade_alerts/repair_runner.py:453"
       ],
@@ -2053,7 +2050,7 @@
           "治標：把下方「給 AI 的追查指令」整段貼給 Claude，以交易所成交紀錄為準手動補寫（只追加、先給你確認），讓帳本、交易所、Google 表三方一致。",
           "治本：同一段指令也會要求 Claude 追查根本原因並提出修正。"
         ],
-        "ai_prompt": "請在 my-crypto-bot 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/repair_bot.py 的證據抓取（唯讀）抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
+        "ai_prompt": "請在 my-crypto-bot 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），唯讀向交易所查這個 trade_id 的成交紀錄當證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
       }
     },
     {
@@ -2062,7 +2059,6 @@
       "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
       "project": "mycrypto",
       "sources": [
-        "scripts/repair_bot.py:1",
         "trade-alerts/src/trade_alerts/repair_runner.py:282"
       ],
       "current": {
@@ -2093,7 +2089,8 @@
       "title": "重啟後接管了一個帳本沒有記完的部位",
       "project": "mycrypto",
       "sources": [
-        "mexc_futures_bot.py:1141"
+        "mexc_futures_bot.py:1439",
+        "mexc_futures_bot.py:2019"
       ],
       "current": {
         "latch": null,
