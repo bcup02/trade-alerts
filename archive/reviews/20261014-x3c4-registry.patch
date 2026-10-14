@@ -1,0 +1,625 @@
+diff --git a/scripts/render_guides.py b/scripts/render_guides.py
+index dfb156d..f9ff27e 100644
+--- a/scripts/render_guides.py
++++ b/scripts/render_guides.py
+@@ -40,6 +40,41 @@ TIERS = [
+ ]
+ BOT_LABEL_FLEET = "全機隊"
+ 
++#: What the ops-notify "axes" are (f-44, 2026-10-14: the user asked what 「軸」 means).  One row per axis the
++#: relay reads each round; ``codes`` are the FLEET.OPS_* catalog codes raised from that axis.  A test keeps every
++#: FLEET.OPS_* code in exactly this table, so a new axis cannot be added to the catalog without being explained here.
++OPS_NOTIFY_AXES = [
++    ("帳本軸", "ledger", "帳本和交易所的成交對不對得上（對帳結果檔）", ["FLEET.OPS_LEDGER_DIVERGED"]),
++    ("Google 表軸", "google", "帳本和 Google 表對不對得上", ["FLEET.OPS_GOOGLE_DIVERGED"]),
++    ("運行狀態軸", "runtime", "策略有沒有定期回報「我還活著」（心跳），以及策略自己報的出錯或安全暫停",
++     ["FLEET.OPS_RUNTIME_ALERT", "FLEET.OPS_STATUS_STALE"]),
++    ("服務單元軸", "units", "指定的背景服務有沒有掛掉（systemd 單元）", ["FLEET.OPS_UNIT_FAILED"]),
++    ("匯出檔軸", "export", "策略把要通知的事轉成的匯出檔，讀得到、有在更新嗎", ["FLEET.OPS_EXPORT_UNAVAILABLE"]),
++    ("時鐘軸", "clock", "主機的時鐘同步有沒有被關掉", ["FLEET.OPS_CLOCK_DEGRADED"]),
++]
++
++
++def _axes_section(catalog: dict[str, Any]) -> str:
++    ids = {entry["code"]: entry["error_id"] for entry in catalog["entries"]}
++    rows = []
++    for name, key, meaning, codes in OPS_NOTIFY_AXES:
++        numbers = "、".join(ids[code] for code in codes)
++        rows.append(f"<tr><td><b>{html.escape(name)}</b><br><span class=\"axis-key\">{key}</span></td>"
++                    f"<td>{html.escape(meaning)}</td><td class=\"axis-ids\">{numbers}</td></tr>")
++    return f"""  <div class="axes" id="axes">
++    <h2>維運通知的「軸」是什麼</h2>
++    <p>維運通知每 10 分鐘會對每個對象（四支策略；主機只有時鐘）讀一輪狀態，每一種讀法叫一個<b>軸</b>：每個軸各自檢查、各自通知，
++    一個軸壞了不影響其他軸。下面標「（維運通知…軸）」或出現在 ERR-043～049 的錯誤，就是從這幾個軸發現的；
++    策略自己在程式裡偵測到的錯誤（例如開倉後停損被拒）沒有軸。所有讀數都放在 A1 的 <code>/var/lib/ops-notify/health.json</code>。</p>
++    <div class="axes-table"><table>
++      <thead><tr><th>軸</th><th>在看什麼</th><th>出問題時的錯誤編號</th></tr></thead>
++      <tbody>
++{chr(10).join(rows)}
++      </tbody>
++    </table></div>
++  </div>
++"""
++
+ _CSS = """
+   :root{
+     --paper:#F1F3EC; --paper-raised:#FAFBF6; --line:#DBE0D0;
+@@ -250,6 +285,14 @@ _RISK_CSS = """
+   .row-tier{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;font-weight:700;padding:3px 8px;border:1px solid var(--tc);border-radius:999px;color:var(--tc);background:var(--tb);text-align:center;white-space:nowrap;}
+   .row.flash{outline:2px solid var(--accent);outline-offset:-2px;background:var(--accent-bg);}
+   .row{scroll-margin-top:16px;}
++  .axes{margin:0 0 18px;padding:12px 14px;background:var(--paper-raised);border:1px solid var(--accent-line);border-radius:3px;}
++  .axes h2{margin:0 0 6px;font-size:15px;}
++  .axes p{margin:0 0 10px;font-size:13px;color:var(--ink-soft);max-width:68ch;}
++  .axes-table{overflow-x:auto;}
++  .axes table{border-collapse:collapse;width:100%;font-size:13px;}
++  .axes th,.axes td{text-align:left;vertical-align:top;padding:6px 10px;border-top:1px solid var(--accent-line);}
++  .axes th{font-size:12px;color:var(--ink-soft);border-top:0;}
++  .axis-key,.axis-ids{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;color:var(--ink-soft);}
+   @media (max-width:560px){ .row-side{flex-direction:row;flex-wrap:wrap;} }
+   #totop{position:fixed;right:20px;bottom:20px;width:46px;height:46px;border-radius:50%;border:1px solid var(--accent-line);background:var(--accent-bg);color:var(--accent);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:0;pointer-events:none;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility 0s linear .2s;}
+   #totop.show{opacity:1;pointer-events:auto;visibility:visible;transform:none;transition:opacity .2s,transform .2s,visibility 0s;}
+@@ -520,7 +563,7 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
+   <div class="legend">
+ {''.join(f'''    <div class="legend-item"><span class="legend-code" style="color:var(--{t['id']})">{t['id']}</span><span class="legend-name">{t['title']}</span><span class="legend-sub">{t['sub']}</span></div>
+ ''' for t in TIERS)}  </div>
+-  <div id="filters"></div>
++{_axes_section(catalog)}  <div id="filters"></div>
+   <div id="register"></div>
+   <div class="foot">
+     資料來源：trade-alerts <code>{catalog['catalog_version']}</code>（錯誤分類）與 <code>{registry['registry_version']}</code>（各策略實際進度，{registry['updated_at']} 盤點）。
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index f374fef..08defdb 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1,7 +1,7 @@
+ {
+   "registry_version": "fleet-rollout-registry/v1",
+   "catalog_version": "fleet-error-catalog/v2",
+-  "updated_at": "2026-10-13",
++  "updated_at": "2026-10-14",
+   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file.",
+   "projects": {
+     "momentum": "動能策略",
+@@ -49,7 +49,7 @@
+     "mycrypto": {
+       "repo": "AI-for-column/my-crypto-bot",
+       "branch": "operations",
+-      "commit": "4d136313faa66c69c546587144eec134c4873489"
++      "commit": "0757c6f8504019c8766e8b7acdb243c80136df03"
+     },
+     "btc-competition": {
+       "repo": "AI-for-column/btc-bull-market-competition",
+@@ -142,9 +142,8 @@
+           "evidence": "src/seykota_bot/bot.py:54 _CONSECUTIVE_FAILURE_LATCH_THRESHOLD Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）；計數只算非暫時性的失敗：對帳讀取與 K 線抓取遇到暫時性網路錯誤（HTTP 5xx／408、後端碼 -1000／-1001／-1006／-1007）不計入、下一輪直接重試（src/seykota_bot/bot.py:1599、src/seykota_bot/bot.py:2282，#89）"
+         },
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "MYC.RUNTIME_CYCLE_FAILED 目前每次都照常重試但沒有計數，v2 要求連續 3 次失敗才升格通知。"
++          "state": "done",
++          "evidence": "failure_episodes.py:135 FailureEpisodes.failure：同一段失敗連續 3 次（failure_episodes.py:54 THRESHOLD）才升格並只寫一則事件，成功就結束這一段，狀態存在 state/failure-episodes.json、重啟接續、事件編號由失敗期間推導（重啟後不重複通知）；mexc_futures_bot.py:2287 run_forever 整輪例外連續 3 輪才通知（ERR-027）；mexc_futures_bot.py:1219 沒有交易所端停損連續 3 輪（ERR-029／031）；mexc_futures_bot.py:1229 殘留停損單取消連續 3 次（ERR-032）。my-crypto-bot #73（審閱 3 輪）。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+         },
+         "btc-competition": {
+           "state": "n/a",
+@@ -167,7 +166,7 @@
+         },
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "portfolio_snapshot_adapter.py:75 _runtime_status（strategy.runtime_status）"
++          "evidence": "portfolio_snapshot_adapter.py:76 _runtime_status（strategy.runtime_status）"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -190,7 +189,7 @@
+         },
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "reconcile_compare.py:101 main"
++          "evidence": "reconcile_compare.py:102 main"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -213,7 +212,7 @@
+         },
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "google_reconcile.py:135 main"
++          "evidence": "google_reconcile.py:136 main"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -307,9 +306,8 @@
+           "evidence": "scripts/repair_bot.py:234 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
+         },
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "目前沒有任何會通知人的事件來源。"
++          "state": "done",
++          "evidence": "ops_export_refresh.py:28 refresh_ops_export 每分鐘（deploy/my-crypto-ops-export-refresh.timer:5）把 audit/fleet_event_log.jsonl 轉成 audit/ops_export.json（fleet-ops-export/v2，只含 R3 與已升格的 R2）；my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元），啟用計時器後手動一輪成功、匯出檔 notices=0。"
+         },
+         "btc-competition": {
+           "state": "pending",
+@@ -332,9 +330,8 @@
+           "evidence": "scripts/repair_bot.py:234 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機尚未開（開發機的通知路徑會在「通知分兩則」那包重整）。"
+         },
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "還沒有匯出檔。"
++          "state": "done",
++          "evidence": "ops_export_refresh.py:28 寫出的匯出檔由 A1 維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-10-14 台北 12:05 設 OPS_NOTIFY_MYCRYPTO_OPS_EXPORT=on（備份 ops-notify.env.bak-x3c4-202610141305），手動一輪維運通知讀到加密的匯出檔軸 OK、notices=0、零誤發。限制：還沒有實際經這條路送到手機的通知（見「需要人處理的通知真的送到 LINE」）。開發機另計，尚未開。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -357,8 +354,8 @@
+         },
+         "mycrypto": {
+           "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定；7e 已取消（2026-10-12），開發機維運通知保留 Telegram 單向發送是否沿用，另議。　這支策略目前還沒有任何會通知人的事件來源。"
++          "phase": "x3-crypto-binance",
++          "reason": "2026-10-14 台北 12:05：A1 維運通知對加密的匯出轉送已開、匯出檔軸 OK，策略端的事件日誌與匯出檔也已上線；還沒有實際經這條路送到你手機（加密 OFFLINE、沒有真實事件，也還沒做受控測試事件）。受控測試通過、手機確認收到之後才改已做。"
+         },
+         "btc-competition": {
+           "state": "pending",
+@@ -404,9 +401,8 @@
+           "evidence": "deploy/seykota-repair-shadow.service 與 deploy/seykota-repair-shadow.timer 列入正式機 OPS_NOTIFY_SEYKOTA_UNITS（2026-09-24），服務單元狀態 OK。開發機尚未設定。"
+         },
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "x3-crypto-binance",
+-          "reason": "現況：維運通知目前只盯加密的資金費同步（my-crypto-bot-funding-sync.service 與 .timer，2026-10-06 起）；主程式、對帳抓取、快照、報表等背景服務沒盯，掛掉時靠運行狀態（策略停止回報）與對帳間接發現。使用者 2026-10-10 決定照現狀，換 Binance（x3）接上共用做法時一併補齊要盯的清單。"
++          "state": "done",
++          "evidence": "deploy/my-crypto-ops-export-refresh.service 與 deploy/my-crypto-ops-export-refresh.timer 連同 deploy/my-crypto-bot-funding-sync.service／.timer 列入 A1 的 OPS_NOTIFY_MYCRYPTO_UNITS（2026-10-14 台北 12:05；做法同動能：只盯會產生通知的單元），服務單元狀態 OK。主程式、對帳抓取、快照、報表等背景服務沒有列入，掛掉時靠運行狀態（策略停止回報）與對帳間接發現。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -499,7 +495,7 @@
+         },
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "mexc_futures_bot.py:411 只呼叫一次 create_market_order、失敗記帳後往外拋（不帶 client id，MEXC 端無從去重）；ccxt 4.5.71 預設不重試，:335 init_exchange 沒開 maxRetriesOnFailure；mexc_futures_bot.py:1906 run_forever 例外後睡 POLLING_SECONDS 才跑下一輪；:1433 每輪開頭先查部位、:1455 有部位就只管理不開新倉，查部位失敗則在送任何單之前就丟例外；平倉 :1769 帶 reduceOnly。2026-09-24 h7 查核＋模擬測試確認；回歸測試 my-crypto-bot #49。"
++          "evidence": "mexc_futures_bot.py:492 只呼叫一次 create_market_order、失敗記帳後往外拋（不帶 client id，MEXC 端無從去重）；ccxt 4.5.71 預設不重試，:391 init_exchange 沒開 maxRetriesOnFailure；mexc_futures_bot.py:2282 run_forever 例外後睡 POLLING_SECONDS 才跑下一輪；:1752 每輪開頭先查部位、:1774 有部位就只管理不開新倉，查部位失敗則在送任何單之前就丟例外；平倉 :2121 帶 reduceOnly。2026-09-24 h7 查核＋模擬測試確認；回歸測試 my-crypto-bot #49。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -622,7 +618,7 @@
+         },
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "graceful_stop.py:54 install_signal_handlers；mexc_futures_bot.py:1902 啟動時安裝；deploy/my-crypto-bot.service:20 TimeoutStopSec=180。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。同日 17:50 重開機時服務乾淨結束（systemd 回報 Deactivated successfully），重啟後讀回持倉與交易所停損單都在；這支停止時沒有專屬的結束日誌，所以只確認乾淨結束，沒有逐步確認「當輪做完才停」。"
++          "evidence": "graceful_stop.py:54 install_signal_handlers；mexc_futures_bot.py:2277 啟動時安裝；deploy/my-crypto-bot.service:20 TimeoutStopSec=180。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。同日 17:50 重開機時服務乾淨結束（systemd 回報 Deactivated successfully），重啟後讀回持倉與交易所停損單都在；這支停止時沒有專屬的結束日誌，所以只確認乾淨結束，沒有逐步確認「當輪做完才停」。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -645,7 +641,7 @@
+         },
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "mexc_futures_bot.py:951 ENTRY_PENDING；mexc_futures_bot.py:1528 開倉前先存 entry_pending 狀態（含 trade_id、external_id）；mexc_futures_bot.py:1141 _adopt_pending_entry 重啟後接管開到一半的部位並沿用 trade_id、補掛停損。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。限制：加密沒有通知管道，接管只寫稽核日誌；A1 正式機沒有發生過被中斷的進場。這支要搬到 Binance（進度頁 x 系列），這份 MEXC 版程式碼之後會重寫。"
++          "evidence": "mexc_futures_bot.py:1037 ENTRY_PENDING；mexc_futures_bot.py:1849 開倉前先存 entry_pending 狀態（含 trade_id、external_id）；mexc_futures_bot.py:1439 _adopt_pending_entry 重啟後接管開到一半的部位並沿用 trade_id、補掛停損。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。限制：加密沒有通知管道，接管只寫稽核日誌；A1 正式機沒有發生過被中斷的進場。這支要搬到 Binance（進度頁 x 系列），這份 MEXC 版程式碼之後會重寫。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -1202,13 +1198,13 @@
+       "behaviour": {
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "mexc_futures_bot.py:734 只記錄差額，不影響交易（Phase 4e 定案）"
++          "evidence": "mexc_futures_bot.py:815 只記錄差額，不影響交易（Phase 4e 定案）"
+         }
+       },
+       "emits_event": {
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "mexc_futures_bot.py:734 append_fleet_event（R0）"
++          "evidence": "mexc_futures_bot.py:815 append_fleet_event（R0）"
+         }
+       }
+     },
+@@ -1216,16 +1212,14 @@
+       "code": "MYC.RUNTIME_CYCLE_FAILED",
+       "behaviour": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "目前：每次都照常重試，但沒有計數、連續失敗也不會升格。"
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:2287 run_forever 整輪例外下一輪照常重試，連續 3 輪失敗才升格並通知一次（failure_episodes.py:135；從 R2 的『3 次』規則）；2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+         }
+       },
+       "emits_event": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:2287 _count_failure(RUNTIME_CYCLE_FAILED) → mexc_futures_bot.py:1191 _emit_escalation 寫 R2 已升格事件（等級 fleet_events.py:43，有測試核對等於錯誤目錄），匯出檔轉給維運通知。只數真倉與測試網的失敗。限制同上：A1 沒被觸發過。"
+         }
+       }
+     },
+@@ -1234,14 +1228,13 @@
+       "behaviour": {
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "mexc_futures_bot.py:1620 只通知、不自動下單（現行行為即符合 v2）"
++          "evidence": "mexc_futures_bot.py:1943 只通知、不自動下單（現行行為即符合 v2）"
+         }
+       },
+       "emits_event": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:1955 開倉後停損單被拒時立刻寫 R3 事件（fleet_events.py:37 RISK_TIER），匯出檔轉給維運通知；事件文字只含交易對、方向、trade_id、停損價與已遮金鑰並截斷的交易所錯誤訊息。my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+         }
+       }
+     },
+@@ -1249,16 +1242,14 @@
+       "code": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
+       "behaviour": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "目前：只記錄。v2：自動重查部位並補掛停損，最多 3 次，失敗才通知。"
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:1967 開倉後查不到部位時記一次失敗；下一輪本來就會重查部位並補掛停損（原有行為），與搬移停損失敗共用同一段失敗期間，連續 3 輪沒掛成功才升格；停損掛上、交易所看得到停損或空手就結束。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+         }
+       },
+       "emits_event": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:1967 _protection_failed(PROTECTION_PLACEMENT_NO_POSITION) → mexc_futures_bot.py:1191 _emit_escalation 寫 R2 已升格事件（fleet_events.py:40）。限制同上：A1 沒被觸發過。"
+         }
+       }
+     },
+@@ -1267,14 +1258,13 @@
+       "behaviour": {
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "mexc_futures_bot.py:1633 只通知、不自動下單（現行行為即符合 v2）"
++          "evidence": "mexc_futures_bot.py:1971 只通知、不自動下單（現行行為即符合 v2）"
+         }
+       },
+       "emits_event": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:1976 掛開倉停損單時拋例外，立刻寫 R3 事件（fleet_events.py:37 RISK_TIER），匯出檔轉給維運通知。my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+         }
+       }
+     },
+@@ -1282,16 +1272,14 @@
+       "code": "MYC.PROTECTION_REPLACE_FAILED",
+       "behaviour": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "下一輪會自動重掛（已符合），但連續失敗不會升格通知。"
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:2221 搬移（或重新掛）停損失敗清掉失效單號，下一輪自動重掛（原有行為）；mexc_futures_bot.py:2233 例外分支同；連續 3 輪沒掛成功才升格通知一次。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+         }
+       },
+       "emits_event": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:2221 _protection_failed(PROTECTION_REPLACE_FAILED) → mexc_futures_bot.py:1191 _emit_escalation 寫 R2 已升格事件（fleet_events.py:41）。限制同上：A1 沒被觸發過。"
+         }
+       }
+     },
+@@ -1299,16 +1287,14 @@
+       "code": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
+       "behaviour": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。"
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:2151 平倉後取消殘留停損單失敗時記住單號；mexc_futures_bot.py:1235 _retry_orphan_cancels 空手時每輪重試（先看交易所停損清單，已不在清單就算完成，清單讀不出來算一次失敗），只取消自己記錄的單號；連續 3 次失敗才升格；mexc_futures_bot.py:1268 重試前又開了新部位則條件不成立、立刻通知。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+         }
+       },
+       "emits_event": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "目前只寫 log，沒有寫進共用事件日誌，所以不會有白話通知。"
++          "state": "done",
++          "evidence": "mexc_futures_bot.py:2151 _orphan_failed → mexc_futures_bot.py:1191 _emit_escalation 寫 R2 已升格事件（fleet_events.py:42）。限制同上：A1 沒被觸發過。"
+         }
+       }
+     },
+@@ -1477,7 +1463,7 @@
+         },
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "reconcile_compare.py:101 main 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
++          "evidence": "reconcile_compare.py:102 main 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -1516,7 +1502,7 @@
+         },
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "google_reconcile.py:135 main 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
++          "evidence": "google_reconcile.py:136 main 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -1555,7 +1541,7 @@
+         },
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "portfolio_snapshot_adapter.py:75 _runtime_status 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
++          "evidence": "portfolio_snapshot_adapter.py:76 _runtime_status 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -1593,9 +1579,8 @@
+           "evidence": "deploy/seykota-repair-shadow.service 列入正式機 OPS_NOTIFY_SEYKOTA_UNITS，由維運通知服務單元軸盯。"
+         },
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "x3-crypto-binance",
+-          "reason": "現況：維運通知目前只盯加密的資金費同步（my-crypto-bot-funding-sync.service 與 .timer，2026-10-06 起）；主程式、對帳抓取、快照、報表等背景服務沒盯，掛掉時靠運行狀態（策略停止回報）與對帳間接發現。使用者 2026-10-10 決定照現狀，換 Binance（x3）接上共用做法時一併補齊要盯的清單。（見「維運通知盯背景服務有沒有掛掉」）"
++          "state": "done",
++          "evidence": "deploy/my-crypto-ops-export-refresh.service 與 deploy/my-crypto-bot-funding-sync.service 列入 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（2026-10-14 台北 12:05），維運通知手動一輪加密的服務單元軸 OK；掛掉時由 ERR-046 通知。限制：主程式、對帳抓取、快照、報表沒有列入（見『維運通知盯背景服務有沒有掛掉』）；沒有實際收到過加密單元失敗的通知。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -1633,9 +1618,8 @@
+           "evidence": "scripts/repair_bot.py:234 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_SEYKOTA_OPS_EXPORT=on）。"
+         },
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "8-mycrypto",
+-          "reason": "還沒有匯出檔。"
++          "state": "done",
++          "evidence": "ops_export_refresh.py:28 每分鐘寫出 audit/ops_export.json（deploy/my-crypto-ops-export-refresh.timer:5）；A1 維運通知 2026-10-14 台北 12:05 起讀它，加密的匯出檔軸 OK（檢查時間 04:05:15Z）；匯出檔讀不到或太久沒更新由 ERR-047 通知。限制：沒有實際收到過加密匯出檔異常的通知。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -1674,7 +1658,7 @@
+         },
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "reconcile_compare.py:101 main 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
++          "evidence": "reconcile_compare.py:102 main 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
+         },
+         "btc-competition": {
+           "state": "done",
+@@ -1921,14 +1905,13 @@
+       "behaviour": {
+         "mycrypto": {
+           "state": "done",
+-          "evidence": "sync_funding_fees_entry.py:54 EXIT_SHEET_FAILED = 3；:364 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:85 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations aba9569，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=加密策略 row=5 total=-0.01784778）。my-crypto-bot-funding-sync.service／.timer 已於同日加進 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（備份 ops-notify.env.bak-f26a-*），尚未實際收到過這個單元的失敗通知。限制：沒有事件管道（見 emits_event 格）。"
++          "evidence": "sync_funding_fees_entry.py:66 EXIT_SHEET_FAILED = 3；:447 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:97 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations aba9569，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=加密策略 row=5 total=-0.01784778）。my-crypto-bot-funding-sync.service／.timer 已於同日加進 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（備份 ops-notify.env.bak-f26a-*），尚未實際收到過這個單元的失敗通知。限制：沒有事件管道（見 emits_event 格）。"
+         }
+       },
+       "emits_event": {
+         "mycrypto": {
+-          "state": "pending",
+-          "phase": "x3-crypto-binance",
+-          "reason": "加密仍釘共用庫 v0.15.0，沒有匯出檔與修復機器人，事件日誌的通知到不了手機；換 Binance（x3）升級共用庫後才會有白話通知。在那之前只有服務失敗（ERR-046）一條路。"
++          "state": "done",
++          "evidence": "sync_funding_fees_entry.py:432 失敗期間第一次放棄時 fleet_events.record(FUNDING_SHEET_WRITE_FAILED) 寫一則 R2 已升格事件，一段期間只寫一次（事件編號由失敗期間身分推導：sync_funding_fees_entry.py:249；寫前先查日誌：sync_funding_fees_entry.py:350；只在重啟後認得出編號時才寫：sync_funding_fees_entry.py:426）。my-crypto-bot #74（審閱 2 輪）。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 沒有發生過資金費寫表失敗；舊格式且已『放棄』的狀態檔升級後會補寫一則事件（A1 部署時狀態檔正常，沒有發生）。"
+         }
+       }
+     },
+@@ -1966,37 +1949,142 @@
+   "recent_changes": [
+     {
+       "kind": "cap",
+-      "id": "notify.telegram_repeat",
+-      "project": "momentum",
++      "id": "latch.consecutive_failure_counter",
++      "project": "mycrypto",
+       "type": "completed",
+-      "note": "f-38 第二階段：2026-10-12 使用者決定停用 Telegram 遙控（ops-control），按鈕與其持續提醒取消，這格改不適用；替代做法在維運通知（f-39），不屬於策略 repo。"
++      "note": "x3c：加密策略的事件日誌、匯出檔與連續失敗計數（my-crypto-bot #71／#73／#74）2026-10-14 台北 12:05 上 A1 正式機（新）。"
+     },
+     {
+       "kind": "cap",
+-      "id": "notify.telegram_repeat",
+-      "project": "seykota",
++      "id": "ops_export.writer",
++      "project": "mycrypto",
+       "type": "completed",
+-      "note": "f-38 第二階段：2026-10-12 使用者決定停用 Telegram 遙控（ops-control），按鈕與其持續提醒取消，這格改不適用；替代做法在維運通知（f-39），不屬於策略 repo。"
++      "note": "x3c：加密策略的事件日誌、匯出檔與連續失敗計數（my-crypto-bot #71／#73／#74）2026-10-14 台北 12:05 上 A1 正式機（新）。"
+     },
+     {
+       "kind": "cap",
+-      "id": "notify.telegram_repeat",
++      "id": "ops_notify.export_relay_enabled",
+       "project": "mycrypto",
+       "type": "completed",
+-      "note": "f-38 第二階段：2026-10-12 使用者決定停用 Telegram 遙控（ops-control），按鈕與其持續提醒取消，這格改不適用；替代做法在維運通知（f-39），不屬於策略 repo。"
++      "note": "x3c：加密策略的事件日誌、匯出檔與連續失敗計數（my-crypto-bot #71／#73／#74）2026-10-14 台北 12:05 上 A1 正式機（新）。"
+     },
+     {
+       "kind": "cap",
+-      "id": "notify.telegram_repeat",
+-      "project": "btc-competition",
++      "id": "ops_notify.units_axis",
++      "project": "mycrypto",
+       "type": "completed",
+-      "note": "f-38 第二階段：2026-10-12 使用者決定停用 Telegram 遙控（ops-control），按鈕與其持續提醒取消，這格改不適用；替代做法在維運通知（f-39），不屬於策略 repo。"
++      "note": "x3c：加密策略的事件日誌、匯出檔與連續失敗計數（my-crypto-bot #71／#73／#74）2026-10-14 台北 12:05 上 A1 正式機（新）。"
+     },
+     {
+       "kind": "cap",
+       "id": "notify.line_first_notice",
++      "project": "mycrypto",
+       "type": "updated",
+-      "note": "f-38：說明改指向維運通知的 Telegram 持續提醒（f-39）；加密、競賽兩格理由裡「7e 做完要移除」改成 7e 已取消。"
++      "note": "匯出轉送已在 A1 打開，但還沒有受控測試事件經它送到手機，維持未做；原因文字改成最新現況。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.RUNTIME_CYCLE_FAILED",
++      "aspect": "behaviour",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.RUNTIME_CYCLE_FAILED",
++      "aspect": "emits_event",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
++      "aspect": "behaviour",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
++      "aspect": "emits_event",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.PROTECTION_REPLACE_FAILED",
++      "aspect": "behaviour",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.PROTECTION_REPLACE_FAILED",
++      "aspect": "emits_event",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
++      "aspect": "behaviour",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
++      "aspect": "emits_event",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.PROTECTION_PLACEMENT_REJECTED",
++      "aspect": "emits_event",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.PROTECTION_PLACEMENT_ERROR",
++      "aspect": "emits_event",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
++      "aspect": "emits_event",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "FLEET.OPS_UNIT_FAILED",
++      "aspect": "behaviour",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
++    },
++    {
++      "kind": "rule",
++      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
++      "aspect": "behaviour",
++      "project": "mycrypto",
++      "type": "completed",
++      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
+     }
+   ]
+ }
+diff --git a/tests/test_ops_notify_axes_table.py b/tests/test_ops_notify_axes_table.py
+new file mode 100644
+index 0000000..d4c7184
+--- /dev/null
++++ b/tests/test_ops_notify_axes_table.py
+@@ -0,0 +1,45 @@
++"""f-44: the risk register explains what an ops-notify 「軸」 is, and the table cannot fall behind the catalog."""
++from __future__ import annotations
++
++import importlib.util
++import re
++from pathlib import Path
++
++from trade_alerts.fleet_event_log import load_error_catalog
++
++ROOT = Path(__file__).resolve().parents[1]
++PAGE = ROOT / "docs" / "guides" / "fleet-risk-register.html"
++
++
++def _render_guides():
++    spec = importlib.util.spec_from_file_location("render_guides", ROOT / "scripts" / "render_guides.py")
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module
++
++
++def test_every_ops_notify_catalog_code_is_in_the_axes_table_exactly_once():
++    module = _render_guides()
++    listed = [code for _name, _key, _meaning, codes in module.OPS_NOTIFY_AXES for code in codes]
++    catalog_codes = [e["code"] for e in load_error_catalog()["entries"] if e["code"].startswith("FLEET.OPS_")]
++    assert sorted(listed) == sorted(catalog_codes)
++
++
++def test_the_page_has_the_table_with_each_axis_and_its_error_numbers():
++    html = PAGE.read_text(encoding="utf-8")
++    section = html[html.index('id="axes"'):html.index('id="filters"')]
++    module = _render_guides()
++    ids = {e["code"]: e["error_id"] for e in load_error_catalog()["entries"]}
++    for name, key, meaning, codes in module.OPS_NOTIFY_AXES:
++        row = re.search(rf"<tr><td><b>{re.escape(name)}</b>.*?</tr>", section, re.S)
++        assert row, name
++        assert key in row.group(0) and meaning in row.group(0)
++        for code in codes:
++            assert ids[code] in row.group(0), (name, code)
++    assert "沒有軸" in section                      # says that errors the strategy detects itself have no axis
++    assert "health.json" in section
++
++
++def test_the_generated_page_is_current():
++    module = _render_guides()
++    assert PAGE.read_text(encoding="utf-8") == module.rendered_pages()[PAGE]
