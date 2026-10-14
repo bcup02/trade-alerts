@@ -508,9 +508,9 @@ def test_the_runner_codes_are_catalogued_the_same_for_every_strategy_that_runs_i
     activity and hides the other's."""
     catalog = load_error_catalog()
     for code in RUNNER_CODES:
-        mom, sey = (catalog_entry(catalog, project, code) for project in ("momentum", "seykota"))
+        mom, sey, myc = (catalog_entry(catalog, project, code) for project in ("momentum", "seykota", "mycrypto"))
         for key in ("verdict", "risk_tier", "resume"):
-            assert mom[key] == sey[key], (code, key)
+            assert mom[key] == sey[key] == myc[key], (code, key)
     tiers = {code: catalog_entry(catalog, "momentum", code)["risk_tier"] for code in RUNNER_CODES}
     assert tiers == {REPAIRED: "R1", FAILED: "R2", BLOCKED: "R3", "VERIFIED_CLOSE_REPAIR_RECURRING": "R3"}
 
@@ -535,10 +535,10 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
                             if name.startswith("CODE_") and value == bare)
             assert f"code={constant}" in call, source
             cited += 1
-    # 4 runner codes x 2 strategies; FAILED is emitted from two call sites.
+    # 4 runner codes x 3 strategies (momentum, seykota, mycrypto); FAILED is emitted from two call sites.
     # g1: UNRECORDED_FILL_CORRECTED for 3 strategies, UNRESOLVED for all 4.
     # f-30: the pending-expired notice is emitted from one call site.
-    assert cited == 10 + 7 + 1
+    assert cited == 15 + 7 + 1
 
 
 # --------------------------------------------------------------------------- #

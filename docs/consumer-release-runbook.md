@@ -1056,3 +1056,15 @@ trade-alerts：v0.30.6（狀態告警第二則加上可貼上的唯讀指令；f
 受影響消費專案：維運通知（改釘並部署後，A1 與開發機的狀態告警第二則才會換成新文字）。
 部署入口：無（函式庫）。
 ```
+
+```text
+trade-alerts：v0.30.7（錯誤清單新增 ERR-062～066：加密策略的修復機器人四條與重啟接管一條；x3d）
+變更摘要：1. 錯誤清單新增五條加密策略規則：MYC.VERIFIED_CLOSE_AUTO_REPAIRED（ERR-062，R1）、MYC.VERIFIED_CLOSE_REPAIR_BLOCKED（ERR-063，R3）、MYC.VERIFIED_CLOSE_REPAIR_FAILED（ERR-064，R2）、MYC.VERIFIED_CLOSE_REPAIR_RECURRING（ERR-065，R3）、MYC.POSITION_ADOPTED_AFTER_INTERRUPTION（ERR-066，R3），各附白話說明、處理步驟與給 AI 的追查指令。
+          2. 一致性登記冊對應五列（加密欄「未做」，預定 x3d）。
+          3. 沒有程式或函式簽名變更；只有錯誤清單與登記冊資料、版本號，以及守門測試改成跟著目錄筆數算。
+向後相容：沒釘此版的專案不受影響；加密釘此版後，修復機器人與接管事件的通知才認得新編號。
+受影響消費專案：加密（x3d 改釘）。
+部署入口：各專案既有部署腳本。
+版本驗證／服務驗證／部署時間：待加密釘版部署後補記。
+交易安全：未啟用真倉、未下單、未修改秘密或保護單。
+```

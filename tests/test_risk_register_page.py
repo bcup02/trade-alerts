@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 import pytest
+from trade_alerts import load_error_catalog
 
 quickjs = pytest.importorskip("quickjs")
 
@@ -96,7 +97,7 @@ def run(ctx, code):
 def test_the_page_builds_one_row_per_error_with_an_id_and_a_tier_badge():
     ctx, data = boot()
     entries = data["entries"]
-    assert run(ctx, "info().rows") == len(entries) == 61
+    assert run(ctx, "info().rows") == len(entries) == len(load_error_catalog()["entries"])
     ids = run(ctx, "info().ids")
     assert sorted(ids) == sorted(e["error_id"] for e in entries) and len(set(ids)) == len(ids)
     for e in entries:
@@ -157,7 +158,7 @@ def test_a_link_with_an_error_number_in_the_hash_jumps_on_load():
 @pytest.mark.parametrize("hash_", ["#ERR-999", "#nonsense", "#ERR-04x", "ERR-044", "#ERR-044<img>", ""])
 def test_a_bad_or_unknown_hash_does_nothing_and_does_not_break_the_page(hash_):
     ctx, _ = boot(hash_=hash_)
-    assert run(ctx, "__log.scroll") == [] and run(ctx, "info().rows") == 61
+    assert run(ctx, "__log.scroll") == [] and run(ctx, "info().rows") == len(load_error_catalog()["entries"])
 
 
 def test_the_empty_choice_does_nothing():

@@ -143,6 +143,11 @@ Phase 2c 刪除，其餘多條是同一個條件的重複呼叫點，本目錄�
 | `SEY.FUNDING_SHEET_WRITE_FAILED` | 未發出（f-26a；資金費同步寫不進「帳戶餘額總表」分頁，結束碼 3＋事件日誌 R2 標記已重試用盡，ERR-057） | JUDGEMENT | R2 | P8（v2） |
 | `MOM.FUNDING_SHEET_WRITE_FAILED` | 未發出（f-26a；同上，ERR-058） | JUDGEMENT | R2 | P8（v2） |
 | `MYC.FUNDING_SHEET_WRITE_FAILED` | 未發出（f-26a；同上，但加密沒有事件日誌的通知管道，只有服務失敗一條路，ERR-059） | JUDGEMENT | R2 | P8（v2） |
+| `MYC.VERIFIED_CLOSE_AUTO_REPAIRED` | 未發出（x3d；加密修復機器人自動補寫漏記平倉，ERR-062） | MECHANICAL | R1 | P8（v2） |
+| `MYC.VERIFIED_CLOSE_REPAIR_BLOCKED` | 未發出（x3d；同上，帳本已有修復痕跡或整批寫入失敗而停手，ERR-063） | JUDGEMENT | R3 | P8（v2） |
+| `MYC.VERIFIED_CLOSE_REPAIR_FAILED` | 未發出（x3d；同上，連續 3 次補不起來才升格，ERR-064） | JUDGEMENT | R2 | P8（v2） |
+| `MYC.VERIFIED_CLOSE_REPAIR_RECURRING` | 未發出（x3d；同上，7 天內自動補寫達 2 次通知一次，ERR-065） | JUDGEMENT | R3 | P8（v2） |
+| `MYC.POSITION_ADOPTED_AFTER_INTERRUPTION` | 未發出（x3d；加密重啟後接管開到一半的部位，現只寫稽核日誌，ERR-066） | JUDGEMENT | R3 | P8（v2） |
 
 momentum 是全機隊唯一有完整 latch 模型的實作（dict 欄位 + 原因碼 + 帳本冪等 resume；當時還有 Telegram
 中繼，已於 2026-10-12 停用），Phase 4 以它為統一基準，見 §4。它對 catch-all 的處置（`MOM.RUNTIME_CYCLE_FAILED`）也
