@@ -40,6 +40,41 @@ TIERS = [
 ]
 BOT_LABEL_FLEET = "全機隊"
 
+#: What the ops-notify "axes" are (f-44, 2026-10-14: the user asked what 「軸」 means).  One row per axis the
+#: relay reads each round; ``codes`` are the FLEET.OPS_* catalog codes raised from that axis.  A test keeps every
+#: FLEET.OPS_* code in exactly this table, so a new axis cannot be added to the catalog without being explained here.
+OPS_NOTIFY_AXES = [
+    ("帳本軸", "ledger", "帳本和交易所的成交對不對得上（對帳結果檔）", ["FLEET.OPS_LEDGER_DIVERGED"]),
+    ("Google 表軸", "google", "帳本和 Google 表對不對得上", ["FLEET.OPS_GOOGLE_DIVERGED"]),
+    ("運行狀態軸", "runtime", "策略有沒有定期回報「我還活著」（心跳），以及策略自己報的出錯或安全暫停",
+     ["FLEET.OPS_RUNTIME_ALERT", "FLEET.OPS_STATUS_STALE"]),
+    ("服務單元軸", "units", "指定的背景服務有沒有掛掉（systemd 單元）", ["FLEET.OPS_UNIT_FAILED"]),
+    ("匯出檔軸", "export", "策略把要通知的事轉成的匯出檔，讀得到、有在更新嗎", ["FLEET.OPS_EXPORT_UNAVAILABLE"]),
+    ("時鐘軸", "clock", "主機的時鐘同步有沒有被關掉", ["FLEET.OPS_CLOCK_DEGRADED"]),
+]
+
+
+def _axes_section(catalog: dict[str, Any]) -> str:
+    ids = {entry["code"]: entry["error_id"] for entry in catalog["entries"]}
+    rows = []
+    for name, key, meaning, codes in OPS_NOTIFY_AXES:
+        numbers = "、".join(ids[code] for code in codes)
+        rows.append(f"<tr><td><b>{html.escape(name)}</b><br><span class=\"axis-key\">{key}</span></td>"
+                    f"<td>{html.escape(meaning)}</td><td class=\"axis-ids\">{numbers}</td></tr>")
+    return f"""  <div class="axes" id="axes">
+    <h2>維運通知的「軸」是什麼</h2>
+    <p>維運通知每 10 分鐘會對每個對象（四支策略；主機只有時鐘）讀一輪狀態，每一種讀法叫一個<b>軸</b>：每個軸各自檢查、各自通知，
+    一個軸壞了不影響其他軸。下面標「（維運通知…軸）」或出現在 ERR-043～049 的錯誤，就是從這幾個軸發現的；
+    策略自己在程式裡偵測到的錯誤（例如開倉後停損被拒）沒有軸。所有讀數都放在 A1 的 <code>/var/lib/ops-notify/health.json</code>。</p>
+    <div class="axes-table"><table>
+      <thead><tr><th>軸</th><th>在看什麼</th><th>出問題時的錯誤編號</th></tr></thead>
+      <tbody>
+{chr(10).join(rows)}
+      </tbody>
+    </table></div>
+  </div>
+"""
+
 _CSS = """
   :root{
     --paper:#F1F3EC; --paper-raised:#FAFBF6; --line:#DBE0D0;
@@ -250,6 +285,14 @@ _RISK_CSS = """
   .row-tier{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;font-weight:700;padding:3px 8px;border:1px solid var(--tc);border-radius:999px;color:var(--tc);background:var(--tb);text-align:center;white-space:nowrap;}
   .row.flash{outline:2px solid var(--accent);outline-offset:-2px;background:var(--accent-bg);}
   .row{scroll-margin-top:16px;}
+  .axes{margin:0 0 18px;padding:12px 14px;background:var(--paper-raised);border:1px solid var(--accent-line);border-radius:3px;}
+  .axes h2{margin:0 0 6px;font-size:15px;}
+  .axes p{margin:0 0 10px;font-size:13px;color:var(--ink-soft);max-width:68ch;}
+  .axes-table{overflow-x:auto;}
+  .axes table{border-collapse:collapse;width:100%;font-size:13px;}
+  .axes th,.axes td{text-align:left;vertical-align:top;padding:6px 10px;border-top:1px solid var(--accent-line);}
+  .axes th{font-size:12px;color:var(--ink-soft);border-top:0;}
+  .axis-key,.axis-ids{font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:12px;color:var(--ink-soft);}
   @media (max-width:560px){ .row-side{flex-direction:row;flex-wrap:wrap;} }
   #totop{position:fixed;right:20px;bottom:20px;width:46px;height:46px;border-radius:50%;border:1px solid var(--accent-line);background:var(--accent-bg);color:var(--accent);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:0;pointer-events:none;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility 0s linear .2s;}
   #totop.show{opacity:1;pointer-events:auto;visibility:visible;transform:none;transition:opacity .2s,transform .2s,visibility 0s;}
@@ -520,7 +563,7 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
   <div class="legend">
 {''.join(f'''    <div class="legend-item"><span class="legend-code" style="color:var(--{t['id']})">{t['id']}</span><span class="legend-name">{t['title']}</span><span class="legend-sub">{t['sub']}</span></div>
 ''' for t in TIERS)}  </div>
-  <div id="filters"></div>
+{_axes_section(catalog)}  <div id="filters"></div>
   <div id="register"></div>
   <div class="foot">
     資料來源：trade-alerts <code>{catalog['catalog_version']}</code>（錯誤分類）與 <code>{registry['registry_version']}</code>（各策略實際進度，{registry['updated_at']} 盤點）。
