@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 61,
+  "error_ids_issued": 66,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -1960,6 +1960,163 @@
           "下一次每日調整正常收尾後，狀態不再有逾時證據；若又出現，會是另一段期間、再通知一次。"
         ],
         "ai_prompt": "請在 btc-bull-market-competition 追查調倉批次為什麼沒有持倉快照就結束：讀 audit/ledger_status.json 的 evidence.pending_expired（since、rebalance_batch_without_snapshot、spot_fills_after_last_snapshot），對照 audit/trading_ledger.jsonl 從 since 前後的事件（rebalance 開始、order_attempt、spot_fill、holdings_snapshot），以及該時段 btc-competition-daily.service 的 journal（是否被殺、逾時、例外），判斷是批次中途被中斷（graceful_stop／interrupted_orders 有沒有處理）、還是快照寫入失敗；提出治本修正與回歸測試。注意這是現貨策略，不要下單或修改帳本。"
+      }
+    },
+    {
+      "error_id": "ERR-062",
+      "code": "MYC.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "title": "無歧義的漏記平倉已自動補寫進帳本",
+      "project": "mycrypto",
+      "sources": [
+        "scripts/repair_bot.py:1",
+        "trade-alerts/src/trade_alerts/repair_runner.py:406"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "MECHANICAL",
+      "risk_tier": "R1",
+      "auto_action": "共用修復執行器（trade_alerts.repair_runner）判定能對應時：證據檔落地、以本策略自己的帳本寫入器 staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、記事件日誌。本地算的毛損益與交易所已實現損益差超過 0.01 時以交易所數字寫入，reconciliation 區塊記 pnl_source=exchange_realized 與本地數字。一輪最多寫一筆，多筆漏記依序逐輪補。不通知。（加密策略換 Binance 時（x3d）接上共用修復執行器，從一開始就沒有自動補寫開關。）",
+      "human_action": "無需決定。證據檔與事件日誌留有完整紀錄。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "交易所是權威資料；當賣出成交精確加總等於開倉量、部位在交易所確已平掉，照交易所寫下去就是唯一正解，沒有第二個選項，所以既不該產生決策請求，也不需要通知（v2，2026-09-18：v1 的「事後稽核通知」取消——帳本補寫只是記下交易所上已經發生的事，沒有動到任何錢）。判準不成立時：帳本已留有這筆交易的修復痕跡或整批寫入失敗 → MYC.VERIFIED_CLOSE_REPAIR_BLOCKED（R3）；其餘以交易所為準仍能對應的情況照樣補寫，只有結構上對不上才重試並升格（R2）。交易所上該 symbol 仍有部位時，在抓證據階段就中止，下一輪再看。",
+      "operator_message": {
+        "what": "加密策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。",
+        "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
+        "steps": [
+          "不需要任何動作。",
+          "想核對：audit/fleet_event_log.jsonl 裡這筆事件記著交易編號、出場價和損益，可以跟交易所 App 比對。"
+        ]
+      }
+    },
+    {
+      "error_id": "ERR-063",
+      "code": "MYC.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+      "project": "mycrypto",
+      "sources": [
+        "scripts/repair_bot.py:1",
+        "trade-alerts/src/trade_alerts/repair_runner.py:471"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不寫、不重試。開請求、記事件日誌，由 ops_export 通知；此 trade_id 之後一律跳過，直到請求關閉（帳本出現這筆 trade_close 時自動 WITHDRAWN）。",
+      "human_action": "帳本裡這筆已有補到一半的紀錄（或這次寫入無法驗證），自動補完可能重複記帳。先讀清楚帳本現況，再以交易所成交紀錄為準讓帳本、交易所、Google 表三方一致，最後關閉請求。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "帳本裡已有這筆交易的修復紀錄（例如先前寫到一半）或這次寫入無法驗證，代表真實帳本的狀態已經不是「乾淨的孤兒開倉」。此時自動補完後半段等於猜，而猜錯會重複或錯記真實損益——這正是必須交給人的情況。",
+      "operator_message": {
+        "what": "加密策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。",
+        "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
+        "steps": [
+          "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
+          "確認修正步驟後請 Claude 照做（只追加、以交易所成交紀錄為準）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
+          "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
+        ],
+        "ai_prompt": "請在 my-crypto-bot（主機上的 /opt/my-crypto-bot）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/repair_bot.py 的證據抓取（唯讀，只查交易所成交）對照帳本，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
+      }
+    },
+    {
+      "error_id": "ERR-064",
+      "code": "MYC.VERIFIED_CLOSE_REPAIR_FAILED",
+      "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+      "project": "mycrypto",
+      "sources": [
+        "scripts/repair_bot.py:1",
+        "trade-alerts/src/trade_alerts/repair_runner.py:439",
+        "trade-alerts/src/trade_alerts/repair_runner.py:453"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "共用修復執行器每輪重試：查交易所失敗（網路／API）或 assess_repair 判定結構對不上（平倉成交方向與開倉不符、成交早於開倉、缺 trade_id／incident_id、成交數量加總不等於開倉量、已有 trade_close）各記一次失敗事件、不通知；同一 trade_id 連續 escalate_after 次失敗才開請求、事件標 escalated、由 ops_export 通知一次（附 ai_prompt）。升格後每輪靜默重試，成功則請求 RESOLVED_AUTO；帳本出現這筆 trade_close（人工補好）則 WITHDRAWN。交易所仍有部位不算失敗。",
+      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "v2 取代 MYC.VERIFIED_CLOSE_PROPOSED：交易所是權威，能對應的一律照交易所補（損益差額也以交易所已實現損益為準），真正需要人的只剩結構上對不上或交易所一直查不到的情況，而那時該做的是追查根因。查交易所失敗也算一次失敗（2026-09-22 使用者拍板），否則 API 長期壞掉不會有人知道。",
+      "operator_message": {
+        "what": "加密策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
+        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+        "steps": [
+          "治標：把下方「給 AI 的追查指令」整段貼給 Claude，以交易所成交紀錄為準手動補寫（只追加、先給你確認），讓帳本、交易所、Google 表三方一致。",
+          "治本：同一段指令也會要求 Claude 追查根本原因並提出修正。"
+        ],
+        "ai_prompt": "請在 my-crypto-bot 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/repair_bot.py 的證據抓取（唯讀）抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
+      }
+    },
+    {
+      "error_id": "ERR-065",
+      "code": "MYC.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
+      "project": "mycrypto",
+      "sources": [
+        "scripts/repair_bot.py:1",
+        "trade-alerts/src/trade_alerts/repair_runner.py:282"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不動帳本、不暫停。修復機器人每輪結束時數最近 7 天內這支策略的「VERIFIED_CLOSE_AUTO_REPAIRED」事件；達 2 次就寫一筆事件日誌並由 ops_export 通知一次（附次數與交易編號）。這則通知發出後 7 天內不再重發；7 天後若 7 天窗口內仍有 2 次以上，會再發一次。",
+      "human_action": "帳本已經被自動補對，不用再動帳本；要做的是追出為什麼平倉一直沒被記進帳本（有 bug 在持續漏記），並確認修正。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-01 使用者核可（g2）：自動補寫（R1）本身不通知，但若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 永遠不會被發現。門檻 7 天內 2 次、通知後 7 天內不重發，是為了讓一次偶發事件不吵人、但同一個問題連續發生時一定被看見。因為發的是「請追根因」而不是「帳本壞了」，帳本已經對，所以是 R3 事件通知而不是請求（不開請求、不鎖機）。",
+      "operator_message": {
+        "what": "加密策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。",
+        "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
+        "steps": [
+          "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
+        ],
+        "ai_prompt": "請在 my-crypto-bot 追查平倉一直漏記的原因：讀 audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、還是交易所路徑沒走到記帳），提出治本修正與回歸測試。"
+      }
+    },
+    {
+      "error_id": "ERR-066",
+      "code": "MYC.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "title": "重啟後接管了一個帳本沒有記完的部位",
+      "project": "mycrypto",
+      "sources": [
+        "mexc_futures_bot.py:1141"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "交易所上有部位、本地狀態沒有時（常見於進場下單途中被中斷重啟）：用開倉前存下的 entry_pending（含 trade_id、external_id）沿用原本的 trade_id、補寫 trade_open 與 position_recovered，並掛上移動停損；找不到對應紀錄（例如手動下的單）就用新的 trade_id 接管。兩種都寫事件日誌。",
+      "human_action": "確認這個部位是不是預期的（上一次進場被中斷，還是有人在交易所手動下單）；對帳若顯示未記成交，照該通知處理。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "使用者 2026-10-01 定案（f-12c）：動能實測進場單送出後被殺、重啟會自動接管並補掛停損，但沒有任何人知道。加密策略 2026-10-04 的 f-12（my-crypto-bot #55）已有同樣的接管，卻只寫稽核日誌、沒有通知；x3d 補上事件日誌與 R3 通知。接管本身是對的（有部位就要有停損），但「發生過一次被中斷的進場」是人需要知道的事。",
+      "operator_message": {
+        "what": "加密策略重啟後，發現交易所上有一個部位是本地狀態裡沒有的，已經自動接管並補掛移動停損。",
+        "direction": "部位已有停損保護，不需要立刻動作；請確認它是怎麼來的，並確認帳本與交易所一致。",
+        "steps": [
+          "看訊息裡的 trade_id、方向、數量、均價，以及 kind：interrupted_entry＝上一次進場被中斷，unknown_origin＝帳本裡找不到對應的下單紀錄。",
+          "到交易所 App 確認這個部位存在、且有一張移動停損單。",
+          "kind 是 unknown_origin 時，確認是不是你自己手動下的單；不是的話把下方指令貼給 Claude 追查。",
+          "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
+        ],
+        "ai_prompt": "請在 my-crypto-bot 追查一次重啟後接管部位：讀 audit/trading_ledger.jsonl 裡該 trade_id 的 order_attempt／position_recovered／trade_open，以及 journalctl 在那個時間點前後 my-crypto-bot.service 的 graceful_stop／接管紀錄，判斷是進場途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。"
       }
     }
   ],

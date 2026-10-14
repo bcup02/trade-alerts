@@ -1944,147 +1944,123 @@
           "evidence": "src/btc_competition/unrecorded_fill.py:246 通知先於 _run_round，所以該輪結尾 refresh_ops_export（:219）寫的匯出檔 audit/ops_export.json 已帶出 ERR-061 通知，由維運通知轉送；事件寫進 audit/fleet_event_log.jsonl。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 7d499bb 於 2026-10-11 台北約 00:22（A1 日誌 JST 約 01:22）部署（AI-for-column/btc-bull-market-competition#55，審閱 PASS）；/opt 的 src/btc_competition/unrecorded_fill.py（blob 7461592）、src/btc_competition/reconcile_compare.py（166d84a）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.1，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（eb9be02）、錯誤清單（ce83d1e）都與 tag v0.30.1 同檔。部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪 unrecorded-fill（ops_export_written 為 true）與對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired。限制：A1 的競賽目前沒有超過 24 小時未結算的批次，ERR-061 通知在 A1 沒有實際被觸發過，只在測試驗證（競賽 tests/test_unrecorded_fill_pending_expired.py、tests/test_reconcile_compare.py 的 f-30 測試）；開發機同樣沒有逾時案例。競賽沒有結清工具，通知的步驟是追查為什麼沒收尾。"
         }
       }
+    },
+    {
+      "code": "MYC.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "x3d：加密接上共用修復執行器，上 A1 後改已做。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "同上：共用修復執行器寫進 audit/fleet_event_log.jsonl。"
+        }
+      }
+    },
+    {
+      "code": "MYC.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "x3d：同上，修復機器人接上後具備；上 A1 後改已做。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知。"
+        }
+      }
+    },
+    {
+      "code": "MYC.VERIFIED_CLOSE_REPAIR_FAILED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "x3d：同上，連續失敗 3 次才升格通知；上 A1 後改已做。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知。"
+        }
+      }
+    },
+    {
+      "code": "MYC.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "x3d：同上，7 天內自動補寫達 2 次通知一次；上 A1 後改已做。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知。"
+        }
+      }
+    },
+    {
+      "code": "MYC.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "x3d：接管開到一半的部位時寫 R3 事件日誌並通知（目前只寫稽核日誌）；上 A1 後改已做。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "x3-crypto-binance",
+          "reason": "同上：接管時寫 R3 事件日誌，由匯出檔通知。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "latch.consecutive_failure_counter",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：加密策略的事件日誌、匯出檔與連續失敗計數（my-crypto-bot #71／#73／#74）2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_export.writer",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：加密策略的事件日誌、匯出檔與連續失敗計數（my-crypto-bot #71／#73／#74）2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.export_relay_enabled",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：加密策略的事件日誌、匯出檔與連續失敗計數（my-crypto-bot #71／#73／#74）2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.units_axis",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：加密策略的事件日誌、匯出檔與連續失敗計數（my-crypto-bot #71／#73／#74）2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "cap",
-      "id": "notify.line_first_notice",
-      "project": "mycrypto",
-      "type": "updated",
-      "note": "匯出轉送已在 A1 打開，但還沒有受控測試事件經它送到手機，維持未做；原因文字改成最新現況。"
+      "kind": "rule",
+      "id": "MYC.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "type": "added",
+      "note": "x3d：加密策略新增的錯誤規則（ERR-062～066），目前未做；加密接上修復機器人與接管通知後才改已做。"
     },
     {
       "kind": "rule",
-      "id": "MYC.RUNTIME_CYCLE_FAILED",
-      "aspect": "behaviour",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
+      "id": "MYC.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "type": "added",
+      "note": "x3d：加密策略新增的錯誤規則（ERR-062～066），目前未做；加密接上修復機器人與接管通知後才改已做。"
     },
     {
       "kind": "rule",
-      "id": "MYC.RUNTIME_CYCLE_FAILED",
-      "aspect": "emits_event",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
+      "id": "MYC.VERIFIED_CLOSE_REPAIR_FAILED",
+      "type": "added",
+      "note": "x3d：加密策略新增的錯誤規則（ERR-062～066），目前未做；加密接上修復機器人與接管通知後才改已做。"
     },
     {
       "kind": "rule",
-      "id": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
-      "aspect": "behaviour",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
+      "id": "MYC.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "type": "added",
+      "note": "x3d：加密策略新增的錯誤規則（ERR-062～066），目前未做；加密接上修復機器人與接管通知後才改已做。"
     },
     {
       "kind": "rule",
-      "id": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
-      "aspect": "emits_event",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_REPLACE_FAILED",
-      "aspect": "behaviour",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_REPLACE_FAILED",
-      "aspect": "emits_event",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
-      "aspect": "behaviour",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
-      "aspect": "emits_event",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_PLACEMENT_REJECTED",
-      "aspect": "emits_event",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_PLACEMENT_ERROR",
-      "aspect": "emits_event",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.FUNDING_SHEET_WRITE_FAILED",
-      "aspect": "emits_event",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_UNIT_FAILED",
-      "aspect": "behaviour",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
-      "aspect": "behaviour",
-      "project": "mycrypto",
-      "type": "completed",
-      "note": "x3c：2026-10-14 台北 12:05 上 A1 正式機（新）。"
+      "id": "MYC.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "type": "added",
+      "note": "x3d：加密策略新增的錯誤規則（ERR-062～066），目前未做；加密接上修復機器人與接管通知後才改已做。"
     }
   ]
 }

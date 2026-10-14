@@ -117,9 +117,9 @@
   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>61 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    四支策略目前所有已知的「出問題」情況，共 <b>66 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
-    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>28 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
+    每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>33 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
   <div class="legend">
     <div class="legend-item"><span class="legend-code" style="color:var(--R3)">R3</span><span class="legend-name">一定要人處理</span><span class="legend-sub">系統絕不自己動手，會一直提醒到有人處理</span></div>
@@ -1837,6 +1837,156 @@
    "tier": "R3",
    "title": "調倉批次或現貨成交超過 24 小時沒結算，系統已不再等待",
    "what": "競賽策略有一個調倉批次沒有寫下持倉快照就結束了（或最後一份持倉快照之後還有現貨成交沒結算），已經超過 24 小時。系統不再等：交易所餘額和帳本現在對得上，所以對帳狀態是「一致」。但那一段一直沒有正常收尾。"
+  },
+  {
+   "ai_prompt": null,
+   "behaviour": {
+    "phase": "x3-crypto-binance",
+    "reason": "x3d：加密接上共用修復執行器，上 A1 後改已做。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.VERIFIED_CLOSE_AUTO_REPAIRED",
+   "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
+   "emits_event": {
+    "phase": "x3-crypto-binance",
+    "reason": "同上：共用修復執行器寫進 audit/fleet_event_log.jsonl。",
+    "state": "pending"
+   },
+   "error_id": "ERR-062",
+   "notes": [
+    "行為未做 — x3d：加密接上共用修復執行器，上 A1 後改已做。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）",
+    "寫進事件日誌未做 — 同上：共用修復執行器寫進 audit/fleet_event_log.jsonl。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）"
+   ],
+   "open": true,
+   "steps": [],
+   "tier": "R1",
+   "title": "無歧義的漏記平倉已自動補寫進帳本",
+   "what": "加密策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot（主機上的 /opt/my-crypto-bot）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/repair_bot.py 的證據抓取（唯讀，只查交易所成交）對照帳本，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。",
+   "behaviour": {
+    "phase": "x3-crypto-binance",
+    "reason": "x3d：同上，修復機器人接上後具備；上 A1 後改已做。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.VERIFIED_CLOSE_REPAIR_BLOCKED",
+   "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
+   "emits_event": {
+    "phase": "x3-crypto-binance",
+    "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知。",
+    "state": "pending"
+   },
+   "error_id": "ERR-063",
+   "notes": [
+    "行為未做 — x3d：同上，修復機器人接上後具備；上 A1 後改已做。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）",
+    "寫進事件日誌未做 — 同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）"
+   ],
+   "open": true,
+   "steps": [
+    "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
+    "確認修正步驟後請 Claude 照做（只追加、以交易所成交紀錄為準）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
+    "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
+   ],
+   "tier": "R3",
+   "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+   "what": "加密策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/repair_bot.py 的證據抓取（唯讀）抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。",
+   "behaviour": {
+    "phase": "x3-crypto-binance",
+    "reason": "x3d：同上，連續失敗 3 次才升格通知；上 A1 後改已做。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.VERIFIED_CLOSE_REPAIR_FAILED",
+   "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+   "emits_event": {
+    "phase": "x3-crypto-binance",
+    "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知。",
+    "state": "pending"
+   },
+   "error_id": "ERR-064",
+   "notes": [
+    "行為未做 — x3d：同上，連續失敗 3 次才升格通知；上 A1 後改已做。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）",
+    "寫進事件日誌未做 — 同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）"
+   ],
+   "open": true,
+   "steps": [
+    "治標：把下方「給 AI 的追查指令」整段貼給 Claude，以交易所成交紀錄為準手動補寫（只追加、先給你確認），讓帳本、交易所、Google 表三方一致。",
+    "治本：同一段指令也會要求 Claude 追查根本原因並提出修正。"
+   ],
+   "tier": "R2",
+   "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+   "what": "加密策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot 追查平倉一直漏記的原因：讀 audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、還是交易所路徑沒走到記帳），提出治本修正與回歸測試。",
+   "behaviour": {
+    "phase": "x3-crypto-binance",
+    "reason": "x3d：同上，7 天內自動補寫達 2 次通知一次；上 A1 後改已做。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
+   "emits_event": {
+    "phase": "x3-crypto-binance",
+    "reason": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知。",
+    "state": "pending"
+   },
+   "error_id": "ERR-065",
+   "notes": [
+    "行為未做 — x3d：同上，7 天內自動補寫達 2 次通知一次；上 A1 後改已做。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）",
+    "寫進事件日誌未做 — 同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
+    "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
+   ],
+   "tier": "R3",
+   "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
+   "what": "加密策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。"
+  },
+  {
+   "ai_prompt": "請在 my-crypto-bot 追查一次重啟後接管部位：讀 audit/trading_ledger.jsonl 裡該 trade_id 的 order_attempt／position_recovered／trade_open，以及 journalctl 在那個時間點前後 my-crypto-bot.service 的 graceful_stop／接管紀錄，判斷是進場途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。",
+   "behaviour": {
+    "phase": "x3-crypto-binance",
+    "reason": "x3d：接管開到一半的部位時寫 R3 事件日誌並通知（目前只寫稽核日誌）；上 A1 後改已做。",
+    "state": "pending"
+   },
+   "bot": "mycrypto",
+   "bot_label": "加密策略",
+   "code": "MYC.POSITION_ADOPTED_AFTER_INTERRUPTION",
+   "direction": "部位已有停損保護，不需要立刻動作；請確認它是怎麼來的，並確認帳本與交易所一致。",
+   "emits_event": {
+    "phase": "x3-crypto-binance",
+    "reason": "同上：接管時寫 R3 事件日誌，由匯出檔通知。",
+    "state": "pending"
+   },
+   "error_id": "ERR-066",
+   "notes": [
+    "行為未做 — x3d：接管開到一半的部位時寫 R3 事件日誌並通知（目前只寫稽核日誌）；上 A1 後改已做。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）",
+    "寫進事件日誌未做 — 同上：接管時寫 R3 事件日誌，由匯出檔通知。（預定：加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備）"
+   ],
+   "open": true,
+   "steps": [
+    "看訊息裡的 trade_id、方向、數量、均價，以及 kind：interrupted_entry＝上一次進場被中斷，unknown_origin＝帳本裡找不到對應的下單紀錄。",
+    "到交易所 App 確認這個部位存在、且有一張移動停損單。",
+    "kind 是 unknown_origin 時，確認是不是你自己手動下的單；不是的話把下方指令貼給 Claude 追查。",
+    "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
+   ],
+   "tier": "R3",
+   "title": "重啟後接管了一個帳本沒有記完的部位",
+   "what": "加密策略重啟後，發現交易所上有一個部位是本地狀態裡沒有的，已經自動接管並補掛移動停損。"
   }
  ],
  "tiers": [
