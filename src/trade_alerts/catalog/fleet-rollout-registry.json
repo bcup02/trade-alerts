@@ -452,13 +452,11 @@
         "seykota": {
           "state": "done",
           "evidence": "src/seykota_bot/reconcile/google_reconcile.py:96 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（剛進場、剛平倉不算對不上；老交易缺列仍 DIVERGED）。",
-          "verified_at": "2026-10-07",
           "limit": "部署時趨勢空手、之後還沒有新交易，寬限路徑在 A1 沒有實際遇到「新交易等同步」，只在共用庫與策略端測試、開發機驗證。"
         },
         "momentum": {
           "state": "done",
           "evidence": "src/google_reconcile.py:91 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（同上三項）。",
-          "verified_at": "2026-10-07",
           "limit": "只在動能的進場看到過。"
         },
         "mycrypto": {
@@ -704,13 +702,11 @@
         "seykota": {
           "state": "done",
           "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫，策略沒有自己的實作；pyproject.toml 釘 v0.28.0）。",
-          "verified_at": "2026-10-08",
           "limit": "A1 沒有遇到過帳本更正卡住，停放路徑只在共用庫與策略端測試、開發機實測（開發機 2026-10-08 台北 18:21 一筆已連續 582 次的更正，在新版下下一次回答就停放）。"
         },
         "momentum": {
           "state": "done",
           "evidence": "src/google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫；pyproject.toml 釘 v0.28.0）。",
-          "verified_at": "2026-10-08",
           "limit": "同趨勢，A1 上停放路徑沒有實際被觸發過。"
         },
         "mycrypto": {
@@ -732,13 +728,11 @@
         "seykota": {
           "state": "done",
           "evidence": "scripts/requeue_projection_intents.py:44 呼叫 requeue_rejected_projection_intents（:36 只收單一 --trade-id、:43 沒有佇列檔就停）。",
-          "verified_at": "2026-10-08",
           "limit": "A1 還沒執行過這個指令稿（A1 沒有被停放的紀錄）。"
         },
         "momentum": {
           "state": "done",
           "evidence": "scripts/requeue_projection_intents.py:46 呼叫 requeue_rejected_projection_intents（:38 只收單一 --trade-id、:45 沒有佇列檔就停）。",
-          "verified_at": "2026-10-08",
           "limit": "只在測試與趨勢的開發機實測驗證；動能的指令稿本身沒在任何主機上實際執行過。"
         },
         "mycrypto": {
@@ -762,13 +756,11 @@
         "seykota": {
           "state": "done",
           "evidence": "src/seykota_bot/google_ledger_provenance.py:210 與 :212 的平倉投影帶 entry_price、entry_volume（取自帳本平倉列，整筆加權平均價與總量）。",
-          "verified_at": "2026-10-08",
           "limit": "寫回 G／I 的接收端路徑只在接收端 Node 測試與開發機驗證，A1 還沒有新的有加碼的交易走過這條路徑。"
         },
         "momentum": {
           "state": "done",
           "evidence": "src/google_ledger_provenance.py:189 與 :191 的平倉投影帶 entry_price、entry_volume。",
-          "verified_at": "2026-10-08",
           "limit": "動能沒有加碼，這格對它只是把同樣的值再寫一次；沒有在 A1 實際看到寫回後的儲存格。"
         },
         "mycrypto": {
@@ -829,7 +821,6 @@
         "btc-competition": {
           "state": "done",
           "evidence": "src/btc_competition/reconcile_compare.py:65 _PENDING_MAX_SECONDS（24 小時）；:210 回 PENDING 只在「剛到的交易所成交還沒進帳本」或「未收尾的批次／快照後成交還沒過期」；:179 起算與過期判定（時間讀不出，或比現在晚超過 :266 _CLOCK_SKEW_SECONDS 的 300 秒，視為已過期、不再等）；:302 環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS；過期後比對餘額，證據帶 pending_expired（:188 reason：waited_over_limit／time_unreadable／time_in_future）。",
-          "verified_at": "2026-10-10",
           "limit": "A1 的競賽目前沒有未收尾的項目，超過 24 小時的行為在 A1 沒有實際被觸發過；只在測試與開發機實測（開發機 8 天的 PENDING 在 2026-10-10 台北 20:35 部署後恢復為 RECONCILED，證據記的是等了 197.6 小時）。"
         }
       }
@@ -1944,7 +1935,6 @@
         "seykota": {
           "state": "done",
           "evidence": "src/seykota_bot/funding_sync.py:107 EXIT_SHEET_FAILED = 3；:365／:368／:373／:445 放棄分支與寫入未確認都以結束碼 3 結束（接收端明確拒絕立刻放棄、連線類連續 3 次才放棄），狀態檔記住連續失敗直到寫入確認成功；seykota-funding-sync.service 在 A1 維運通知監控清單（f-5）。",
-          "verified_at": "2026-10-09",
           "limit": "放棄分支沒有在 A1 真實觸發過；audit 目錄完全寫不進去時沒有東西能跨輪記住。"
         }
       },
@@ -1952,7 +1942,6 @@
         "seykota": {
           "state": "done",
           "evidence": "src/seykota_bot/fleet_events.py:24 FUNDING_SHEET_WRITE_FAILED、:45 風險分級 R2；src/seykota_bot/funding_sync.py:433 放棄時寫一筆事件日誌（事件編號預存去重），由趨勢修復機器人每輪匯出給維運通知；ERR-057 在共用庫 v0.29.0 錯誤清單。",
-          "verified_at": "2026-10-09",
           "limit": "事件到手機的最後一段（匯出器＋維運通知）沒有實機跑過，A1 沒有真的觸發過放棄。"
         }
       }
@@ -1963,7 +1952,6 @@
         "momentum": {
           "state": "done",
           "evidence": "src/binance_funding_sync.py:224 EXIT_SHEET_FAILED = 3；:496／:499／:504／:576 放棄分支與寫入未確認都以結束碼 3 結束（規則同趨勢）；mexc-momentum-funding-sync.service 在 A1 維運通知監控清單（f-5）。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。",
-          "verified_at": "2026-10-09",
           "limit": "放棄分支沒有在 A1 真實觸發過。"
         }
       },
@@ -1971,7 +1959,6 @@
         "momentum": {
           "state": "done",
           "evidence": "src/fleet_events.py:27 FUNDING_SHEET_WRITE_FAILED（ERR-058，R2）；src/binance_funding_sync.py:564 放棄時寫一筆事件日誌（R2、已重試用盡、事件編號預存去重），由動能修復機器人每輪匯出給維運通知。",
-          "verified_at": "2026-10-09",
           "limit": "事件到手機的最後一段沒有實機跑過，A1 沒有真的觸發過放棄。"
         }
       }
@@ -1982,7 +1969,6 @@
         "mycrypto": {
           "state": "done",
           "evidence": "sync_funding_fees_entry.py:66 EXIT_SHEET_FAILED = 3；:447 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:97 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。",
-          "verified_at": "2026-10-09",
           "limit": "放棄分支沒有在 A1 真實觸發過；事件管道已在 2026-10-14 台北 12:05 隨 x3c 上 A1（見 emits_event 格）。"
         }
       },

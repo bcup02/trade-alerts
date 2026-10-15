@@ -732,7 +732,7 @@ def test_verified_at_and_limit_are_accepted_on_done_cells_and_checked(registry, 
     _, _, status = _first_done_cap(reg)
     status.update({"verified_at": "2026-10-15", "limit": "A1 沒有觸發過。"})
     assert not [p for p in registry_problems(reg, catalog) if "verified_at" in p or "limit" in p]
-    for bad in ("2026-13-01", "2026-10-32", "10/15", "2026-1-5", "", 20261015, None):
+    for bad in ("2026-13-01", "2026-10-32", "2026-02-31", "2026-04-31", "10/15", "2026-1-5", "", 20261015, None):
         status["verified_at"] = bad
         assert [p for p in registry_problems(reg, catalog) if "verified_at must be" in p], bad
     status["verified_at"] = "2026-10-15"
@@ -808,6 +808,12 @@ def test_the_migration_splits_losslessly_and_keeps_a_citation_in_evidence():
     assert parts["a1_check"].startswith("A1 正式機（新）執行環境") and parts["a1_check"].endswith("相同。")
     assert parts["limit"] == "A1 沒觸發過。" and parts["verified_at"] == "2026-10-14"
     assert m._squash(m.recompose(parts)) == m._squash(text)
+    # review of #200: a deploy date is not a check date.  Only the header parenthesis after "執行環境" can say when the check ran.
+    deploy_only = "src/a.py:10 does X。 A1 正式機（新）執行環境（唯讀查證）：operations abc1234 於 2026-10-08 台北 21:26 部署；/opt 的 src/a.py 相同。 限制：y"
+    assert m.split_evidence(deploy_only)["verified_at"] is None
+    assert m.split_evidence("x src/a.py:1。 A1 正式機（新）執行環境（2026-10-04 台北約 20:16 唯讀查）：ok。")["verified_at"] == "2026-10-04"
+    assert m.split_evidence("x src/a.py:1。 A1 正式機（新）執行環境（部署 2026-10-04 台北）：ok。")["verified_at"] is None
+    assert m.check_date(None) is None
     only_limit = m.split_evidence("src/a.py:1 does X。限制：none yet")
     assert only_limit["a1_check"] is None and only_limit["limit"] == "none yet" and only_limit["evidence"] == "src/a.py:1 does X。"
     plain = "src/a.py:1 does X"
@@ -826,3 +832,12 @@ def test_the_pages_show_the_limit_and_the_verification_date_as_their_own_element
     assert any(l.get("verified_at") for l in lines)
     risk = _page_data(render_guides.render_risk_register(catalog, registry))
     assert all(set(e["behaviour"]) == {"state"} and set(e["emits_event"]) == {"state"} for e in risk["entries"])   # evidence is not shown there
+
+
+def test_every_verified_at_in_the_registry_is_the_check_date_its_archived_paragraph_states(registry):
+    """Regression for the #200 review: the first date in a paragraph used to be taken, which is often the deploy date."""
+    m = _load_one_off()
+    archive = json.loads((Path(__file__).resolve().parents[1] / "docs" / "registry-a1-checks.json").read_text(encoding="utf-8"))["cells"]
+    for key, status in m.cells(registry):
+        if status["state"] == "done" and key in archive:
+            assert status.get("verified_at") == m.check_date(archive[key]["a1_check"]), key

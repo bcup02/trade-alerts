@@ -25,6 +25,9 @@ ARCHIVE = ROOT / "docs" / "registry-a1-checks.json"
 _A1 = re.compile(r"A1 正式機（新）(?:實際)?執行環境")
 _LIMIT = "限制："
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+# the check date counts only when the header parenthesis right after "執行環境" says it was a read-only check
+# ("（唯讀查證，2026-10-14 台北）", "（2026-10-04 台北約 20:16 唯讀查）"); a date elsewhere in the paragraph is usually the deploy date (review of #200)
+_CHECK_HEADER = re.compile(r"執行環境（([^）]*)）")
 _CITATION = re.compile(r"(?<![\w./-])((?:(?:src|scripts|tools|tests|docs|deploy)/[\w./-]+\.\w+)|[\w-]+\.py)")
 
 
@@ -47,8 +50,14 @@ def split_evidence(text: str) -> dict[str, str | None]:
     limit = text[start_limit + len(_LIMIT):].strip() if start_limit is not None else None
     if not core or not _CITATION.search(core):
         return {"evidence": text, "a1_check": None, "limit": None, "verified_at": None}
-    date = _DATE.search(a1_text).group(0) if a1_text and _DATE.search(a1_text) else None
-    return {"evidence": core, "a1_check": a1_text, "limit": limit, "verified_at": date}
+    return {"evidence": core, "a1_check": a1_text, "limit": limit, "verified_at": check_date(a1_text)}
+
+
+def check_date(a1_text: str | None) -> str | None:
+    """The date the A1 paragraph says the read-only check ran, or ``None`` when it only carries other dates (deploy dates)."""
+    header = _CHECK_HEADER.search(a1_text or "")
+    found = _DATE.search(header.group(1)) if header and "唯讀查" in header.group(1) else None
+    return found.group(0) if found else None
 
 
 def recompose(parts: dict[str, str | None]) -> str:

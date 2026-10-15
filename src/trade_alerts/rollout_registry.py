@@ -22,6 +22,7 @@ rows that make claims about itself.  The human page
 """
 from __future__ import annotations
 
+import datetime
 import json
 import re
 from importlib import resources
@@ -51,6 +52,16 @@ _DEPLOY_PROMISE = re.compile(r"上正式機後改已做|上 A1 後改已做|上�
 #: made the pages hard to read: the long A1 verification text lives in docs/registry-a1-checks.json, a limit is one sentence.
 MAX_EVIDENCE_CHARS, MAX_LIMIT_CHARS, MAX_REASON_CHARS = 700, 300, 450
 _DATE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
+
+
+def _is_calendar_date(text: str) -> bool:
+    try:
+        datetime.date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
+
 _OWNER = {prefix: project for project, prefix in PROJECT_CODE_PREFIXES.items()}
 
 
@@ -85,7 +96,8 @@ def _status_problems(where: str, status: Any, phases: Mapping[str, Any]) -> list
             problems.append(f"{where}: evidence is {len(status['evidence'])} characters (max {MAX_EVIDENCE_CHARS}) -- "
                             "keep what the code does and the file:line citations; put the A1 verification text in docs/registry-a1-checks.json "
                             "and the caveat in `limit`")
-        if "verified_at" in status and not (isinstance(status["verified_at"], str) and _DATE.fullmatch(status["verified_at"])):
+        if "verified_at" in status and not (isinstance(status["verified_at"], str) and _DATE.fullmatch(status["verified_at"])
+                                            and _is_calendar_date(status["verified_at"])):
             problems.append(f"{where}: verified_at must be a YYYY-MM-DD date, got {status['verified_at']!r}")
         if "limit" in status:
             if not text("limit"):
