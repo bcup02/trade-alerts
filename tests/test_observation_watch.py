@@ -707,3 +707,38 @@ def test_git_head_asks_only_for_rev_parse_in_the_listed_a1_clones(monkeypatch):
     monkeypatch.setattr(remote, "_run", lambda host, words: "not a sha; rm -rf /\n")
     with pytest.raises(ow.RemoteError, match="unexpected"):
         remote.git_head("a1", "mycrypto")
+
+
+def test_a_failed_fetch_of_the_registry_clone_is_an_error_not_an_empty_answer(repos):
+    """Review of #193: with a stale origin/main (no awaiting cells) and the fetch failing, the check must not say
+    "nothing to compare"."""
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _commit(myc, "a")
+    _publish_registry(repos, {"capabilities": [], "catalog": []})           # the stale copy: nothing awaits
+    _git(repos / "trade-alerts", "remote", "add", "origin", str(repos / "no-such-remote"))   # a fetch from it fails
+    with pytest.raises(ow.RemoteError, match="cannot refresh"):
+        ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1})))
+    state = ow.run_checks(GitHeads({"mycrypto": c1}), NOW, {}, checks=[c for c in ow.CHECKS if c.id == "registry-awaits"])
+    assert state["registry-awaits"]["state"] == ow.ERROR
+
+
+def test_a_failed_fetch_of_a_strategy_clone_is_not_fatal_when_the_commit_is_known(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1, c2 = _commit(myc, "a"), _commit(myc, "b")
+    _publish_registry(repos, _registry({"mycrypto": c2}))
+    _git(myc, "remote", "add", "origin", str(repos / "no-such-remote"))
+    assert ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c2}))).state == ow.OBSERVED
+    assert ow._refresh(myc) is False and ow._refresh(repos / "trade-alerts") is None
+
+
+def test_observed_also_lists_the_cells_still_waiting(repos):
+    myc, sey = repos / ow.REPOS["mycrypto"], repos / ow.REPOS["seykota"]
+    c1 = _commit(myc, "a")
+    s1, s2 = _commit(sey, "s"), _commit(sey, "t")
+    reg = _registry({"mycrypto": c1})
+    reg["capabilities"][0]["status"]["seykota"] = {"state": "pending", "phase": "p", "reason": "r", "awaits_commit": s2}
+    _publish_registry(repos, reg)
+    result = ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1, "seykota": s1})))   # seykota's awaited commit is not on A1
+    assert result.state == ow.OBSERVED
+    assert any(e.startswith("（仍在等）") and "seykota" in e for e in result.evidence)
+    assert not any("seykota" in e for e in result.evidence if not e.startswith("（仍在等）"))

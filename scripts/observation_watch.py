@@ -525,10 +525,15 @@ def _git(repo: Path, *args: str, timeout: int = 120) -> subprocess.CompletedProc
     return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=timeout)
 
 
-def _refresh(repo: Path) -> None:
-    """Fetch when the clone has an ``origin``; a failed fetch is not fatal (the commits may already be here)."""
-    if _git(repo, "remote", "get-url", "origin").returncode == 0:
-        _git(repo, "fetch", "-q", "origin")
+def _refresh(repo: Path) -> bool | None:
+    """Fetch when the clone has an ``origin``: True = refreshed, False = the fetch failed, None = no origin to fetch.
+
+    Callers decide what a failure means: the registry's own clone must be fresh (a stale ``origin/main`` could be
+    missing the very cells this check exists for), while a strategy clone only has to contain the awaited commit,
+    which ``cat-file`` and ``merge-base`` check explicitly."""
+    if _git(repo, "remote", "get-url", "origin").returncode != 0:
+        return None
+    return _git(repo, "fetch", "-q", "origin").returncode == 0
 
 
 def awaiting_cells(registry: Mapping[str, Any]) -> list[tuple[str, str, str]]:
@@ -554,7 +559,10 @@ def check_registry_awaits(ctx: Context) -> Result:
     this check asks A1 which commit each strategy's deploy clone is at and whether the awaited commit is part of it."""
     root = repos_root()
     ta = root / "trade-alerts"
-    _refresh(ta)
+    if _refresh(ta) is False:
+        # Reading the old origin/main here would answer "nothing to compare" about a registry that may already hold
+        # the cells this check is for (review of #193): say the source could not be refreshed instead.
+        raise RemoteError(f"cannot refresh {ta} (git fetch failed): the registry on origin/main may be out of date")
     shown = _git(ta, "show", f"{os.environ.get('OBSERVATION_WATCH_REGISTRY_REF', 'origin/main')}:{REGISTRY_RELATIVE}")
     if shown.returncode != 0:
         raise RemoteError(f"cannot read the registry from {ta}: {shown.stderr.strip()[:120]}")
@@ -577,7 +585,7 @@ def check_registry_awaits(ctx: Context) -> Result:
         (due if deployed.returncode == 0 else open_).append(f"{label}：等 {commit[:7]}，A1 現在 {heads[project][:7]}")
     if due:
         return Result(OBSERVED, f"登記冊有 {len(due)} 格還寫未做，但它們在等的提交已經在 A1 上跑了：該改已做（並重發登記冊）。",
-                      due, needs_human=True, key=",".join(sorted(d.split("：")[0] for d in due)))
+                      due + [f"（仍在等）{o}" for o in open_], needs_human=True, key=",".join(sorted(d.split("：")[0] for d in due)))
     return Result(WAITING, f"登記冊有 {len(open_)} 格在等部署，等的提交都還沒上 A1。", open_)
 
 
