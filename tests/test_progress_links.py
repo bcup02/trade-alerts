@@ -345,3 +345,36 @@ def test_an_unreadable_registry_is_a_controlled_error_with_exit_1(tmp_path, caps
     monkeypatch.setattr(cpl, "load_registry_from_main", no_origin)
     assert cpl.main(["--db-dir", str(export)]) == 1
     assert "origin/main" in capsys.readouterr().out
+
+
+def _registry_file(tmp_path, mutate):
+    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    mutate(real)
+    path = tmp_path / "reg.json"
+    path.write_text(json.dumps(real), encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize("name, mutate", [
+    ("no catalog", lambda r: r.pop("catalog")),
+    ("no capabilities", lambda r: r.pop("capabilities")),
+    ("empty catalog", lambda r: r.__setitem__("catalog", [])),
+    ("capabilities not a list", lambda r: r.__setitem__("capabilities", {"id": "x"})),
+    ("capability without id", lambda r: r["capabilities"][0].pop("id")),
+    ("capability without status", lambda r: r["capabilities"][0].pop("status")),
+    ("rule without code", lambda r: r["catalog"][0].pop("code")),
+    ("rule without behaviour", lambda r: r["catalog"][0].pop("behaviour")),
+    ("rule emits_event not an object", lambda r: r["catalog"][0].__setitem__("emits_event", [])),
+])
+def test_a_registry_with_the_wrong_shape_is_an_error_not_a_silent_pass(tmp_path, capsys, name, mutate):
+    """Review of #206 (round 3): valid JSON without `catalog` made a link into a rule-less registry check nothing -> exit 0."""
+    (tmp_path / "db").mkdir()
+    export = _export(tmp_path / "db", [{"id": "i-1", "status": "done", "title": "t", "registry": ["cap:x.cap@seykota"]}])
+    reg = _registry_file(tmp_path, mutate)
+    assert cpl.main(["--db-dir", str(export), "--registry", str(reg)]) == 1, name
+    assert "讀不到登記冊" in capsys.readouterr().out
+
+
+def test_the_real_registry_has_the_shape_the_checker_requires():
+    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    cpl.check_registry_shape(real)

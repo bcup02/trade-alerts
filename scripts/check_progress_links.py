@@ -217,6 +217,23 @@ def link_problems(items: Iterable[Mapping[str, Any]], registry: Mapping[str, Any
     return problems
 
 
+def check_registry_shape(registry: Any) -> None:
+    """The links are looked up in ``capabilities`` and ``catalog``; a registry without them (or with them empty or the
+    wrong shape) is valid JSON that would make every link "not found" -- or, worse, check nothing -- so it is an error."""
+    if not isinstance(registry, dict):
+        raise ValueError("登記冊不是 JSON 物件")
+    for key, name_key, aspects in (("capabilities", "id", ("status",)), ("catalog", "code", ASPECTS)):
+        entries = registry.get(key)
+        if not isinstance(entries, list) or not entries:
+            raise ValueError(f"登記冊缺少 {key} 清單（不存在、不是清單或是空的）")
+        for entry in entries:
+            if not isinstance(entry, dict) or not isinstance(entry.get(name_key), str):
+                raise ValueError(f"登記冊 {key} 裡有項目沒有字串的 {name_key}")
+            for aspect in aspects:
+                if not isinstance(entry.get(aspect), dict):
+                    raise ValueError(f"登記冊 {key} 的 {entry[name_key]} 缺少 {aspect}（要是物件）")
+
+
 def load_registry_from_main(root: Path = ROOT) -> dict[str, Any]:
     shown = subprocess.run(["git", "-C", str(root), "show", "origin/main:src/trade_alerts/catalog/fleet-rollout-registry.json"],
                            capture_output=True, text=True)
@@ -249,6 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         registry = load_rollout_registry(args.registry) if args.registry else load_registry_from_main()
+        check_registry_shape(registry)
     except (ValueError, OSError, RuntimeError) as exc:      # missing / unreadable / broken registry file, or no origin/main to read it from
         print(f"✗ 讀不到登記冊：{exc}")
         return 1
