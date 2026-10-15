@@ -15,8 +15,10 @@ All text reaches the page through ``textContent``, never ``innerHTML``.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -170,11 +172,76 @@ _FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family
           '&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">')
 
 
+DIGEST_PLACEHOLDER = "__GUIDE_DIGEST__"      # only in the footer template; replaced inside _page
+_ZERO = "0" * 16
+_DIGEST_COMMENT = re.compile(r"<!-- fleet-guide-digest: ([0-9a-f]{16}) -->")
+_DIGEST_FOOTER = re.compile(r"頁面版本碼 <code>([0-9a-f]{16})</code>")
+
+
 def _page(title: str, body: str, data: dict[str, Any], script: str, css: str = "") -> str:
     blob = json.dumps(data, ensure_ascii=False, sort_keys=True, indent=1).replace("</", "<\\/")
-    return (f"<title>{title}</title>\n{_FONTS}\n<style>{_CSS}{css}</style>\n\n{body}\n\n"
+    if body.count(DIGEST_PLACEHOLDER) != 1 or DIGEST_PLACEHOLDER in blob + script + css:
+        raise ValueError("the footer's version-code placeholder must appear exactly once, and only in the body")
+    page = (f"<title>{title}</title>\n<!-- fleet-guide-digest: {_ZERO} -->\n{_FONTS}\n<style>{_CSS}{css}</style>\n\n{body}\n\n"
             f'<script type="application/json" id="data">\n{blob}\n</script>\n'
-            f"<script>\n{script}\n</script>\n")
+            f"<script>\n{script}\n</script>\n").replace(DIGEST_PLACEHOLDER, _ZERO)
+    code = hashlib.sha256(page.encode("utf-8")).hexdigest()[:16]
+    return page.replace(f"<!-- fleet-guide-digest: {_ZERO} -->", f"<!-- fleet-guide-digest: {code} -->", 1).replace(
+        f"頁面版本碼 <code>{_ZERO}</code>", f"頁面版本碼 <code>{code}</code>", 1)
+
+
+def verify_digest(page: str) -> tuple[str | None, str]:
+    """The version code a page carries, if the page is internally consistent: ``(code, "")``; otherwise ``(None, why)``.
+
+    The page must carry exactly one code in the line-2 comment and exactly one in the footer, the two must be equal, and
+    the sha256 of the page with just those two spots set to sixteen zeros must give that code.  Everything else in the
+    page is hashed as it is -- nothing is stripped or normalised, so any other change shows (review of #195: an earlier
+    version removed every occurrence of its placeholder and ignored a changed footer code)."""
+    comments, footers = _DIGEST_COMMENT.findall(page), _DIGEST_FOOTER.findall(page)
+    if not comments or not footers:
+        return None, "沒有版本碼（舊版頁面，或第 2 行／頁尾的版本碼被拿掉）"
+    if len(comments) != 1 or len(footers) != 1:
+        return None, f"版本碼出現的次數不對（第 2 行 {len(comments)} 處、頁尾 {len(footers)} 處，各應是 1 處）"
+    if comments[0] != footers[0]:
+        return None, f"第 2 行的版本碼 {comments[0]} 和頁尾的 {footers[0]} 不一樣"
+    zeroed = _DIGEST_COMMENT.sub(f"<!-- fleet-guide-digest: {_ZERO} -->", page, count=1)
+    zeroed = _DIGEST_FOOTER.sub(f"頁面版本碼 <code>{_ZERO}</code>", zeroed, count=1)
+    actual = hashlib.sha256(zeroed.encode("utf-8")).hexdigest()[:16]
+    if actual != comments[0]:
+        return None, f"內容和它自己的版本碼 {comments[0]} 對不上（實際是 {actual}）"
+    return comments[0], ""
+
+
+def published_core(text: str) -> str:
+    """What our page looked like before the host wrapped it: from the title to the last script (the artifact service
+    adds ``<!doctype><html><head>…<body>`` in front and ``</body></html>`` behind)."""
+    start = text.find("<title>")
+    end = text.rfind("</script>")
+    if start < 0 or end < 0:
+        raise ValueError("not a guide page: no <title> or closing </script>")
+    return text[start:end + len("</script>")] + "\n"
+
+
+def check_published(kind: str, published_file: Path) -> tuple[str, str]:
+    """Compare a saved copy of a published page with what main renders now.
+
+    ``current``  -- the published page is the page main renders now (its fingerprint equals the fresh one and is
+                    internally consistent): nothing to publish, nothing to read.
+    ``stale``    -- an untouched older render: publish the fresh page (no hand edits can be lost, the pages are generated).
+    ``altered``  -- the published text does not match its own fingerprint: someone edited it after rendering; read it
+                    before overwriting.
+    Returns ``(verdict, explanation)``."""
+    fresh_pages = rendered_pages()
+    page_path = {"risk": RISK_PAGE, "rollout": ROLLOUT_PAGE}[kind]
+    fresh = fresh_pages[page_path]
+    core = published_core(Path(published_file).read_text(encoding="utf-8"))
+    code, why = verify_digest(core)
+    if code is None:
+        return "altered", f"已發布的頁面{why}：先讀它再覆蓋"
+    fresh_code, _ = verify_digest(fresh)
+    if code == fresh_code:
+        return "current", f"已發布頁面就是 main 現在產生的頁面（版本碼 {fresh_code}）：不用重發"
+    return "stale", f"已發布頁面是舊的產生結果（版本碼 {code}），main 現在是 {fresh_code}：直接發布 docs/guides 裡的新頁面"
 
 
 _JS_HELPERS = r"""
@@ -569,6 +636,7 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
   <div class="foot">
     資料來源：trade-alerts <code>{catalog['catalog_version']}</code>（錯誤分類）與 <code>{registry['registry_version']}</code>（各策略實際進度，{registry['updated_at']} 盤點）。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
+    頁面版本碼 <code>__GUIDE_DIGEST__</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
   </div>
 </div>
 <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>"""
@@ -731,6 +799,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
     資料來源：trade-alerts <code>{registry['registry_version']}</code>（{registry['updated_at']} 對四個 repo 逐項盤點）、<code>{catalog['catalog_version']}</code> 與 <code>{glossary['glossary_version']}</code>。
     「檔案:行號」證據對應的版本：{sources}。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+    頁面版本碼 <code>__GUIDE_DIGEST__</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
   </div>
 </div>
 <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>"""
@@ -748,7 +817,18 @@ def rendered_pages() -> dict[Path, str]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="exit 1 if a committed page differs from a fresh render")
+    parser.add_argument("--check-published", nargs=2, metavar=("risk|rollout", "FILE"), action="append",
+                        help="compare a saved copy of a published page (FILE) with what main renders; exit 1 unless 'current'")
     args = parser.parse_args(argv)
+    if args.check_published:
+        worst = 0
+        for kind, path in args.check_published:
+            if kind not in ("risk", "rollout"):
+                parser.error("--check-published needs 'risk' or 'rollout' first")
+            verdict, why = check_published(kind, Path(path))
+            print(f"{kind}: {verdict.upper()} -- {why}")
+            worst = max(worst, {"current": 0, "stale": 1, "altered": 2}[verdict])
+        return worst
     stale = []
     for path, html in rendered_pages().items():
         if args.check:

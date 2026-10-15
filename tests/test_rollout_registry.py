@@ -598,3 +598,117 @@ def test_a_pending_reason_that_does_not_promise_a_deployment_needs_no_commit(reg
     status.pop("awaits_commit", None)
     assert not [p for p in registry_problems(reg, catalog) if "awaits_commit" in p]
     assert not [p for p in registry_problems(registry, catalog) if "awaits_commit" in p]  # the shipped registry is clean
+
+
+# --- the published page fingerprints itself (phase-sync2) -------------------------------------------------------
+
+_WRAP_HEAD = '<!doctype html><html><head><meta charset=utf8><style>:root{}</style></head><body>\n'
+_WRAP_TAIL = "\n</body></html>"
+
+
+def _wrapped(page: str) -> str:
+    """What the artifact service stores: our page between its own head and tail."""
+    return _WRAP_HEAD + page + _WRAP_TAIL
+
+
+def test_every_rendered_page_carries_a_consistent_fingerprint():
+    render_guides = _render_guides()
+    for path, page in render_guides.rendered_pages().items():
+        stamp = render_guides._DIGEST_COMMENT.search(page)
+        assert stamp and page.splitlines()[1].startswith("<!-- fleet-guide-digest: "), "the stamp is on line 2"
+        assert render_guides.verify_digest(page) == (stamp.group(1), "")
+        assert f"頁面版本碼 <code>{stamp.group(1)}</code>" in page
+        assert render_guides.DIGEST_PLACEHOLDER not in page
+        assert render_guides.published_core(_wrapped(page)) == page   # the host's wrapper does not disturb it
+
+
+def test_check_published_says_current_stale_or_altered(tmp_path, registry, catalog):
+    render_guides = _render_guides()
+    fresh = render_guides.rendered_pages()[render_guides.ROLLOUT_PAGE]
+    saved = tmp_path / "saved.html"
+
+    saved.write_text(_wrapped(fresh), encoding="utf-8")
+    assert render_guides.check_published("rollout", saved)[0] == "current"
+
+    older_registry = copy.deepcopy(registry)
+    older_registry["updated_at"] = "2020-01-01"                        # an earlier, untouched render of the same page
+    older = render_guides.render_rollout_register(catalog, older_registry, render_guides.load_glossary())
+    assert older != fresh
+    saved.write_text(_wrapped(older), encoding="utf-8")
+    verdict, why = render_guides.check_published("rollout", saved)
+    assert verdict == "stale" and "直接發布" in why
+
+    edited = fresh.replace("機隊一致性登記冊", "機隊一致性登記冊（手改）", 1)   # someone edited the published text
+    saved.write_text(_wrapped(edited), encoding="utf-8")
+    assert render_guides.check_published("rollout", saved)[0] == "altered"
+
+    unstamped = render_guides._DIGEST_COMMENT.sub("", fresh)             # a page from before version codes existed
+    saved.write_text(_wrapped(unstamped), encoding="utf-8")
+    verdict, why = render_guides.check_published("rollout", saved)
+    assert verdict == "altered" and "沒有版本碼" in why
+
+    saved.write_text(_wrapped(fresh), encoding="utf-8")                  # the other page's file is not this page
+    assert render_guides.check_published("risk", saved)[0] == "stale"
+
+
+def test_check_published_cli_exit_codes(tmp_path, capsys):
+    render_guides = _render_guides()
+    fresh = render_guides.rendered_pages()[render_guides.RISK_PAGE]
+    good, bad = tmp_path / "good.html", tmp_path / "bad.html"
+    good.write_text(_wrapped(fresh), encoding="utf-8")
+    bad.write_text(_wrapped(fresh.replace("機隊風險登記冊", "x", 1)), encoding="utf-8")
+    assert render_guides.main(["--check-published", "risk", str(good)]) == 0
+    assert "risk: CURRENT" in capsys.readouterr().out
+    assert render_guides.main(["--check-published", "risk", str(bad)]) == 2
+    assert render_guides.main(["--check-published", "risk", str(good), "--check-published", "rollout", str(good)]) == 1
+
+
+def _verdict(render_guides, tmp_path, page, kind="rollout"):
+    saved = tmp_path / "saved.html"
+    saved.write_text(_wrapped(page), encoding="utf-8")
+    return render_guides.check_published(kind, saved)
+
+
+def test_changing_only_the_footer_version_code_is_altered(tmp_path):
+    """Review of #195 (BLOCK-1): the footer code used to be masked out of the hash and never compared with line 2."""
+    render_guides = _render_guides()
+    fresh = render_guides.rendered_pages()[render_guides.ROLLOUT_PAGE]
+    code = render_guides._DIGEST_COMMENT.search(fresh).group(1)
+    tampered = fresh.replace(f"頁面版本碼 <code>{code}</code>", "頁面版本碼 <code>0000000000000000</code>")
+    assert tampered != fresh
+    verdict, why = _verdict(render_guides, tmp_path, tampered)
+    assert verdict == "altered" and "不一樣" in why
+    assert _verdict(render_guides, tmp_path, fresh)[0] == "current"          # the unmodified page still passes
+
+
+def test_inserting_the_old_placeholder_text_into_the_body_is_altered(tmp_path):
+    """Review of #195 (BLOCK-2): the placeholder was deleted from the whole page before hashing, so text added with that
+    name vanished from the hash input."""
+    render_guides = _render_guides()
+    fresh = render_guides.rendered_pages()[render_guides.ROLLOUT_PAGE]
+    for sneaky in (render_guides.DIGEST_PLACEHOLDER, "0" * 16, "頁面版本碼 <code>" + "a" * 16 + "</code>", "<!-- fleet-guide-digest: " + "b" * 16 + " -->"):
+        edited = fresh.replace("<h1>機隊一致性登記冊</h1>", "<h1>機隊一致性登記冊" + sneaky + "</h1>", 1)
+        assert edited != fresh
+        assert _verdict(render_guides, tmp_path, edited)[0] == "altered", sneaky
+
+
+def test_missing_or_duplicated_version_codes_are_altered(tmp_path):
+    render_guides = _render_guides()
+    fresh = render_guides.rendered_pages()[render_guides.ROLLOUT_PAGE]
+    code = render_guides._DIGEST_COMMENT.search(fresh).group(1)
+    footer = f"頁面版本碼 <code>{code}</code>"
+    assert _verdict(render_guides, tmp_path, fresh.replace(footer, "頁面版本碼"))[0] == "altered"                 # footer code removed
+    assert _verdict(render_guides, tmp_path, fresh.replace(footer, footer + " " + footer, 1))[0] == "altered"    # footer code twice
+    stamp = f"<!-- fleet-guide-digest: {code} -->"
+    assert _verdict(render_guides, tmp_path, fresh.replace(stamp, stamp + stamp, 1))[0] == "altered"            # line-2 code twice
+
+
+def test_the_page_templates_have_exactly_one_footer_placeholder():
+    render_guides = _render_guides()
+    import pytest as _pytest
+    with _pytest.raises(ValueError, match="exactly once"):
+        render_guides._page("t", "no placeholder here", {}, "")
+    with _pytest.raises(ValueError, match="exactly once"):
+        render_guides._page("t", render_guides.DIGEST_PLACEHOLDER * 2, {}, "")
+    with _pytest.raises(ValueError, match="exactly once"):
+        render_guides._page("t", render_guides.DIGEST_PLACEHOLDER, {"x": render_guides.DIGEST_PLACEHOLDER}, "")
