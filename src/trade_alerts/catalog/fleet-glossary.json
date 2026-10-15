@@ -636,6 +636,16 @@
       ],
       "definition": "錯誤規則的第二欄：這條錯誤發生時，有沒有寫進事件日誌（寫進去才會變成白話通知）。",
       "retired": []
+    },
+    {
+      "id": "register.page_digest",
+      "category": "登記冊狀態",
+      "zh": "頁面版本碼",
+      "en": [
+        "fleet-guide-digest"
+      ],
+      "definition": "登記冊頁面第 2 行與頁尾的 16 位代碼，由頁面內容算出；拿已發布頁面的版本碼跟 main 現在產生的比，就知道要不要重發、頁面有沒有被改過。",
+      "retired": []
     }
   ]
 }

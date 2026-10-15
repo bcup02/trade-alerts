@@ -1,4 +1,5 @@
 <title>機隊一致性登記冊</title>
+<!-- fleet-guide-digest: 20524903add8b3fc -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
   :root{
@@ -205,13 +206,14 @@
   <p class="group-sub">只列還有未做格子的關卡；「未做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
   <div id="phases" class="phase-list"></div>
 
-  <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">50 條</span></div>
+  <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">51 條</span></div>
   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
   <div id="glossaryHost"></div>
   <div class="foot">
     資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-15 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 489bbcd</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 53e04ce</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 2ee102c</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 7d499bb</code>。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+    頁面版本碼 <code>20524903add8b3fc</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
   </div>
 </div>
 <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>
@@ -896,6 +898,16 @@
      "note": null,
      "retired": [],
      "zh": "寫進事件日誌"
+    },
+    {
+     "definition": "登記冊頁面第 2 行與頁尾的 16 位代碼，由頁面內容算出；拿已發布頁面的版本碼跟 main 現在產生的比，就知道要不要重發、頁面有沒有被改過。",
+     "en": [
+      "fleet-guide-digest"
+     ],
+     "id": "register.page_digest",
+     "note": null,
+     "retired": [],
+     "zh": "頁面版本碼"
     }
    ]
   }
@@ -1033,9 +1045,9 @@
     "btc-competition": "na",
     "momentum": "na",
     "mycrypto": "na",
-    "seykota": "recent"
+    "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "latch.restart_only_clear",
    "kind": "cap",
    "rows": [
@@ -1526,12 +1538,12 @@
    "anchor": "cap-ops_export.writer",
    "complete": true,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "done",
     "momentum": "done",
     "mycrypto": "done",
     "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "ops_export.writer",
    "kind": "cap",
    "rows": [
@@ -1650,12 +1662,12 @@
    "anchor": "cap-notify.line_first_notice",
    "complete": false,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "done",
     "momentum": "done",
     "mycrypto": "pending",
     "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "notify.line_first_notice",
    "kind": "cap",
    "rows": [
@@ -1894,7 +1906,7 @@
    "title": "資金費同步"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-reconcile.google_projection_grace",
    "complete": false,
    "dots": {
@@ -2208,12 +2220,12 @@
    "anchor": "cap-repair_bot.recurrence_escalation",
    "complete": true,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "na",
     "momentum": "done",
     "mycrypto": "done",
     "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "repair_bot.recurrence_escalation",
    "kind": "cap",
    "rows": [
@@ -2266,16 +2278,16 @@
    "title": "自動修補重複發生時升格通知"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-notify.error_id",
    "complete": false,
    "dots": {
-    "btc-competition": "recent",
-    "momentum": "recent",
+    "btc-competition": "done",
+    "momentum": "done",
     "mycrypto": "pending",
-    "seykota": "recent"
+    "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "notify.error_id",
    "kind": "cap",
    "rows": [
@@ -2452,7 +2464,7 @@
    "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-reconcile.adopted_fills",
    "complete": false,
    "dots": {
@@ -2514,7 +2526,7 @@
    "title": "接手倉位與原生停損平倉的成交，對帳不再誤判成「帳本沒記」"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-projection.park_unconfirmed_correction",
    "complete": false,
    "dots": {
@@ -2576,7 +2588,7 @@
    "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-projection.requeue_parked",
    "complete": false,
    "dots": {
@@ -2638,7 +2650,7 @@
    "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-google.close_whole_trade_entry",
    "complete": false,
    "dots": {
@@ -2700,7 +2712,7 @@
    "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-google.spot_fill_row",
    "complete": true,
    "dots": {
@@ -2753,7 +2765,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：部署後競賽還沒有新的成交，第一次實際用 append_fill_v2 送出要等下一次每日調整（2026-10-09 台北 08:10）有成交；接收端的收單只用非機密探測驗證過（回簽章檢查，不是寫入）。"
+       "text": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。首次實際送出：2026-10-15 台北 08:10 的每日調整有 1 筆成交，08:15 以 append_fill_v2（spot_fill）送出，接收端 CONFIRMED（receiver_row 6），對帳一致（A1 唯讀查 audit/google-projection-outbox.jsonl 與對帳狀態，2026-10-15 台北）。限制：只看過這一次；表上那一列的儲存格內容（P 欄 spot_fill）沒有逐格讀回，靠接收端回覆 CONFIRMED 與對帳一致。"
       }
      ]
     }
@@ -3113,7 +3125,7 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "SEY.EXCHANGE_TARGET_UNSAFE",
    "kind": "rule",
    "rows": [
@@ -3148,7 +3160,7 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
    "kind": "rule",
    "rows": [
@@ -3319,11 +3331,11 @@
    "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MOM.PROTECTION_UNVERIFIED",
    "kind": "rule",
    "rows": [
@@ -3354,11 +3366,11 @@
    "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MOM.STATE_REPAIRED_SAFE_HALT",
    "kind": "rule",
    "rows": [
@@ -3389,11 +3401,11 @@
    "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MOM.RUNTIME_CYCLE_FAILED",
    "kind": "rule",
    "rows": [
@@ -3528,12 +3540,12 @@
    "anchor": "rule-BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
    "complete": true,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "done",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
    "kind": "rule",
    "rows": [
@@ -3568,7 +3580,7 @@
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
    "kind": "rule",
    "rows": [
@@ -3598,12 +3610,12 @@
    "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
    "complete": true,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "done",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "BTC.ORDER_STATUS_UNKNOWN",
    "kind": "rule",
    "rows": [
@@ -3633,12 +3645,12 @@
    "anchor": "rule-BTC.REBALANCE_PENDING",
    "complete": true,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "done",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "BTC.REBALANCE_PENDING",
    "kind": "rule",
    "rows": [
@@ -4901,11 +4913,11 @@
    "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
    "kind": "rule",
    "rows": [
@@ -4938,9 +4950,9 @@
     "btc-competition": "none",
     "momentum": "none",
     "mycrypto": "none",
-    "seykota": "recent"
+    "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
    "kind": "rule",
    "rows": [
@@ -4970,12 +4982,12 @@
    "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
    "complete": true,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "done",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
    "kind": "rule",
    "rows": [
@@ -5005,12 +5017,12 @@
    "anchor": "rule-BTC.STATE_FILE_CORRUPT",
    "complete": true,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "done",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "BTC.STATE_FILE_CORRUPT",
    "kind": "rule",
    "rows": [
@@ -5041,11 +5053,11 @@
    "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "recent",
+    "momentum": "done",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
    "kind": "rule",
    "rows": [
@@ -5078,9 +5090,9 @@
     "btc-competition": "none",
     "momentum": "none",
     "mycrypto": "none",
-    "seykota": "recent"
+    "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
    "kind": "rule",
    "rows": [
@@ -5110,12 +5122,12 @@
    "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
    "complete": false,
    "dots": {
-    "btc-competition": "recent",
+    "btc-competition": "na",
     "momentum": "pending",
     "mycrypto": "na",
     "seykota": "pending"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
    "kind": "rule",
    "rows": [
@@ -5614,196 +5626,10 @@
  },
  "recent_summary": [
   {
-   "anchor": "cap-latch.restart_only_clear",
-   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
-   "project": "趨勢策略",
-   "title": "「改好設定重啟」就能解除的安全暫停真的會被清掉"
-  },
-  {
-   "anchor": "cap-ops_export.writer",
-   "note": "競賽自己的安全暫停與狀態事件 10/4 起就寫進事件日誌並匯出，之前沒更新：改已做。",
+   "anchor": "cap-google.spot_fill_row",
+   "note": "首次實際送出已發生（10/15 台北 08:15，receiver_row 6，CONFIRMED）：更正舊的『第一次要等 10/9』限制句。",
    "project": "競賽策略",
-   "title": "把要通知的事寫成匯出檔"
-  },
-  {
-   "anchor": "cap-notify.line_first_notice",
-   "note": "10/11 競賽 ERR-023 受控測試你手機收到兩則：改已做。",
-   "project": "競賽策略",
-   "title": "需要人處理的通知真的送到 LINE（只發第一則）"
-  },
-  {
-   "anchor": "cap-notify.error_id",
-   "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。",
-   "project": "趨勢策略",
-   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
-  },
-  {
-   "anchor": "cap-notify.error_id",
-   "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。",
-   "project": "動能策略",
-   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
-  },
-  {
-   "anchor": "cap-notify.error_id",
-   "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。",
-   "project": "競賽策略",
-   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
-  },
-  {
-   "anchor": "cap-reconcile.google_projection_grace",
-   "note": "把『還沒看到擋掉誤報』的限制更正：10/9 已在 A1 實際看到（f-22f）。",
-   "project": "動能策略",
-   "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上"
-  },
-  {
-   "anchor": "cap-notify.error_id",
-   "note": "未做的理由改寫成現況（加密還沒實際把通知送到手機）。",
-   "project": "加密策略",
-   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
-  },
-  {
-   "anchor": "cap-reconcile.google_projection_grace",
-   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
-   "project": "加密策略",
-   "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上"
-  },
-  {
-   "anchor": "cap-reconcile.adopted_fills",
-   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
-   "project": "加密策略",
-   "title": "接手倉位與原生停損平倉的成交，對帳不再誤判成「帳本沒記」"
-  },
-  {
-   "anchor": "cap-projection.park_unconfirmed_correction",
-   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
-   "project": "加密策略",
-   "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
-  },
-  {
-   "anchor": "cap-projection.requeue_parked",
-   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
-   "project": "加密策略",
-   "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
-  },
-  {
-   "anchor": "cap-google.close_whole_trade_entry",
-   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
-   "project": "加密策略",
-   "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
-  },
-  {
-   "anchor": "cap-repair_bot.recurrence_escalation",
-   "note": "競賽沒有漏記平倉修復機器人：依你的決定改不適用。",
-   "project": "競賽策略",
-   "title": "自動修補重複發生時升格通知"
-  },
-  {
-   "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
-   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
-   "project": "趨勢策略",
-   "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
-  },
-  {
-   "anchor": "rule-MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
-   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
-   "project": "動能策略",
-   "title": "R3｜重啟後接管了一個帳本沒有記完的部位"
-  },
-  {
-   "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
-   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
-   "project": "競賽策略",
-   "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
-  },
-  {
-   "anchor": "rule-BTC.STATE_FILE_CORRUPT",
-   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
-   "project": "競賽策略",
-   "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
-  },
-  {
-   "anchor": "rule-BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
-   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
-   "project": "競賽策略",
-   "title": "R3｜出現負／不可能的餘額，本地帳本本身不可信"
-  },
-  {
-   "anchor": "rule-BTC.EXECUTION_BLOCKED_ZERO_FILLS",
-   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
-   "project": "競賽策略",
-   "title": "R2｜連續 3 天該再平衡卻零成交"
-  },
-  {
-   "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
-   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
-   "project": "競賽策略",
-   "title": "R3｜送出的單 60 秒內確定不了有沒有成交"
-  },
-  {
-   "anchor": "rule-BTC.REBALANCE_PENDING",
-   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
-   "project": "競賽策略",
-   "title": "R0｜部分成交，目標權重尚未達成"
-  },
-  {
-   "anchor": "rule-MOM.PROTECTION_UNVERIFIED",
-   "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。",
-   "project": "動能策略",
-   "title": "R3｜原生移動停損無法驗證"
-  },
-  {
-   "anchor": "rule-MOM.STATE_REPAIRED_SAFE_HALT",
-   "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。",
-   "project": "動能策略",
-   "title": "R3｜工具修復本地 state 後主動 latch，等人明確解除"
-  },
-  {
-   "anchor": "rule-MOM.RUNTIME_CYCLE_FAILED",
-   "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。",
-   "project": "動能策略",
-   "title": "R0｜run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）"
-  },
-  {
-   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
-   "note": "共用修復執行器的『重複發生升格』已在 A1：改已做。",
-   "project": "動能策略",
-   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
-  },
-  {
-   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
-   "note": "共用修復執行器的『重複發生升格』已在 A1：改已做。",
-   "project": "趨勢策略",
-   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
-  },
-  {
-   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
-   "note": "平倉找不到開倉列的停放已在 A1：行為改已做。",
-   "project": "動能策略",
-   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
-  },
-  {
-   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
-   "note": "平倉找不到開倉列的停放已在 A1：行為改已做。",
-   "project": "趨勢策略",
-   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
-  },
-  {
-   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
-   "note": "競賽是現貨、沒有平倉投影：改不適用。",
-   "project": "競賽策略",
-   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
-  },
-  {
-   "anchor": "rule-SEY.EXCHANGE_TARGET_UNSAFE",
-   "note": "改好設定重啟後暫停會被程式清掉（f-12，10/4 起在 A1）：行為改已做。",
-   "project": "趨勢策略",
-   "title": "R3｜執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）"
-  },
-  {
-   "anchor": "rule-SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
-   "note": "改好設定重啟後暫停會被程式清掉（f-12，10/4 起在 A1）：行為改已做。",
-   "project": "趨勢策略",
-   "title": "R3｜真倉固定訂單識別能力不足"
+   "title": "現貨成交用專屬的寫入動作（append_fill_v2），不再假裝成永遠沒平倉的開倉列"
   }
  ],
  "totals": {

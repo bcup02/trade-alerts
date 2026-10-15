@@ -598,3 +598,66 @@ def test_a_pending_reason_that_does_not_promise_a_deployment_needs_no_commit(reg
     status.pop("awaits_commit", None)
     assert not [p for p in registry_problems(reg, catalog) if "awaits_commit" in p]
     assert not [p for p in registry_problems(registry, catalog) if "awaits_commit" in p]  # the shipped registry is clean
+
+
+# --- the published page fingerprints itself (phase-sync2) -------------------------------------------------------
+
+_WRAP_HEAD = '<!doctype html><html><head><meta charset=utf8><style>:root{}</style></head><body>\n'
+_WRAP_TAIL = "\n</body></html>"
+
+
+def _wrapped(page: str) -> str:
+    """What the artifact service stores: our page between its own head and tail."""
+    return _WRAP_HEAD + page + _WRAP_TAIL
+
+
+def test_every_rendered_page_carries_a_consistent_fingerprint():
+    render_guides = _render_guides()
+    for path, page in render_guides.rendered_pages().items():
+        stamp = render_guides._DIGEST_COMMENT.search(page)
+        assert stamp and page.splitlines()[1].startswith("<!-- fleet-guide-digest: "), "the stamp is on line 2"
+        assert render_guides.page_digest(page) == stamp.group(1)
+        assert f"頁面版本碼 <code>{stamp.group(1)}</code>" in page
+        assert render_guides.DIGEST_PLACEHOLDER not in page
+        assert render_guides.published_core(_wrapped(page)) == page   # the host's wrapper does not disturb it
+
+
+def test_check_published_says_current_stale_or_altered(tmp_path, registry, catalog):
+    render_guides = _render_guides()
+    fresh = render_guides.rendered_pages()[render_guides.ROLLOUT_PAGE]
+    saved = tmp_path / "saved.html"
+
+    saved.write_text(_wrapped(fresh), encoding="utf-8")
+    assert render_guides.check_published("rollout", saved)[0] == "current"
+
+    older_registry = copy.deepcopy(registry)
+    older_registry["updated_at"] = "2020-01-01"                        # an earlier, untouched render of the same page
+    older = render_guides.render_rollout_register(catalog, older_registry, render_guides.load_glossary())
+    assert older != fresh
+    saved.write_text(_wrapped(older), encoding="utf-8")
+    verdict, why = render_guides.check_published("rollout", saved)
+    assert verdict == "stale" and "直接發布" in why
+
+    edited = fresh.replace("機隊一致性登記冊", "機隊一致性登記冊（手改）", 1)   # someone edited the published text
+    saved.write_text(_wrapped(edited), encoding="utf-8")
+    assert render_guides.check_published("rollout", saved)[0] == "altered"
+
+    unstamped = render_guides._DIGEST_COMMENT.sub("", fresh)             # a page from before fingerprints existed
+    saved.write_text(_wrapped(unstamped), encoding="utf-8")
+    verdict, why = render_guides.check_published("rollout", saved)
+    assert verdict == "altered" and "沒有版本碼" in why
+
+    saved.write_text(_wrapped(fresh), encoding="utf-8")                  # the other page's file is not this page
+    assert render_guides.check_published("risk", saved)[0] == "stale"
+
+
+def test_check_published_cli_exit_codes(tmp_path, capsys):
+    render_guides = _render_guides()
+    fresh = render_guides.rendered_pages()[render_guides.RISK_PAGE]
+    good, bad = tmp_path / "good.html", tmp_path / "bad.html"
+    good.write_text(_wrapped(fresh), encoding="utf-8")
+    bad.write_text(_wrapped(fresh.replace("機隊風險登記冊", "x", 1)), encoding="utf-8")
+    assert render_guides.main(["--check-published", "risk", str(good)]) == 0
+    assert "risk: CURRENT" in capsys.readouterr().out
+    assert render_guides.main(["--check-published", "risk", str(bad)]) == 2
+    assert render_guides.main(["--check-published", "risk", str(good), "--check-published", "rollout", str(good)]) == 1
