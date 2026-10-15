@@ -918,3 +918,11 @@ def test_citations_that_all_miss_the_sources_commit_are_an_error_not_all_clear(r
     _publish_registry(repos, _drift_registry(c1, ["src/a.py"]))              # neither src/a.py nor src/b.py exists at c1
     with pytest.raises(ow.RemoteError, match="一個都找不到"):
         ow.check_registry_drift(ctx(Blobs({})))
+
+
+def test_the_unit_lets_the_watcher_fetch_every_clone_it_refreshes():
+    """Regression: ProtectHome=read-only made `git fetch` fail on FETCH_HEAD, so registry-awaits/-drift reported broken."""
+    unit = (Path(__file__).resolve().parents[1] / "deploy" / "observation-watch" / "observation-watch.service").read_text(encoding="utf-8")
+    writable = " ".join(line.split("=", 1)[1] for line in unit.splitlines() if line.startswith("ReadWritePaths="))
+    for name in ("trade-alerts", *ow.REPOS.values()):
+        assert f"-/home/@WATCH_USER@/{name}/.git" in writable.split(), name
