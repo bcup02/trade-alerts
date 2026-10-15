@@ -209,7 +209,9 @@ def test_error_id_is_shown_on_both_register_pages(catalog):
     spec.loader.exec_module(module)
     pages = {path.name: html for path, html in module.rendered_pages().items()}
     first = catalog["entries"][0]
-    assert f'"error_id": "{first["error_id"]}"' in pages["fleet-risk-register.html"]
+    risk_data = json.loads(re.search(r'<script type="application/json" id="data">\n(.*?)\n</script>', pages["fleet-risk-register.html"], re.S)
+                           .group(1).replace("<\\/", "</"))
+    assert any(e["error_id"] == first["error_id"] and e["code"] == first["code"] for e in risk_data["entries"])
     assert f'{first["error_id"]} · {first["code"]}' in pages["fleet-rollout-register.html"]
 
 

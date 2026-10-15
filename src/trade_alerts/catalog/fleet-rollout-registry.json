@@ -2,7 +2,7 @@
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
   "updated_at": "2026-10-15",
-  "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md).",
+  "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
     "seykota": "趨勢策略",
@@ -115,7 +115,9 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed 只處理 EXCHANGE_TARGET_UNSAFE 與 FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 兩種：重啟後把原本擋下的守門檢查再跑一次，通過就追加 safe_halt_cleared（method=config_fixed_restart）、清掉暫停並記 safe_halt_cleared_after_config_fix（:599）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫它；解除工具 src/seykota_bot/safe_halt_resume.py:134 仍刻意拒絕這兩類（只准改好設定重啟）。PR #79（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419（改好設定重啟後暫停被清掉）、tests/test_safe_halt_model_migration.py:304（解除工具拒絕這兩類）。限制：A1 沒有發生過這兩類設定錯誤暫停，沒有實際觸發過；錯誤清單 ERR-009／ERR-010 的處理步驟與追查指令仍寫「已知缺陷：重啟後清不掉」，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
+          "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed 只處理 EXCHANGE_TARGET_UNSAFE 與 FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 兩種：重啟後把原本擋下的守門檢查再跑一次，通過就追加 safe_halt_cleared（method=config_fixed_restart）、清掉暫停並記 safe_halt_cleared_after_config_fix（:599）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫它；解除工具 src/seykota_bot/safe_halt_resume.py:134 仍刻意拒絕這兩類（只准改好設定重啟）。PR #79（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 沒有發生過這兩類設定錯誤暫停，沒有實際觸發過；錯誤清單 ERR-009／ERR-010 的處理步驟與追查指令仍寫「已知缺陷：重啟後清不掉」，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
         },
         "mycrypto": {
           "state": "n/a",
@@ -142,7 +144,8 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "failure_episodes.py:135 FailureEpisodes.failure：同一段失敗連續 3 次（failure_episodes.py:54 THRESHOLD）才升格並只寫一則事件，成功就結束這一段，狀態存在 state/failure-episodes.json、重啟接續、事件編號由失敗期間推導（重啟後不重複通知）；mexc_futures_bot.py:2338 run_forever 整輪例外連續 3 輪才通知（ERR-027）；mexc_futures_bot.py:1267 沒有交易所端停損連續 3 輪（ERR-029／031）；mexc_futures_bot.py:1277 殘留停損單取消連續 3 次（ERR-032）。my-crypto-bot #73（審閱 3 輪）。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+          "evidence": "failure_episodes.py:135 FailureEpisodes.failure：同一段失敗連續 3 次（failure_episodes.py:54 THRESHOLD）才升格並只寫一則事件，成功就結束這一段，狀態存在 state/failure-episodes.json、重啟接續、事件編號由失敗期間推導（重啟後不重複通知）；mexc_futures_bot.py:2338 run_forever 整輪例外連續 3 輪才通知（ERR-027）；mexc_futures_bot.py:1267 沒有交易所端停損連續 3 輪（ERR-029／031）；mexc_futures_bot.py:1277 殘留停損單取消連續 3 次（ERR-032）。my-crypto-bot #73（審閱 3 輪）。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -234,7 +237,9 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 run_repair_round（共用修復執行器）每 15 分鐘（deploy/my-crypto-repair-bot.timer:8）找「帳本有開倉、交易所已無部位」的候選，repair_bot.py:132 fetch_evidence 用 Binance 唯讀成交建證據（成交量須剛好等於開倉量、開倉模式缺值或與帳戶不符一律拒絕、整頁成交都滿也拒絕）；非 Binance 時以暫停模式跑只刷新匯出檔（repair_bot.py:233、:238）。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "repair_bot.py:238 run_repair_round（共用修復執行器）每 15 分鐘（deploy/my-crypto-repair-bot.timer:8）找「帳本有開倉、交易所已無部位」的候選，repair_bot.py:132 fetch_evidence 用 Binance 唯讀成交建證據（成交量須剛好等於開倉量、開倉模式缺值或與帳戶不符一律拒絕、整頁成交都滿也拒絕）；非 Binance 時以暫停模式跑只刷新匯出檔（repair_bot.py:233、:238）。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -257,7 +262,9 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 run_repair_round 照證據補寫：repair_bot.py:185 staging_ledger 用策略自己的 TradeLedger 整批寫入、一輪最多一筆，repair_bot.py:196 補寫後以 mexc_futures_bot.py:698 post_trade_close_to_sheet 把 Google 表那一列的平倉欄位填上（請求與正常平倉共用 mexc_futures_bot.py:670）。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "repair_bot.py:238 run_repair_round 照證據補寫：repair_bot.py:185 staging_ledger 用策略自己的 TradeLedger 整批寫入、一輪最多一筆，repair_bot.py:196 補寫後以 mexc_futures_bot.py:698 post_trade_close_to_sheet 把 Google 表那一列的平倉欄位填上（請求與正常平倉共用 mexc_futures_bot.py:670）。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -280,7 +287,9 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:233 讀 MYCRYPTO_REPAIR_PAUSED（共用庫 repair_paused），為真時 run_repair_round 以暫停模式跑（repair_bot.py:238）、少記成交處理也跳過（repair_bot.py:244）；deploy/my-crypto-bot.env.example:87 預設 false。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "repair_bot.py:233 讀 MYCRYPTO_REPAIR_PAUSED（共用庫 repair_paused），為真時 run_repair_round 以暫停模式跑（repair_bot.py:238）、少記成交處理也跳過（repair_bot.py:244）；deploy/my-crypto-bot.env.example:87 預設 false。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -307,7 +316,9 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:219 每輪（含跳過）重寫 audit/ops_export.json（g1-5，2026-09-26 01:16 UTC 上正式機）；策略自己的安全暫停與狀態事件也寫進事件日誌，由同一個作業轉成匯出檔：src/btc_competition/runner.py:629 _record_halt（下單結果不明、帳本持倉出現負數、連續 3 天零成交、狀態檔損毀，等級表 :538）、src/btc_competition/interrupted_orders.py:181（被中斷的單補記）。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 的競賽沒有自己偵測到過這些暫停；2026-10-11 台北的受控測試（見 notify.line_first_notice）用人工寫的測試事件驗過匯出檔→維運通知→手機這條路。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:219 每輪（含跳過）重寫 audit/ops_export.json（g1-5，2026-09-26 01:16 UTC 上正式機）；策略自己的安全暫停與狀態事件也寫進事件日誌，由同一個作業轉成匯出檔：src/btc_competition/runner.py:629 _record_halt（下單結果不明、帳本持倉出現負數、連續 3 天零成交、狀態檔損毀，等級表 :538）、src/btc_competition/interrupted_orders.py:181（被中斷的單補記）。PR #41（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 的競賽沒有自己偵測到過這些暫停；2026-10-11 台北的受控測試（見 notify.line_first_notice）用人工寫的測試事件驗過匯出檔→維運通知→手機這條路。"
         }
       }
     },
@@ -326,7 +337,8 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "ops_export_refresh.py:28 寫出的匯出檔由 A1 維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-10-14 台北 12:05 設 OPS_NOTIFY_MYCRYPTO_OPS_EXPORT=on（備份 ops-notify.env.bak-x3c4-202610141305），手動一輪維運通知讀到加密的匯出檔軸 OK、notices=0、零誤發。限制：還沒有實際經這條路送到手機的通知（見「需要人處理的通知真的送到 LINE」）。開發機另計，尚未開。"
+          "evidence": "ops_export_refresh.py:28 寫出的匯出檔由 A1 維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-10-14 台北 12:05 設 OPS_NOTIFY_MYCRYPTO_OPS_EXPORT=on（備份 ops-notify.env.bak-x3c4-202610141305），手動一輪維運通知讀到加密的匯出檔軸 OK、notices=0、零誤發。",
+          "limit": "還沒有實際經這條路送到手機的通知（見「需要人處理的通知真的送到 LINE」）。開發機另計，尚未開。"
         },
         "btc-competition": {
           "state": "done",
@@ -354,7 +366,8 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:219 寫出的匯出檔由 A1 維運通知轉送（OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on，2026-09-26）。2026-10-11 台北 A1 受控測試：競賽 ERR-023（下單結果不明）標明「測試」的事件經匯出檔與維運通知送出，你手機收到兩則（第一則通知本文、第二則給 AI 的追查指令）。限制：事件是人工寫的測試事件，競賽自己偵測到暫停的路徑在 A1 沒被實際觸發過。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:219 寫出的匯出檔由 A1 維運通知轉送（OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on，2026-09-26）。2026-10-11 台北 A1 受控測試：競賽 ERR-023（下單結果不明）標明「測試」的事件經匯出檔與維運通知送出，你手機收到兩則（第一則通知本文、第二則給 AI 的追查指令）。",
+          "limit": "事件是人工寫的測試事件，競賽自己偵測到暫停的路徑在 A1 沒被實際觸發過。"
         }
       }
     },
@@ -411,11 +424,15 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:598（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations ac378ed（資金費同步 2026-10-06 台北 17:15 隨 4780bd9 部署，2026-10-09 台北 f-26a、f-26b 換版）；/opt 的 scripts/sync_funding_fees.py（a6fa37f）、src/binance_funding_sync.py（ab1d5a0）、service（08446a1）、timer（38496fb）的 blob 與 ac378ed 同檔相同（A1 hash-object 與 git rev-parse 逐檔比對，四個檔案 blob 都沒變）；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。限制：同上，沒有用真資料驗過多頁分頁。"
+          "evidence": "scripts/sync_funding_fees.py:189（EXCHANGE=binance 時改走 Binance 版）與 :192（呼叫 binance_funding_sync 的 main）；src/binance_funding_sync.py:598（呼叫共用 Binance 工具的 sync_funding_fees，整個帳戶查、排除 EXCLUDED_SYMBOLS、帳本壞了就停手）；deploy/mexc-momentum-funding-sync.timer:5 每 4 小時、deploy/mexc-momentum-funding-sync.service 逾時 300 秒。",
+          "verified_at": "2026-10-10",
+          "limit": "同上，沒有用真資料驗過多頁分頁。"
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/funding_sync.py:462（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :470（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 489bbcd（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，2026-10-09 台北 f-26a、f-26b 換版）；/opt 的 src/seykota_bot/funding_sync.py（4ac684c）、service（e274d7c）、timer（f706bc0）的 blob 與 489bbcd 同檔相同（A1 hash-object 與 git rev-parse 逐檔比對，三個檔案 blob 都沒變）；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。限制：A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
+          "evidence": "src/seykota_bot/funding_sync.py:462（呼叫共用 Binance 工具的 sync_funding_fees，只查 BTCUSDT 資金費、整批驗證才寫入帳本）與 :470（main 入口，只有真倉＋主網才寫 Google 總表）；deploy/seykota-funding-sync.service:16 的 ExecStart 與 deploy/seykota-funding-sync.timer 每小時 20 分排程。",
+          "verified_at": "2026-10-10",
+          "limit": "A1 的資料不到一頁，多頁分頁沒用真資料驗過；A1 帳戶 2026-09-19 之前查不到資金費，2026-09-04 那筆缺口補不回來。"
         },
         "mycrypto": {
           "state": "done",
@@ -434,11 +451,15 @@
       "status": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/reconcile/google_reconcile.py:96 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（剛進場、剛平倉不算對不上；老交易缺列仍 DIVERGED）。A1 正式機（新）執行環境（唯讀查證）：operations 3520da6 於 2026-10-07 台北 16:07（A1 日誌 JST 17:07）部署；/opt 的 src/seykota_bot/reconcile/google_reconcile.py（7f854ee）、pyproject.toml（d328f78）、requirements.lock（879f662）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.27.7，其共用庫對帳模組檔（trade_alerts 套件的 ledger_reconcile 模組）的 blob（fca13c4）與 tag v0.27.7 同檔；部署後手動一輪對帳台北 16:08（JST 17:08）RECONCILED。限制：部署時趨勢空手、之後還沒有新交易，寬限路徑在 A1 沒有實際遇到「新交易等同步」，只在共用庫與策略端測試、開發機驗證。"
+          "evidence": "src/seykota_bot/reconcile/google_reconcile.py:96 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（剛進場、剛平倉不算對不上；老交易缺列仍 DIVERGED）。",
+          "verified_at": "2026-10-07",
+          "limit": "部署時趨勢空手、之後還沒有新交易，寬限路徑在 A1 沒有實際遇到「新交易等同步」，只在共用庫與策略端測試、開發機驗證。"
         },
         "momentum": {
           "state": "done",
-          "evidence": "src/google_reconcile.py:91 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（同上三項）。A1 正式機（新）執行環境（唯讀查證）：operations 71ccee3 於 2026-10-07 台北 16:07（A1 日誌 JST 17:07）部署；/opt 的 src/google_reconcile.py（48433a6）、pyproject.toml（5628afd）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.27.7，其共用庫對帳模組檔（trade_alerts 套件的 ledger_reconcile 模組）的 blob（fca13c4）與 tag v0.27.7 同檔；部署後手動一輪對帳台北 16:08（JST 17:08）RECONCILED。動機：2026-10-05～06 兩天 7 輪 DIVERGED 讀數、5 次 ERR-044 告警都是動能進場／平倉後對帳比同步先讀。2026-10-09 台北動能進場後（04:15 那輪兩筆、12:01 一筆），A1 對帳讀數是 RECONCILED，04:15 那輪的證據帶 2 筆 projection_pending（寬限中），其後沒有 DIVERGED 也沒有 ERR-044，寬限在 A1 實際擋掉了誤報（進度頁 f-22f）。限制：只在動能的進場看到過。"
+          "evidence": "src/google_reconcile.py:91 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（同上三項）。",
+          "verified_at": "2026-10-07",
+          "limit": "只在動能的進場看到過。"
         },
         "mycrypto": {
           "state": "pending",
@@ -552,15 +573,21 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 呼叫共用修復執行器 run_repair_round；共用庫 trade_alerts/repair_runner.py（git tag v0.26.0＝e266a673ba406f112e0ab30c29883582f74e392e，檔案 blob cd00814a845f75dd6648d337c11c77d0b15a36b9，與 v0.25.0 的同檔 blob 相同）第 226 行每輪呼叫 _check_recurring、第 248 行定義：同一支策略最近 7 天內自動補寫達 2 次（第 83–84 行 RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次，窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）。A1 正式機（新）實際執行環境（2026-10-04 台北約 20:16 唯讀查）：mexc-momentum-repair-shadow.service 的 ExecStart 是 /opt/mexc-4h-momentum-trailing-stop/.venv/bin/python /opt/mexc-4h-momentum-trailing-stop/scripts/repair_bot.py；該 venv 載入的 trade-alerts 是 0.26.0（模組 /opt/mexc-4h-momentum-trailing-stop/.venv/lib/python3.12/site-packages/trade_alerts/repair_runner.py，在 A1 上 git hash-object 為 cd00814a845f75dd6648d337c11c77d0b15a36b9，與上述 blob 相同；執行時讀回 RECURRING_THRESHOLD 2、RECURRING_WINDOW_DAYS 7）；mexc-momentum-repair-shadow.timer 每 15 分鐘排程（台北 20:05 東京 21:05 的那一輪日誌輸出 candidates／repaired／failed／escalated 全為空，paused false）。2026-10-04 台北 17:18–17:22 隨 A1 部署（operations ce51083；/opt 內 src、scripts、deploy 與根目錄 .py 共 72 檔與該 commit 逐檔雜湊相同）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）；升格邏輯本身只在共用庫測試與開發機驗證，沒有在正式機製造修補去觸發。"
+          "evidence": "scripts/repair_bot.py:176 呼叫共用修復執行器 run_repair_round；共用庫 trade_alerts/repair_runner.py（git tag v0.26.0＝e266a673ba406f112e0ab30c29883582f74e392e，檔案 blob cd00814a845f75dd6648d337c11c77d0b15a36b9，與 v0.25.0 的同檔 blob 相同）第 226 行每輪呼叫 _check_recurring、第 248 行定義：同一支策略最近 7 天內自動補寫達 2 次（第 83–84 行 RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次，窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）。",
+          "verified_at": "2026-10-04",
+          "limit": "尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）；升格邏輯本身只在共用庫測試與開發機驗證，沒有在正式機製造修補去觸發。"
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:234 呼叫共用修復執行器 run_repair_round；共用庫 trade_alerts/repair_runner.py（git tag v0.26.0＝e266a673ba406f112e0ab30c29883582f74e392e，檔案 blob cd00814a845f75dd6648d337c11c77d0b15a36b9，與 v0.25.0 的同檔 blob 相同）第 226 行每輪呼叫 _check_recurring、第 248 行定義：同一支策略最近 7 天內自動補寫達 2 次（第 83–84 行 RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次，窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）。A1 正式機（新）實際執行環境（2026-10-04 台北約 20:16 唯讀查）：seykota-repair-shadow.service 的 ExecStart 是 /opt/ed-seykota-systematic-trend-following/.venv/bin/python /opt/ed-seykota-systematic-trend-following/scripts/repair_bot.py；該 venv 載入的 trade-alerts 是 0.26.0（模組 /opt/ed-seykota-systematic-trend-following/.venv/lib/python3.12/site-packages/trade_alerts/repair_runner.py，在 A1 上 git hash-object 為 cd00814a845f75dd6648d337c11c77d0b15a36b9，與上述 blob 相同；執行時讀回 RECURRING_THRESHOLD 2、RECURRING_WINDOW_DAYS 7）；seykota-repair-shadow.timer 每 15 分鐘排程（台北 20:05 東京 21:05 的那一輪日誌輸出 candidates／repaired／failed／escalated 全為空，paused false）。2026-10-04 台北 17:18–17:22 隨 A1 部署（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）；升格邏輯本身只在共用庫測試與開發機驗證，沒有在正式機製造修補去觸發。"
+          "evidence": "scripts/repair_bot.py:234 呼叫共用修復執行器 run_repair_round；共用庫 trade_alerts/repair_runner.py（git tag v0.26.0＝e266a673ba406f112e0ab30c29883582f74e392e，檔案 blob cd00814a845f75dd6648d337c11c77d0b15a36b9，與 v0.25.0 的同檔 blob 相同）第 226 行每輪呼叫 _check_recurring、第 248 行定義：同一支策略最近 7 天內自動補寫達 2 次（第 83–84 行 RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次，窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）。",
+          "verified_at": "2026-10-04",
+          "limit": "尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）；升格邏輯本身只在共用庫測試與開發機驗證，沒有在正式機製造修補去觸發。"
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 經共用修復執行器每輪檢查「7 天內自動補寫達 2 次就通知一次、之後 7 天不重發」（trade-alerts v0.30.7 repair_runner 的 _check_recurring，ERR-065）；加密的 ERR-062～065 規則在錯誤清單 v0.30.7。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "repair_bot.py:238 經共用修復執行器每輪檢查「7 天內自動補寫達 2 次就通知一次、之後 7 天不重發」（trade-alerts v0.30.7 repair_runner 的 _check_recurring，ERR-065）；加密的 ERR-062～065 規則在錯誤清單 v0.30.7。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -575,11 +602,13 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。限制：策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-015（移動停損無法驗證）。"
+          "evidence": "scripts/repair_bot.py:176 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。",
+          "limit": "策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-015（移動停損無法驗證）。"
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:234 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。限制：策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-037（交易所有成交、帳本沒記）。"
+          "evidence": "scripts/repair_bot.py:234 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。",
+          "limit": "策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-037（交易所有成交、帳本沒記）。"
         },
         "mycrypto": {
           "state": "pending",
@@ -588,7 +617,8 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:219 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。限制：策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-023（下單結果不明）。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:219 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。",
+          "limit": "策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-023（下單結果不明）。"
         }
       }
     },
@@ -611,7 +641,8 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/graceful_stop.py:54 install_signal_handlers；src/btc_competition/runner.py:826 每日調整啟動時安裝；deploy/btc-competition-bot.service:18 TimeoutStopSec=600。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。限制：競賽沒有常駐程序，A1 上還沒有在每日調整進行中被停止過，「送完手上那張單再停」只在開發機 DEMO 驗證，正式機沒有實測。"
+          "evidence": "src/btc_competition/graceful_stop.py:54 install_signal_handlers；src/btc_competition/runner.py:826 每日調整啟動時安裝；deploy/btc-competition-bot.service:18 TimeoutStopSec=600。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。",
+          "limit": "競賽沒有常駐程序，A1 上還沒有在每日調整進行中被停止過，「送完手上那張單再停」只在開發機 DEMO 驗證，正式機沒有實測。"
         }
       }
     },
@@ -630,7 +661,8 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:1061 ENTRY_PENDING；mexc_futures_bot.py:1897 開倉前先存 entry_pending 狀態（含 trade_id、external_id）；mexc_futures_bot.py:1487 _adopt_pending_entry 重啟後接管開到一半的部位並沿用 trade_id、補掛停損。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。接管通知：2026-10-14 台北約 17:27 隨 A1 正式機分支 operations 2ee102c 上線，接管會寫 R3 事件並通知（ERR-066，見 MYC.POSITION_ADOPTED_AFTER_INTERRUPTION 的格子；mexc_futures_bot.py:1092、:1534 就是這條接管路徑的通知點）。限制：A1 正式機沒有發生過被中斷的進場，接管與通知都沒有實機觸發過。這支要搬到 Binance（進度頁 x 系列），這份 MEXC 版程式碼之後會重寫。"
+          "evidence": "mexc_futures_bot.py:1061 ENTRY_PENDING；mexc_futures_bot.py:1897 開倉前先存 entry_pending 狀態（含 trade_id、external_id）；mexc_futures_bot.py:1487 _adopt_pending_entry 重啟後接管開到一半的部位並沿用 trade_id、補掛停損。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。接管通知：2026-10-14 台北約 17:27 隨 A1 正式機分支 operations 2ee102c 上線，接管會寫 R3 事件並通知（ERR-066，見 MYC.POSITION_ADOPTED_AFTER_INTERRUPTION 的格子；mexc_futures_bot.py:1092、:1534 就是這條接管路徑的通知點）。",
+          "limit": "A1 正式機沒有發生過被中斷的進場，接管與通知都沒有實機觸發過。這支要搬到 Binance（進度頁 x 系列），這份 MEXC 版程式碼之後會重寫。"
         },
         "btc-competition": {
           "state": "done",
@@ -645,11 +677,13 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "src/reconcile_compare.py:56 _OPEN_EVENT_TYPES = frozenset({\"trade_open\", \"position_recovered\"})（接手倉位也算開倉，#118）、src/google_reconcile.py:79 local_trades 同樣的 open_event_types；共用庫 v0.27.3（pyproject.toml:57，含 MEXC 方向代碼與同一次開倉兩列只算一次）。2026-10-05 台北 18:57（JST 19:57，UTC 10:57）部署 A1 正式機（新）（operations 97f5ebb，bot 於該時間重啟）：/opt 的 src/reconcile_compare.py、src/google_reconcile.py、pyproject.toml 與該 commit 的檔案雜湊相同，venv trade-alerts 0.27.3 的對帳檔與 v0.27.3 同檔（blob 83a90df），部署後手動一輪與 JST 20:00（台北 19:00）排程一輪的對帳與 Google 對帳都 RECONCILED。限制：A1 上動能沒有接手倉位，新路徑只在開發機與測試驗證過；動能預設紙上判斷會把沒有訂單編號的原生停損平倉當紙上，那一筆成交仍會留在清單（保守方向）。"
+          "evidence": "src/reconcile_compare.py:56 _OPEN_EVENT_TYPES = frozenset({\"trade_open\", \"position_recovered\"})（接手倉位也算開倉，#118）、src/google_reconcile.py:79 local_trades 同樣的 open_event_types；共用庫 v0.27.3（pyproject.toml:57，含 MEXC 方向代碼與同一次開倉兩列只算一次）。2026-10-05 台北 18:57（JST 19:57，UTC 10:57）部署 A1 正式機（新）（operations 97f5ebb，bot 於該時間重啟）：/opt 的 src/reconcile_compare.py、src/google_reconcile.py、pyproject.toml 與該 commit 的檔案雜湊相同，venv trade-alerts 0.27.3 的對帳檔與 v0.27.3 同檔（blob 83a90df），部署後手動一輪與 JST 20:00（台北 19:00）排程一輪的對帳與 Google 對帳都 RECONCILED。",
+          "limit": "A1 上動能沒有接手倉位，新路徑只在開發機與測試驗證過；動能預設紙上判斷會把沒有訂單編號的原生停損平倉當紙上，那一筆成交仍會留在清單（保守方向）。"
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/reconcile/compare.py:194 explained = match_fills_to_adopted_events(not_by_order_id, real, norm_symbol=norm_symbol_plain)（只傳濾掉紙上列的 real，共用庫 v0.27.0，#95）；2026-10-05 台北 18:56（JST 19:56，UTC 10:56）部署 A1 正式機（新）（operations 5958bbf，bot 於該時間重啟）：/opt 的 src/seykota_bot/reconcile/compare.py、pyproject.toml 與該 commit 的檔案雜湊相同，venv trade-alerts 0.27.0 的對帳檔與 v0.27.0 同檔（blob 0e8005d），部署後手動一輪對帳與 JST 20:00（台北 19:00）排程一輪對帳 RECONCILED、位置差異空、未記成交 0 筆。限制：A1 上趨勢策略沒有接手倉位，配對路徑只在開發機（10/3 起的兩筆成交被解釋）與測試驗證過。"
+          "evidence": "src/seykota_bot/reconcile/compare.py:194 explained = match_fills_to_adopted_events(not_by_order_id, real, norm_symbol=norm_symbol_plain)（只傳濾掉紙上列的 real，共用庫 v0.27.0，#95）；2026-10-05 台北 18:56（JST 19:56，UTC 10:56）部署 A1 正式機（新）（operations 5958bbf，bot 於該時間重啟）：/opt 的 src/seykota_bot/reconcile/compare.py、pyproject.toml 與該 commit 的檔案雜湊相同，venv trade-alerts 0.27.0 的對帳檔與 v0.27.0 同檔（blob 0e8005d），部署後手動一輪對帳與 JST 20:00（台北 19:00）排程一輪對帳 RECONCILED、位置差異空、未記成交 0 筆。",
+          "limit": "A1 上趨勢策略沒有接手倉位，配對路徑只在開發機（10/3 起的兩筆成交被解釋）與測試驗證過。"
         },
         "mycrypto": {
           "state": "pending",
@@ -669,11 +703,15 @@
       "status": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫，策略沒有自己的實作；pyproject.toml 釘 v0.28.0）。A1 正式機（新）執行環境（唯讀查證）：operations 9952c3d 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/seykota_bot/google_projection_worker.py（blob c0fb2df）與 pyproject.toml（blob 2225d6d）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：A1 沒有遇到過帳本更正卡住，停放路徑只在共用庫與策略端測試、開發機實測（開發機 2026-10-08 台北 18:21 一筆已連續 582 次的更正，在新版下下一次回答就停放）。"
+          "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫，策略沒有自己的實作；pyproject.toml 釘 v0.28.0）。",
+          "verified_at": "2026-10-08",
+          "limit": "A1 沒有遇到過帳本更正卡住，停放路徑只在共用庫與策略端測試、開發機實測（開發機 2026-10-08 台北 18:21 一筆已連續 582 次的更正，在新版下下一次回答就停放）。"
         },
         "momentum": {
           "state": "done",
-          "evidence": "src/google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫；pyproject.toml 釘 v0.28.0）。A1 正式機（新）執行環境（唯讀查證）：operations fe4637e 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/google_projection_worker.py（blob 0b364cd）與 pyproject.toml（blob b16ecad）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：同趨勢，A1 上停放路徑沒有實際被觸發過。"
+          "evidence": "src/google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫；pyproject.toml 釘 v0.28.0）。",
+          "verified_at": "2026-10-08",
+          "limit": "同趨勢，A1 上停放路徑沒有實際被觸發過。"
         },
         "mycrypto": {
           "state": "pending",
@@ -693,11 +731,15 @@
       "status": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/requeue_projection_intents.py:44 呼叫 requeue_rejected_projection_intents（:36 只收單一 --trade-id、:43 沒有佇列檔就停）。A1 正式機（新）執行環境（唯讀查證）：operations 9952c3d 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 scripts/requeue_projection_intents.py（blob cce6b27） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。開發機實測（2026-10-08 台北 18:21）：開發機趨勢那筆停放的平倉與更正用這個指令稿重新排入後都 CONFIRMED（第 4 列），Google 對帳 RECONCILED、0 筆差異。限制：A1 還沒執行過這個指令稿（A1 沒有被停放的紀錄）。"
+          "evidence": "scripts/requeue_projection_intents.py:44 呼叫 requeue_rejected_projection_intents（:36 只收單一 --trade-id、:43 沒有佇列檔就停）。",
+          "verified_at": "2026-10-08",
+          "limit": "A1 還沒執行過這個指令稿（A1 沒有被停放的紀錄）。"
         },
         "momentum": {
           "state": "done",
-          "evidence": "scripts/requeue_projection_intents.py:46 呼叫 requeue_rejected_projection_intents（:38 只收單一 --trade-id、:45 沒有佇列檔就停）。A1 正式機（新）執行環境（唯讀查證）：operations fe4637e 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 scripts/requeue_projection_intents.py（blob b5cfe80） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：只在測試與趨勢的開發機實測驗證；動能的指令稿本身沒在任何主機上實際執行過。"
+          "evidence": "scripts/requeue_projection_intents.py:46 呼叫 requeue_rejected_projection_intents（:38 只收單一 --trade-id、:45 沒有佇列檔就停）。",
+          "verified_at": "2026-10-08",
+          "limit": "只在測試與趨勢的開發機實測驗證；動能的指令稿本身沒在任何主機上實際執行過。"
         },
         "mycrypto": {
           "state": "pending",
@@ -706,7 +748,9 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "scripts/requeue_projection_intents.py:45 呼叫 requeue_rejected_projection_intents（:37 只收單一 --trade-id、:44 沒有佇列檔就停）。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版）；/opt 的 scripts/requeue_projection_intents.py（blob afb517b）的 blob 與 70630a1 同檔相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。限制：競賽的指令稿只在測試驗證，沒有在任何主機實際執行過；通用重排只是複製原本的綁定，不是把舊投影搬到新動作的 migration 工具。"
+          "evidence": "scripts/requeue_projection_intents.py:45 呼叫 requeue_rejected_projection_intents（:37 只收單一 --trade-id、:44 沒有佇列檔就停）。",
+          "verified_at": "2026-10-10",
+          "limit": "競賽的指令稿只在測試驗證，沒有在任何主機實際執行過；通用重排只是複製原本的綁定，不是把舊投影搬到新動作的 migration 工具。"
         }
       }
     },
@@ -717,11 +761,15 @@
       "status": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/google_ledger_provenance.py:210 與 :212 的平倉投影帶 entry_price、entry_volume（取自帳本平倉列，整筆加權平均價與總量）。A1 正式機（新）執行環境（唯讀查證）：operations 9952c3d 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/seykota_bot/google_ledger_provenance.py（blob 06b1a0a） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：寫回 G／I 的接收端路徑只在接收端 Node 測試與開發機驗證，A1 還沒有新的有加碼的交易走過這條路徑。"
+          "evidence": "src/seykota_bot/google_ledger_provenance.py:210 與 :212 的平倉投影帶 entry_price、entry_volume（取自帳本平倉列，整筆加權平均價與總量）。",
+          "verified_at": "2026-10-08",
+          "limit": "寫回 G／I 的接收端路徑只在接收端 Node 測試與開發機驗證，A1 還沒有新的有加碼的交易走過這條路徑。"
         },
         "momentum": {
           "state": "done",
-          "evidence": "src/google_ledger_provenance.py:189 與 :191 的平倉投影帶 entry_price、entry_volume。A1 正式機（新）執行環境（唯讀查證）：operations fe4637e 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/google_ledger_provenance.py（blob f572082） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：動能沒有加碼，這格對它只是把同樣的值再寫一次；沒有在 A1 實際看到寫回後的儲存格。"
+          "evidence": "src/google_ledger_provenance.py:189 與 :191 的平倉投影帶 entry_price、entry_volume。",
+          "verified_at": "2026-10-08",
+          "limit": "動能沒有加碼，這格對它只是把同樣的值再寫一次；沒有在 A1 實際看到寫回後的儲存格。"
         },
         "mycrypto": {
           "state": "pending",
@@ -753,7 +801,9 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。首次實際送出：2026-10-15 台北 08:10 的每日調整有 1 筆成交，08:15 以 append_fill_v2（spot_fill）送出，接收端 CONFIRMED（receiver_row 6），對帳一致（A1 唯讀查 audit/google-projection-outbox.jsonl 與對帳狀態，2026-10-15 台北）。限制：只看過這一次；表上那一列的儲存格內容（P 欄 spot_fill）沒有逐格讀回，靠接收端回覆 CONFIRMED 與對帳一致。"
+          "evidence": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。",
+          "verified_at": "2026-10-10",
+          "limit": "只看過這一次；表上那一列的儲存格內容（P 欄 spot_fill）沒有逐格讀回，靠接收端回覆 CONFIRMED 與對帳一致。"
         }
       }
     },
@@ -764,7 +814,9 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "src/reconcile_compare.py:85 把環境變數 RECONCILE_PENDING_MAX_SECONDS（預設共用庫 DEFAULT_PENDING_MAX_SECONDS＝24 小時）傳給共用比對（:72）；超過上限的位置對帳標記（時間讀不出，或比現在晚超過 5 分鐘，也視為逾時）不再讓狀態停在 PENDING：部位與成交對不上仍判對不上，對得上則 RECONCILED，並在證據 pending_expired 列出被放棄等待的標記（共用庫 v0.30.0 ledger_reconcile，審閱 bcup02/trade-alerts#162）。src/reconcile_apply.py:105 結清工具接受「RECONCILED 且帶 pending_expired」（逾時後狀態已不是 PENDING），:127 起只結清該狀態點名的標記，狀態寫出之後才出現的新標記一律拒絕（審閱 BLOCK-135-01）。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 53e04ce 於 2026-10-11 台北 00:24（A1 日誌 JST 01:24）部署（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）；/opt 的 src/reconcile_compare.py（blob 957a848）、src/reconcile_apply.py（aa7ba79）、scripts/repair_bot.py（eb6be00）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.0，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（44daf37）、錯誤清單（9836736）都與 tag v0.30.0 同檔。部署前後啟用與運行中的單元清單逐項無差異（第一次比對只差控制消費者計時器正好在執行，20 秒後再比對完全相同）、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）、動能空手（交易所持倉 0）；部署後手動一輪：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired；修復輪 candidates 空、pending_expired 為空。限制：A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
+          "evidence": "src/reconcile_compare.py:85 把環境變數 RECONCILE_PENDING_MAX_SECONDS（預設共用庫 DEFAULT_PENDING_MAX_SECONDS＝24 小時）傳給共用比對（:72）；超過上限的位置對帳標記（時間讀不出，或比現在晚超過 5 分鐘，也視為逾時）不再讓狀態停在 PENDING：部位與成交對不上仍判對不上，對得上則 RECONCILED，並在證據 pending_expired 列出被放棄等待的標記（共用庫 v0.30.0 ledger_reconcile，審閱 bcup02/trade-alerts#162）。src/reconcile_apply.py:105 結清工具接受「RECONCILED 且帶 pending_expired」（逾時後狀態已不是 PENDING），:127 起只結清該狀態點名的標記，狀態寫出之後才出現的新標記一律拒絕（審閱 BLOCK-135-01）。",
+          "verified_at": "2026-10-11",
+          "limit": "A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
         },
         "seykota": {
           "state": "n/a",
@@ -776,7 +828,9 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/reconcile_compare.py:65 _PENDING_MAX_SECONDS（24 小時）；:210 回 PENDING 只在「剛到的交易所成交還沒進帳本」或「未收尾的批次／快照後成交還沒過期」；:179 起算與過期判定（時間讀不出，或比現在晚超過 :266 _CLOCK_SKEW_SECONDS 的 300 秒，視為已過期、不再等）；:302 環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS；過期後比對餘額，證據帶 pending_expired（:188 reason：waited_over_limit／time_unreadable／time_in_future）。A1 正式機（新）執行環境（唯讀查證）：operations 0025f3c 於 2026-10-10 台北 21:10（A1 日誌 JST 22:10）部署（AI-for-column/btc-bull-market-competition#53，審閱三輪 PASS）；/opt 的 src/btc_competition/reconcile_compare.py（blob 1b4ff00）的 blob 與該 commit 同檔相同；部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED。限制：A1 的競賽目前沒有未收尾的項目，超過 24 小時的行為在 A1 沒有實際被觸發過；只在測試與開發機實測（開發機 8 天的 PENDING 在 2026-10-10 台北 20:35 部署後恢復為 RECONCILED，證據記的是等了 197.6 小時）。"
+          "evidence": "src/btc_competition/reconcile_compare.py:65 _PENDING_MAX_SECONDS（24 小時）；:210 回 PENDING 只在「剛到的交易所成交還沒進帳本」或「未收尾的批次／快照後成交還沒過期」；:179 起算與過期判定（時間讀不出，或比現在晚超過 :266 _CLOCK_SKEW_SECONDS 的 300 秒，視為已過期、不再等）；:302 環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS；過期後比對餘額，證據帶 pending_expired（:188 reason：waited_over_limit／time_unreadable／time_in_future）。",
+          "verified_at": "2026-10-10",
+          "limit": "A1 的競賽目前沒有未收尾的項目，超過 24 小時的行為在 A1 沒有實際被觸發過；只在測試與開發機實測（開發機 8 天的 PENDING 在 2026-10-10 台北 20:35 部署後恢復為 RECONCILED，證據記的是等了 197.6 小時）。"
         }
       }
     }
@@ -842,7 +896,8 @@
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1040 _note_stop_move_failure 每次失敗寫一筆 PROTECTION_MOVE_DEFERRED 事件（:1061），連續第 3 次（:92 _STOP_MOVE_ESCALATE_AFTER）以 R3 升格並附 notice_text、只升格一次（失敗次數存在 pending_operations，重啟後照算）；PR #81（f-14，審閱 PASS）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d，/opt 檔案與該 commit 逐檔雜湊相同）。限制：正式機沒有發生過舊停損取消不掉的情形，升格路徑只在開發機與測試驗證。"
+          "evidence": "src/seykota_bot/bot.py:1040 _note_stop_move_failure 每次失敗寫一筆 PROTECTION_MOVE_DEFERRED 事件（:1061），連續第 3 次（:92 _STOP_MOVE_ESCALATE_AFTER）以 R3 升格並附 notice_text、只升格一次（失敗次數存在 pending_operations，重啟後照算）；PR #81（f-14，審閱 PASS）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d，/opt 檔案與該 commit 逐檔雜湊相同）。",
+          "limit": "正式機沒有發生過舊停損取消不掉的情形，升格路徑只在開發機與測試驗證。"
         }
       }
     },
@@ -916,7 +971,9 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419、tests/test_safe_halt_model_migration.py:304。限制：A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令仍寫『已知缺陷：重啟後清不掉』，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
+          "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令仍寫『已知缺陷：重啟後清不掉』，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
         }
       },
       "emits_event": {
@@ -932,7 +989,9 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419、tests/test_safe_halt_model_migration.py:304。限制：A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令仍寫『已知缺陷：重啟後清不掉』，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
+          "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令仍寫『已知缺陷：重啟後清不掉』，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
         }
       },
       "emits_event": {
@@ -1018,7 +1077,9 @@
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "src/strategy.py:1391 暫停前寫 R3 事件 PROTECTION_UNVERIFIED（src/fleet_events.py:23），由動能修復機器人每輪（scripts/repair_bot.py:176）刷新匯出檔交給維運通知。PR #108（8a）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。驗證：2026-10-11 台北 A1 受控測試——ERR-015 測試事件你手機收到兩則。限制：測試事件是人工寫的，動能自己偵測到『移動停損無法驗證』的路徑在 A1 沒被實際觸發過。"
+          "evidence": "src/strategy.py:1391 暫停前寫 R3 事件 PROTECTION_UNVERIFIED（src/fleet_events.py:23），由動能修復機器人每輪（scripts/repair_bot.py:176）刷新匯出檔交給維運通知。PR #108（8a）。",
+          "verified_at": "2026-10-15",
+          "limit": "測試事件是人工寫的，動能自己偵測到『移動停損無法驗證』的路徑在 A1 沒被實際觸發過。"
         }
       }
     },
@@ -1033,7 +1094,9 @@
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "src/safe_halt_state_repair.py:163 修復工具修完本地紀錄、主動安全暫停時寫 R3 事件 STATE_REPAIRED_SAFE_HALT（src/fleet_events.py:24），由動能修復機器人每輪刷新匯出檔交給維運通知。PR #108（8a）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。限制：A1 沒有跑過這個修復工具，事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路用 ERR-015 受控測試事件驗過，不是這個事件。"
+          "evidence": "src/safe_halt_state_repair.py:163 修復工具修完本地紀錄、主動安全暫停時寫 R3 事件 STATE_REPAIRED_SAFE_HALT（src/fleet_events.py:24），由動能修復機器人每輪刷新匯出檔交給維運通知。PR #108（8a）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 沒有跑過這個修復工具，事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路用 ERR-015 受控測試事件驗過，不是這個事件。"
         }
       }
     },
@@ -1048,7 +1111,8 @@
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "src/fleet_events.py:65 record_cycle_failure 寫 R0 事件 RUNTIME_CYCLE_FAILED（一段連續失敗的第一輪才寫一行），由 src/main.py:336 在 run_forever 抓到例外時呼叫；R0 只記錄、不通知。PR #108（8a）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。"
+          "evidence": "src/fleet_events.py:65 record_cycle_failure 寫 R0 事件 RUNTIME_CYCLE_FAILED（一段連續失敗的第一輪才寫一行），由 src/main.py:336 在 run_forever 抓到例外時呼叫；R0 只記錄、不通知。PR #108（8a）。",
+          "verified_at": "2026-10-15"
         }
       }
     },
@@ -1108,7 +1172,9 @@
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:488 呼叫 :629 _record_halt，把安全暫停寫進事件日誌（等級表 :538：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
+          "evidence": "src/btc_competition/runner.py:488 呼叫 :629 _record_halt，把安全暫停寫進事件日誌（等級表 :538：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
       }
     },
@@ -1124,7 +1190,9 @@
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:488 呼叫 :629 _record_halt，把安全暫停寫進事件日誌（等級表 :538：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
+          "evidence": "src/btc_competition/runner.py:488 呼叫 :629 _record_halt，把安全暫停寫進事件日誌（等級表 :538：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
       }
     },
@@ -1139,7 +1207,9 @@
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:488 呼叫 :629 _record_halt，把安全暫停寫進事件日誌（等級表 :538：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
+          "evidence": "src/btc_competition/runner.py:488 呼叫 :629 _record_halt，把安全暫停寫進事件日誌（等級表 :538：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
       }
     },
@@ -1154,7 +1224,9 @@
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:492 部分成交、目標權重沒達成時寫 R0 事件 REBALANCE_PENDING（只記錄、不通知），下一輪續做。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：R0 本來就不通知；A1 沒有發生過部分成交的調整。"
+          "evidence": "src/btc_competition/runner.py:492 部分成交、目標權重沒達成時寫 R0 事件 REBALANCE_PENDING（只記錄、不通知），下一輪續做。PR #41（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "R0 本來就不通知；A1 沒有發生過部分成交的調整。"
         }
       }
     },
@@ -1193,7 +1265,8 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2338 run_forever 整輪例外下一輪照常重試，連續 3 輪失敗才升格並通知一次（failure_episodes.py:135；從 R2 的『3 次』規則）；2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+          "evidence": "mexc_futures_bot.py:2338 run_forever 整輪例外下一輪照常重試，連續 3 輪失敗才升格並通知一次（failure_episodes.py:135；從 R2 的『3 次』規則）；2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       },
       "emits_event": {
@@ -1214,7 +1287,8 @@
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2003 開倉後停損單被拒時立刻寫 R3 事件（fleet_events.py:37 RISK_TIER），匯出檔轉給維運通知；事件文字只含交易對、方向、trade_id、停損價與已遮金鑰並截斷的交易所錯誤訊息。my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+          "evidence": "mexc_futures_bot.py:2003 開倉後停損單被拒時立刻寫 R3 事件（fleet_events.py:37 RISK_TIER），匯出檔轉給維運通知；事件文字只含交易對、方向、trade_id、停損價與已遮金鑰並截斷的交易所錯誤訊息。my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       }
     },
@@ -1223,7 +1297,8 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2015 開倉後查不到部位時記一次失敗；下一輪本來就會重查部位並補掛停損（原有行為），與搬移停損失敗共用同一段失敗期間，連續 3 輪沒掛成功才升格；停損掛上、交易所看得到停損或空手就結束。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+          "evidence": "mexc_futures_bot.py:2015 開倉後查不到部位時記一次失敗；下一輪本來就會重查部位並補掛停損（原有行為），與搬移停損失敗共用同一段失敗期間，連續 3 輪沒掛成功才升格；停損掛上、交易所看得到停損或空手就結束。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       },
       "emits_event": {
@@ -1244,7 +1319,8 @@
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2024 掛開倉停損單時拋例外，立刻寫 R3 事件（fleet_events.py:37 RISK_TIER），匯出檔轉給維運通知。my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+          "evidence": "mexc_futures_bot.py:2024 掛開倉停損單時拋例外，立刻寫 R3 事件（fleet_events.py:37 RISK_TIER），匯出檔轉給維運通知。my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       }
     },
@@ -1253,7 +1329,8 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2272 搬移（或重新掛）停損失敗清掉失效單號，下一輪自動重掛（原有行為）；mexc_futures_bot.py:2284 例外分支同；連續 3 輪沒掛成功才升格通知一次。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+          "evidence": "mexc_futures_bot.py:2272 搬移（或重新掛）停損失敗清掉失效單號，下一輪自動重掛（原有行為）；mexc_futures_bot.py:2284 例外分支同；連續 3 輪沒掛成功才升格通知一次。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       },
       "emits_event": {
@@ -1268,7 +1345,8 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2202 平倉後取消殘留停損單失敗時記住單號；mexc_futures_bot.py:1283 _retry_orphan_cancels 空手時每輪重試（先看交易所停損清單，已不在清單就算完成，清單讀不出來算一次失敗），只取消自己記錄的單號；連續 3 次失敗才升格；mexc_futures_bot.py:1316 重試前又開了新部位則條件不成立、立刻通知。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
+          "evidence": "mexc_futures_bot.py:2202 平倉後取消殘留停損單失敗時記住單號；mexc_futures_bot.py:1283 _retry_orphan_cancels 空手時每輪重試（先看交易所停損清單，已不在清單就算完成，清單讀不出來算一次失敗），只取消自己記錄的單號；連續 3 次失敗才升格；mexc_futures_bot.py:1316 重試前又開了新部位則條件不成立、立刻通知。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       },
       "emits_event": {
@@ -1418,13 +1496,17 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:215 UnrecordedFillAdapter(client_ids=False)、repair_bot.py:244 run_unrecorded_fill_round：交易所有成交而帳本沒記時一律不寫帳本、不下單，開一個請求（同一張單只開一次）並通知（R3，ERR-042）；帳本之後記到那張單時請求自動撤回。非 Binance 時（目前 A1）這段仍照跑，只受 MYCRYPTO_REPAIR_PAUSED 停用。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 沒有發生過少記成交，通知只在測試驗證。"
+          "evidence": "repair_bot.py:215 UnrecordedFillAdapter(client_ids=False)、repair_bot.py:244 run_unrecorded_fill_round：交易所有成交而帳本沒記時一律不寫帳本、不下單，開一個請求（同一張單只開一次）並通知（R3，ERR-042）；帳本之後記到那張單時請求自動撤回。非 Binance 時（目前 A1）這段仍照跑，只受 MYCRYPTO_REPAIR_PAUSED 停用。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 沒有發生過少記成交，通知只在測試驗證。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:244 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ERR-042）。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：事件到手機的最後一段沒有實機跑過。"
+          "evidence": "repair_bot.py:244 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ERR-042）。",
+          "verified_at": "2026-10-14",
+          "limit": "事件到手機的最後一段沒有實機跑過。"
         }
       }
     },
@@ -1558,7 +1640,8 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "deploy/my-crypto-ops-export-refresh.service 與 deploy/my-crypto-bot-funding-sync.service 列入 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（2026-10-14 台北 12:05），維運通知手動一輪加密的服務單元軸 OK；掛掉時由 ERR-046 通知。限制：主程式、對帳抓取、快照、報表沒有列入（見『維運通知盯背景服務有沒有掛掉』）；沒有實際收到過加密單元失敗的通知。"
+          "evidence": "deploy/my-crypto-ops-export-refresh.service 與 deploy/my-crypto-bot-funding-sync.service 列入 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（2026-10-14 台北 12:05），維運通知手動一輪加密的服務單元軸 OK；掛掉時由 ERR-046 通知。",
+          "limit": "主程式、對帳抓取、快照、報表沒有列入（見『維運通知盯背景服務有沒有掛掉』）；沒有實際收到過加密單元失敗的通知。"
         },
         "btc-competition": {
           "state": "done",
@@ -1597,7 +1680,8 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "ops_export_refresh.py:28 每分鐘寫出 audit/ops_export.json（deploy/my-crypto-ops-export-refresh.timer:5）；A1 維運通知 2026-10-14 台北 12:05 起讀它，加密的匯出檔軸 OK（檢查時間 04:05:15Z）；匯出檔讀不到或太久沒更新由 ERR-047 通知。限制：沒有實際收到過加密匯出檔異常的通知。"
+          "evidence": "ops_export_refresh.py:28 每分鐘寫出 audit/ops_export.json（deploy/my-crypto-ops-export-refresh.timer:5）；A1 維運通知 2026-10-14 台北 12:05 起讀它，加密的匯出檔軸 OK（檢查時間 04:05:15Z）；匯出檔讀不到或太久沒更新由 ERR-047 通知。",
+          "limit": "沒有實際收到過加密匯出檔異常的通知。"
         },
         "btc-competition": {
           "state": "done",
@@ -1706,13 +1790,17 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "src/strategy.py:947 _append_position_recovered 補寫接管事件 position_recovered；src/strategy.py:1625 接管時沿用被中斷那次進場的 trade_id，先存狀態再寫帳本，並補寫該次進場沒來得及寫的 trade_open；之後 :1658 呼叫 _record_position_adoption。PR #108（f-12）、#112（f-16）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。驗證：開發機 DEMO 用強制終止模擬被殺（2026-10-02、10-03，三種情形都補寫 position_recovered、開倉列排隊並送到 Google 表）。限制：A1 正式機沒有發生過被中斷的進場，沒有實際觸發過。"
+          "evidence": "src/strategy.py:947 _append_position_recovered 補寫接管事件 position_recovered；src/strategy.py:1625 接管時沿用被中斷那次進場的 trade_id，先存狀態再寫帳本，並補寫該次進場沒來得及寫的 trade_open；之後 :1658 呼叫 _record_position_adoption。PR #108（f-12）、#112（f-16）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 正式機沒有發生過被中斷的進場，沒有實際觸發過。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "src/strategy.py:1503 _record_position_adoption 把接管寫成 R3 事件 POSITION_ADOPTED_AFTER_INTERRUPTION（src/fleet_events.py:26），kind 分 interrupted_entry／unknown_origin，呼叫點 src/strategy.py:1658；事件由動能修復機器人每輪（scripts/repair_bot.py:176）刷新匯出檔交給維運通知。PR #108（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。限制：這個事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路只用受控測試事件（ERR-015）驗過，不是這個事件。"
+          "evidence": "src/strategy.py:1503 _record_position_adoption 把接管寫成 R3 事件 POSITION_ADOPTED_AFTER_INTERRUPTION（src/fleet_events.py:26），kind 分 interrupted_entry／unknown_origin，呼叫點 src/strategy.py:1658；事件由動能修復機器人每輪（scripts/repair_bot.py:176）刷新匯出檔交給維運通知。PR #108（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "這個事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路只用受控測試事件（ERR-015）驗過，不是這個事件。"
         }
       }
     },
@@ -1721,13 +1809,17 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1261 送單前先記下進場意圖 entry_intent；src/seykota_bot/bot.py:1458 重啟後依 entry_intent 找回被中斷的進場，沿用同一個 trade_id，並由 :1478 補寫該次進場沒來得及寫的 trade_open；src/seykota_bot/bot.py:1385 停損掛到一半被中斷時，用記下的原價重新掛上。PR #79（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/fleet_events.py（1896da8）、scripts/repair_bot.py（a397ec7）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 489bbcd 也是同一份。驗證：開發機 DEMO 強制終止實測（2026-10-02 開 XRP 小部位後 SIGKILL，30 秒內自動重啟、接管部位、帳本單一 trade_id、補掛停損）。限制：A1 正式機沒有發生過被中斷的進場，沒有實際觸發過。"
+          "evidence": "src/seykota_bot/bot.py:1261 送單前先記下進場意圖 entry_intent；src/seykota_bot/bot.py:1458 重啟後依 entry_intent 找回被中斷的進場，沿用同一個 trade_id，並由 :1478 補寫該次進場沒來得及寫的 trade_open；src/seykota_bot/bot.py:1385 停損掛到一半被中斷時，用記下的原價重新掛上。PR #79（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 正式機沒有發生過被中斷的進場，沒有實際觸發過。"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1403 _record_position_adoption 把接管寫成 R3 事件 POSITION_ADOPTED_AFTER_INTERRUPTION（src/seykota_bot/fleet_events.py:23，風險分級 :44），kind 有 interrupted_entry／stop_rearmed／unknown_origin 三種，呼叫點 src/seykota_bot/bot.py:1547，一次接管通知一次；事件由趨勢修復機器人每輪刷新匯出檔（scripts/repair_bot.py:234）交給維運通知。PR #79（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/fleet_events.py（1896da8）、scripts/repair_bot.py（a397ec7）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 489bbcd 也是同一份。限制：這個事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路只用受控測試事件（ERR-037）驗過，不是這個事件。"
+          "evidence": "src/seykota_bot/bot.py:1403 _record_position_adoption 把接管寫成 R3 事件 POSITION_ADOPTED_AFTER_INTERRUPTION（src/seykota_bot/fleet_events.py:23，風險分級 :44），kind 有 interrupted_entry／stop_rearmed／unknown_origin 三種，呼叫點 src/seykota_bot/bot.py:1547，一次接管通知一次；事件由趨勢修復機器人每輪刷新匯出檔（scripts/repair_bot.py:234）交給維運通知。PR #79（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "這個事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路只用受控測試事件（ERR-037）驗過，不是這個事件。"
         }
       }
     },
@@ -1736,13 +1828,17 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:300 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:100 recover 讀沒結清的 order_attempt，依交易所對該自訂編號的回答把已成交的補記成現貨成交（reason interrupted_order_recovered，:51；以交易所 order_id 去重），由 src/btc_competition/unrecorded_fill.py:275 的計時器作業每輪先跑。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。驗證：開發機 DEMO。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
+          "evidence": "src/btc_competition/runner.py:300 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:100 recover 讀沒結清的 order_attempt，依交易所對該自訂編號的回答把已成交的補記成現貨成交（reason interrupted_order_recovered，:51；以交易所 order_id 去重），由 src/btc_competition/unrecorded_fill.py:275 的計時器作業每輪先跑。PR #41（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
       },
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/interrupted_orders.py:181 補記一張被中斷的單時寫 R3 事件 ORDER_RECOVERED_AFTER_INTERRUPTION（src/btc_competition/fleet_events.py:30），同一個作業（src/btc_competition/unrecorded_fill.py:219）刷新匯出檔交給維運通知。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
+          "evidence": "src/btc_competition/interrupted_orders.py:181 補記一張被中斷的單時寫 R3 事件 ORDER_RECOVERED_AFTER_INTERRUPTION（src/btc_competition/fleet_events.py:30），同一個作業（src/btc_competition/unrecorded_fill.py:219）刷新匯出檔交給維運通知。PR #41（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
       }
     },
@@ -1751,13 +1847,17 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:642 _halt_on_unreadable_state：狀態檔存在但讀不出來時鎖安全暫停 STATE_FILE_CORRUPT、另存損毀備份（evidence.damaged_copy）、這輪不送單，不再把它當成第一次執行而整本重新調倉；src/btc_competition/safe_halt_resume.py:120 解除工具對這個代碼多印提醒（解除後從全新狀態開始，要先決定是否還原備份）。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。測試：tests/test_graceful_stop.py:160（狀態檔損毀→安全暫停、事件 R3）。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
+          "evidence": "src/btc_competition/runner.py:642 _halt_on_unreadable_state：狀態檔存在但讀不出來時鎖安全暫停 STATE_FILE_CORRUPT、另存損毀備份（evidence.damaged_copy）、這輪不送單，不再把它當成第一次執行而整本重新調倉；src/btc_competition/safe_halt_resume.py:120 解除工具對這個代碼多印提醒（解除後從全新狀態開始，要先決定是否還原備份）。PR #41（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
       },
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:662 呼叫 :629 _record_halt 寫 R3 事件（等級表 :538），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
+          "evidence": "src/btc_competition/runner.py:662 呼叫 :629 _record_halt 寫 R3 事件（等級表 :538），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
+          "verified_at": "2026-10-15",
+          "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
       }
     },
@@ -1766,13 +1866,15 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 呼叫 run_repair_round，其中的共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
+          "evidence": "scripts/repair_bot.py:176 呼叫 run_repair_round，其中的共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。",
+          "limit": "尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 的同一輪把事件寫進 audit/fleet_event_log.jsonl（R3）並刷新匯出檔，由維運通知轉送；共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
+          "evidence": "scripts/repair_bot.py:176 的同一輪把事件寫進 audit/fleet_event_log.jsonl（R3）並刷新匯出檔，由維運通知轉送；共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。",
+          "limit": "尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
         }
       }
     },
@@ -1781,13 +1883,15 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:234 呼叫 run_repair_round，其中的共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
+          "evidence": "scripts/repair_bot.py:234 呼叫 run_repair_round，其中的共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。",
+          "limit": "尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:234 的同一輪把事件寫進 audit/fleet_event_log.jsonl（R3）並刷新匯出檔，由維運通知轉送；共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
+          "evidence": "scripts/repair_bot.py:234 的同一輪把事件寫進 audit/fleet_event_log.jsonl（R3）並刷新匯出檔，由維運通知轉送；共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。",
+          "limit": "尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
         }
       }
     },
@@ -1796,11 +1900,13 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "src/google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。限制：A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
+          "evidence": "src/google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。",
+          "limit": "A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。限制：A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
+          "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。",
+          "limit": "A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
         },
         "mycrypto": {
           "state": "n/a",
@@ -1837,13 +1943,17 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/funding_sync.py:107 EXIT_SHEET_FAILED = 3；:365／:368／:373／:445 放棄分支與寫入未確認都以結束碼 3 結束（接收端明確拒絕立刻放棄、連線類連續 3 次才放棄），狀態檔記住連續失敗直到寫入確認成功；seykota-funding-sync.service 在 A1 維運通知監控清單（f-5）。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=趨勢策略 row=7 total=-0.38607562）。限制：放棄分支沒有在 A1 真實觸發過；audit 目錄完全寫不進去時沒有東西能跨輪記住。"
+          "evidence": "src/seykota_bot/funding_sync.py:107 EXIT_SHEET_FAILED = 3；:365／:368／:373／:445 放棄分支與寫入未確認都以結束碼 3 結束（接收端明確拒絕立刻放棄、連線類連續 3 次才放棄），狀態檔記住連續失敗直到寫入確認成功；seykota-funding-sync.service 在 A1 維運通知監控清單（f-5）。",
+          "verified_at": "2026-10-09",
+          "limit": "放棄分支沒有在 A1 真實觸發過；audit 目錄完全寫不進去時沒有東西能跨輪記住。"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/fleet_events.py:24 FUNDING_SHEET_WRITE_FAILED、:45 風險分級 R2；src/seykota_bot/funding_sync.py:433 放棄時寫一筆事件日誌（事件編號預存去重），由趨勢修復機器人每輪匯出給維運通知；ERR-057 在共用庫 v0.29.0 錯誤清單。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，趨勢）。限制：事件到手機的最後一段（匯出器＋維運通知）沒有實機跑過，A1 沒有真的觸發過放棄。"
+          "evidence": "src/seykota_bot/fleet_events.py:24 FUNDING_SHEET_WRITE_FAILED、:45 風險分級 R2；src/seykota_bot/funding_sync.py:433 放棄時寫一筆事件日誌（事件編號預存去重），由趨勢修復機器人每輪匯出給維運通知；ERR-057 在共用庫 v0.29.0 錯誤清單。",
+          "verified_at": "2026-10-09",
+          "limit": "事件到手機的最後一段（匯出器＋維運通知）沒有實機跑過，A1 沒有真的觸發過放棄。"
         }
       }
     },
@@ -1852,13 +1962,17 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "src/binance_funding_sync.py:224 EXIT_SHEET_FAILED = 3；:496／:499／:504／:576 放棄分支與寫入未確認都以結束碼 3 結束（規則同趨勢）；mexc-momentum-funding-sync.service 在 A1 維運通知監控清單（f-5）。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=動能策略 row=6 total=-0.00191524）。限制：放棄分支沒有在 A1 真實觸發過。"
+          "evidence": "src/binance_funding_sync.py:224 EXIT_SHEET_FAILED = 3；:496／:499／:504／:576 放棄分支與寫入未確認都以結束碼 3 結束（規則同趨勢）；mexc-momentum-funding-sync.service 在 A1 維運通知監控清單（f-5）。EXCHANGE=mexc 的舊路徑只改預設專案名，行為不變。",
+          "verified_at": "2026-10-09",
+          "limit": "放棄分支沒有在 A1 真實觸發過。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "src/fleet_events.py:27 FUNDING_SHEET_WRITE_FAILED（ERR-058，R2）；src/binance_funding_sync.py:564 放棄時寫一筆事件日誌（R2、已重試用盡、事件編號預存去重），由動能修復機器人每輪匯出給維運通知。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，動能）。限制：事件到手機的最後一段沒有實機跑過，A1 沒有真的觸發過放棄。"
+          "evidence": "src/fleet_events.py:27 FUNDING_SHEET_WRITE_FAILED（ERR-058，R2）；src/binance_funding_sync.py:564 放棄時寫一筆事件日誌（R2、已重試用盡、事件編號預存去重），由動能修復機器人每輪匯出給維運通知。",
+          "verified_at": "2026-10-09",
+          "limit": "事件到手機的最後一段沒有實機跑過，A1 沒有真的觸發過放棄。"
         }
       }
     },
@@ -1867,13 +1981,16 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "sync_funding_fees_entry.py:66 EXIT_SHEET_FAILED = 3；:447 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:97 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations aba9569，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=加密策略 row=5 total=-0.01784778）。my-crypto-bot-funding-sync.service／.timer 已於同日加進 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（備份 ops-notify.env.bak-f26a-*），尚未實際收到過這個單元的失敗通知。限制：放棄分支沒有在 A1 真實觸發過；事件管道已在 2026-10-14 台北 12:05 隨 x3c 上 A1（見 emits_event 格）。"
+          "evidence": "sync_funding_fees_entry.py:66 EXIT_SHEET_FAILED = 3；:447 寫入未確認時服務以結束碼 3 結束，服務顯示失敗（ERR-046 服務失敗那一條路）；:97 SIGALRM 牆鐘硬限制 100 秒、deploy/my-crypto-bot-funding-sync.service TimeoutStartSec 180。",
+          "verified_at": "2026-10-09",
+          "limit": "放棄分支沒有在 A1 真實觸發過；事件管道已在 2026-10-14 台北 12:05 隨 x3c 上 A1（見 emits_event 格）。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "sync_funding_fees_entry.py:432 失敗期間第一次放棄時 fleet_events.record(FUNDING_SHEET_WRITE_FAILED) 寫一則 R2 已升格事件，一段期間只寫一次（事件編號由失敗期間身分推導：sync_funding_fees_entry.py:249；寫前先查日誌：sync_funding_fees_entry.py:350；只在重啟後認得出編號時才寫：sync_funding_fees_entry.py:426）。my-crypto-bot #74（審閱 2 輪）。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。限制：A1 沒有發生過資金費寫表失敗；舊格式且已『放棄』的狀態檔升級後會補寫一則事件（A1 部署時狀態檔正常，沒有發生）。"
+          "evidence": "sync_funding_fees_entry.py:432 失敗期間第一次放棄時 fleet_events.record(FUNDING_SHEET_WRITE_FAILED) 寫一則 R2 已升格事件，一段期間只寫一次（事件編號由失敗期間身分推導：sync_funding_fees_entry.py:249；寫前先查日誌：sync_funding_fees_entry.py:350；只在重啟後認得出編號時才寫：sync_funding_fees_entry.py:426）。my-crypto-bot #74（審閱 2 輪）。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "limit": "A1 沒有發生過資金費寫表失敗；舊格式且已『放棄』的狀態檔升級後會補寫一則事件（A1 部署時狀態檔正常，沒有發生）。"
         }
       }
     },
@@ -1882,13 +1999,17 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 run_repair_round（共用庫 repair_runner）每輪讀 audit/ledger_status.json 的 evidence.pending_expired，對還沒通知過的逾時標記寫一筆事件日誌 LEDGER_PENDING_EXPIRED（R3，錯誤清單 ERR-060）；同一筆標記不重發（已通知名單從事件日誌讀回，讀與寫同一把鎖），只有狀態是 RECONCILED 才通知，讀寫失敗只記警告、下輪重試（共用庫 repair_runner 模組的 _check_pending_expired（錯誤清單 ERR-060 的來源是它發事件的那一行），審閱 bcup02/trade-alerts#162 兩輪）。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 53e04ce 於 2026-10-11 台北 00:24（A1 日誌 JST 01:24）部署（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）；/opt 的 src/reconcile_compare.py（blob 957a848）、src/reconcile_apply.py（aa7ba79）、scripts/repair_bot.py（eb6be00）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.0，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（44daf37）、錯誤清單（9836736）都與 tag v0.30.0 同檔。部署前後啟用與運行中的單元清單逐項無差異（第一次比對只差控制消費者計時器正好在執行，20 秒後再比對完全相同）、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）、動能空手（交易所持倉 0）；部署後手動一輪：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired；修復輪 candidates 空、pending_expired 為空。限制：A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
+          "evidence": "scripts/repair_bot.py:176 run_repair_round（共用庫 repair_runner）每輪讀 audit/ledger_status.json 的 evidence.pending_expired，對還沒通知過的逾時標記寫一筆事件日誌 LEDGER_PENDING_EXPIRED（R3，錯誤清單 ERR-060）；同一筆標記不重發（已通知名單從事件日誌讀回，讀與寫同一把鎖），只有狀態是 RECONCILED 才通知，讀寫失敗只記警告、下輪重試（共用庫 repair_runner 模組的 _check_pending_expired（錯誤清單 ERR-060 的來源是它發事件的那一行），審閱 bcup02/trade-alerts#162 兩輪）。",
+          "verified_at": "2026-10-11",
+          "limit": "A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 同一個修復輪寫事件日誌 audit/fleet_event_log.jsonl 後刷新匯出檔 audit/ops_export.json，ERR-060 通知（含結清步驟與給 AI 的追查指令）由維運通知轉送；動能的結清工具與步驟一致（src/reconcile_apply.py:105）。A1 的匯出檔寫入與維運通知轉送是既有路徑（修復輪 ops_export_written、維運通知手動一輪 notices=0）。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 53e04ce 於 2026-10-11 台北 00:24（A1 日誌 JST 01:24）部署（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）；/opt 的 src/reconcile_compare.py（blob 957a848）、src/reconcile_apply.py（aa7ba79）、scripts/repair_bot.py（eb6be00）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.0，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（44daf37）、錯誤清單（9836736）都與 tag v0.30.0 同檔。部署前後啟用與運行中的單元清單逐項無差異（第一次比對只差控制消費者計時器正好在執行，20 秒後再比對完全相同）、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）、動能空手（交易所持倉 0）；部署後手動一輪：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired；修復輪 candidates 空、pending_expired 為空。限制：A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
+          "evidence": "scripts/repair_bot.py:176 同一個修復輪寫事件日誌 audit/fleet_event_log.jsonl 後刷新匯出檔 audit/ops_export.json，ERR-060 通知（含結清步驟與給 AI 的追查指令）由維運通知轉送；動能的結清工具與步驟一致（src/reconcile_apply.py:105）。A1 的匯出檔寫入與維運通知轉送是既有路徑（修復輪 ops_export_written、維運通知手動一輪 notices=0）。",
+          "verified_at": "2026-10-11",
+          "limit": "A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
         }
       }
     },
@@ -1897,13 +2018,17 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:234 announce_batch_expired（共用庫 v0.30.1 pending_expired_notice）在 :226 announce_pending_expired 內被呼叫，:244 起 run 每輪先通知（:246）再跑 _run_round（:247）；只在對帳為 RECONCILED 且證據帶 pending_expired 時，每一段卡住的期間寫一筆 LEDGER_PENDING_EXPIRED（R3，ERR-061），期間身分用開始等的時間 since，時間讀不出時用 src/btc_competition/reconcile_compare.py:197 的 episode_ids（等待中帳本列的 event_id）；寫入或讀取失敗只記警告、回傳 error，不中斷這一輪（審閱 bcup02/trade-alerts#164 兩輪、競賽 #55）。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 7d499bb 於 2026-10-11 台北約 00:22（A1 日誌 JST 約 01:22）部署（AI-for-column/btc-bull-market-competition#55，審閱 PASS）；/opt 的 src/btc_competition/unrecorded_fill.py（blob 7461592）、src/btc_competition/reconcile_compare.py（166d84a）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.1，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（eb9be02）、錯誤清單（ce83d1e）都與 tag v0.30.1 同檔。部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪 unrecorded-fill（ops_export_written 為 true）與對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired。限制：A1 的競賽目前沒有超過 24 小時未結算的批次，ERR-061 通知在 A1 沒有實際被觸發過，只在測試驗證（競賽 tests/test_unrecorded_fill_pending_expired.py、tests/test_reconcile_compare.py 的 f-30 測試）；開發機同樣沒有逾時案例。競賽沒有結清工具，通知的步驟是追查為什麼沒收尾。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:234 announce_batch_expired（共用庫 v0.30.1 pending_expired_notice）在 :226 announce_pending_expired 內被呼叫，:244 起 run 每輪先通知（:246）再跑 _run_round（:247）；只在對帳為 RECONCILED 且證據帶 pending_expired 時，每一段卡住的期間寫一筆 LEDGER_PENDING_EXPIRED（R3，ERR-061），期間身分用開始等的時間 since，時間讀不出時用 src/btc_competition/reconcile_compare.py:197 的 episode_ids（等待中帳本列的 event_id）；寫入或讀取失敗只記警告、回傳 error，不中斷這一輪（審閱 bcup02/trade-alerts#164 兩輪、競賽 #55）。",
+          "verified_at": "2026-10-11",
+          "limit": "A1 的競賽目前沒有超過 24 小時未結算的批次，ERR-061 通知在 A1 沒有實際被觸發過，只在測試驗證（競賽 tests/test_unrecorded_fill_pending_expired.py、tests/test_reconcile_compare.py 的 f-30 測試）；開發機同樣沒有逾時案例。競賽沒有結清工具，通知的步驟是追查為什麼沒收尾。"
         }
       },
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:246 通知先於 _run_round，所以該輪結尾 refresh_ops_export（:219）寫的匯出檔 audit/ops_export.json 已帶出 ERR-061 通知，由維運通知轉送；事件寫進 audit/fleet_event_log.jsonl。A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 7d499bb 於 2026-10-11 台北約 00:22（A1 日誌 JST 約 01:22）部署（AI-for-column/btc-bull-market-competition#55，審閱 PASS）；/opt 的 src/btc_competition/unrecorded_fill.py（blob 7461592）、src/btc_competition/reconcile_compare.py（166d84a）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.1，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（eb9be02）、錯誤清單（ce83d1e）都與 tag v0.30.1 同檔。部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪 unrecorded-fill（ops_export_written 為 true）與對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired。限制：A1 的競賽目前沒有超過 24 小時未結算的批次，ERR-061 通知在 A1 沒有實際被觸發過，只在測試驗證（競賽 tests/test_unrecorded_fill_pending_expired.py、tests/test_reconcile_compare.py 的 f-30 測試）；開發機同樣沒有逾時案例。競賽沒有結清工具，通知的步驟是追查為什麼沒收尾。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:246 通知先於 _run_round，所以該輪結尾 refresh_ops_export（:219）寫的匯出檔 audit/ops_export.json 已帶出 ERR-061 通知，由維運通知轉送；事件寫進 audit/fleet_event_log.jsonl。",
+          "verified_at": "2026-10-11",
+          "limit": "A1 的競賽目前沒有超過 24 小時未結算的批次，ERR-061 通知在 A1 沒有實際被觸發過，只在測試驗證（競賽 tests/test_unrecorded_fill_pending_expired.py、tests/test_reconcile_compare.py 的 f-30 測試）；開發機同樣沒有逾時案例。競賽沒有結清工具，通知的步驟是追查為什麼沒收尾。"
         }
       }
     },
@@ -1912,13 +2037,17 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：證據對得上就以交易所為準補寫、不通知（R1）。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：證據對得上就以交易所為準補寫、不通知（R1）。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 同一輪寫進 audit/fleet_event_log.jsonl（R1 事件 VERIFIED_CLOSE_AUTO_REPAIRED）並刷新匯出檔。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "repair_bot.py:238 同一輪寫進 audit/fleet_event_log.jsonl（R1 事件 VERIFIED_CLOSE_AUTO_REPAIRED）並刷新匯出檔。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       }
     },
@@ -1927,13 +2056,17 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：帳本已有修復痕跡或整批寫入失敗就停手、開請求並通知（R3）。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：帳本已有修復痕跡或整批寫入失敗就停手、開請求並通知（R3）。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 同一輪寫事件日誌與請求佇列，匯出檔經維運通知轉送（ERR-063）。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "repair_bot.py:238 同一輪寫事件日誌與請求佇列，匯出檔經維運通知轉送（ERR-063）。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       }
     },
@@ -1942,13 +2075,17 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：查不到或結構對不上每輪記一次失敗，同一筆連續 3 次才升格通知（R2，ERR-064）。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：查不到或結構對不上每輪記一次失敗，同一筆連續 3 次才升格通知（R2，ERR-064）。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 同一輪寫事件日誌（升格時標已重試用盡）並刷新匯出檔，由維運通知轉送。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "repair_bot.py:238 同一輪寫事件日誌（升格時標已重試用盡）並刷新匯出檔，由維運通知轉送。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       }
     },
@@ -1957,13 +2094,17 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：7 天內自動補寫達 2 次通知一次、之後 7 天不重發（R3，ERR-065）。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：7 天內自動補寫達 2 次通知一次、之後 7 天不重發（R3，ERR-065）。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 同一輪寫事件日誌並刷新匯出檔，由維運通知轉送。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "repair_bot.py:238 同一輪寫事件日誌並刷新匯出檔，由維運通知轉送。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       }
     },
@@ -1972,24 +2113,20 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:1092 _record_adoption_event 把重啟接管寫成 R3 事件並通知：進場被中斷接管 mexc_futures_bot.py:1534（interrupted_entry），找不到追蹤紀錄而重建 mexc_futures_bot.py:2091（unknown_origin）；同一次接管只通知一次（事件編號由 trade_id 或方向|數量|進場價推導，寫前查日誌）；舊版 state.json 補欄位不通知。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 沒有發生過被中斷的進場或遺失狀態，只有單元測試；接管本身（沿用 trade_id、補掛停損）自 f-12 起就在 A1。"
+          "evidence": "mexc_futures_bot.py:1092 _record_adoption_event 把重啟接管寫成 R3 事件並通知：進場被中斷接管 mexc_futures_bot.py:1534（interrupted_entry），找不到追蹤紀錄而重建 mexc_futures_bot.py:2091（unknown_origin）；同一次接管只通知一次（事件編號由 trade_id 或方向|數量|進場價推導，寫前查日誌）；舊版 state.json 補欄位不通知。",
+          "verified_at": "2026-10-14",
+          "limit": "A1 沒有發生過被中斷的進場或遺失狀態，只有單元測試；接管本身（沿用 trade_id、補掛停損）自 f-12 起就在 A1。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "fleet_events.py:30 POSITION_ADOPTED_AFTER_INTERRUPTION、fleet_events.py:45 風險分級 R3；mexc_futures_bot.py:1092 經 _record_fleet_event 寫入（永不丟例外，記警告失敗也被吞），由修復機器人與匯出檔計時器刷新 audit/ops_export.json 交給維運通知；測試 tests/test_graceful_stop.py 以 build_ops_export 驗證變成 critical 的 ERR-066 通知。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：事件到手機的最後一段沒有實機跑過。"
+          "evidence": "fleet_events.py:30 POSITION_ADOPTED_AFTER_INTERRUPTION、fleet_events.py:45 風險分級 R3；mexc_futures_bot.py:1092 經 _record_fleet_event 寫入（永不丟例外，記警告失敗也被吞），由修復機器人與匯出檔計時器刷新 audit/ops_export.json 交給維運通知；測試 tests/test_graceful_stop.py 以 build_ops_export 驗證變成 critical 的 ERR-066 通知。",
+          "verified_at": "2026-10-14",
+          "limit": "事件到手機的最後一段沒有實機跑過。"
         }
       }
     }
   ],
-  "recent_changes": [
-    {
-      "kind": "cap",
-      "id": "google.spot_fill_row",
-      "project": "btc-competition",
-      "type": "updated",
-      "note": "首次實際送出已發生（10/15 台北 08:15，receiver_row 6，CONFIRMED）：更正舊的『第一次要等 10/9』限制句。"
-    }
-  ]
+  "recent_changes": []
 }

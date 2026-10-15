@@ -46,6 +46,11 @@ _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 #: cells that had been live on A1 since 10-04 still said "not on the live host yet").
 AWAITS_COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
 _DEPLOY_PROMISE = re.compile(r"上正式機後改已做|上 A1 後改已做|上線後改已做|部署後改已做|還沒上正式機|尚未部署|未部署|未發版")
+#: Length caps of the prose in a cell (phase-sync4).  They sit just above what the registry held when they were introduced
+#: (2026-10-15: longest evidence 586, limit 206, pending/n-a reason 348), so a cell cannot grow back into the paragraph that
+#: made the pages hard to read: the long A1 verification text lives in docs/registry-a1-checks.json, a limit is one sentence.
+MAX_EVIDENCE_CHARS, MAX_LIMIT_CHARS, MAX_REASON_CHARS = 700, 300, 450
+_DATE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
 _OWNER = {prefix: project for project, prefix in PROJECT_CODE_PREFIXES.items()}
 
 
@@ -75,6 +80,24 @@ def _status_problems(where: str, status: Any, phases: Mapping[str, Any]) -> list
     problems = []
     if state == "done" and not text("evidence"):
         problems.append(f"{where}: done without evidence")
+    if state == "done":
+        if text("evidence") and len(status["evidence"]) > MAX_EVIDENCE_CHARS:
+            problems.append(f"{where}: evidence is {len(status['evidence'])} characters (max {MAX_EVIDENCE_CHARS}) -- "
+                            "keep what the code does and the file:line citations; put the A1 verification text in docs/registry-a1-checks.json "
+                            "and the caveat in `limit`")
+        if "verified_at" in status and not (isinstance(status["verified_at"], str) and _DATE.fullmatch(status["verified_at"])):
+            problems.append(f"{where}: verified_at must be a YYYY-MM-DD date, got {status['verified_at']!r}")
+        if "limit" in status:
+            if not text("limit"):
+                problems.append(f"{where}: limit must be a non-empty string")
+            elif len(status["limit"]) > MAX_LIMIT_CHARS:
+                problems.append(f"{where}: limit is {len(status['limit'])} characters (max {MAX_LIMIT_CHARS}) -- one sentence")
+    else:
+        for field in ("verified_at", "limit"):
+            if field in status:
+                problems.append(f"{where}: {field} only belongs on a done cell")
+        if text("reason") and len(status["reason"]) > MAX_REASON_CHARS:
+            problems.append(f"{where}: reason is {len(status['reason'])} characters (max {MAX_REASON_CHARS})")
     if state == "pending":
         if not text("reason"):
             problems.append(f"{where}: pending without a reason")

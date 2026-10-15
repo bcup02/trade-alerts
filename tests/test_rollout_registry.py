@@ -712,3 +712,117 @@ def test_the_page_templates_have_exactly_one_footer_placeholder():
         render_guides._page("t", render_guides.DIGEST_PLACEHOLDER * 2, {}, "")
     with _pytest.raises(ValueError, match="exactly once"):
         render_guides._page("t", render_guides.DIGEST_PLACEHOLDER, {"x": render_guides.DIGEST_PLACEHOLDER}, "")
+
+
+# --- cell fields: verified_at, limit, length caps (phase-sync4) -------------------------------------------------
+
+from trade_alerts.rollout_registry import MAX_EVIDENCE_CHARS, MAX_LIMIT_CHARS, MAX_REASON_CHARS  # noqa: E402
+
+
+def _first_done_cap(reg):
+    for capability in reg["capabilities"]:
+        for project, status in capability["status"].items():
+            if status["state"] == "done":
+                return capability, project, status
+    raise AssertionError("no done capability cell")
+
+
+def test_verified_at_and_limit_are_accepted_on_done_cells_and_checked(registry, catalog):
+    reg = copy.deepcopy(registry)
+    _, _, status = _first_done_cap(reg)
+    status.update({"verified_at": "2026-10-15", "limit": "A1 沒有觸發過。"})
+    assert not [p for p in registry_problems(reg, catalog) if "verified_at" in p or "limit" in p]
+    for bad in ("2026-13-01", "2026-10-32", "10/15", "2026-1-5", "", 20261015, None):
+        status["verified_at"] = bad
+        assert [p for p in registry_problems(reg, catalog) if "verified_at must be" in p], bad
+    status["verified_at"] = "2026-10-15"
+    for bad in ("", "   ", 5, None):
+        status["limit"] = bad
+        assert [p for p in registry_problems(reg, catalog) if "limit must be" in p], bad
+
+
+def test_verified_at_and_limit_do_not_belong_on_pending_or_na_cells(registry, catalog):
+    reg = copy.deepcopy(registry)
+    _, _, pending = _first_pending_cap(reg)
+    pending["limit"] = "x"
+    assert [p for p in registry_problems(reg, catalog) if "limit only belongs on a done cell" in p]
+    del pending["limit"]
+    pending["verified_at"] = "2026-10-15"
+    assert [p for p in registry_problems(reg, catalog) if "verified_at only belongs on a done cell" in p]
+
+
+def test_the_prose_length_caps(registry, catalog):
+    # the caps are a ratchet: raising one has to be a visible change here, reviewed on its own
+    assert (MAX_EVIDENCE_CHARS, MAX_LIMIT_CHARS, MAX_REASON_CHARS) == (700, 300, 450)
+    reg = copy.deepcopy(registry)
+    _, _, done = _first_done_cap(reg)
+    original = done["evidence"]
+    done["evidence"] = "src/a.py:1 " + "字" * MAX_EVIDENCE_CHARS
+    assert [p for p in registry_problems(reg, catalog) if "evidence is" in p and "docs/registry-a1-checks.json" in p]
+    done["evidence"] = original
+    done["limit"] = "字" * (MAX_LIMIT_CHARS + 1)
+    assert [p for p in registry_problems(reg, catalog) if "limit is" in p]
+    del done["limit"]
+    _, _, pending = _first_pending_cap(reg)
+    pending["reason"] = "字" * (MAX_REASON_CHARS + 1)
+    assert [p for p in registry_problems(reg, catalog) if "reason is" in p]
+    assert not [p for p in registry_problems(registry, catalog) if "characters" in p]       # the shipped registry is within its caps
+
+
+A1_CHECKS_PATH = _ROOT / "docs" / "registry-a1-checks.json"
+
+
+def _cell_status(reg, key):
+    kind, rest = key.split(":", 1)
+    ident, project = rest.rsplit("|", 1)
+    if kind == "cap":
+        return next(c for c in reg["capabilities"] if c["id"] == ident)["status"][project]
+    code, aspect = ident.rsplit(":", 1)
+    return next(r for r in reg["catalog"] if r["code"] == code)[aspect][project]
+
+
+def test_every_archived_a1_check_belongs_to_a_done_cell(registry):
+    archive = json.loads(A1_CHECKS_PATH.read_text(encoding="utf-8"))["cells"]
+    assert archive
+    for key, entry in archive.items():
+        assert _cell_status(registry, key)["state"] == "done", key
+        assert entry["a1_check"].strip().startswith("A1 正式機（新）"), key
+        assert set(entry) == {"a1_check"}
+
+
+
+
+def _load_one_off():
+    spec = importlib.util.spec_from_file_location("migrate_fields", _ROOT / "scripts" / "one_off" / "migrate_registry_fields_20261015.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_migration_splits_losslessly_and_keeps_a_citation_in_evidence():
+    m = _load_one_off()
+    text = ("src/a.py:10 does X；src/b.py:3 does Y。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：/opt 的 src/a.py（blob abc1234）相同。 "
+            "限制：A1 沒觸發過。")
+    parts = m.split_evidence(text)
+    assert parts["evidence"] == "src/a.py:10 does X；src/b.py:3 does Y。"
+    assert parts["a1_check"].startswith("A1 正式機（新）執行環境") and parts["a1_check"].endswith("相同。")
+    assert parts["limit"] == "A1 沒觸發過。" and parts["verified_at"] == "2026-10-14"
+    assert m._squash(m.recompose(parts)) == m._squash(text)
+    only_limit = m.split_evidence("src/a.py:1 does X。限制：none yet")
+    assert only_limit["a1_check"] is None and only_limit["limit"] == "none yet" and only_limit["evidence"] == "src/a.py:1 does X。"
+    plain = "src/a.py:1 does X"
+    assert m.split_evidence(plain) == {"evidence": plain, "a1_check": None, "limit": None, "verified_at": None}
+    # every citation sits inside the A1 paragraph: splitting would leave evidence without a file, so the cell is left alone
+    unsplittable = "does X。 A1 正式機（新）執行環境：/opt 的 src/a.py 相同。 限制：y"
+    assert m.split_evidence(unsplittable)["a1_check"] is None and m.split_evidence(unsplittable)["evidence"] == unsplittable
+
+
+def test_the_pages_show_the_limit_and_the_verification_date_as_their_own_elements(registry, catalog):
+    render_guides = _render_guides()
+    data = _page_data(render_guides.render_rollout_register(catalog, registry, render_guides.load_glossary()))
+    lines = [line for item in data["items"] for row in item["rows"] for line in row["lines"]]
+    with_limit = [l for l in lines if l.get("limit")]
+    assert with_limit and all(l["state"] == "done" and "限制：" not in l["text"] for l in with_limit)
+    assert any(l.get("verified_at") for l in lines)
+    risk = _page_data(render_guides.render_risk_register(catalog, registry))
+    assert all(set(e["behaviour"]) == {"state"} and set(e["emits_event"]) == {"state"} for e in risk["entries"])   # evidence is not shown there

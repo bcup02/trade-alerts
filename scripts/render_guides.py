@@ -179,7 +179,7 @@ _DIGEST_FOOTER = re.compile(r"頁面版本碼 <code>([0-9a-f]{16})</code>")
 
 
 def _page(title: str, body: str, data: dict[str, Any], script: str, css: str = "") -> str:
-    blob = json.dumps(data, ensure_ascii=False, sort_keys=True, indent=1).replace("</", "<\\/")
+    blob = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).replace("</", "<\\/")
     if body.count(DIGEST_PLACEHOLDER) != 1 or DIGEST_PLACEHOLDER in blob + script + css:
         raise ValueError("the footer's version-code placeholder must appear exactly once, and only in the body")
     page = (f"<title>{title}</title>\n<!-- fleet-guide-digest: {_ZERO} -->\n{_FONTS}\n<style>{_CSS}{css}</style>\n\n{body}\n\n"
@@ -413,6 +413,8 @@ _ROLLOUT_CSS = """
   .sl > .who{font-weight:700;color:var(--ink-soft);padding:8px 0;border-block-end:1px solid var(--line);}
   .sl > .lines{padding:8px 0;border-block-end:1px solid var(--line);display:flex;flex-direction:column;gap:6px;min-width:0;overflow-wrap:anywhere;}
   .aspect{font-weight:700;color:var(--ink-soft);margin-inline-end:4px;}
+  .vdate{display:inline-block;font-size:11.5px;color:var(--ink-faint);margin-inline-start:6px;}
+  .limit{margin-top:3px;font-size:12.5px;color:var(--ink-soft);}
   .phase{display:inline-block;font-size:11.5px;padding:1px 7px;margin-inline-start:6px;border-radius:3px;border:1px dashed var(--pending);color:var(--pending);}
   details.done-card{padding:0;margin-bottom:8px;}
   details.done-card > summary{list-style:none;display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;color:var(--ink);font-weight:400;}
@@ -466,7 +468,9 @@ function table(item){
       line.appendChild(document.createTextNode(" "));
       if(l.aspect) line.appendChild(el("span","aspect",l.aspect));
       line.appendChild(document.createTextNode(l.text));
+      if(l.verified_at) line.appendChild(el("span","vdate","查證 "+l.verified_at));
       if(l.phase) line.appendChild(el("span","phase","預定："+l.phase));
+      if(l.limit){ var lim=el("div","limit"); lim.appendChild(el("span","aspect","限制")); lim.appendChild(document.createTextNode(l.limit)); line.appendChild(lim); }
       box.appendChild(line);
     });
     g.appendChild(box);
@@ -611,8 +615,8 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
             "what": message["what"], "direction": message["direction"],
             "steps": message["steps"] if entry["risk_tier"] in ("R2", "R3") else [],
             "ai_prompt": message.get("ai_prompt"),
-            "behaviour": _combined(row["behaviour"]) if fleet else row["behaviour"][project_keys[0]],
-            "emits_event": _combined(row["emits_event"]) if fleet else row["emits_event"][project_keys[0]],
+            "behaviour": _combined(row["behaviour"]) if fleet else {"state": row["behaviour"][project_keys[0]]["state"]},
+            "emits_event": _combined(row["emits_event"]) if fleet else {"state": row["emits_event"][project_keys[0]]["state"]},
             "notes": notes,
             "open": bool(notes),
         })
@@ -647,7 +651,8 @@ def _line(status: dict[str, Any], aspect: str | None, phases: dict[str, str]) ->
     state = status["state"]
     text = status["evidence"] if state == "done" else status["reason"]
     return {"aspect": aspect, "state": state, "text": text,
-            "phase": phases[status["phase"]] if state == "pending" else None}
+            "phase": phases[status["phase"]] if state == "pending" else None,
+            "limit": status.get("limit"), "verified_at": status.get("verified_at")}
 
 
 def _dot(states: set[str]) -> str:
@@ -797,7 +802,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
   <div id="glossaryHost"></div>
   <div class="foot">
     資料來源：trade-alerts <code>{registry['registry_version']}</code>（{registry['updated_at']} 對四個 repo 逐項盤點）、<code>{catalog['catalog_version']}</code> 與 <code>{glossary['glossary_version']}</code>。
-    「檔案:行號」證據對應的版本：{sources}。
+    「檔案:行號」證據對應的版本：{sources}。各格的「A1 查證」長文（檔案雜湊、部署時間）放在 repo 的 <code>docs/registry-a1-checks.json</code>。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
     頁面版本碼 <code>__GUIDE_DIGEST__</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
   </div>

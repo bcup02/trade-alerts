@@ -1,0 +1,185 @@
+{
+  "note": "The long A1 verification paragraphs of the rollout registry's done cells (moved out of the cells on 2026-10-15, phase-sync4). Key = cell (cap:<id>|<project> or rule:<code>:<aspect>|<project>); the cell's evidence keeps the file:line citations.",
+  "cells": {
+    "cap:google.close_whole_trade_entry|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：operations fe4637e 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/google_ledger_provenance.py（blob f572082） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。"
+    },
+    "cap:google.close_whole_trade_entry|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：operations 9952c3d 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/seykota_bot/google_ledger_provenance.py（blob 06b1a0a） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。"
+    },
+    "cap:google.spot_fill_row|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。首次實際送出：2026-10-15 台北 08:10 的每日調整有 1 筆成交，08:15 以 append_fill_v2（spot_fill）送出，接收端 CONFIRMED（receiver_row 6），對帳一致（A1 唯讀查 audit/google-projection-outbox.jsonl 與對帳狀態，2026-10-15 台北）。"
+    },
+    "cap:latch.restart_only_clear|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419（改好設定重啟後暫停被清掉）、tests/test_safe_halt_model_migration.py:304（解除工具拒絕這兩類）。"
+    },
+    "cap:ops_export.writer|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。"
+    },
+    "cap:projection.park_unconfirmed_correction|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：operations fe4637e 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/google_projection_worker.py（blob 0b364cd）與 pyproject.toml（blob b16ecad）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。"
+    },
+    "cap:projection.park_unconfirmed_correction|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：operations 9952c3d 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 src/seykota_bot/google_projection_worker.py（blob c0fb2df）與 pyproject.toml（blob 2225d6d）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。"
+    },
+    "cap:projection.requeue_parked|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版）；/opt 的 scripts/requeue_projection_intents.py（blob afb517b）的 blob 與 70630a1 同檔相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。"
+    },
+    "cap:projection.requeue_parked|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：operations fe4637e 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 scripts/requeue_projection_intents.py（blob b5cfe80） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。"
+    },
+    "cap:projection.requeue_parked|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：operations 9952c3d 於 2026-10-08 台北 21:26–21:28（A1 日誌 JST 22:26–22:28）部署；/opt 的 scripts/requeue_projection_intents.py（blob cce6b27） 的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.28.0，其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（70f26e6）、google_ledger_client 模組檔（77d7e08）都與 tag v0.28.0 同檔；部署前後 unit 啟用與運行狀態逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。開發機實測（2026-10-08 台北 18:21）：開發機趨勢那筆停放的平倉與更正用這個指令稿重新排入後都 CONFIRMED（第 4 列），Google 對帳 RECONCILED、0 筆差異。"
+    },
+    "cap:reconcile.funding_fee_sync|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations ac378ed（資金費同步 2026-10-06 台北 17:15 隨 4780bd9 部署，2026-10-09 台北 f-26a、f-26b 換版）；/opt 的 scripts/sync_funding_fees.py（a6fa37f）、src/binance_funding_sync.py（ab1d5a0）、service（08446a1）、timer（38496fb）的 blob 與 ac378ed 同檔相同（A1 hash-object 與 git rev-parse 逐檔比對，四個檔案 blob 都沒變）；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:15 部署後手動一輪記到 1 筆（ZENUSDT）-0.00191524 USDT，Google 總表第 6 列寫入成功；最近一輪 2026-10-07 台北 11:00（A1 日誌 JST 12:00）0 筆新增、總表寫入成功。"
+    },
+    "cap:reconcile.funding_fee_sync|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 489bbcd（資金費同步 2026-10-06 台北 17:15 隨 aaf51f7 部署，2026-10-09 台北 f-26a、f-26b 換版）；/opt 的 src/seykota_bot/funding_sync.py（4ac684c）、service（e274d7c）、timer（f706bc0）的 blob 與 489bbcd 同檔相同（A1 hash-object 與 git rev-parse 逐檔比對，三個檔案 blob 都沒變）；venv 的 binance-trading-toolkit 0.4.0；timer enabled，2026-10-06 台北 17:16（A1 日誌 JST 18:16）第一輪寫入 13 筆 BTCUSDT 資金費、合計 -0.38607562 USDT，Google 總表第 7 列寫入成功；之後每小時一輪（2026-10-06 起 21 輪完成、0 次失敗）。"
+    },
+    "cap:reconcile.google_projection_grace|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：operations 71ccee3 於 2026-10-07 台北 16:07（A1 日誌 JST 17:07）部署；/opt 的 src/google_reconcile.py（48433a6）、pyproject.toml（5628afd）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.27.7，其共用庫對帳模組檔（trade_alerts 套件的 ledger_reconcile 模組）的 blob（fca13c4）與 tag v0.27.7 同檔；部署後手動一輪對帳台北 16:08（JST 17:08）RECONCILED。動機：2026-10-05～06 兩天 7 輪 DIVERGED 讀數、5 次 ERR-044 告警都是動能進場／平倉後對帳比同步先讀。2026-10-09 台北動能進場後（04:15 那輪兩筆、12:01 一筆），A1 對帳讀數是 RECONCILED，04:15 那輪的證據帶 2 筆 projection_pending（寬限中），其後沒有 DIVERGED 也沒有 ERR-044，寬限在 A1 實際擋掉了誤報（進度頁 f-22f）。"
+    },
+    "cap:reconcile.google_projection_grace|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：operations 3520da6 於 2026-10-07 台北 16:07（A1 日誌 JST 17:07）部署；/opt 的 src/seykota_bot/reconcile/google_reconcile.py（7f854ee）、pyproject.toml（d328f78）、requirements.lock（879f662）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.27.7，其共用庫對帳模組檔（trade_alerts 套件的 ledger_reconcile 模組）的 blob（fca13c4）與 tag v0.27.7 同檔；部署後手動一輪對帳台北 16:08（JST 17:08）RECONCILED。"
+    },
+    "cap:reconcile.pending_age_cap|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：operations 0025f3c 於 2026-10-10 台北 21:10（A1 日誌 JST 22:10）部署（AI-for-column/btc-bull-market-competition#53，審閱三輪 PASS）；/opt 的 src/btc_competition/reconcile_compare.py（blob 1b4ff00）的 blob 與該 commit 同檔相同；部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED。"
+    },
+    "cap:reconcile.pending_age_cap|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 53e04ce 於 2026-10-11 台北 00:24（A1 日誌 JST 01:24）部署（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）；/opt 的 src/reconcile_compare.py（blob 957a848）、src/reconcile_apply.py（aa7ba79）、scripts/repair_bot.py（eb6be00）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.0，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（44daf37）、錯誤清單（9836736）都與 tag v0.30.0 同檔。部署前後啟用與運行中的單元清單逐項無差異（第一次比對只差控制消費者計時器正好在執行，20 秒後再比對完全相同）、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）、動能空手（交易所持倉 0）；部署後手動一輪：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired；修復輪 candidates 空、pending_expired 為空。"
+    },
+    "cap:repair_bot.detect_propose|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "cap:repair_bot.pause_brake|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "cap:repair_bot.recurrence_escalation|momentum": {
+      "a1_check": "A1 正式機（新）實際執行環境（2026-10-04 台北約 20:16 唯讀查）：mexc-momentum-repair-shadow.service 的 ExecStart 是 /opt/mexc-4h-momentum-trailing-stop/.venv/bin/python /opt/mexc-4h-momentum-trailing-stop/scripts/repair_bot.py；該 venv 載入的 trade-alerts 是 0.26.0（模組 /opt/mexc-4h-momentum-trailing-stop/.venv/lib/python3.12/site-packages/trade_alerts/repair_runner.py，在 A1 上 git hash-object 為 cd00814a845f75dd6648d337c11c77d0b15a36b9，與上述 blob 相同；執行時讀回 RECURRING_THRESHOLD 2、RECURRING_WINDOW_DAYS 7）；mexc-momentum-repair-shadow.timer 每 15 分鐘排程（台北 20:05 東京 21:05 的那一輪日誌輸出 candidates／repaired／failed／escalated 全為空，paused false）。2026-10-04 台北 17:18–17:22 隨 A1 部署（operations ce51083；/opt 內 src、scripts、deploy 與根目錄 .py 共 72 檔與該 commit 逐檔雜湊相同）。"
+    },
+    "cap:repair_bot.recurrence_escalation|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "cap:repair_bot.recurrence_escalation|seykota": {
+      "a1_check": "A1 正式機（新）實際執行環境（2026-10-04 台北約 20:16 唯讀查）：seykota-repair-shadow.service 的 ExecStart 是 /opt/ed-seykota-systematic-trend-following/.venv/bin/python /opt/ed-seykota-systematic-trend-following/scripts/repair_bot.py；該 venv 載入的 trade-alerts 是 0.26.0（模組 /opt/ed-seykota-systematic-trend-following/.venv/lib/python3.12/site-packages/trade_alerts/repair_runner.py，在 A1 上 git hash-object 為 cd00814a845f75dd6648d337c11c77d0b15a36b9，與上述 blob 相同；執行時讀回 RECURRING_THRESHOLD 2、RECURRING_WINDOW_DAYS 7）；seykota-repair-shadow.timer 每 15 分鐘排程（台北 20:05 東京 21:05 的那一輪日誌輸出 candidates／repaired／failed／escalated 全為空，paused false）。2026-10-04 台北 17:18–17:22 隨 A1 部署（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。"
+    },
+    "cap:repair_bot.verified_close|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:BTC.BOOK_CORRUPT_NEGATIVE_BALANCE:emits_event|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。"
+    },
+    "rule:BTC.EXECUTION_BLOCKED_ZERO_FILLS:emits_event|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。"
+    },
+    "rule:BTC.LEDGER_PENDING_EXPIRED:behaviour|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 7d499bb 於 2026-10-11 台北約 00:22（A1 日誌 JST 約 01:22）部署（AI-for-column/btc-bull-market-competition#55，審閱 PASS）；/opt 的 src/btc_competition/unrecorded_fill.py（blob 7461592）、src/btc_competition/reconcile_compare.py（166d84a）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.1，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（eb9be02）、錯誤清單（ce83d1e）都與 tag v0.30.1 同檔。部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪 unrecorded-fill（ops_export_written 為 true）與對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired。"
+    },
+    "rule:BTC.LEDGER_PENDING_EXPIRED:emits_event|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 7d499bb 於 2026-10-11 台北約 00:22（A1 日誌 JST 約 01:22）部署（AI-for-column/btc-bull-market-competition#55，審閱 PASS）；/opt 的 src/btc_competition/unrecorded_fill.py（blob 7461592）、src/btc_competition/reconcile_compare.py（166d84a）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.1，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（eb9be02）、錯誤清單（ce83d1e）都與 tag v0.30.1 同檔。部署前後啟用與運行中的單元清單逐項無差異、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）；部署後手動一輪 unrecorded-fill（ops_export_written 為 true）與對帳：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired。"
+    },
+    "rule:BTC.ORDER_RECOVERED_AFTER_INTERRUPTION:behaviour|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。驗證：開發機 DEMO。"
+    },
+    "rule:BTC.ORDER_RECOVERED_AFTER_INTERRUPTION:emits_event|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。"
+    },
+    "rule:BTC.ORDER_STATUS_UNKNOWN:emits_event|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。"
+    },
+    "rule:BTC.REBALANCE_PENDING:emits_event|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。"
+    },
+    "rule:BTC.STATE_FILE_CORRUPT:behaviour|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。測試：tests/test_graceful_stop.py:160（狀態檔損毀→安全暫停、事件 R3）。"
+    },
+    "rule:BTC.STATE_FILE_CORRUPT:emits_event|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。"
+    },
+    "rule:MOM.FUNDING_SHEET_WRITE_FAILED:behaviour|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=動能策略 row=6 total=-0.00191524）。"
+    },
+    "rule:MOM.FUNDING_SHEET_WRITE_FAILED:emits_event|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 490e241，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，動能）。"
+    },
+    "rule:MOM.LEDGER_PENDING_EXPIRED:behaviour|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 53e04ce 於 2026-10-11 台北 00:24（A1 日誌 JST 01:24）部署（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）；/opt 的 src/reconcile_compare.py（blob 957a848）、src/reconcile_apply.py（aa7ba79）、scripts/repair_bot.py（eb6be00）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.0，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（44daf37）、錯誤清單（9836736）都與 tag v0.30.0 同檔。部署前後啟用與運行中的單元清單逐項無差異（第一次比對只差控制消費者計時器正好在執行，20 秒後再比對完全相同）、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）、動能空手（交易所持倉 0）；部署後手動一輪：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired；修復輪 candidates 空、pending_expired 為空。"
+    },
+    "rule:MOM.LEDGER_PENDING_EXPIRED:emits_event|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-11 台北）：operations 53e04ce 於 2026-10-11 台北 00:24（A1 日誌 JST 01:24）部署（AI-for-column/mexc-4h-momentum-trailing-stop#135，審閱兩輪 PASS）；/opt 的 src/reconcile_compare.py（blob 957a848）、src/reconcile_apply.py（aa7ba79）、scripts/repair_bot.py（eb6be00）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.0，其 ledger_reconcile 模組檔（blob 4c68e8c）、repair_runner 模組檔（2599ad3）、pending_expired_notice 模組檔（44daf37）、錯誤清單（9836736）都與 tag v0.30.0 同檔。部署前後啟用與運行中的單元清單逐項無差異（第一次比對只差控制消費者計時器正好在執行，20 秒後再比對完全相同）、0 個失敗單元、真倉開關檔沒動（LIVE_ONLINE、DRY_RUN_ONLY=0）、動能空手（交易所持倉 0）；部署後手動一輪：帳本↔交易所 RECONCILED、帳本↔Google 表 RECONCILED，證據沒有 pending_expired；修復輪 candidates 空、pending_expired 為空。"
+    },
+    "rule:MOM.POSITION_ADOPTED_AFTER_INTERRUPTION:behaviour|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。驗證：開發機 DEMO 用強制終止模擬被殺（2026-10-02、10-03，三種情形都補寫 position_recovered、開倉列排隊並送到 Google 表）。"
+    },
+    "rule:MOM.POSITION_ADOPTED_AFTER_INTERRUPTION:emits_event|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。"
+    },
+    "rule:MOM.PROTECTION_UNVERIFIED:emits_event|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。驗證：2026-10-11 台北 A1 受控測試——ERR-015 測試事件你手機收到兩則。"
+    },
+    "rule:MOM.RUNTIME_CYCLE_FAILED:emits_event|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。"
+    },
+    "rule:MOM.STATE_REPAIRED_SAFE_HALT:emits_event|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。"
+    },
+    "rule:MYC.FUNDING_SHEET_WRITE_FAILED:behaviour|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations aba9569，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=加密策略 row=5 total=-0.01784778）。my-crypto-bot-funding-sync.service／.timer 已於同日加進 A1 維運通知的 OPS_NOTIFY_MYCRYPTO_UNITS（備份 ops-notify.env.bak-f26a-*），尚未實際收到過這個單元的失敗通知。"
+    },
+    "rule:MYC.POSITION_ADOPTED_AFTER_INTERRUPTION:behaviour|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.POSITION_ADOPTED_AFTER_INTERRUPTION:emits_event|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.UNRECORDED_FILL_UNRESOLVED:behaviour|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.UNRECORDED_FILL_UNRESOLVED:emits_event|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.VERIFIED_CLOSE_AUTO_REPAIRED:behaviour|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.VERIFIED_CLOSE_AUTO_REPAIRED:emits_event|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.VERIFIED_CLOSE_REPAIR_BLOCKED:behaviour|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.VERIFIED_CLOSE_REPAIR_BLOCKED:emits_event|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.VERIFIED_CLOSE_REPAIR_FAILED:behaviour|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.VERIFIED_CLOSE_REPAIR_FAILED:emits_event|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.VERIFIED_CLOSE_REPAIR_RECURRING:behaviour|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:MYC.VERIFIED_CLOSE_REPAIR_RECURRING:emits_event|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+    },
+    "rule:SEY.EXCHANGE_TARGET_UNSAFE:behaviour|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419、tests/test_safe_halt_model_migration.py:304。"
+    },
+    "rule:SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE:behaviour|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419、tests/test_safe_halt_model_migration.py:304。"
+    },
+    "rule:SEY.FUNDING_SHEET_WRITE_FAILED:behaviour|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=趨勢策略 row=7 total=-0.38607562）。"
+    },
+    "rule:SEY.FUNDING_SHEET_WRITE_FAILED:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，趨勢）。"
+    },
+    "rule:SEY.POSITION_ADOPTED_AFTER_INTERRUPTION:behaviour|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/fleet_events.py（1896da8）、scripts/repair_bot.py（a397ec7）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 489bbcd 也是同一份。驗證：開發機 DEMO 強制終止實測（2026-10-02 開 XRP 小部位後 SIGKILL，30 秒內自動重啟、接管部位、帳本單一 trade_id、補掛停損）。"
+    },
+    "rule:SEY.POSITION_ADOPTED_AFTER_INTERRUPTION:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/fleet_events.py（1896da8）、scripts/repair_bot.py（a397ec7）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 489bbcd 也是同一份。"
+    }
+  }
+}
