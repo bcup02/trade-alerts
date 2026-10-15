@@ -16,3 +16,6 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/home/@WATCH_USER@/.local/state/observation-watch
+# The registry checks `git fetch` the registry clone and the four strategy clones (writes FETCH_HEAD and refs under .git);
+# with the home read-only that failed ("Read-only file system") and phase-sync1/4 reported broken.  "-" = skip a missing clone.
+ReadWritePaths=-/home/@WATCH_USER@/trade-alerts/.git -/home/@WATCH_USER@/ed-seykota-systematic-trend-following/.git -/home/@WATCH_USER@/mexc-4h-momentum-trailing-stop/.git -/home/@WATCH_USER@/my-crypto-bot/.git -/home/@WATCH_USER@/btc-bull-market-competition/.git
