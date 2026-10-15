@@ -23,7 +23,7 @@
     "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）——2026-10-12 使用者決定取消：停用 Telegram 遙控，持續提醒改由維運通知發送（f-39），不做按鈕",
     "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
     "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
-    "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作並已上 A1（趨勢、動能、加密各自接上）；競賽沒有漏記平倉的修復機器人，這格是留未做還是改不適用，等使用者決定",
+    "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作並已上 A1（趨勢、動能、加密各自接上）；競賽沒有修復機器人，列不適用",
     "error-ids": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
     "hotfix-btc-order-resend": "緊急修正：競賽策略送單結果不明時，同一輪以新 client id 重新規劃再送（2026-09-24 h7 查核重現；btc-bull-market-competition PR #35）",
     "h4-trade-correction": "帳本更正事件：共用格式與套用規則（trade-alerts）＋趨勢策略接上並更正 2026-09-21 重複進場與 09-19 估算值兩筆（h4）；修復機器人自動產生更正屬 unrecorded-fill（g1）",
@@ -563,9 +563,8 @@
           "evidence": "repair_bot.py:238 經共用修復執行器每輪檢查「7 天內自動補寫達 2 次就通知一次、之後 7 天不重發」（trade-alerts v0.30.7 repair_runner 的 _check_recurring，ERR-065）；加密的 ERR-062～065 規則在錯誤清單 v0.30.7。 A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。 限制：A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
         "btc-competition": {
-          "state": "pending",
-          "phase": "repair-recurrence",
-          "reason": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+          "state": "n/a",
+          "reason": "競賽是現貨再平衡，沒有開倉／平倉配對，也沒有漏記平倉的修復機器人（見能力『修復機器人：抓錯並提出修復建議』等三格，競賽都是不適用），所以沒有『自動補寫』可以重複發生。競賽帳本少記成交走另一條路：每次補記都立刻發 R3 通知（BTC.UNRECORDED_FILL_CORRECTED，ERR-040），不是 R1 靜默補寫。2026-10-15 使用者決定列不適用。"
         }
       }
     },
@@ -2075,6 +2074,13 @@
       "project": "mycrypto",
       "type": "updated",
       "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.recurrence_escalation",
+      "project": "btc-competition",
+      "type": "completed",
+      "note": "競賽沒有漏記平倉修復機器人：依你的決定改不適用。"
     },
     {
       "kind": "rule",

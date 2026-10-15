@@ -177,8 +177,8 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>25</b><span>項未完成——還有策略沒做到</span></a>
-    <a class="c-done" href="#group-done"><b>72</b><span>項已完成——四支都到位，不用再動</span></a>
+    <a class="c-pending" href="#group-pending"><b>24</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-done" href="#group-done"><b>73</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
   <p class="dot-legend">
@@ -193,11 +193,11 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">25 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">24 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
-  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">72 項</span></div>
+  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">73 項</span></div>
   <p class="group-sub">每支相關的策略都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
   <div id="done"></div>
 
@@ -2206,14 +2206,14 @@
   {
    "added_recent": false,
    "anchor": "cap-repair_bot.recurrence_escalation",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "done",
     "mycrypto": "done",
     "seykota": "done"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "repair_bot.recurrence_escalation",
    "kind": "cap",
    "rows": [
@@ -2255,9 +2255,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作並已上 A1（趨勢、動能、加密各自接上）；競賽沒有漏記平倉的修復機器人，這格是留未做還是改不適用，等使用者決定",
-       "state": "pending",
-       "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+       "phase": null,
+       "state": "n/a",
+       "text": "競賽是現貨再平衡，沒有開倉／平倉配對，也沒有漏記平倉的修復機器人（見能力『修復機器人：抓錯並提出修復建議』等三格，競賽都是不適用），所以沒有『自動補寫』可以重複發生。競賽帳本少記成交走另一條路：每次補記都立刻發 R3 通知（BTC.UNRECORDED_FILL_CORRECTED，ERR-040），不是 R1 靜默補寫。2026-10-15 使用者決定列不適用。"
       }
      ]
     }
@@ -5559,7 +5559,7 @@
   "hotfix-seykota-order-resend": 0,
   "hotfix-seykota-stop-resolution": 0,
   "naming-rollout": 0,
-  "repair-recurrence": 1,
+  "repair-recurrence": 0,
   "t9-competition-retry": 0,
   "unrecorded-fill": 0,
   "v2-W2": 0,
@@ -5572,7 +5572,6 @@
   "8-momentum",
   "8-seykota",
   "8-btc-competition",
-  "repair-recurrence",
   "x3-crypto-binance"
  ],
  "phases": {
@@ -5592,7 +5591,7 @@
   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
   "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
   "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
-  "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作並已上 A1（趨勢、動能、加密各自接上）；競賽沒有漏記平倉的修復機器人，這格是留未做還是改不適用，等使用者決定",
+  "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作並已上 A1（趨勢、動能、加密各自接上）；競賽沒有修復機器人，列不適用",
   "t9-competition-retry": "t9：競賽策略失敗時當天重試（同一程序內每 15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.6 錯誤清單已改；競賽程式在 PR #45（審閱中，合併後上開發機實測），之後才部署 A1 正式機（新）",
   "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
   "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
@@ -5691,6 +5690,12 @@
    "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
    "project": "加密策略",
    "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
+  },
+  {
+   "anchor": "cap-repair_bot.recurrence_escalation",
+   "note": "競賽沒有漏記平倉修復機器人：依你的決定改不適用。",
+   "project": "競賽策略",
+   "title": "自動修補重複發生時升格通知"
   },
   {
    "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
@@ -5804,8 +5809,8 @@
  "totals": {
   "btc-competition": {
    "done": 43,
-   "n/a": 22,
-   "pending": 2
+   "n/a": 23,
+   "pending": 1
   },
   "momentum": {
    "done": 58,
