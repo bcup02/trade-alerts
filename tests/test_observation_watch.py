@@ -859,3 +859,62 @@ def test_git_blobs_asks_only_for_ls_tree_of_safe_paths_in_the_listed_clones(monk
     monkeypatch.setattr(remote, "_run", lambda host, words: seen.append((host, words)) or "")
     remote.git_blobs("a1", "mycrypto", many)
     assert len(seen) == 1 + 3                                                # chunks of 80
+
+
+# --- review of #199: an unreadable ls-tree answer must not become "nothing drifted" -----------------------------------
+
+def test_an_unparseable_ls_tree_line_is_an_error_not_a_missing_file():
+    good = "100644 blob " + "a" * 40 + "\tsrc/a.py"
+    assert ow._parse_ls_tree(good + "\n\n") == {"src/a.py": "a" * 40}
+    for bad in ("unrecognized ls-tree output", good + "\nfatal: not a tree", "100644 tree " + "a" * 40 + "\tsrc", "100644 blob xyz\tsrc/a.py"):
+        with pytest.raises(ow.RemoteError, match="unrecognised"):
+            ow._parse_ls_tree(bad)
+
+
+def test_the_review_scenario_garbage_from_the_sources_tree_is_an_error(repos, monkeypatch):
+    """Registry cites src/a.py, the sources commit exists, ls-tree exits 0 with output nobody can parse, and A1 holds another blob."""
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _write(myc, {"src/a.py": "one"})
+    _publish_registry(repos, _drift_registry(c1, ["src/a.py"]))
+    real_git = ow._git
+
+    def fake_git(repo, *args, **kw):
+        if "ls-tree" in args and repo.name == ow.REPOS["mycrypto"]:
+            return subprocess.CompletedProcess(args, 0, stdout="unrecognized ls-tree output\n", stderr="")
+        return real_git(repo, *args, **kw)
+    monkeypatch.setattr(ow, "_git", fake_git)
+    remote = Blobs({"src/a.py": "f" * 40})
+    with pytest.raises(ow.RemoteError, match="unrecognised"):
+        ow.check_registry_drift(ctx(remote))
+    state = ow.run_checks(remote, NOW, {}, checks=[c for c in ow.CHECKS if c.id == "registry-drift"])
+    assert state["registry-drift"]["state"] == ow.ERROR and remote.asked == []
+
+
+def test_garbage_from_a1_is_an_error_and_so_is_an_answer_about_other_files(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _write(myc, {"src/a.py": "one", "src/b.py": "two"})
+    _publish_registry(repos, _drift_registry(c1, ["src/a.py"]))
+
+    class Garbage(Blobs):
+        def git_blobs(self, host, key, paths):
+            raise ow.RemoteError("A1 mycrypto: unrecognised output line 'oops'")
+    with pytest.raises(ow.RemoteError, match="unrecognised"):
+        ow.check_registry_drift(ctx(Garbage({})))
+    class Chatty(Blobs):
+        def git_blobs(self, host, key, paths):
+            return {**super().git_blobs(host, key, paths), "src/zzz.py": "1" * 40}
+    with pytest.raises(ow.RemoteError, match="not asked for"):
+        ow.check_registry_drift(ctx(Chatty({"src/a.py": "2" * 40})))
+    remote = ow.Remote("k")
+    import types
+    remote._run = types.MethodType(lambda self, host, words: "not an ls-tree line\n", remote)
+    with pytest.raises(ow.RemoteError, match="unrecognised"):
+        remote.git_blobs("a1", "mycrypto", ["src/a.py"])
+
+
+def test_citations_that_all_miss_the_sources_commit_are_an_error_not_all_clear(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _write(myc, {"src/other.py": "x"})
+    _publish_registry(repos, _drift_registry(c1, ["src/a.py"]))              # neither src/a.py nor src/b.py exists at c1
+    with pytest.raises(ow.RemoteError, match="一個都找不到"):
+        ow.check_registry_drift(ctx(Blobs({})))

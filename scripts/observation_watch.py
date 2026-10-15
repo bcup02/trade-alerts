@@ -87,8 +87,20 @@ _SAFE_PATH = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*")
 _LS_TREE_LINE = re.compile(r"^\d{6} blob ([0-9a-f]{40})\t(.+)$")
 
 
-def _parse_ls_tree(text: str) -> dict[str, str]:
-    return {m.group(2): m.group(1) for m in map(_LS_TREE_LINE.match, text.splitlines()) if m}
+def _parse_ls_tree(text: str, source: str = "git ls-tree") -> dict[str, str]:
+    """``{path: blob}`` from ``git ls-tree`` output.  A non-empty line that is not ``<mode> blob <sha>\\t<path>`` is an error:
+    quietly skipping it would turn "could not read the tree" into "the file is not there" (review of #199)."""
+    found: dict[str, str] = {}
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        match = _LS_TREE_LINE.match(line)
+        if not match:
+            raise RemoteError(f"{source}: unrecognised output line {line[:80]!r}")
+        found[match.group(2)] = match.group(1)
+    return found
+
+
 ALLOWED_UNITS = frozenset({"ops-notify.service"})
 _SINCE_RE = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
@@ -149,7 +161,7 @@ class Remote:
             chunk = paths[start:start + 80]
             if chunk:
                 out = self._run(host, ["git", "-c", f"safe.directory={directory}", "-C", directory, "ls-tree", "-r", "HEAD", "--", *chunk])
-                found.update(_parse_ls_tree(out))
+                found.update(_parse_ls_tree(out, "A1 " + key))
         return found
 
     def journal(self, host: str, unit: str, since_utc: str) -> str:
@@ -651,7 +663,7 @@ def _blobs_at(repo: Path, commit: str, paths: list[str]) -> dict[str, str]:
         done = _git(repo, "ls-tree", "-r", commit, "--", *chunk)
         if done.returncode != 0:
             raise RemoteError(f"git ls-tree {commit[:7]} in {repo}: {done.stderr.strip()[:120]}")
-        found.update(_parse_ls_tree(done.stdout))
+        found.update(_parse_ls_tree(done.stdout, f"git ls-tree {commit[:7]} in {repo.name}"))
     return found
 
 
@@ -677,7 +689,11 @@ def check_registry_drift(ctx: Context) -> Result:
             raise RemoteError(f"{project}: sources commit {commit[:7]} not found in {repo}")
         paths = sorted(files)
         at_sources = _blobs_at(repo, commit, paths)
-        on_a1 = ctx.remote.git_blobs("a1", project, [p for p in paths if p in at_sources])
+        asked = [p for p in paths if p in at_sources]
+        on_a1 = ctx.remote.git_blobs("a1", project, asked)
+        stray = sorted(set(on_a1) - set(asked))
+        if stray:
+            raise RemoteError(f"{project}: A1 answered about files that were not asked for: {stray[:3]!r}")
         for path in paths:
             if path not in at_sources:
                 continue                       # the citation names no file in that repo (verify_registry_evidence reports those)
@@ -685,6 +701,9 @@ def check_registry_drift(ctx: Context) -> Result:
             if on_a1.get(path) != at_sources[path]:
                 a1_blob = on_a1.get(path)
                 drifted.append((project, path, a1_blob[:7] if a1_blob else "（A1 上沒有這個檔案）", at_sources[path][:7], files[path]))
+    if checked == 0 and cited_files(registry):
+        # every cited file is missing at the sources commit: that is a wrong sources commit or an unreadable tree, not "no drift"
+        raise RemoteError("登記冊引用了檔案，但在 sources 提交上一個都找不到：sources 提交或引用寫法有問題，沒辦法比對")
     if not drifted:
         return Result(WAITING, f"登記冊引用的 {checked} 個檔案，在 A1 部署複本上都和 sources 提交是同一份。")
     cells = {label for *_, labels in drifted for label in labels}
