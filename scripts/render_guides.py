@@ -172,26 +172,44 @@ _FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family
           '&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">')
 
 
-DIGEST_PLACEHOLDER = "__GUIDE_DIGEST__"
+DIGEST_PLACEHOLDER = "__GUIDE_DIGEST__"      # only in the footer template; replaced inside _page
+_ZERO = "0" * 16
 _DIGEST_COMMENT = re.compile(r"<!-- fleet-guide-digest: ([0-9a-f]{16}) -->")
+_DIGEST_FOOTER = re.compile(r"頁面版本碼 <code>([0-9a-f]{16})</code>")
 
 
 def _page(title: str, body: str, data: dict[str, Any], script: str, css: str = "") -> str:
     blob = json.dumps(data, ensure_ascii=False, sort_keys=True, indent=1).replace("</", "<\\/")
-    page = (f"<title>{title}</title>\n<!-- fleet-guide-digest: {DIGEST_PLACEHOLDER} -->\n{_FONTS}\n<style>{_CSS}{css}</style>\n\n{body}\n\n"
+    if body.count(DIGEST_PLACEHOLDER) != 1 or DIGEST_PLACEHOLDER in blob + script + css:
+        raise ValueError("the footer's version-code placeholder must appear exactly once, and only in the body")
+    page = (f"<title>{title}</title>\n<!-- fleet-guide-digest: {_ZERO} -->\n{_FONTS}\n<style>{_CSS}{css}</style>\n\n{body}\n\n"
             f'<script type="application/json" id="data">\n{blob}\n</script>\n'
-            f"<script>\n{script}\n</script>\n")
-    return page.replace(DIGEST_PLACEHOLDER, page_digest(page))
+            f"<script>\n{script}\n</script>\n").replace(DIGEST_PLACEHOLDER, _ZERO)
+    code = hashlib.sha256(page.encode("utf-8")).hexdigest()[:16]
+    return page.replace(f"<!-- fleet-guide-digest: {_ZERO} -->", f"<!-- fleet-guide-digest: {code} -->", 1).replace(
+        f"頁面版本碼 <code>{_ZERO}</code>", f"頁面版本碼 <code>{code}</code>", 1)
 
 
-def page_digest(page: str) -> str:
-    """The page's fingerprint: sha256 of the page with its own fingerprint blanked out, first 16 hex digits.
+def verify_digest(page: str) -> tuple[str | None, str]:
+    """The version code a page carries, if the page is internally consistent: ``(code, "")``; otherwise ``(None, why)``.
 
-    It sits in a comment on line 2 and in the footer, so whoever holds a copy of the published page can tell
-    (``check_published``) whether it is the page main renders now, without reading the page."""
-    blanked = _DIGEST_COMMENT.sub(f"<!-- fleet-guide-digest: {DIGEST_PLACEHOLDER} -->", page)
-    blanked = re.sub(r"(?<=頁面版本碼 <code>)[0-9a-f]{16}(?=</code>)", DIGEST_PLACEHOLDER, blanked)
-    return hashlib.sha256(blanked.replace(DIGEST_PLACEHOLDER, "").encode("utf-8")).hexdigest()[:16]
+    The page must carry exactly one code in the line-2 comment and exactly one in the footer, the two must be equal, and
+    the sha256 of the page with just those two spots set to sixteen zeros must give that code.  Everything else in the
+    page is hashed as it is -- nothing is stripped or normalised, so any other change shows (review of #195: an earlier
+    version removed every occurrence of its placeholder and ignored a changed footer code)."""
+    comments, footers = _DIGEST_COMMENT.findall(page), _DIGEST_FOOTER.findall(page)
+    if not comments or not footers:
+        return None, "沒有版本碼（舊版頁面，或第 2 行／頁尾的版本碼被拿掉）"
+    if len(comments) != 1 or len(footers) != 1:
+        return None, f"版本碼出現的次數不對（第 2 行 {len(comments)} 處、頁尾 {len(footers)} 處，各應是 1 處）"
+    if comments[0] != footers[0]:
+        return None, f"第 2 行的版本碼 {comments[0]} 和頁尾的 {footers[0]} 不一樣"
+    zeroed = _DIGEST_COMMENT.sub(f"<!-- fleet-guide-digest: {_ZERO} -->", page, count=1)
+    zeroed = _DIGEST_FOOTER.sub(f"頁面版本碼 <code>{_ZERO}</code>", zeroed, count=1)
+    actual = hashlib.sha256(zeroed.encode("utf-8")).hexdigest()[:16]
+    if actual != comments[0]:
+        return None, f"內容和它自己的版本碼 {comments[0]} 對不上（實際是 {actual}）"
+    return comments[0], ""
 
 
 def published_core(text: str) -> str:
@@ -217,15 +235,13 @@ def check_published(kind: str, published_file: Path) -> tuple[str, str]:
     page_path = {"risk": RISK_PAGE, "rollout": ROLLOUT_PAGE}[kind]
     fresh = fresh_pages[page_path]
     core = published_core(Path(published_file).read_text(encoding="utf-8"))
-    found = _DIGEST_COMMENT.search(core)
-    if not found:
-        return "altered", "已發布的頁面沒有版本碼（舊版頁面或被改過）：先讀它再覆蓋"
-    if page_digest(core) != found.group(1):
-        return "altered", f"已發布頁面的內容和它自己的版本碼 {found.group(1)} 對不上：發布後被改過，先讀它再覆蓋"
-    fresh_digest = _DIGEST_COMMENT.search(fresh).group(1)
-    if found.group(1) == fresh_digest:
-        return "current", f"已發布頁面就是 main 現在產生的頁面（版本碼 {fresh_digest}）：不用重發"
-    return "stale", f"已發布頁面是舊的產生結果（版本碼 {found.group(1)}），main 現在是 {fresh_digest}：直接發布 docs/guides 裡的新頁面"
+    code, why = verify_digest(core)
+    if code is None:
+        return "altered", f"已發布的頁面{why}：先讀它再覆蓋"
+    fresh_code, _ = verify_digest(fresh)
+    if code == fresh_code:
+        return "current", f"已發布頁面就是 main 現在產生的頁面（版本碼 {fresh_code}）：不用重發"
+    return "stale", f"已發布頁面是舊的產生結果（版本碼 {code}），main 現在是 {fresh_code}：直接發布 docs/guides 裡的新頁面"
 
 
 _JS_HELPERS = r"""
