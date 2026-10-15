@@ -40,6 +40,12 @@ STATES = ("done", "pending", "n/a")
 #: merged to development or running on the dev host.
 LIVE_BRANCH = "operations"
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
+#: A pending cell that waits for a deployment names the commit it waits for (``awaits_commit``); the observation
+#: watch (scripts/observation_watch.py, check ``registry-awaits``) compares it with what is running on A1 and says
+#: when the cell must flip.  Without it "flips after it is deployed" is a promise only memory keeps (2026-10-15: 38
+#: cells that had been live on A1 since 10-04 still said "not on the live host yet").
+AWAITS_COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
+_DEPLOY_PROMISE = re.compile(r"上正式機後改已做|上 A1 後改已做|上線後改已做|部署後改已做|還沒上正式機|尚未部署|未部署|未發版")
 _OWNER = {prefix: project for project, prefix in PROJECT_CODE_PREFIXES.items()}
 
 
@@ -74,6 +80,14 @@ def _status_problems(where: str, status: Any, phases: Mapping[str, Any]) -> list
             problems.append(f"{where}: pending without a reason")
         if status.get("phase") not in phases:
             problems.append(f"{where}: pending phase {status.get('phase')!r} is not a registered phase")
+        awaits = status.get("awaits_commit")
+        if awaits is not None and not (isinstance(awaits, str) and AWAITS_COMMIT.fullmatch(awaits)):
+            problems.append(f"{where}: awaits_commit must be a 7-40 character lowercase hex commit, got {awaits!r}")
+        elif awaits is None and text("reason") and _DEPLOY_PROMISE.search(status["reason"]):
+            problems.append(f"{where}: the reason promises a deployment ({_DEPLOY_PROMISE.search(status['reason']).group(0)!r}) "
+                            "but names no commit -- add awaits_commit so the watch can tell when the cell must flip")
+    elif "awaits_commit" in status:
+        problems.append(f"{where}: awaits_commit only belongs on a pending cell")
     if state == "n/a" and not text("reason"):
         problems.append(f"{where}: n/a without a reason")
     return problems

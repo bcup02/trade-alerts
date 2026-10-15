@@ -34,6 +34,15 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項�
 - Telegram 設定放在 `/etc/observation-watch/watch.env`（root 0600，只有 token 與 chat id）；程式不印出、不寫入日誌。
 - 測試用的受控事件（`details.test` / `evidence.test`）一律不算。
 
+## 登記冊等部署的格子（`registry-awaits`，phase-sync1）
+一致性登記冊的「已做」＝正式機（A1）上在跑。以前「上線後改已做」只靠記憶，2026-10-15 重讀才發現 38 格 10/4 就上線了還寫未做。現在：
+
+- 未做的格子如果在等某個部署，要在該格寫 `awaits_commit`（那支策略 repo 的提交，7～40 位小寫十六進位）。理由寫了「上正式機後改已做／還沒上正式機／未部署／未發版」這類話卻沒填，`registry_problems`（CI）會擋。
+- `registry-awaits` 每 30 分鐘做三件事：從 `origin/main` 讀登記冊；問 A1 各策略部署用複本（`/home/ubuntu/src/<repo>`）現在在哪個提交（只准 `git rev-parse HEAD`，目錄是固定清單）；用開發機上同名 repo 的 `git merge-base --is-ancestor` 判斷等的提交是否已包含在內。
+- 已包含 → 狀態 `observed`＋`needs_human`，Telegram 點名是哪幾格：照格子的證據欄補 A1 查證後改已做、重發登記冊。還沒 → `waiting`。等的提交在本機找不到（寫錯或沒推上遠端）→ `error`（連續 3 次通知），不會默默當成沒事。
+- 限制：「A1 部署複本的 HEAD」是部署的代理——部署流程是先 pull 再跑安裝腳本，兩步之間或只 pull 沒安裝時會不準；要確認實際在跑的檔案用格子裡的 `git hash-object` 比對。開發機的 repo 要能 fetch（工具會先 `git fetch`，失敗不致命）。
+- 不在這個檢查範圍：不寫 `awaits_commit` 的未做格子（例如等手機測試、等使用者決定、等還沒開 PR 的工作）——這些沒有提交可比對。
+
 ## 新增一個檢查
 在 `scripts/observation_watch.py` 寫一個 `check_xxx(ctx) -> Result`，加進 `CHECKS`（`covers` 填進度頁項目編號），
 在 `tests/test_observation_watch.py` 用 `FakeRemote` 寫：等待、通過、失敗各一個測試。判斷不到的事（手機上看到的樣子）設 `needs_human=True`，不要假裝能自動驗證。

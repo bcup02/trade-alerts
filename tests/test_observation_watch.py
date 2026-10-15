@@ -436,7 +436,7 @@ def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
     assert len(ids) == len(set(ids))
     assert all(c.covers and c.title for c in ow.CHECKS)
     covered = {i for c in ow.CHECKS for i in c.covers}
-    assert {"f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x1"} <= covered
+    assert {"phase-sync1", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x1"} <= covered
 
 
 # --- deployment files ----------------------------------------------------------------------------------------------
@@ -571,3 +571,174 @@ def test_a_run_that_waited_behind_another_decides_from_what_that_one_saved(tmp_p
     held.close()
     t.join(5)
     assert codes == [0] and ow.load_state(state)["items"]["crypto-flat"]["acked_key"] == f"{ow.WAITING}:new"
+
+
+# --- registry cells waiting for a deployment (phase-sync1) ---------------------------------------------------------
+
+import subprocess
+
+
+def _git(repo, *args):
+    done = subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *args], capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    return done.stdout.strip()
+
+
+def _commit(repo, name):
+    (repo / name).write_text(name, encoding="utf-8")
+    _git(repo, "add", name)
+    _git(repo, "commit", "-q", "-m", name)
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def _registry(awaits):
+    """A registry with one pending capability cell per (project, commit) in ``awaits`` and one rule cell."""
+    return {"capabilities": [{"id": "x.cap", "status": {p: {"state": "pending", "phase": "p", "reason": "r", "awaits_commit": c}
+                                                       for p, c in awaits.items()}}],
+            "catalog": [{"code": "MYC.X", "behaviour": {"mycrypto": {"state": "done", "evidence": "e"}},
+                         "emits_event": {"mycrypto": {"state": "pending", "phase": "p", "reason": "r",
+                                                      "awaits_commit": awaits.get("mycrypto", "")}}}]}
+
+
+class GitHeads(FakeRemote):
+    def __init__(self, heads):
+        super().__init__()
+        self.heads = heads
+
+    def git_head(self, host, key):
+        return self.heads[key]
+
+
+@pytest.fixture()
+def repos(tmp_path, monkeypatch):
+    root = tmp_path / "home"
+    for name in ("trade-alerts", ow.REPOS["mycrypto"], ow.REPOS["seykota"]):
+        (root / name).mkdir(parents=True)
+        _git(root / name, "init", "-q")
+    monkeypatch.setenv("OBSERVATION_WATCH_REPOS_ROOT", str(root))
+    monkeypatch.setenv("OBSERVATION_WATCH_REGISTRY_REF", "HEAD")
+    return root
+
+
+def _publish_registry(root, registry):
+    ta = root / "trade-alerts"
+    target = ta / ow.REGISTRY_RELATIVE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(registry), encoding="utf-8")
+    _git(ta, "add", "-A")
+    _git(ta, "commit", "-q", "-m", "registry")
+
+
+def test_a_cell_whose_awaited_commit_is_running_on_a1_is_flagged(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1, c2 = _commit(myc, "a"), _commit(myc, "b")
+    c3 = _commit(myc, "c")
+    _publish_registry(repos, _registry({"mycrypto": c2}))
+    result = ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c3})))      # A1 is past the awaited commit
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable
+    assert "2 格" in result.summary and any("x.cap / mycrypto" in e for e in result.evidence)
+    assert any("MYC.X emits_event" in e for e in result.evidence) and c2[:7] in result.evidence[0]
+    assert ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c2}))).state == ow.OBSERVED     # exactly the awaited commit
+    assert c1 != c2
+
+
+def test_a_cell_whose_awaited_commit_is_not_on_a1_yet_keeps_waiting(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1, c2 = _commit(myc, "a"), _commit(myc, "b")
+    _publish_registry(repos, _registry({"mycrypto": c2}))
+    result = ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1})))      # A1 is one commit behind
+    assert result.state == ow.WAITING and not result.needs_human and "2 格在等部署" in result.summary
+
+
+def test_a_commit_on_another_branch_is_not_deployed(repos):
+    """Ancestry, not the commit's existence: A1 at c1 does not contain a side branch's commit."""
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _commit(myc, "a")
+    _git(myc, "checkout", "-q", "-b", "side")
+    side = _commit(myc, "s")
+    _git(myc, "checkout", "-q", "-")
+    _publish_registry(repos, _registry({"mycrypto": side}))
+    assert ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1}))).state == ow.WAITING
+
+
+def test_no_cell_names_a_commit_means_nothing_to_compare(repos):
+    _commit(repos / ow.REPOS["mycrypto"], "a")
+    _publish_registry(repos, {"capabilities": [], "catalog": []})
+    result = ow.check_registry_awaits(ctx(GitHeads({})))
+    assert result.state == ow.WAITING and "沒有東西要比對" in result.summary
+
+
+def test_an_unknown_awaited_commit_is_an_error_not_a_pass(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _commit(myc, "a")
+    _publish_registry(repos, _registry({"mycrypto": "deadbeef" * 5}))
+    with pytest.raises(ow.RemoteError, match="找不到"):
+        ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1})))
+    state = ow.run_checks(GitHeads({"mycrypto": c1}), NOW, {}, checks=[c for c in ow.CHECKS if c.id == "registry-awaits"])
+    assert state["registry-awaits"]["state"] == ow.ERROR      # the loop turns it into an error entry that is announced after repeats
+
+
+def test_a_missing_registry_ref_is_an_error(repos, monkeypatch):
+    monkeypatch.setenv("OBSERVATION_WATCH_REGISTRY_REF", "no-such-ref")
+    _commit(repos / "trade-alerts", "a")
+    with pytest.raises(ow.RemoteError, match="cannot read the registry"):
+        ow.check_registry_awaits(ctx(GitHeads({})))
+
+
+def test_awaiting_cells_only_counts_pending_cells_with_a_commit():
+    reg = _registry({"mycrypto": "abc1234"})
+    reg["capabilities"].append({"id": "y", "status": {"seykota": {"state": "pending", "phase": "p", "reason": "r"},
+                                                      "momentum": {"state": "done", "evidence": "e"}}})
+    labels = [c[0] for c in ow.awaiting_cells(reg)]
+    assert labels == ["能力 x.cap / mycrypto", "規則 MYC.X emits_event / mycrypto"]
+
+
+def test_git_head_asks_only_for_rev_parse_in_the_listed_a1_clones(monkeypatch):
+    seen = []
+    remote = ow.Remote("k")
+    monkeypatch.setattr(remote, "_run", lambda host, words: seen.append((host, words)) or ("a" * 40 + "\n"))
+    assert remote.git_head("a1", "mycrypto") == "a" * 40
+    host, words = seen[0]
+    assert host == "a1" and words[-2:] == ["rev-parse", "HEAD"] and words[words.index("-C") + 1] == "/home/ubuntu/src/my-crypto-bot"
+    for bad_host, bad_key in (("dev", "mycrypto"), ("a1", "ops-notify"), ("a1", "../../etc"), ("a1", "my-crypto-bot")):
+        with pytest.raises(ow.RemoteError):
+            remote.git_head(bad_host, bad_key)
+    assert len(seen) == 1                                                                   # nothing reached the shell for the refused ones
+    monkeypatch.setattr(remote, "_run", lambda host, words: "not a sha; rm -rf /\n")
+    with pytest.raises(ow.RemoteError, match="unexpected"):
+        remote.git_head("a1", "mycrypto")
+
+
+def test_a_failed_fetch_of_the_registry_clone_is_an_error_not_an_empty_answer(repos):
+    """Review of #193: with a stale origin/main (no awaiting cells) and the fetch failing, the check must not say
+    "nothing to compare"."""
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _commit(myc, "a")
+    _publish_registry(repos, {"capabilities": [], "catalog": []})           # the stale copy: nothing awaits
+    _git(repos / "trade-alerts", "remote", "add", "origin", str(repos / "no-such-remote"))   # a fetch from it fails
+    with pytest.raises(ow.RemoteError, match="cannot refresh"):
+        ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1})))
+    state = ow.run_checks(GitHeads({"mycrypto": c1}), NOW, {}, checks=[c for c in ow.CHECKS if c.id == "registry-awaits"])
+    assert state["registry-awaits"]["state"] == ow.ERROR
+
+
+def test_a_failed_fetch_of_a_strategy_clone_is_not_fatal_when_the_commit_is_known(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1, c2 = _commit(myc, "a"), _commit(myc, "b")
+    _publish_registry(repos, _registry({"mycrypto": c2}))
+    _git(myc, "remote", "add", "origin", str(repos / "no-such-remote"))
+    assert ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c2}))).state == ow.OBSERVED
+    assert ow._refresh(myc) is False and ow._refresh(repos / "trade-alerts") is None
+
+
+def test_observed_also_lists_the_cells_still_waiting(repos):
+    myc, sey = repos / ow.REPOS["mycrypto"], repos / ow.REPOS["seykota"]
+    c1 = _commit(myc, "a")
+    s1, s2 = _commit(sey, "s"), _commit(sey, "t")
+    reg = _registry({"mycrypto": c1})
+    reg["capabilities"][0]["status"]["seykota"] = {"state": "pending", "phase": "p", "reason": "r", "awaits_commit": s2}
+    _publish_registry(repos, reg)
+    result = ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1, "seykota": s1})))   # seykota's awaited commit is not on A1
+    assert result.state == ow.OBSERVED
+    assert any(e.startswith("（仍在等）") and "seykota" in e for e in result.evidence)
+    assert not any("seykota" in e for e in result.evidence if not e.startswith("（仍在等）"))

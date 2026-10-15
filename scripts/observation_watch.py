@@ -4,7 +4,8 @@
 The observation area lists things that can only be verified when something happens in production (the next real
 status alert, the next real trade, the crypto strategy going flat ...).  Each *check* here knows
 
-  * how to see that the event happened (read-only: files under /opt/<repo>/audit, /var/lib/..., the ops-notify journal),
+  * how to see that the event happened (read-only: files under /opt/<repo>/audit, /var/lib/..., the ops-notify journal,
+    the commit a strategy clone on A1 is at),
   * what "as expected" means mechanically, and what "not as expected" means,
   * whether a mechanical pass is enough to close the item (``closable``) or the operator must still look at a phone
     (``needs_human``).
@@ -78,6 +79,10 @@ def _allowed_paths() -> frozenset[str]:
 
 
 ALLOWED_PATHS = _allowed_paths()
+#: A1 deploys by pulling ``operations`` in these clones and running the repo's installer, so a clone's HEAD is the
+#: commit that was deployed.  Exactly these directories, and only ``rev-parse HEAD``, may be asked.
+A1_CLONES = {key: f"/home/ubuntu/src/{name}" for key, name in REPOS.items()}
+_SHA40 = re.compile(r"[0-9a-f]{40}")
 ALLOWED_UNITS = frozenset({"ops-notify.service"})
 _SINCE_RE = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
@@ -114,6 +119,16 @@ class Remote:
         if path not in ALLOWED_PATHS:
             raise RemoteError(f"path not on the read whitelist: {path!r}")
         return self._run(host, ["cat", path])
+
+    def git_head(self, host: str, key: str) -> str:
+        """The commit the deploy clone of strategy ``key`` is at (A1 only)."""
+        if host != "a1" or key not in A1_CLONES:
+            raise RemoteError(f"git head not allowed: {host!r} {key!r}")
+        directory = A1_CLONES[key]
+        sha = self._run(host, ["git", "-c", f"safe.directory={directory}", "-C", directory, "rev-parse", "HEAD"]).strip()
+        if not _SHA40.fullmatch(sha):
+            raise RemoteError(f"{host}: {key}: unexpected rev-parse output {sha[:60]!r}")
+        return sha
 
     def journal(self, host: str, unit: str, since_utc: str) -> str:
         if unit not in ALLOWED_UNITS or not _SINCE_RE.fullmatch(since_utc):
@@ -497,6 +512,83 @@ def check_safe_halt_notice(ctx: Context) -> Result:
     return _strategy_event_result(ctx, events, seen="A1 出現真實的 R3 策略通知。", ask="請照通知步驟貼一次確認指令，確認能跑（只用預覽，不要解除）。")
 
 
+# --- registry cells waiting for a deployment (phase-sync1) -----------------------------------------------------------
+
+REGISTRY_RELATIVE = "src/trade_alerts/catalog/fleet-rollout-registry.json"
+
+
+def repos_root() -> Path:
+    return Path(os.environ.get("OBSERVATION_WATCH_REPOS_ROOT") or Path.home())
+
+
+def _git(repo: Path, *args: str, timeout: int = 120) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=timeout)
+
+
+def _refresh(repo: Path) -> bool | None:
+    """Fetch when the clone has an ``origin``: True = refreshed, False = the fetch failed, None = no origin to fetch.
+
+    Callers decide what a failure means: the registry's own clone must be fresh (a stale ``origin/main`` could be
+    missing the very cells this check exists for), while a strategy clone only has to contain the awaited commit,
+    which ``cat-file`` and ``merge-base`` check explicitly."""
+    if _git(repo, "remote", "get-url", "origin").returncode != 0:
+        return None
+    return _git(repo, "fetch", "-q", "origin").returncode == 0
+
+
+def awaiting_cells(registry: Mapping[str, Any]) -> list[tuple[str, str, str]]:
+    """``(cell label, strategy key, commit)`` for every pending cell that names the commit it waits for."""
+    cells = []
+    for capability in registry.get("capabilities") or []:
+        for project, status in (capability.get("status") or {}).items():
+            if status.get("state") == "pending" and status.get("awaits_commit"):
+                cells.append((f"能力 {capability['id']} / {project}", project, status["awaits_commit"]))
+    for row in registry.get("catalog") or []:
+        for aspect in ("behaviour", "emits_event"):
+            for project, status in (row.get(aspect) or {}).items():
+                if status.get("state") == "pending" and status.get("awaits_commit"):
+                    cells.append((f"規則 {row['code']} {aspect} / {project}", project, status["awaits_commit"]))
+    return cells
+
+
+def check_registry_awaits(ctx: Context) -> Result:
+    """phase-sync1: a registry cell that still says "pending until <commit> is deployed" while A1 already runs that commit.
+
+    "done" means running on A1, and nothing used to notice when that became true: on 2026-10-15 a rereading found 38
+    cells that had been live since 10-04.  A cell that waits for a deployment names the commit (``awaits_commit``);
+    this check asks A1 which commit each strategy's deploy clone is at and whether the awaited commit is part of it."""
+    root = repos_root()
+    ta = root / "trade-alerts"
+    if _refresh(ta) is False:
+        # Reading the old origin/main here would answer "nothing to compare" about a registry that may already hold
+        # the cells this check is for (review of #193): say the source could not be refreshed instead.
+        raise RemoteError(f"cannot refresh {ta} (git fetch failed): the registry on origin/main may be out of date")
+    shown = _git(ta, "show", f"{os.environ.get('OBSERVATION_WATCH_REGISTRY_REF', 'origin/main')}:{REGISTRY_RELATIVE}")
+    if shown.returncode != 0:
+        raise RemoteError(f"cannot read the registry from {ta}: {shown.stderr.strip()[:120]}")
+    cells = awaiting_cells(json.loads(shown.stdout))
+    if not cells:
+        return Result(WAITING, "登記冊沒有帶『等哪個提交』的未做格子，沒有東西要比對。")
+    heads: dict[str, str] = {}
+    due, open_ = [], []
+    for label, project, commit in cells:
+        repo = root / REPOS[project]
+        if project not in heads:
+            heads[project] = ctx.remote.git_head("a1", project)
+            _refresh(repo)
+        known = _git(repo, "cat-file", "-e", f"{commit}^{{commit}}").returncode == 0
+        if not known:
+            raise RemoteError(f"{label}: 等的提交 {commit} 在 {repo} 找不到（寫錯或還沒推上遠端？）")
+        deployed = _git(repo, "merge-base", "--is-ancestor", commit, heads[project])
+        if deployed.returncode not in (0, 1):
+            raise RemoteError(f"{label}: merge-base 出錯：{deployed.stderr.strip()[:120]}")
+        (due if deployed.returncode == 0 else open_).append(f"{label}：等 {commit[:7]}，A1 現在 {heads[project][:7]}")
+    if due:
+        return Result(OBSERVED, f"登記冊有 {len(due)} 格還寫未做，但它們在等的提交已經在 A1 上跑了：該改已做（並重發登記冊）。",
+                      due + [f"（仍在等）{o}" for o in open_], needs_human=True, key=",".join(sorted(d.split("：")[0] for d in due)))
+    return Result(WAITING, f"登記冊有 {len(open_)} 格在等部署，等的提交都還沒上 A1。", open_)
+
+
 CHECKS: tuple[Check, ...] = (
     Check("crypto-flat", "加密策略空手（開工 x1 的訊號）", ("phase-x1",), check_crypto_flat),
     Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
@@ -508,6 +600,7 @@ CHECKS: tuple[Check, ...] = (
     Check("pending-expired", "對帳標記逾時通知", ("f-30",), check_pending_expired),
     Check("repair-recurring", "自動補寫重複發生通知", ("phase-g2",), check_repair_recurring),
     Check("safe-halt-notice", "A1 第一則真實 R3 策略通知", ("f-35", "f-37"), check_safe_halt_notice),
+    Check("registry-awaits", "登記冊等部署的格子：等的提交已上 A1", ("phase-sync1",), check_registry_awaits),
 )
 
 
