@@ -247,7 +247,11 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError) as exc:
         print(f"✗ {exc}")
         return 1
-    registry = load_rollout_registry(args.registry) if args.registry else load_registry_from_main()
+    try:
+        registry = load_rollout_registry(args.registry) if args.registry else load_registry_from_main()
+    except (ValueError, OSError, RuntimeError) as exc:      # missing / unreadable / broken registry file, or no origin/main to read it from
+        print(f"✗ 讀不到登記冊：{exc}")
+        return 1
     linked = [i for i in items if "registry" in i]
     problems = link_problems(items, registry, watch)
     print(f"進度項目 {len(items)} 項，其中 {len(linked)} 項連了登記冊格子；問題 {len(problems)} 個")

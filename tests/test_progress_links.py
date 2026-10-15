@@ -325,3 +325,23 @@ def test_an_item_file_that_cannot_be_read_is_a_controlled_error_with_exit_1(tmp_
     missing_json = tmp_path / "none.json"
     assert cpl.main(["--items-json", str(missing_json), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
     assert cpl.main([str(tmp_path / "none.html"), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
+
+
+def test_an_unreadable_registry_is_a_controlled_error_with_exit_1(tmp_path, capsys, monkeypatch):
+    """Review of #206 (round 2): --registry missing / broken JSON, and no origin/main, used to escape as a traceback."""
+    export = _export(tmp_path, [{"id": "ok", "status": "todo", "title": "t"}])
+    assert cpl.main(["--db-dir", str(export), "--registry", str(tmp_path / "nonexistent.json")]) == 1
+    assert "讀不到登記冊" in capsys.readouterr().out
+    broken = tmp_path / "broken.json"
+    broken.write_text("{broken", encoding="utf-8")
+    assert cpl.main(["--db-dir", str(export), "--registry", str(broken)]) == 1
+    assert "讀不到登記冊" in capsys.readouterr().out
+    as_dir = tmp_path / "dir.json"
+    as_dir.mkdir()
+    assert cpl.main(["--db-dir", str(export), "--registry", str(as_dir)]) == 1
+
+    def no_origin(root=cpl.ROOT):
+        raise RuntimeError("cannot read the registry from origin/main in /x: fatal: bad revision")
+    monkeypatch.setattr(cpl, "load_registry_from_main", no_origin)
+    assert cpl.main(["--db-dir", str(export)]) == 1
+    assert "origin/main" in capsys.readouterr().out
