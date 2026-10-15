@@ -65,6 +65,9 @@ def _json_objects(region: str, key: str) -> list[dict[str, Any]]:
 
 
 _REGISTRY_KEY = re.compile(r'(?<!\\)"registry"\s*:')
+#: A JS-literal item (`{id:"x", registry:[...]}`) has an unquoted key position: after `{` or `,`.  It can never be read, so
+#: each one counts as a registry field that was not read.
+_UNQUOTED_REGISTRY_KEY = re.compile(r'[{,]\s*registry\s*:')
 
 
 def _block(page_html: str, name: str) -> str | None:
@@ -76,14 +79,15 @@ def _block(page_html: str, name: str) -> str | None:
 def extract_items(page_html: str) -> list[dict[str, Any]]:
     """The progress items written as JSON in the page's ``var ITEMS = [ ... ];``.
 
-    An item that carries a ``registry`` field but could not be read (written as a JS literal, or broken JSON) would be a
-    link that silently checks nothing, so that is an error: the number of ``"registry":`` keys in the block must equal
-    the number found in the items that were read."""
+    An item that carries a ``registry`` field but could not be read (written as a JS literal -- quoted or unquoted key --
+    or broken JSON) would be a link that silently checks nothing, so that is an error: the number of ``registry`` keys in
+    the block must equal the number found in the items that were read."""
     block = _block(page_html, "ITEMS")
     if block is None:
         raise ValueError("no `var ITEMS = [ ... ];` block in the page")
     items = _json_objects(block, "id")
-    in_text, in_items = len(_REGISTRY_KEY.findall(block)), sum(1 for item in items if "registry" in item)
+    in_text = len(_REGISTRY_KEY.findall(block)) + len(_UNQUOTED_REGISTRY_KEY.findall(block))
+    in_items = sum(1 for item in items if "registry" in item)
     if in_text != in_items:
         raise ValueError(f"頁面 ITEMS 裡有 {in_text} 處 registry 欄，只讀得到 {in_items} 個項目帶它：有項目的寫法讀不懂"
                          "（舊式 JS 物件寫法或 JSON 壞掉），連結會變成靜默不檢查，請改成 JSON 寫法")
@@ -149,9 +153,9 @@ def link_problems(items: Iterable[Mapping[str, Any]], registry: Mapping[str, Any
     problems: list[str] = []
     watching = set(watch_ids)
     for item in items:
-        links = item.get("registry")
-        if links is None:
+        if "registry" not in item:          # no field = nothing to check; a field with null is an invalid value, not "no field"
             continue
+        links = item["registry"]
         name = f"{item.get('id')}（{str(item.get('title', ''))[:24]}）"
         status = item.get("status")
         if status not in KNOWN_STATUSES:
@@ -201,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"✗ {exc}")
         return 1
     registry = load_rollout_registry(args.registry) if args.registry else load_registry_from_main()
-    linked = [i for i in items if i.get("registry") is not None]
+    linked = [i for i in items if "registry" in i]
     problems = link_problems(items, registry, watch)
     print(f"進度項目 {len(items)} 項，其中 {len(linked)} 項連了登記冊格子；問題 {len(problems)} 個")
     for line in problems:

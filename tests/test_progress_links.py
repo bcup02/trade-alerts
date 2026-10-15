@@ -77,10 +77,10 @@ def test_a_link_that_points_at_nothing_is_an_error_not_a_silent_pass(link):
 
 
 def test_registry_must_be_a_non_empty_list_of_strings():
-    for bad in ([], "cap:x.cap", [1], None):
+    for bad in ([], "cap:x.cap", [1], None, {}, 0, ""):
         items = [{"id": "i", "title": "t", "status": "done", "registry": bad}]
-        problems = cpl.link_problems(items, registry())
-        assert (bad is None and problems == []) or any("registry 要是非空的字串清單" in p for p in problems)
+        assert any("registry 要是非空的字串清單" in p for p in cpl.link_problems(items, registry())), bad
+    assert cpl.link_problems([{"id": "i", "title": "t", "status": "done"}], registry()) == []     # no field at all: nothing to check
 
 
 PAGE = '''<script>
@@ -145,12 +145,11 @@ def test_a_multi_line_json_item_is_read_and_checked():
 
 def test_an_item_with_registry_that_cannot_be_read_is_an_error_not_a_pass():
     js_literal = 'var ITEMS = [\n    {id:"old", status:"done", registry:["cap:x.cap"]},\n    {"id": "ok", "status": "done", "registry": ["cap:x.cap@seykota"]},\n  ];'
-    # the JS-literal one has an unquoted key: not matched by the regex, so it is not counted among the items either -- the count of
-    # `"registry":` keys only sees quoted keys, so a quoted-but-broken item is the case that must be caught:
     broken = 'var ITEMS = [\n    {"id": "bad", "status": "done", "registry": ["cap:x.cap@seykota"],},\n    {"id": "ok", "status": "done", "registry": ["cap:x.cap@seykota"]},\n  ];'
     with pytest.raises(ValueError, match="registry"):
         cpl.extract_items(broken)
-    assert [i["id"] for i in cpl.extract_items(js_literal)] == ["ok"]        # unquoted keys are the documented unsupported form
+    with pytest.raises(ValueError, match="registry"):                          # BLOCK (second review): unquoted keys carrying registry
+        cpl.extract_items(js_literal)
 
 
 def test_the_word_registry_inside_a_text_is_not_a_field():
@@ -196,3 +195,24 @@ def test_cli_reports_an_unreadable_item_and_exits_1(tmp_path, capsys):
     page.write_text('var ITEMS = [\n    {"id": "bad", "registry": ["cap:x.cap"],},\n  ];\n', encoding="utf-8")
     assert cpl.main([str(page), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
     assert "讀不懂" in capsys.readouterr().out
+
+
+def test_js_literal_items_without_registry_are_still_fine_but_with_registry_are_errors():
+    plain = 'var ITEMS = [\n    {id:"old", status:"done", title:"x"},\n    {"id": "ok", "status": "done"},\n  ];'
+    assert [i["id"] for i in cpl.extract_items(plain)] == ["ok"]
+    for literal in ('{id:"f-23e", status:"done", registry:["cap:x.cap@momentum"]},',
+                    '{ id: "f-23e", status: "done",\n      registry : ["cap:x.cap@momentum"] },',
+                    '{"id": "q", "registry":["cap:x.cap"]}, {id:"f", status:"done", registry:["cap:x.cap"]},'):
+        with pytest.raises(ValueError, match="registry"):
+            cpl.extract_items("var ITEMS = [\n    " + literal + "\n  ];")
+
+
+def test_a_registry_null_is_an_invalid_value_not_a_missing_field(tmp_path, capsys):
+    items = [{"id": "f-23e", "title": "t", "status": "done", "registry": None}]
+    assert any("非空的字串清單" in p for p in cpl.link_problems(items, registry()))
+    f = tmp_path / "items.json"
+    f.write_text(json.dumps(items), encoding="utf-8")
+    reg = tmp_path / "registry.json"
+    reg.write_text((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"), encoding="utf-8")
+    assert cpl.main(["--items-json", str(f), "--registry", str(reg)]) == 1
+    assert "其中 1 項連了登記冊格子" in capsys.readouterr().out
