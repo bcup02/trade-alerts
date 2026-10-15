@@ -49,6 +49,16 @@
           "type": "string",
           "pattern": "^[0-9a-f]{7,40}$",
           "description": "pending: the commit (in this strategy's repo) whose deployment to the live host makes this cell true; the observation watch flags the cell once that commit is running on A1."
+        },
+        "verified_at": {
+          "type": "string",
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+          "description": "done: the date the claim was last checked against the live host (A1)."
+        },
+        "limit": {
+          "type": "string",
+          "minLength": 1,
+          "description": "done: what this claim does NOT show, in one sentence (e.g. never triggered on A1)."
         }
       },
       "allOf": [
