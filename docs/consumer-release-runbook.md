@@ -1071,8 +1071,8 @@ trade-alerts：v0.30.7（錯誤清單新增 ERR-062～066：加密策略的修�
 
 ```text
 trade-alerts：v0.30.8（錯誤清單 ERR-009／ERR-010／ERR-060 的處理步驟與追查指令改成現況；f-46）
-變更摘要：1. ERR-009／ERR-010（趨勢的設定錯誤暫停）：拿掉過時的「已知缺陷：重啟後清不掉」，改寫成實際行為——重啟後每輪先重跑原本擋下的守門檢查，通過就自動清掉並在帳本記 safe_halt_cleared（method=config_fixed_restart），不用也不能用解除工具；新增一步「用 grep 確認有沒有清掉」與「改對仍清不掉才貼 AI 指令」。給 AI 的追查指令改成讀 _clear_config_halt_if_fixed。
-          2. ERR-060（動能的對帳標記逾時）：結清步驟前補一步——預覽與結清會拒絕超過 3600 秒的對帳快照，A1 每 15 分鐘自動抓一次，碰到就先 `sudo systemctl start mexc-momentum-reconcile-fetch.service`；追查指令同步。
+變更摘要：1. ERR-009／ERR-010（趨勢的設定錯誤暫停）：拿掉過時的「已知缺陷：重啟後清不掉」，改寫成實際行為——重啟後每輪先重跑原本擋下的守門檢查，通過就自動清掉並在帳本記 safe_halt_cleared（method=config_fixed_restart），不用也不能用解除工具；新增一步「用 seykota-resume preview（只讀）確認現在還有沒有暫停」與「還在暫停時怎麼排查、仍清不掉才貼 AI 指令」。給 AI 的追查指令改成讀 _clear_config_halt_if_fixed。
+          2. ERR-060（動能的對帳標記逾時）：結清步驟前補一步——預覽與結清會拒絕超過 3600 秒的對帳快照，A1 每 15 分鐘自動抓一次，碰到就先 `sudo systemctl start mexc-momentum-reconcile-fetch.service`（跑完整套對帳，只更新狀態檔）；快照時間比現在晚超過 5 分鐘才算未來被拒；追查指令同步。
           3. 沒有程式或函式簽名變更；只有錯誤清單資料與版本號；兩張風險登記冊頁面重新產生。
 向後相容：只改文字（錯誤清單資料），欄位與編號不變；沒釘此版的專案不受影響。
 受影響消費專案：趨勢（ERR-009／010 的通知文字，改釘並部署後才換）、動能（ERR-060 的通知文字，改釘並部署後才換）。
