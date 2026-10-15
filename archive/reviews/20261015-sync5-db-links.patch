@@ -1,0 +1,378 @@
+diff --git a/docs/session-wrap-up-sop.md b/docs/session-wrap-up-sop.md
+index 924107a..f3251eb 100644
+--- a/docs/session-wrap-up-sop.md
++++ b/docs/session-wrap-up-sop.md
+@@ -53,11 +53,13 @@ cd ~/trade-alerts
+ 
+ ## 4. 機隊工程進度頁
+ 
+-- [ ] 這次有狀態變化的項目都已更新：**先改頁面 ITEMS（改內容就把 `v` 加一）→ 重新發布 → 用同一份內容（含 `v`）
+-      寫進資料庫**。不要只寫資料庫。
+-- [ ] 發布前對頁面檔跑 `python scripts/check_progress_links.py <頁面檔>`（先 `git fetch` trade-alerts）：進度項目的 `registry` 欄（連到的登記冊格子，寫法見腳本開頭說明）跟登記冊互相檢查——項目標完成但格子還沒做、或格子都做完了項目還開著（觀察區裡的項目除外），都會報錯。新增或結案項目時順手填 `registry`。
+-- [ ] 發布後把資料庫 `checklist` 全部讀回來，跟頁面 ITEMS 逐筆比對 `v`：資料庫的 `v` 跟頁面不同就會被靜默忽略。
+-- [ ] 「建議下一步」（資料庫 `meta/next`＋頁面 `DEFAULT_NEXT`）重新掃過：急迫的先；沒有急迫的就接同一組下一小塊；
++- [ ] **進度頁自 2026-10-15（phase-sync5）起是靜態外殼：頁面本身沒有資料，所有項目都在它的資料庫**（`checklist` 一項一個文件，`meta/next`、`meta/info`、`meta/watch`、`meta/decide`）。
++      這次有狀態變化的項目，用 `ArtifactData` 對那一項 `set`／`update`，**一定帶 `if_version`**（版本從上一次 `list` 或 `get` 的結果取；別人改過會被拒絕，重讀再寫）。**不用重發頁面、不用讀整份頁面**；只有版面或腳本要改時才重發頁面檔。
++      新項目用 `set` 新增文件（欄位見頁面腳本開頭註解）；`v` 欄已不再使用。
++- [ ] 改完對資料庫做連結檢查：先對 `checklist` 與 `meta` 各做一次 `ArtifactData list`，`out_dir` 指向**新的空目錄**（舊檔會被當成現行項目），再跑
++      `python scripts/check_progress_links.py --db-dir <那個目錄>`（先 `git fetch` trade-alerts）：進度項目的 `registry` 欄（連到的登記冊格子，寫法見腳本開頭說明）跟登記冊互相檢查——項目標完成但格子還沒做、或格子都做完了項目還開著（觀察區裡的項目除外），都會報錯；匯出讀不懂（空的、id 跟檔名不一致、watch.json 壞掉）也報錯。新增或結案項目時順手填 `registry`。
++      這個檢查還不是自動跑的（進度資料在平台資料庫，CI 與觀察區讀不到），收尾時手動跑。
++- [ ] 「建議下一步」（資料庫 `meta/next`）重新掃過：急迫的先；沒有急迫的就接同一組下一小塊；
+       同組做完才換組。理由用白話寫。
+ - [ ] `meta/info` 的說明與最後更新時間已更新。
+ - [ ] 新開的關卡／項目用白話寫、每項附建議模型。
+diff --git a/scripts/check_progress_links.py b/scripts/check_progress_links.py
+index 7536f76..b4e57ea 100644
+--- a/scripts/check_progress_links.py
++++ b/scripts/check_progress_links.py
+@@ -2,8 +2,16 @@
+ """Check that the progress page and the rollout registry agree about what is finished (phase-sync3).
+ 
+     git fetch origin   # the registry is read from origin/main
+-    python scripts/check_progress_links.py <progress page .html>        # items are read from the page's ITEMS
++    python scripts/check_progress_links.py --db-dir <dir>               # items exported from the page's database (phase-sync5)
+     python scripts/check_progress_links.py --items-json items.json      # or from a JSON list of items
++    python scripts/check_progress_links.py <progress page .html>        # old pages that still carry `var ITEMS = [...]`
++
++Since phase-sync5 the progress page is a static shell and the items live in its database.  Export them with
++``ArtifactData action=list collection=checklist out_dir=<dir>`` and the same for ``collection=meta`` (one fresh,
++empty directory per run -- a leftover file from an older export would be read as a current item), then point
++``--db-dir`` at <dir>: it reads ``<dir>/checklist/*.json`` (one item per file, named by its id) and
++``<dir>/meta/watch.json`` (the 觀察區).  Anything it cannot read -- no checklist files, a file that is not a JSON
++object, an ``id`` that is not the file name, no or broken watch.json -- is an error, never an empty list.
+ 
+ A progress item may carry ``"registry": ["cap:<capability id>@seykota,momentum", "rule:<catalog code>#emits_event", ...]``
+ -- the registry cells it is about (``@`` names the strategies, ``#`` one aspect of a rule; without them every strategy
+@@ -35,7 +43,8 @@ from typing import Any, Iterable, Mapping
+ ROOT = Path(__file__).resolve().parents[1]
+ sys.path.insert(0, str(ROOT / "src"))
+ 
+-from trade_alerts.rollout_registry import STRATEGY_PROJECTS, load_rollout_registry  # noqa: E402
++from trade_alerts.fleet_event_log import load_error_catalog  # noqa: E402
++from trade_alerts.rollout_registry import STRATEGY_PROJECTS, load_rollout_registry, registry_problems  # noqa: E402
+ 
+ _LINK = re.compile(r"^(cap|rule):([A-Za-z0-9_.]+)(?:#(behaviour|emits_event))?(?:@([a-z\-]+(?:,[a-z\-]+)*))?$")
+ ASPECTS = ("behaviour", "emits_event")
+@@ -85,7 +94,7 @@ def extract_items(page_html: str) -> list[dict[str, Any]]:
+     the block must equal the number found in the items that were read."""
+     block = _block(page_html, "ITEMS")
+     if block is None:
+-        raise ValueError("no `var ITEMS = [ ... ];` block in the page")
++        raise ValueError("no `var ITEMS = [ ... ];` block in the page（靜態外殼的頁面沒有資料：改用 --db-dir 檢查資料庫匯出）")
+     items = _json_objects(block, "id")
+     in_text = len(_REGISTRY_KEY.findall(block))
+     in_items = sum(1 for item in items if "registry" in item)
+@@ -101,6 +110,36 @@ def extract_watch_ids(page_html: str) -> set[str]:
+     return set() if block is None else {o["id"] for o in _json_objects(block, "id") if isinstance(o.get("id"), str)}
+ 
+ 
++def load_db_export(directory: Path) -> tuple[list[dict[str, Any]], set[str]]:
++    """``(items, watch ids)`` from an ArtifactData export of the progress page's database (see the module docstring)."""
++    checklist = directory / "checklist"
++    files = sorted(checklist.glob("*.json")) if checklist.is_dir() else []
++    if not files:
++        raise ValueError(f"{checklist} 沒有任何項目檔：匯出是空的或路徑不對，不能當作『沒有項目』")
++    items: list[dict[str, Any]] = []
++    for path in files:
++        try:
++            item = json.loads(path.read_text(encoding="utf-8"))
++        except OSError as exc:
++            raise ValueError(f"讀不到 {path}：{exc}") from exc
++        except ValueError as exc:
++            raise ValueError(f"{path.name} 不是有效的 JSON：{exc}") from exc
++        if not isinstance(item, dict):
++            raise ValueError(f"{path.name} 不是 JSON 物件")
++        if item.get("id") != path.stem:
++            raise ValueError(f"{path.name} 裡的 id {item.get('id')!r} 跟檔名不一致：匯出不完整或混到別的目錄")
++        items.append(item)
++    watch_file = directory / "meta" / "watch.json"
++    try:
++        watch = json.loads(watch_file.read_text(encoding="utf-8"))
++    except (OSError, ValueError) as exc:
++        raise ValueError(f"讀不到 {watch_file}（觀察區清單）：{exc}") from exc
++    entries = watch.get("items") if isinstance(watch, dict) else None
++    if not isinstance(entries, list) or not all(isinstance(e, dict) and isinstance(e.get("id"), str) for e in entries):
++        raise ValueError("meta/watch.json 的 items 要是有 id 的物件清單")
++    return items, {e["id"] for e in entries}
++
++
+ # --- the registry side --------------------------------------------------------------------------------------------
+ 
+ def cells_for(registry: Mapping[str, Any], link: str) -> tuple[list[tuple[str, str, str]], list[str]]:
+@@ -179,6 +218,31 @@ def link_problems(items: Iterable[Mapping[str, Any]], registry: Mapping[str, Any
+     return problems
+ 
+ 
++def check_registry_shape(registry: Any) -> None:
++    """The links are looked up in ``capabilities`` and ``catalog``; a registry without them (or with them empty or the
++    wrong shape) is valid JSON that would make every link "not found" -- or, worse, check nothing -- so it is an error."""
++    if not isinstance(registry, dict):
++        raise ValueError("登記冊不是 JSON 物件")
++    for key, name_key, aspects in (("capabilities", "id", ("status",)), ("catalog", "code", ASPECTS)):
++        entries = registry.get(key)
++        if not isinstance(entries, list) or not entries:
++            raise ValueError(f"登記冊缺少 {key} 清單（不存在、不是清單或是空的）")
++        for entry in entries:
++            if not isinstance(entry, dict) or not isinstance(entry.get(name_key), str):
++                raise ValueError(f"登記冊 {key} 裡有項目沒有字串的 {name_key}")
++            for aspect in aspects:
++                if not isinstance(entry.get(aspect), dict):
++                    raise ValueError(f"登記冊 {key} 的 {entry[name_key]} 缺少 {aspect}（要是物件）")
++    # the shell is right; now every cell (state, evidence/reason...) must obey the registry's own rules -- the same
++    # `registry_problems` CI runs -- so a cell without `state`, or `done` without evidence, cannot pass as finished
++    try:
++        problems = registry_problems(registry, load_error_catalog())
++    except Exception as exc:    # noqa: BLE001 -- whatever the validator trips over, the registry is unreadable, not fine
++        raise ValueError(f"登記冊結構無法驗證（{type(exc).__name__}: {exc}）") from exc
++    if problems:
++        raise ValueError(f"登記冊本身不符合登記冊的規則（{len(problems)} 處）：" + "；".join(problems[:3]) + ("…" if len(problems) > 3 else ""))
++
++
+ def load_registry_from_main(root: Path = ROOT) -> dict[str, Any]:
+     shown = subprocess.run(["git", "-C", str(root), "show", "origin/main:src/trade_alerts/catalog/fleet-rollout-registry.json"],
+                            capture_output=True, text=True)
+@@ -191,23 +255,36 @@ def main(argv: list[str] | None = None) -> int:
+     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+     parser.add_argument("page", nargs="?", type=Path, help="the progress page .html (its ITEMS are checked)")
+     parser.add_argument("--items-json", type=Path, help="a JSON list of items instead of a page")
++    parser.add_argument("--db-dir", type=Path, help="an ArtifactData export of the progress page's database (checklist/ and meta/)")
+     parser.add_argument("--registry", type=Path, help="a registry JSON file (default: origin/main of this repo; run `git fetch` first)")
+     args = parser.parse_args(argv)
+-    if bool(args.page) == bool(args.items_json):
+-        parser.error("give exactly one of: the page, or --items-json")
++    if sum(map(bool, (args.page, args.items_json, args.db_dir))) != 1:
++        print("✗ 要恰好給一個來源：--db-dir、--items-json 或頁面檔（給了零個或多個）")
++        return 1
+     watch: set[str] = set()
+     try:
+-        if args.items_json:
++        if args.db_dir:
++            items, watch = load_db_export(args.db_dir)
++        elif args.items_json:
+             items = json.loads(args.items_json.read_text(encoding="utf-8"))
+         else:
+             text = args.page.read_text(encoding="utf-8")
+             items, watch = extract_items(text), extract_watch_ids(text)
+-    except ValueError as exc:
++    except (ValueError, OSError) as exc:
+         print(f"✗ {exc}")
+         return 1
+-    registry = load_rollout_registry(args.registry) if args.registry else load_registry_from_main()
++    try:
++        registry = load_rollout_registry(args.registry) if args.registry else load_registry_from_main()
++        check_registry_shape(registry)
++    except (ValueError, OSError, RuntimeError) as exc:      # missing / unreadable / broken registry file, or no origin/main to read it from
++        print(f"✗ 讀不到登記冊：{exc}")
++        return 1
+     linked = [i for i in items if "registry" in i]
+-    problems = link_problems(items, registry, watch)
++    try:
++        problems = link_problems(items, registry, watch)
++    except (KeyError, TypeError, AttributeError) as exc:    # a shape the checks above did not foresee: an error, not a traceback
++        print(f"✗ 連結檢查讀不懂資料：{type(exc).__name__}: {exc}")
++        return 1
+     print(f"進度項目 {len(items)} 項，其中 {len(linked)} 項連了登記冊格子；問題 {len(problems)} 個")
+     for line in problems:
+         print("  ✗ " + line)
+diff --git a/tests/test_progress_links.py b/tests/test_progress_links.py
+index c338cbc..9e828f9 100644
+--- a/tests/test_progress_links.py
++++ b/tests/test_progress_links.py
+@@ -233,3 +233,197 @@ def test_every_spelling_of_the_registry_key_in_an_unreadable_item_is_an_error(li
+ def test_registry_in_ordinary_text_without_a_colon_is_not_a_field():
+     page = 'var ITEMS = [\n    {"id": "a", "status": "done", "detail": "加 registry 欄與 the registry (cells)"},\n  ];'
+     assert [i["id"] for i in cpl.extract_items(page)] == ["a"]
++
++
++# --- phase-sync5: the page is a static shell, the items are checked from a database export ---------------------------
++
++def _export(tmp_path, items, watch=({"id": "w-1", "note": "n"},), watch_raw=None):
++    (tmp_path / "checklist").mkdir()
++    (tmp_path / "meta").mkdir()
++    for it in items:
++        (tmp_path / "checklist" / f"{it['id']}.json").write_text(json.dumps(it), encoding="utf-8")
++    (tmp_path / "meta" / "watch.json").write_text(watch_raw if watch_raw is not None else json.dumps({"items": list(watch)}), encoding="utf-8")
++    return tmp_path
++
++
++def test_a_db_export_is_read_and_checked(tmp_path, capsys):
++    reg = tmp_path / "registry.json"
++    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
++    reg.write_text(json.dumps(real), encoding="utf-8")
++    cap = next(c for c in real["capabilities"] if any(s["state"] == "pending" for s in c["status"].values()))
++    project = next(p for p, s in cap["status"].items() if s["state"] == "pending")
++    export = tmp_path / "db"
++    export.mkdir()
++    _export(export, [{"id": "plain", "status": "todo", "title": "t"},
++                     {"id": "bad", "status": "done", "title": "t", "registry": [f"cap:{cap['id']}@{project}"]}])
++    assert cpl.main(["--db-dir", str(export), "--registry", str(reg)]) == 1
++    assert "已完成" in capsys.readouterr().out
++    items, watch = cpl.load_db_export(export)
++    assert {i["id"] for i in items} == {"plain", "bad"} and watch == {"w-1"}
++
++
++def test_watch_ids_from_the_export_exempt_an_open_item(tmp_path):
++    export = _export(tmp_path, [{"id": "w-1", "status": "waiting", "title": "t", "registry": ["cap:x.cap@seykota"]}])
++    items, watch = cpl.load_db_export(export)
++    assert cpl.link_problems(items, registry(), watch) == []
++    assert cpl.link_problems(items, registry(), set())          # without the exemption the finished cell says close it
++
++
++def test_an_unreadable_db_export_is_an_error_never_an_empty_list(tmp_path):
++    with pytest.raises(ValueError, match="沒有任何項目檔"):
++        cpl.load_db_export(tmp_path)                             # no checklist directory at all
++    (tmp_path / "checklist").mkdir()
++    with pytest.raises(ValueError, match="沒有任何項目檔"):
++        cpl.load_db_export(tmp_path)                             # directory present, nothing in it
++
++
++@pytest.mark.parametrize("name, content, message", [
++    ("a.json", "{not json", "不是有效的 JSON"),
++    ("a.json", "[1, 2]", "不是 JSON 物件"),
++    ("a.json", json.dumps({"id": "other", "status": "todo"}), "跟檔名不一致"),
++    ("a.json", json.dumps({"status": "todo"}), "跟檔名不一致"),
++])
++def test_a_bad_item_file_in_the_export_is_an_error(tmp_path, name, content, message):
++    (tmp_path / "checklist").mkdir()
++    (tmp_path / "checklist" / name).write_text(content, encoding="utf-8")
++    with pytest.raises(ValueError, match=message):
++        cpl.load_db_export(tmp_path)
++
++
++@pytest.mark.parametrize("watch_raw", [None, "{broken", json.dumps({"items": "no"}), json.dumps({"items": [{"note": "no id"}]}),
++                                       json.dumps([1])])
++def test_a_missing_or_broken_watch_list_is_an_error(tmp_path, watch_raw):
++    export = _export(tmp_path, [{"id": "a", "status": "todo", "title": "t"}], watch_raw="x")
++    if watch_raw is None:
++        (export / "meta" / "watch.json").unlink()
++    else:
++        (export / "meta" / "watch.json").write_text(watch_raw, encoding="utf-8")
++    with pytest.raises(ValueError):
++        cpl.load_db_export(export)
++
++
++def test_the_cli_takes_exactly_one_source_and_the_static_shell_page_is_refused(tmp_path, capsys):
++    # review of #206: a usage error is exit code 1 like every other error here (argparse's parser.error would give 2)
++    assert cpl.main(["--db-dir", str(tmp_path), "--items-json", str(tmp_path / "x.json")]) == 1
++    assert cpl.main([]) == 1
++    assert "恰好給一個來源" in capsys.readouterr().out
++    shell = tmp_path / "shell.html"
++    shell.write_text("<script>var WATCH = [];</script>", encoding="utf-8")        # a shell has no ITEMS block
++    assert cpl.main([str(shell), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
++    assert "--db-dir" in capsys.readouterr().out
++    assert cpl.main(["--db-dir", str(tmp_path / "missing")]) == 1                 # unreadable export exits 1, not 0
++
++
++def test_an_item_file_that_cannot_be_read_is_a_controlled_error_with_exit_1(tmp_path, capsys):
++    """Review of #206: `checklist/a.json` is a directory -> IsADirectoryError (an OSError) used to escape as a traceback."""
++    export = _export(tmp_path, [{"id": "ok", "status": "todo", "title": "t"}])
++    (export / "checklist" / "a.json").mkdir()
++    with pytest.raises(ValueError, match="讀不到"):
++        cpl.load_db_export(export)
++    assert cpl.main(["--db-dir", str(export), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
++    assert "讀不到" in capsys.readouterr().out
++    missing_json = tmp_path / "none.json"
++    assert cpl.main(["--items-json", str(missing_json), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
++    assert cpl.main([str(tmp_path / "none.html"), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
++
++
++def test_an_unreadable_registry_is_a_controlled_error_with_exit_1(tmp_path, capsys, monkeypatch):
++    """Review of #206 (round 2): --registry missing / broken JSON, and no origin/main, used to escape as a traceback."""
++    export = _export(tmp_path, [{"id": "ok", "status": "todo", "title": "t"}])
++    assert cpl.main(["--db-dir", str(export), "--registry", str(tmp_path / "nonexistent.json")]) == 1
++    assert "讀不到登記冊" in capsys.readouterr().out
++    broken = tmp_path / "broken.json"
++    broken.write_text("{broken", encoding="utf-8")
++    assert cpl.main(["--db-dir", str(export), "--registry", str(broken)]) == 1
++    assert "讀不到登記冊" in capsys.readouterr().out
++    as_dir = tmp_path / "dir.json"
++    as_dir.mkdir()
++    assert cpl.main(["--db-dir", str(export), "--registry", str(as_dir)]) == 1
++
++    def no_origin(root=cpl.ROOT):
++        raise RuntimeError("cannot read the registry from origin/main in /x: fatal: bad revision")
++    monkeypatch.setattr(cpl, "load_registry_from_main", no_origin)
++    assert cpl.main(["--db-dir", str(export)]) == 1
++    assert "origin/main" in capsys.readouterr().out
++
++
++def _registry_file(tmp_path, mutate):
++    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
++    mutate(real)
++    path = tmp_path / "reg.json"
++    path.write_text(json.dumps(real), encoding="utf-8")
++    return path
++
++
++@pytest.mark.parametrize("name, mutate", [
++    ("no catalog", lambda r: r.pop("catalog")),
++    ("no capabilities", lambda r: r.pop("capabilities")),
++    ("empty catalog", lambda r: r.__setitem__("catalog", [])),
++    ("capabilities not a list", lambda r: r.__setitem__("capabilities", {"id": "x"})),
++    ("capability without id", lambda r: r["capabilities"][0].pop("id")),
++    ("capability without status", lambda r: r["capabilities"][0].pop("status")),
++    ("rule without code", lambda r: r["catalog"][0].pop("code")),
++    ("rule without behaviour", lambda r: r["catalog"][0].pop("behaviour")),
++    ("rule emits_event not an object", lambda r: r["catalog"][0].__setitem__("emits_event", [])),
++])
++def test_a_registry_with_the_wrong_shape_is_an_error_not_a_silent_pass(tmp_path, capsys, name, mutate):
++    """Review of #206 (round 3): valid JSON without `catalog` made a link into a rule-less registry check nothing -> exit 0."""
++    (tmp_path / "db").mkdir()
++    export = _export(tmp_path / "db", [{"id": "i-1", "status": "done", "title": "t", "registry": ["cap:x.cap@seykota"]}])
++    reg = _registry_file(tmp_path, mutate)
++    assert cpl.main(["--db-dir", str(export), "--registry", str(reg)]) == 1, name
++    assert "讀不到登記冊" in capsys.readouterr().out
++
++
++def test_the_real_registry_has_the_shape_the_checker_requires():
++    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
++    cpl.check_registry_shape(real)
++
++
++def _first_cap_and_project(real):
++    cap = real["capabilities"][0]
++    return cap, next(iter(cap["status"]))
++
++
++@pytest.mark.parametrize("name, cell", [
++    ("cell is an empty object (no state)", lambda st: {}),
++    ("done without evidence", lambda st: {"state": "done"}),
++    ("unknown state", lambda st: {"state": "finished", "evidence": "e"}),
++    ("pending without reason", lambda st: {"state": "pending"}),
++    ("cell is not an object", lambda st: "done"),
++])
++def test_a_registry_cell_that_breaks_the_registry_rules_cannot_pass_as_finished(tmp_path, capsys, name, cell):
++    """Review of #206 (round 4): a cell without `state` raised KeyError; `done` without evidence counted as finished."""
++    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
++    cap, project = _first_cap_and_project(real)
++    cap["status"][project] = cell(cap["status"][project])
++    reg = tmp_path / "reg.json"
++    reg.write_text(json.dumps(real), encoding="utf-8")
++    (tmp_path / "db").mkdir()
++    export = _export(tmp_path / "db", [{"id": "i-1", "status": "done", "title": "t", "registry": [f"cap:{cap['id']}@{project}"]}])
++    assert cpl.main(["--db-dir", str(export), "--registry", str(reg)]) == 1, name
++    assert "讀不到登記冊" in capsys.readouterr().out
++
++
++def test_a_rule_cell_without_state_is_refused_too(tmp_path, capsys):
++    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
++    row = real["catalog"][0]
++    project = next(iter(row["behaviour"]))
++    row["behaviour"][project] = {}
++    reg = tmp_path / "reg.json"
++    reg.write_text(json.dumps(real), encoding="utf-8")
++    (tmp_path / "db").mkdir()
++    export = _export(tmp_path / "db", [{"id": "i-1", "status": "done", "title": "t", "registry": [f"rule:{row['code']}#behaviour"]}])
++    assert cpl.main(["--db-dir", str(export), "--registry", str(reg)]) == 1
++    assert "讀不到登記冊" in capsys.readouterr().out
++
++
++def test_an_unforeseen_shape_in_the_link_check_is_an_error_not_a_traceback(tmp_path, capsys, monkeypatch):
++    (tmp_path / "db").mkdir()
++    export = _export(tmp_path / "db", [{"id": "i-1", "status": "done", "title": "t", "registry": ["cap:x@seykota"]}])
++
++    def boom(items, registry, watch_ids=()):
++        raise KeyError("state")
++    monkeypatch.setattr(cpl, "link_problems", boom)
++    assert cpl.main(["--db-dir", str(export), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
++    assert "連結檢查讀不懂資料" in capsys.readouterr().out
