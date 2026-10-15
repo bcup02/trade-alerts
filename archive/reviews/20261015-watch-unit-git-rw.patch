@@ -1,0 +1,27 @@
+diff --git a/deploy/observation-watch/observation-watch.service b/deploy/observation-watch/observation-watch.service
+index d2d91d4..39bf833 100644
+--- a/deploy/observation-watch/observation-watch.service
++++ b/deploy/observation-watch/observation-watch.service
+@@ -16,3 +16,6 @@ PrivateTmp=true
+ ProtectSystem=strict
+ ProtectHome=read-only
+ ReadWritePaths=/home/@WATCH_USER@/.local/state/observation-watch
++# The registry checks `git fetch` the registry clone and the four strategy clones (writes FETCH_HEAD and refs under .git);
++# with the home read-only that failed ("Read-only file system") and phase-sync1/4 reported broken.  "-" = skip a missing clone.
++ReadWritePaths=-/home/@WATCH_USER@/trade-alerts/.git -/home/@WATCH_USER@/ed-seykota-systematic-trend-following/.git -/home/@WATCH_USER@/mexc-4h-momentum-trailing-stop/.git -/home/@WATCH_USER@/my-crypto-bot/.git -/home/@WATCH_USER@/btc-bull-market-competition/.git
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index 6cb602b..0681b02 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -918,3 +918,11 @@ def test_citations_that_all_miss_the_sources_commit_are_an_error_not_all_clear(r
+     _publish_registry(repos, _drift_registry(c1, ["src/a.py"]))              # neither src/a.py nor src/b.py exists at c1
+     with pytest.raises(ow.RemoteError, match="一個都找不到"):
+         ow.check_registry_drift(ctx(Blobs({})))
++
++
++def test_the_unit_lets_the_watcher_fetch_every_clone_it_refreshes():
++    """Regression: ProtectHome=read-only made `git fetch` fail on FETCH_HEAD, so registry-awaits/-drift reported broken."""
++    unit = (Path(__file__).resolve().parents[1] / "deploy" / "observation-watch" / "observation-watch.service").read_text(encoding="utf-8")
++    writable = " ".join(line.split("=", 1)[1] for line in unit.splitlines() if line.startswith("ReadWritePaths="))
++    for name in ("trade-alerts", *ow.REPOS.values()):
++        assert f"-/home/@WATCH_USER@/{name}/.git" in writable.split(), name
