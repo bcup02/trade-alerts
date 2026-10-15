@@ -436,7 +436,7 @@ def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
     assert len(ids) == len(set(ids))
     assert all(c.covers and c.title for c in ow.CHECKS)
     covered = {i for c in ow.CHECKS for i in c.covers}
-    assert {"phase-sync1", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x1"} <= covered
+    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x1"} <= covered
 
 
 # --- deployment files ----------------------------------------------------------------------------------------------
@@ -742,3 +742,120 @@ def test_observed_also_lists_the_cells_still_waiting(repos):
     assert result.state == ow.OBSERVED
     assert any(e.startswith("（仍在等）") and "seykota" in e for e in result.evidence)
     assert not any("seykota" in e for e in result.evidence if not e.startswith("（仍在等）"))
+
+
+# --- registry cells whose cited files changed on A1 (phase-sync4) --------------------------------------------------
+
+def _drift_registry(src_commit, cites):
+    """A registry whose mycrypto sources is ``src_commit`` and with one done capability cell citing ``cites``."""
+    return {"sources": {"mycrypto": {"commit": src_commit}},
+            "capabilities": [{"id": "x.cap", "status": {"mycrypto": {"state": "done", "evidence": "；".join(f"{c}:12 x" for c in cites)},
+                                                      "seykota": {"state": "pending", "phase": "p", "reason": "src/never.py:1 is ignored"}}}],
+            "catalog": [{"code": "MYC.X", "behaviour": {"mycrypto": {"state": "done", "evidence": "src/b.py:3 y"}},
+                         "emits_event": {"mycrypto": {"state": "pending", "phase": "p", "reason": "src/c.py:3 ignored"}}}]}
+
+
+class Blobs(FakeRemote):
+    def __init__(self, blobs):
+        super().__init__()
+        self.blobs, self.asked = blobs, []
+
+    def git_blobs(self, host, key, paths):
+        self.asked.append((host, key, list(paths)))
+        return {p: self.blobs[p] for p in paths if p in self.blobs}
+
+
+def _write(repo, files):
+    for name, content in files.items():
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        (repo / name).write_text(content, encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "c")
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def _blob(repo, commit, path):
+    return _git(repo, "rev-parse", f"{commit}:{path}")
+
+
+def test_cited_files_are_the_files_of_done_cells_only():
+    reg = _drift_registry("abc1234", ["src/a.py"])
+    found = ow.cited_files(reg)
+    assert set(found) == {"mycrypto"}                                        # the pending seykota cell and pending rule aspect add nothing
+    assert set(found["mycrypto"]) == {"src/a.py", "src/b.py"}
+    assert found["mycrypto"]["src/a.py"] == ["能力 x.cap"] and found["mycrypto"]["src/b.py"] == ["規則 MYC.X behaviour"]
+
+
+def test_a_cited_file_that_differs_on_a1_from_the_sources_commit_is_flagged(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _write(myc, {"src/a.py": "one", "src/b.py": "stable"})
+    _publish_registry(repos, _drift_registry(c1, ["src/a.py"]))
+    a_old, b = _blob(myc, c1, "src/a.py"), _blob(myc, c1, "src/b.py")
+    same = Blobs({"src/a.py": a_old, "src/b.py": b})
+    assert ow.check_registry_drift(ctx(same)).state == ow.WAITING and "2 個檔案" in ow.check_registry_drift(ctx(same)).summary
+    changed = Blobs({"src/a.py": "f" * 40, "src/b.py": b})                       # A1 has another version of a.py
+    result = ow.check_registry_drift(ctx(changed))
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable
+    assert len(result.evidence) == 1 and "src/a.py" in result.evidence[0] and "能力 x.cap" in result.evidence[0]
+    assert "1 個在 A1 上和 sources 提交不一樣，影響 1 格" in result.summary
+    assert changed.asked == [("a1", "mycrypto", ["src/a.py", "src/b.py"])] * 1 or changed.asked[0][2] == ["src/a.py", "src/b.py"]
+
+
+def test_a_file_missing_on_a1_is_drift_and_a_file_missing_at_sources_is_not(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _write(myc, {"src/a.py": "one"})
+    _publish_registry(repos, _drift_registry(c1, ["src/a.py", "src/not_in_that_repo.py"]))
+    gone = Blobs({})                                                         # A1 has no src/a.py at all
+    result = ow.check_registry_drift(ctx(gone))
+    assert result.state == ow.OBSERVED and any("A1 上沒有這個檔案" in e for e in result.evidence)
+    assert not any("not_in_that_repo" in e for e in result.evidence)         # not a file of that repo: left to verify_registry_evidence
+    assert gone.asked[0][2] == ["src/a.py"]                                  # and not even asked about
+
+
+def test_the_drift_key_changes_when_a1_moves_again_so_it_is_announced_again(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _write(myc, {"src/a.py": "one", "src/b.py": "b"})
+    _publish_registry(repos, _drift_registry(c1, ["src/a.py"]))
+    b = _blob(myc, c1, "src/b.py")
+    first = ow.check_registry_drift(ctx(Blobs({"src/a.py": "1" * 40, "src/b.py": b})))
+    again = ow.check_registry_drift(ctx(Blobs({"src/a.py": "1" * 40, "src/b.py": b})))
+    later = ow.check_registry_drift(ctx(Blobs({"src/a.py": "2" * 40, "src/b.py": b})))
+    assert first.key == again.key and first.key != later.key
+
+
+def test_an_unknown_sources_commit_is_an_error(repos):
+    _commit(repos / ow.REPOS["mycrypto"], "a")
+    _publish_registry(repos, _drift_registry("deadbeef" * 5, ["src/a.py"]))
+    with pytest.raises(ow.RemoteError, match="sources commit"):
+        ow.check_registry_drift(ctx(Blobs({})))
+
+
+def test_a_registry_that_cannot_be_refreshed_is_an_error_here_too(repos):
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _write(myc, {"src/a.py": "one"})
+    _publish_registry(repos, _drift_registry(c1, ["src/a.py"]))
+    _git(repos / "trade-alerts", "remote", "add", "origin", str(repos / "no-such-remote"))
+    with pytest.raises(ow.RemoteError, match="cannot refresh"):
+        ow.check_registry_drift(ctx(Blobs({})))
+
+
+def test_git_blobs_asks_only_for_ls_tree_of_safe_paths_in_the_listed_clones(monkeypatch):
+    seen = []
+    remote = ow.Remote("k")
+    sha = "a" * 40
+    monkeypatch.setattr(remote, "_run", lambda host, words: seen.append((host, words)) or f"100644 blob {sha}\tsrc/a.py\n")
+    assert remote.git_blobs("a1", "mycrypto", ["src/a.py", "src/zzz.py"]) == {"src/a.py": sha}
+    host, words = seen[0]
+    assert host == "a1" and words[words.index("ls-tree"):words.index("ls-tree") + 3] == ["ls-tree", "-r", "HEAD"]
+    assert words[words.index("--") + 1:] == ["src/a.py", "src/zzz.py"] and words[words.index("-C") + 1] == "/home/ubuntu/src/my-crypto-bot"
+    for bad in (["../etc/passwd"], ["src/../../x"], ["-rf"], ["a b"], ["a;id"], ["a\nb"], ["/abs/path"], [""], ["$(id)"], ["src/a.py", "--output=/x"]):
+        with pytest.raises(ow.RemoteError):
+            remote.git_blobs("a1", "mycrypto", bad)
+    for host, key in (("dev", "mycrypto"), ("a1", "ops-notify"), ("a1", "../x")):
+        with pytest.raises(ow.RemoteError):
+            remote.git_blobs(host, key, ["src/a.py"])
+    assert len(seen) == 1
+    many = [f"src/f{i}.py" for i in range(200)]
+    monkeypatch.setattr(remote, "_run", lambda host, words: seen.append((host, words)) or "")
+    remote.git_blobs("a1", "mycrypto", many)
+    assert len(seen) == 1 + 3                                                # chunks of 80

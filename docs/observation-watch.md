@@ -43,6 +43,14 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項�
 - 限制：「A1 部署複本的 HEAD」是部署的代理——部署流程是先 pull 再跑安裝腳本，兩步之間或只 pull 沒安裝時會不準；要確認實際在跑的檔案用格子裡的 `git hash-object` 比對。開發機的 repo 要能 fetch（工具會先 `git fetch`，失敗不致命）。
 - 不在這個檢查範圍：不寫 `awaits_commit` 的未做格子（例如等手機測試、等使用者決定、等還沒開 PR 的工作）——這些沒有提交可比對。
 
+## 登記冊引用的檔案在 A1 上變了（`registry-drift`，phase-sync4）
+一致性登記冊每個「已做」格子的證據引用 `檔案:行號`，那是 `sources` 提交上的位置。A1 之後部署了別的版本，檔案可能改過、行號位移、說法不再成立，而格子還寫著當初的樣子。
+
+- 每 30 分鐘：讀 `origin/main` 的登記冊，收集所有已做格子引用的檔案；對每支策略，比較「`sources` 提交上那個檔案的 blob」與「A1 部署複本（`/home/ubuntu/src/<repo>`）HEAD 上的 blob」（A1 端只准 `git ls-tree -r HEAD -- <路徑>`，路徑要長得像 repo 內相對路徑）。
+- 有不同 → `observed`＋`needs_human`，Telegram 點名是哪幾個檔案、影響哪幾格；key 含 A1 上的 blob，A1 又改了會再通知一次。全部相同 → `waiting`。`sources` 提交在本機找不到、登記冊 repo 抓不到最新（fetch 失敗）→ `error`。
+- 處理：看那個檔案從 `sources` 到 A1 現行版改了什麼；行號位移就照 f-27／f-18 的流程把該策略的 `sources` 換到 A1 現行版（`verify_registry_evidence.py --relocate`，逐筆比對舊新行文字），並重新確認受影響格子的說法；換完偵測自己恢復 `waiting`。
+- 限制：只比對「引用到的檔案」，不看檔案改了什麼，所以改了無關的行也會點名（寧可多報）；A1 部署複本的 HEAD 是部署的代理（見上一節）；只讀「已做」格子的 `evidence` 欄，未做格子的 `reason` 不算。
+
 ## 新增一個檢查
 在 `scripts/observation_watch.py` 寫一個 `check_xxx(ctx) -> Result`，加進 `CHECKS`（`covers` 填進度頁項目編號），
 在 `tests/test_observation_watch.py` 用 `FakeRemote` 寫：等待、通過、失敗各一個測試。判斷不到的事（手機上看到的樣子）設 `needs_human=True`，不要假裝能自動驗證。
