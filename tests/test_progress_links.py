@@ -303,10 +303,25 @@ def test_a_missing_or_broken_watch_list_is_an_error(tmp_path, watch_raw):
 
 
 def test_the_cli_takes_exactly_one_source_and_the_static_shell_page_is_refused(tmp_path, capsys):
-    with pytest.raises(SystemExit):
-        cpl.main(["--db-dir", str(tmp_path), "--items-json", str(tmp_path / "x.json")])
+    # review of #206: a usage error is exit code 1 like every other error here (argparse's parser.error would give 2)
+    assert cpl.main(["--db-dir", str(tmp_path), "--items-json", str(tmp_path / "x.json")]) == 1
+    assert cpl.main([]) == 1
+    assert "恰好給一個來源" in capsys.readouterr().out
     shell = tmp_path / "shell.html"
     shell.write_text("<script>var WATCH = [];</script>", encoding="utf-8")        # a shell has no ITEMS block
     assert cpl.main([str(shell), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
     assert "--db-dir" in capsys.readouterr().out
     assert cpl.main(["--db-dir", str(tmp_path / "missing")]) == 1                 # unreadable export exits 1, not 0
+
+
+def test_an_item_file_that_cannot_be_read_is_a_controlled_error_with_exit_1(tmp_path, capsys):
+    """Review of #206: `checklist/a.json` is a directory -> IsADirectoryError (an OSError) used to escape as a traceback."""
+    export = _export(tmp_path, [{"id": "ok", "status": "todo", "title": "t"}])
+    (export / "checklist" / "a.json").mkdir()
+    with pytest.raises(ValueError, match="讀不到"):
+        cpl.load_db_export(export)
+    assert cpl.main(["--db-dir", str(export), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
+    assert "讀不到" in capsys.readouterr().out
+    missing_json = tmp_path / "none.json"
+    assert cpl.main(["--items-json", str(missing_json), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
+    assert cpl.main([str(tmp_path / "none.html"), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1

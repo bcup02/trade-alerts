@@ -119,6 +119,8 @@ def load_db_export(directory: Path) -> tuple[list[dict[str, Any]], set[str]]:
     for path in files:
         try:
             item = json.loads(path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            raise ValueError(f"讀不到 {path}：{exc}") from exc
         except ValueError as exc:
             raise ValueError(f"{path.name} 不是有效的 JSON：{exc}") from exc
         if not isinstance(item, dict):
@@ -231,7 +233,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--registry", type=Path, help="a registry JSON file (default: origin/main of this repo; run `git fetch` first)")
     args = parser.parse_args(argv)
     if sum(map(bool, (args.page, args.items_json, args.db_dir))) != 1:
-        parser.error("give exactly one of: --db-dir, --items-json, or the page")
+        print("✗ 要恰好給一個來源：--db-dir、--items-json 或頁面檔（給了零個或多個）")
+        return 1
     watch: set[str] = set()
     try:
         if args.db_dir:
@@ -241,7 +244,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             text = args.page.read_text(encoding="utf-8")
             items, watch = extract_items(text), extract_watch_ids(text)
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
         print(f"✗ {exc}")
         return 1
     registry = load_rollout_registry(args.registry) if args.registry else load_registry_from_main()
