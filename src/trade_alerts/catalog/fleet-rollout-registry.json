@@ -117,7 +117,7 @@
           "state": "done",
           "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed 只處理 EXCHANGE_TARGET_UNSAFE 與 FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 兩種：重啟後把原本擋下的守門檢查再跑一次，通過就追加 safe_halt_cleared（method=config_fixed_restart）、清掉暫停並記 safe_halt_cleared_after_config_fix（:599）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫它；解除工具 src/seykota_bot/safe_halt_resume.py:134 仍刻意拒絕這兩類（只准改好設定重啟）。PR #79（f-12）。",
           "verified_at": "2026-10-15",
-          "limit": "A1 沒有發生過這兩類設定錯誤暫停，沒有實際觸發過；錯誤清單 ERR-009／ERR-010 的處理步驟與追查指令仍寫「已知缺陷：重啟後清不掉」，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
+          "limit": "A1 沒有發生過這兩類設定錯誤暫停，沒有實際觸發過；錯誤清單 ERR-009／ERR-010 的處理步驟與追查指令已改成現況（共用庫 v0.30.8，2026-10-15 台北隨 A1 部署，A1 讀得到的錯誤清單已沒有「已知缺陷」文字）；新文字沒有在真實暫停時被收到過。"
         },
         "mycrypto": {
           "state": "n/a",
@@ -964,7 +964,7 @@
           "state": "done",
           "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。",
           "verified_at": "2026-10-15",
-          "limit": "A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令仍寫『已知缺陷：重啟後清不掉』，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
+          "limit": "A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令已改成現況（共用庫 v0.30.8，2026-10-15 台北隨 A1 部署，A1 讀得到的錯誤清單已沒有『已知缺陷』文字）；新文字沒有在真實暫停時被收到過。"
         }
       },
       "emits_event": {
@@ -982,7 +982,7 @@
           "state": "done",
           "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。",
           "verified_at": "2026-10-15",
-          "limit": "A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令仍寫『已知缺陷：重啟後清不掉』，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
+          "limit": "A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令已改成現況（共用庫 v0.30.8，2026-10-15 台北隨 A1 部署，A1 讀得到的錯誤清單已沒有『已知缺陷』文字）；新文字沒有在真實暫停時被收到過。"
         }
       },
       "emits_event": {
@@ -2117,199 +2117,24 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "repair_bot.detect_propose",
+      "id": "latch.restart_only_clear",
       "type": "updated",
-      "project": "momentum",
-      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.verified_close",
-      "type": "updated",
-      "project": "momentum",
-      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.pause_brake",
-      "type": "updated",
-      "project": "momentum",
-      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_export.writer",
-      "type": "updated",
-      "project": "momentum",
-      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.export_relay_enabled",
-      "type": "updated",
-      "project": "momentum",
-      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "notify.line_first_notice",
-      "type": "updated",
-      "project": "momentum",
-      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.unrecorded_fill_handling",
-      "type": "updated",
-      "project": "momentum",
-      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.recurrence_escalation",
-      "type": "updated",
-      "project": "momentum",
-      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "notify.error_id",
-      "type": "updated",
-      "project": "momentum",
-      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.pending_age_cap",
-      "type": "updated",
-      "project": "momentum",
-      "note": "引用行號隨 sources 換版更新；並補上 f-32 的快照新鮮度前提（審閱 #204 要求）。"
+      "project": "seykota",
+      "note": "限制句更新：ERR-009／010 的過時處理步驟已隨共用庫 v0.30.8 上 A1（f-46／f-48）。"
     },
     {
       "kind": "rule",
-      "id": "MOM.PROTECTION_UNVERIFIED",
+      "id": "SEY.EXCHANGE_TARGET_UNSAFE",
       "type": "updated",
-      "project": "momentum",
-      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+      "project": "seykota",
+      "note": "行為格限制句更新：處理步驟已改成現況（共用庫 v0.30.8 上 A1）。"
     },
     {
       "kind": "rule",
-      "id": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "id": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
       "type": "updated",
-      "project": "momentum",
-      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.UNRECORDED_FILL_CORRECTED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.UNRECORDED_FILL_CORRECTED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
-      "type": "updated",
-      "project": "momentum",
-      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
-      "type": "updated",
-      "project": "momentum",
-      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "BTC.STATE_FILE_CORRUPT",
-      "type": "updated",
-      "project": "btc-competition",
-      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
-      "type": "updated",
-      "project": "momentum",
-      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
-      "type": "updated",
-      "project": "momentum",
-      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.LEDGER_PENDING_EXPIRED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MOM.LEDGER_PENDING_EXPIRED",
-      "type": "updated",
-      "project": "momentum",
-      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+      "project": "seykota",
+      "note": "行為格限制句更新：處理步驟已改成現況（共用庫 v0.30.8 上 A1）。"
     }
   ]
 }
