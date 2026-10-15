@@ -1,0 +1,1216 @@
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index 7a310cb..fee1ec1 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -1,4 +1,5 @@
+ <title>機隊風險登記冊</title>
++<!-- fleet-guide-digest: 5f18d606e782e8cf -->
+ <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+ <style>
+   :root{
+@@ -149,6 +150,7 @@
+   <div class="foot">
+     資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-10-15 盤點）。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
++    頁面版本碼 <code>5f18d606e782e8cf</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
+   </div>
+ </div>
+ <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 1725b0e..245480e 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -1,4 +1,5 @@
+ <title>機隊一致性登記冊</title>
++<!-- fleet-guide-digest: 0c2166282f825c55 -->
+ <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+ <style>
+   :root{
+@@ -205,13 +206,14 @@
+   <p class="group-sub">只列還有未做格子的關卡；「未做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
+   <div id="phases" class="phase-list"></div>
+ 
+-  <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">50 條</span></div>
++  <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">51 條</span></div>
+   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+   <div id="glossaryHost"></div>
+   <div class="foot">
+     資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-15 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 489bbcd</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 53e04ce</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 2ee102c</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 7d499bb</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
++    頁面版本碼 <code>0c2166282f825c55</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
+   </div>
+ </div>
+ <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>
+@@ -896,6 +898,16 @@
+      "note": null,
+      "retired": [],
+      "zh": "寫進事件日誌"
++    },
++    {
++     "definition": "登記冊頁面第 2 行與頁尾的 16 位代碼，由頁面內容算出；拿已發布頁面的版本碼跟 main 現在產生的比，就知道要不要重發、頁面有沒有被改過。",
++     "en": [
++      "fleet-guide-digest"
++     ],
++     "id": "register.page_digest",
++     "note": null,
++     "retired": [],
++     "zh": "頁面版本碼"
+     }
+    ]
+   }
+@@ -1033,9 +1045,9 @@
+     "btc-competition": "na",
+     "momentum": "na",
+     "mycrypto": "na",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "latch.restart_only_clear",
+    "kind": "cap",
+    "rows": [
+@@ -1526,12 +1538,12 @@
+    "anchor": "cap-ops_export.writer",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "done",
+     "momentum": "done",
+     "mycrypto": "done",
+     "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "ops_export.writer",
+    "kind": "cap",
+    "rows": [
+@@ -1650,12 +1662,12 @@
+    "anchor": "cap-notify.line_first_notice",
+    "complete": false,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "done",
+     "momentum": "done",
+     "mycrypto": "pending",
+     "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "notify.line_first_notice",
+    "kind": "cap",
+    "rows": [
+@@ -1894,7 +1906,7 @@
+    "title": "資金費同步"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-reconcile.google_projection_grace",
+    "complete": false,
+    "dots": {
+@@ -2208,12 +2220,12 @@
+    "anchor": "cap-repair_bot.recurrence_escalation",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "na",
+     "momentum": "done",
+     "mycrypto": "done",
+     "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "repair_bot.recurrence_escalation",
+    "kind": "cap",
+    "rows": [
+@@ -2266,16 +2278,16 @@
+    "title": "自動修補重複發生時升格通知"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-notify.error_id",
+    "complete": false,
+    "dots": {
+-    "btc-competition": "recent",
+-    "momentum": "recent",
++    "btc-competition": "done",
++    "momentum": "done",
+     "mycrypto": "pending",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "notify.error_id",
+    "kind": "cap",
+    "rows": [
+@@ -2452,7 +2464,7 @@
+    "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-reconcile.adopted_fills",
+    "complete": false,
+    "dots": {
+@@ -2514,7 +2526,7 @@
+    "title": "接手倉位與原生停損平倉的成交，對帳不再誤判成「帳本沒記」"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-projection.park_unconfirmed_correction",
+    "complete": false,
+    "dots": {
+@@ -2576,7 +2588,7 @@
+    "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-projection.requeue_parked",
+    "complete": false,
+    "dots": {
+@@ -2638,7 +2650,7 @@
+    "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
+   },
+   {
+-   "added_recent": true,
++   "added_recent": false,
+    "anchor": "cap-google.close_whole_trade_entry",
+    "complete": false,
+    "dots": {
+@@ -2700,7 +2712,7 @@
+    "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
+   },
+   {
+-   "added_recent": false,
++   "added_recent": true,
+    "anchor": "cap-google.spot_fill_row",
+    "complete": true,
+    "dots": {
+@@ -2753,7 +2765,7 @@
+        "aspect": null,
+        "phase": null,
+        "state": "done",
+-       "text": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：部署後競賽還沒有新的成交，第一次實際用 append_fill_v2 送出要等下一次每日調整（2026-10-09 台北 08:10）有成交；接收端的收單只用非機密探測驗證過（回簽章檢查，不是寫入）。"
++       "text": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。首次實際送出：2026-10-15 台北 08:10 的每日調整有 1 筆成交，08:15 以 append_fill_v2（spot_fill）送出，接收端 CONFIRMED（receiver_row 6），對帳一致（A1 唯讀查 audit/google-projection-outbox.jsonl 與對帳狀態，2026-10-15 台北）。限制：只看過這一次；表上那一列的儲存格內容（P 欄 spot_fill）沒有逐格讀回，靠接收端回覆 CONFIRMED 與對帳一致。"
+       }
+      ]
+     }
+@@ -3113,7 +3125,7 @@
+     "mycrypto": "none",
+     "seykota": "pending"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "SEY.EXCHANGE_TARGET_UNSAFE",
+    "kind": "rule",
+    "rows": [
+@@ -3148,7 +3160,7 @@
+     "mycrypto": "none",
+     "seykota": "pending"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+    "kind": "rule",
+    "rows": [
+@@ -3319,11 +3331,11 @@
+    "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "MOM.PROTECTION_UNVERIFIED",
+    "kind": "rule",
+    "rows": [
+@@ -3354,11 +3366,11 @@
+    "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "MOM.STATE_REPAIRED_SAFE_HALT",
+    "kind": "rule",
+    "rows": [
+@@ -3389,11 +3401,11 @@
+    "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "MOM.RUNTIME_CYCLE_FAILED",
+    "kind": "rule",
+    "rows": [
+@@ -3528,12 +3540,12 @@
+    "anchor": "rule-BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "done",
+     "momentum": "none",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+    "kind": "rule",
+    "rows": [
+@@ -3568,7 +3580,7 @@
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+    "kind": "rule",
+    "rows": [
+@@ -3598,12 +3610,12 @@
+    "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "done",
+     "momentum": "none",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "BTC.ORDER_STATUS_UNKNOWN",
+    "kind": "rule",
+    "rows": [
+@@ -3633,12 +3645,12 @@
+    "anchor": "rule-BTC.REBALANCE_PENDING",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "done",
+     "momentum": "none",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "BTC.REBALANCE_PENDING",
+    "kind": "rule",
+    "rows": [
+@@ -4901,11 +4913,11 @@
+    "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
+    "kind": "rule",
+    "rows": [
+@@ -4938,9 +4950,9 @@
+     "btc-competition": "none",
+     "momentum": "none",
+     "mycrypto": "none",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+    "kind": "rule",
+    "rows": [
+@@ -4970,12 +4982,12 @@
+    "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "done",
+     "momentum": "none",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+    "kind": "rule",
+    "rows": [
+@@ -5005,12 +5017,12 @@
+    "anchor": "rule-BTC.STATE_FILE_CORRUPT",
+    "complete": true,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "done",
+     "momentum": "none",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "BTC.STATE_FILE_CORRUPT",
+    "kind": "rule",
+    "rows": [
+@@ -5041,11 +5053,11 @@
+    "complete": true,
+    "dots": {
+     "btc-competition": "none",
+-    "momentum": "recent",
++    "momentum": "done",
+     "mycrypto": "none",
+     "seykota": "none"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+    "kind": "rule",
+    "rows": [
+@@ -5078,9 +5090,9 @@
+     "btc-competition": "none",
+     "momentum": "none",
+     "mycrypto": "none",
+-    "seykota": "recent"
++    "seykota": "done"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+    "kind": "rule",
+    "rows": [
+@@ -5110,12 +5122,12 @@
+    "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+    "complete": false,
+    "dots": {
+-    "btc-competition": "recent",
++    "btc-competition": "na",
+     "momentum": "pending",
+     "mycrypto": "na",
+     "seykota": "pending"
+    },
+-   "has_recent": true,
++   "has_recent": false,
+    "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+    "kind": "rule",
+    "rows": [
+@@ -5614,196 +5626,10 @@
+  },
+  "recent_summary": [
+   {
+-   "anchor": "cap-latch.restart_only_clear",
+-   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
+-   "project": "趨勢策略",
+-   "title": "「改好設定重啟」就能解除的安全暫停真的會被清掉"
+-  },
+-  {
+-   "anchor": "cap-ops_export.writer",
+-   "note": "競賽自己的安全暫停與狀態事件 10/4 起就寫進事件日誌並匯出，之前沒更新：改已做。",
+-   "project": "競賽策略",
+-   "title": "把要通知的事寫成匯出檔"
+-  },
+-  {
+-   "anchor": "cap-notify.line_first_notice",
+-   "note": "10/11 競賽 ERR-023 受控測試你手機收到兩則：改已做。",
+-   "project": "競賽策略",
+-   "title": "需要人處理的通知真的送到 LINE（只發第一則）"
+-  },
+-  {
+-   "anchor": "cap-notify.error_id",
+-   "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。",
+-   "project": "趨勢策略",
+-   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+-  },
+-  {
+-   "anchor": "cap-notify.error_id",
+-   "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。",
+-   "project": "動能策略",
+-   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+-  },
+-  {
+-   "anchor": "cap-notify.error_id",
+-   "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。",
+-   "project": "競賽策略",
+-   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+-  },
+-  {
+-   "anchor": "cap-reconcile.google_projection_grace",
+-   "note": "把『還沒看到擋掉誤報』的限制更正：10/9 已在 A1 實際看到（f-22f）。",
+-   "project": "動能策略",
+-   "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上"
+-  },
+-  {
+-   "anchor": "cap-notify.error_id",
+-   "note": "未做的理由改寫成現況（加密還沒實際把通知送到手機）。",
+-   "project": "加密策略",
+-   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+-  },
+-  {
+-   "anchor": "cap-reconcile.google_projection_grace",
+-   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
+-   "project": "加密策略",
+-   "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上"
+-  },
+-  {
+-   "anchor": "cap-reconcile.adopted_fills",
+-   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
+-   "project": "加密策略",
+-   "title": "接手倉位與原生停損平倉的成交，對帳不再誤判成「帳本沒記」"
+-  },
+-  {
+-   "anchor": "cap-projection.park_unconfirmed_correction",
+-   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
+-   "project": "加密策略",
+-   "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
+-  },
+-  {
+-   "anchor": "cap-projection.requeue_parked",
+-   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
+-   "project": "加密策略",
+-   "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
+-  },
+-  {
+-   "anchor": "cap-google.close_whole_trade_entry",
+-   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
+-   "project": "加密策略",
+-   "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
+-  },
+-  {
+-   "anchor": "cap-repair_bot.recurrence_escalation",
+-   "note": "競賽沒有漏記平倉修復機器人：依你的決定改不適用。",
+-   "project": "競賽策略",
+-   "title": "自動修補重複發生時升格通知"
+-  },
+-  {
+-   "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+-   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
+-   "project": "趨勢策略",
+-   "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
+-  },
+-  {
+-   "anchor": "rule-MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
+-   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
+-   "project": "動能策略",
+-   "title": "R3｜重啟後接管了一個帳本沒有記完的部位"
+-  },
+-  {
+-   "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+-   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
+-   "project": "競賽策略",
+-   "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
+-  },
+-  {
+-   "anchor": "rule-BTC.STATE_FILE_CORRUPT",
+-   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
+-   "project": "競賽策略",
+-   "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
+-  },
+-  {
+-   "anchor": "rule-BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+-   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
+-   "project": "競賽策略",
+-   "title": "R3｜出現負／不可能的餘額，本地帳本本身不可信"
+-  },
+-  {
+-   "anchor": "rule-BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+-   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
+-   "project": "競賽策略",
+-   "title": "R2｜連續 3 天該再平衡卻零成交"
+-  },
+-  {
+-   "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
+-   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
+-   "project": "競賽策略",
+-   "title": "R3｜送出的單 60 秒內確定不了有沒有成交"
+-  },
+-  {
+-   "anchor": "rule-BTC.REBALANCE_PENDING",
+-   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
+-   "project": "競賽策略",
+-   "title": "R0｜部分成交，目標權重尚未達成"
+-  },
+-  {
+-   "anchor": "rule-MOM.PROTECTION_UNVERIFIED",
+-   "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。",
+-   "project": "動能策略",
+-   "title": "R3｜原生移動停損無法驗證"
+-  },
+-  {
+-   "anchor": "rule-MOM.STATE_REPAIRED_SAFE_HALT",
+-   "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。",
+-   "project": "動能策略",
+-   "title": "R3｜工具修復本地 state 後主動 latch，等人明確解除"
+-  },
+-  {
+-   "anchor": "rule-MOM.RUNTIME_CYCLE_FAILED",
+-   "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。",
+-   "project": "動能策略",
+-   "title": "R0｜run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）"
+-  },
+-  {
+-   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+-   "note": "共用修復執行器的『重複發生升格』已在 A1：改已做。",
+-   "project": "動能策略",
+-   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
+-  },
+-  {
+-   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+-   "note": "共用修復執行器的『重複發生升格』已在 A1：改已做。",
+-   "project": "趨勢策略",
+-   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
+-  },
+-  {
+-   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+-   "note": "平倉找不到開倉列的停放已在 A1：行為改已做。",
+-   "project": "動能策略",
+-   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+-  },
+-  {
+-   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+-   "note": "平倉找不到開倉列的停放已在 A1：行為改已做。",
+-   "project": "趨勢策略",
+-   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+-  },
+-  {
+-   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+-   "note": "競賽是現貨、沒有平倉投影：改不適用。",
++   "anchor": "cap-google.spot_fill_row",
++   "note": "首次實際送出已發生（10/15 台北 08:15，receiver_row 6，CONFIRMED）：更正舊的『第一次要等 10/9』限制句。",
+    "project": "競賽策略",
+-   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+-  },
+-  {
+-   "anchor": "rule-SEY.EXCHANGE_TARGET_UNSAFE",
+-   "note": "改好設定重啟後暫停會被程式清掉（f-12，10/4 起在 A1）：行為改已做。",
+-   "project": "趨勢策略",
+-   "title": "R3｜執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）"
+-  },
+-  {
+-   "anchor": "rule-SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+-   "note": "改好設定重啟後暫停會被程式清掉（f-12，10/4 起在 A1）：行為改已做。",
+-   "project": "趨勢策略",
+-   "title": "R3｜真倉固定訂單識別能力不足"
++   "title": "現貨成交用專屬的寫入動作（append_fill_v2），不再假裝成永遠沒平倉的開倉列"
+   }
+  ],
+  "totals": {
+diff --git a/docs/session-wrap-up-sop.md b/docs/session-wrap-up-sop.md
+index f2bf89b..b71ac28 100644
+--- a/docs/session-wrap-up-sop.md
++++ b/docs/session-wrap-up-sop.md
+@@ -46,7 +46,7 @@ cd ~/trade-alerts
+       `changed`、`unpaired` 要逐筆讀過、把腳本印出的清單附進審閱附件，才用 `--accept-changed`、`--accept-unpaired`。
+ - [ ] 開工與收尾先看觀察區偵測（`observation_watch.py report`）的 `registry-awaits`：有格子在等的提交已上 A1，就先改已做再做別的。寫新的未做格子、而它在等部署時，一定填 `awaits_commit`（見 `docs/observation-watch.md`）。
+ - [ ] `recent_changes` 反映**最後一次**登記冊編輯真正改的東西（不能放著上一輪的舊內容）：格子變成已做用 `completed`、新增一列用 `added`、既有列內容改了但狀態沒變用 `updated`。只有這次完全沒碰任何現存列才設成 `[]`，並在回覆講明（2026-09-30：清空會讓頁面的「最新變動」框消失）。
+-- [ ] 一致性登記冊、風險登記冊兩個 Artifact 已用 `main` 上的檔案重新發布到原網址（先 `read` 一次再帶 `url` 發布）。
++- [ ] 一致性登記冊、風險登記冊兩個 Artifact 已用 `main` 上的檔案重新發布到原網址。頁面在第 2 行與頁尾帶「頁面版本碼」，**不必讀完整份**：先 `read` 一次（平台要求；它會把存檔寫到檔案），再 `python scripts/render_guides.py --check-published risk <存檔> rollout <存檔>`——`CURRENT` 不用發；`STALE` 直接發布 `docs/guides/` 裡的新頁面（頁面是產生的，沒有手改可丟）；`ALTERED`（發布後被改過、或舊版沒有版本碼）才要先讀再覆蓋。
+ - [ ] 新增給人看的文字沒有舊叫法（`tests/test_fleet_glossary.py` 會擋 trade-alerts 內的；其他 repo 要人工留意）。
+ 
+ ## 4. 機隊工程進度頁
+diff --git a/scripts/render_guides.py b/scripts/render_guides.py
+index f9c56da..8830037 100644
+--- a/scripts/render_guides.py
++++ b/scripts/render_guides.py
+@@ -15,8 +15,10 @@ All text reaches the page through ``textContent``, never ``innerHTML``.
+ from __future__ import annotations
+ 
+ import argparse
++import hashlib
+ import html
+ import json
++import re
+ import sys
+ from pathlib import Path
+ from typing import Any
+@@ -170,11 +172,76 @@ _FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family
+           '&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">')
+ 
+ 
++DIGEST_PLACEHOLDER = "__GUIDE_DIGEST__"      # only in the footer template; replaced inside _page
++_ZERO = "0" * 16
++_DIGEST_COMMENT = re.compile(r"<!-- fleet-guide-digest: ([0-9a-f]{16}) -->")
++_DIGEST_FOOTER = re.compile(r"頁面版本碼 <code>([0-9a-f]{16})</code>")
++
++
+ def _page(title: str, body: str, data: dict[str, Any], script: str, css: str = "") -> str:
+     blob = json.dumps(data, ensure_ascii=False, sort_keys=True, indent=1).replace("</", "<\\/")
+-    return (f"<title>{title}</title>\n{_FONTS}\n<style>{_CSS}{css}</style>\n\n{body}\n\n"
++    if body.count(DIGEST_PLACEHOLDER) != 1 or DIGEST_PLACEHOLDER in blob + script + css:
++        raise ValueError("the footer's version-code placeholder must appear exactly once, and only in the body")
++    page = (f"<title>{title}</title>\n<!-- fleet-guide-digest: {_ZERO} -->\n{_FONTS}\n<style>{_CSS}{css}</style>\n\n{body}\n\n"
+             f'<script type="application/json" id="data">\n{blob}\n</script>\n'
+-            f"<script>\n{script}\n</script>\n")
++            f"<script>\n{script}\n</script>\n").replace(DIGEST_PLACEHOLDER, _ZERO)
++    code = hashlib.sha256(page.encode("utf-8")).hexdigest()[:16]
++    return page.replace(f"<!-- fleet-guide-digest: {_ZERO} -->", f"<!-- fleet-guide-digest: {code} -->", 1).replace(
++        f"頁面版本碼 <code>{_ZERO}</code>", f"頁面版本碼 <code>{code}</code>", 1)
++
++
++def verify_digest(page: str) -> tuple[str | None, str]:
++    """The version code a page carries, if the page is internally consistent: ``(code, "")``; otherwise ``(None, why)``.
++
++    The page must carry exactly one code in the line-2 comment and exactly one in the footer, the two must be equal, and
++    the sha256 of the page with just those two spots set to sixteen zeros must give that code.  Everything else in the
++    page is hashed as it is -- nothing is stripped or normalised, so any other change shows (review of #195: an earlier
++    version removed every occurrence of its placeholder and ignored a changed footer code)."""
++    comments, footers = _DIGEST_COMMENT.findall(page), _DIGEST_FOOTER.findall(page)
++    if not comments or not footers:
++        return None, "沒有版本碼（舊版頁面，或第 2 行／頁尾的版本碼被拿掉）"
++    if len(comments) != 1 or len(footers) != 1:
++        return None, f"版本碼出現的次數不對（第 2 行 {len(comments)} 處、頁尾 {len(footers)} 處，各應是 1 處）"
++    if comments[0] != footers[0]:
++        return None, f"第 2 行的版本碼 {comments[0]} 和頁尾的 {footers[0]} 不一樣"
++    zeroed = _DIGEST_COMMENT.sub(f"<!-- fleet-guide-digest: {_ZERO} -->", page, count=1)
++    zeroed = _DIGEST_FOOTER.sub(f"頁面版本碼 <code>{_ZERO}</code>", zeroed, count=1)
++    actual = hashlib.sha256(zeroed.encode("utf-8")).hexdigest()[:16]
++    if actual != comments[0]:
++        return None, f"內容和它自己的版本碼 {comments[0]} 對不上（實際是 {actual}）"
++    return comments[0], ""
++
++
++def published_core(text: str) -> str:
++    """What our page looked like before the host wrapped it: from the title to the last script (the artifact service
++    adds ``<!doctype><html><head>…<body>`` in front and ``</body></html>`` behind)."""
++    start = text.find("<title>")
++    end = text.rfind("</script>")
++    if start < 0 or end < 0:
++        raise ValueError("not a guide page: no <title> or closing </script>")
++    return text[start:end + len("</script>")] + "\n"
++
++
++def check_published(kind: str, published_file: Path) -> tuple[str, str]:
++    """Compare a saved copy of a published page with what main renders now.
++
++    ``current``  -- the published page is the page main renders now (its fingerprint equals the fresh one and is
++                    internally consistent): nothing to publish, nothing to read.
++    ``stale``    -- an untouched older render: publish the fresh page (no hand edits can be lost, the pages are generated).
++    ``altered``  -- the published text does not match its own fingerprint: someone edited it after rendering; read it
++                    before overwriting.
++    Returns ``(verdict, explanation)``."""
++    fresh_pages = rendered_pages()
++    page_path = {"risk": RISK_PAGE, "rollout": ROLLOUT_PAGE}[kind]
++    fresh = fresh_pages[page_path]
++    core = published_core(Path(published_file).read_text(encoding="utf-8"))
++    code, why = verify_digest(core)
++    if code is None:
++        return "altered", f"已發布的頁面{why}：先讀它再覆蓋"
++    fresh_code, _ = verify_digest(fresh)
++    if code == fresh_code:
++        return "current", f"已發布頁面就是 main 現在產生的頁面（版本碼 {fresh_code}）：不用重發"
++    return "stale", f"已發布頁面是舊的產生結果（版本碼 {code}），main 現在是 {fresh_code}：直接發布 docs/guides 裡的新頁面"
+ 
+ 
+ _JS_HELPERS = r"""
+@@ -569,6 +636,7 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
+   <div class="foot">
+     資料來源：trade-alerts <code>{catalog['catalog_version']}</code>（錯誤分類）與 <code>{registry['registry_version']}</code>（各策略實際進度，{registry['updated_at']} 盤點）。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
++    頁面版本碼 <code>__GUIDE_DIGEST__</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
+   </div>
+ </div>
+ <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>"""
+@@ -731,6 +799,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
+     資料來源：trade-alerts <code>{registry['registry_version']}</code>（{registry['updated_at']} 對四個 repo 逐項盤點）、<code>{catalog['catalog_version']}</code> 與 <code>{glossary['glossary_version']}</code>。
+     「檔案:行號」證據對應的版本：{sources}。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
++    頁面版本碼 <code>__GUIDE_DIGEST__</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
+   </div>
+ </div>
+ <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>"""
+@@ -748,7 +817,18 @@ def rendered_pages() -> dict[Path, str]:
+ def main(argv: list[str] | None = None) -> int:
+     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+     parser.add_argument("--check", action="store_true", help="exit 1 if a committed page differs from a fresh render")
++    parser.add_argument("--check-published", nargs=2, metavar=("risk|rollout", "FILE"), action="append",
++                        help="compare a saved copy of a published page (FILE) with what main renders; exit 1 unless 'current'")
+     args = parser.parse_args(argv)
++    if args.check_published:
++        worst = 0
++        for kind, path in args.check_published:
++            if kind not in ("risk", "rollout"):
++                parser.error("--check-published needs 'risk' or 'rollout' first")
++            verdict, why = check_published(kind, Path(path))
++            print(f"{kind}: {verdict.upper()} -- {why}")
++            worst = max(worst, {"current": 0, "stale": 1, "altered": 2}[verdict])
++        return worst
+     stale = []
+     for path, html in rendered_pages().items():
+         if args.check:
+diff --git a/src/trade_alerts/catalog/fleet-glossary.json b/src/trade_alerts/catalog/fleet-glossary.json
+index ff92b77..90780d7 100644
+--- a/src/trade_alerts/catalog/fleet-glossary.json
++++ b/src/trade_alerts/catalog/fleet-glossary.json
+@@ -636,6 +636,16 @@
+       ],
+       "definition": "錯誤規則的第二欄：這條錯誤發生時，有沒有寫進事件日誌（寫進去才會變成白話通知）。",
+       "retired": []
++    },
++    {
++      "id": "register.page_digest",
++      "category": "登記冊狀態",
++      "zh": "頁面版本碼",
++      "en": [
++        "fleet-guide-digest"
++      ],
++      "definition": "登記冊頁面第 2 行與頁尾的 16 位代碼，由頁面內容算出；拿已發布頁面的版本碼跟 main 現在產生的比，就知道要不要重發、頁面有沒有被改過。",
++      "retired": []
+     }
+   ]
+ }
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 2cc0c81..678c415 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -753,7 +753,7 @@
+         },
+         "btc-competition": {
+           "state": "done",
+-          "evidence": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。限制：部署後競賽還沒有新的成交，第一次實際用 append_fill_v2 送出要等下一次每日調整（2026-10-09 台北 08:10）有成交；接收端的收單只用非機密探測驗證過（回簽章檢查，不是寫入）。"
++          "evidence": "src/btc_competition/google_ledger_provenance.py:42 事件類型 spot_fill、:43 動作 append_fill_v2、:153 投影帶 source 標記。A1 正式機（新）執行環境（唯讀查證，2026-10-10 台北重查）：operations 70630a1（2026-10-08 台北 21:26–21:28 隨 0409a9f 部署，2026-10-09 台北 f-26b 換版，該檔因 f-26b 的分頁名稱常數而變）；/opt 的 src/btc_competition/google_ledger_provenance.py（blob d0a5bb2）的 blob 與 70630a1 同檔相同，上列三處引用的文字在 0409a9f 與 70630a1 相同；venv 的 trade-alerts 0.29.1（2026-10-10 台北重查；2026-10-08 部署時是 0.28.0），其共用庫的 projection_outbox 模組檔（blob 400c681）、ledger_integrity 模組檔（d11ef39）、google_ledger_client 模組檔（77d7e08）都與 tag v0.29.1 同檔。2026-10-08 部署時：unit 啟用與運行狀態前後逐項無差異、0 個失敗單元，部署後手動一輪帳本與 Google 對帳 RECONCILED。正式機接收端（Apps Script）版本 14：2026-10-08 台北下午執行身分授權問題排除後部署，A1 台北 18:16 對帳讀它回 RECONCILED。首次實際送出：2026-10-15 台北 08:10 的每日調整有 1 筆成交，08:15 以 append_fill_v2（spot_fill）送出，接收端 CONFIRMED（receiver_row 6），對帳一致（A1 唯讀查 audit/google-projection-outbox.jsonl 與對帳狀態，2026-10-15 台北）。限制：只看過這一次；表上那一列的儲存格內容（P 欄 spot_fill）沒有逐格讀回，靠接收端回覆 CONFIRMED 與對帳一致。"
+         }
+       }
+     },
+@@ -1986,301 +1986,10 @@
+   "recent_changes": [
+     {
+       "kind": "cap",
+-      "id": "latch.restart_only_clear",
+-      "project": "seykota",
+-      "type": "completed",
+-      "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "ops_export.writer",
+-      "project": "btc-competition",
+-      "type": "completed",
+-      "note": "競賽自己的安全暫停與狀態事件 10/4 起就寫進事件日誌並匯出，之前沒更新：改已做。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "notify.line_first_notice",
+-      "project": "btc-competition",
+-      "type": "completed",
+-      "note": "10/11 競賽 ERR-023 受控測試你手機收到兩則：改已做。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "notify.error_id",
+-      "project": "seykota",
+-      "type": "completed",
+-      "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "notify.error_id",
+-      "project": "momentum",
+-      "type": "completed",
+-      "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "notify.error_id",
++      "id": "google.spot_fill_row",
+       "project": "btc-competition",
+-      "type": "completed",
+-      "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "reconcile.google_projection_grace",
+-      "project": "momentum",
+-      "type": "updated",
+-      "note": "把『還沒看到擋掉誤報』的限制更正：10/9 已在 A1 實際看到（f-22f）。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "notify.error_id",
+-      "project": "mycrypto",
+-      "type": "updated",
+-      "note": "未做的理由改寫成現況（加密還沒實際把通知送到手機）。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "reconcile.google_projection_grace",
+-      "project": "mycrypto",
+-      "type": "updated",
+-      "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "reconcile.adopted_fills",
+-      "project": "mycrypto",
+       "type": "updated",
+-      "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "projection.park_unconfirmed_correction",
+-      "project": "mycrypto",
+-      "type": "updated",
+-      "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "projection.requeue_parked",
+-      "project": "mycrypto",
+-      "type": "updated",
+-      "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "google.close_whole_trade_entry",
+-      "project": "mycrypto",
+-      "type": "updated",
+-      "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。"
+-    },
+-    {
+-      "kind": "cap",
+-      "id": "repair_bot.recurrence_escalation",
+-      "project": "btc-competition",
+-      "type": "completed",
+-      "note": "競賽沒有漏記平倉修復機器人：依你的決定改不適用。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+-      "project": "seykota",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+-      "project": "seykota",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
+-      "project": "momentum",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
+-      "project": "momentum",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+-      "project": "btc-competition",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+-      "project": "btc-competition",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "BTC.STATE_FILE_CORRUPT",
+-      "project": "btc-competition",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "BTC.STATE_FILE_CORRUPT",
+-      "project": "btc-competition",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+-      "project": "btc-competition",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+-      "project": "btc-competition",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "BTC.ORDER_STATUS_UNKNOWN",
+-      "project": "btc-competition",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "BTC.REBALANCE_PENDING",
+-      "project": "btc-competition",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "MOM.PROTECTION_UNVERIFIED",
+-      "project": "momentum",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "MOM.STATE_REPAIRED_SAFE_HALT",
+-      "project": "momentum",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "MOM.RUNTIME_CYCLE_FAILED",
+-      "project": "momentum",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+-      "project": "momentum",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "共用修復執行器的『重複發生升格』已在 A1：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+-      "project": "momentum",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "共用修復執行器的『重複發生升格』已在 A1：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+-      "project": "seykota",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "共用修復執行器的『重複發生升格』已在 A1：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+-      "project": "seykota",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "共用修復執行器的『重複發生升格』已在 A1：改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+-      "project": "momentum",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "平倉找不到開倉列的停放已在 A1：行為改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+-      "project": "seykota",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "平倉找不到開倉列的停放已在 A1：行為改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+-      "project": "btc-competition",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "競賽是現貨、沒有平倉投影：改不適用。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+-      "project": "btc-competition",
+-      "aspect": "emits_event",
+-      "type": "completed",
+-      "note": "競賽是現貨、沒有平倉投影：改不適用。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "SEY.EXCHANGE_TARGET_UNSAFE",
+-      "project": "seykota",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "改好設定重啟後暫停會被程式清掉（f-12，10/4 起在 A1）：行為改已做。"
+-    },
+-    {
+-      "kind": "rule",
+-      "id": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+-      "project": "seykota",
+-      "aspect": "behaviour",
+-      "type": "completed",
+-      "note": "改好設定重啟後暫停會被程式清掉（f-12，10/4 起在 A1）：行為改已做。"
++      "note": "首次實際送出已發生（10/15 台北 08:15，receiver_row 6，CONFIRMED）：更正舊的『第一次要等 10/9』限制句。"
+     }
+   ]
+ }
+diff --git a/tests/test_rollout_registry.py b/tests/test_rollout_registry.py
+index 755251d..41b8eeb 100644
+--- a/tests/test_rollout_registry.py
++++ b/tests/test_rollout_registry.py
+@@ -598,3 +598,117 @@ def test_a_pending_reason_that_does_not_promise_a_deployment_needs_no_commit(reg
+     status.pop("awaits_commit", None)
+     assert not [p for p in registry_problems(reg, catalog) if "awaits_commit" in p]
+     assert not [p for p in registry_problems(registry, catalog) if "awaits_commit" in p]  # the shipped registry is clean
++
++
++# --- the published page fingerprints itself (phase-sync2) -------------------------------------------------------
++
++_WRAP_HEAD = '<!doctype html><html><head><meta charset=utf8><style>:root{}</style></head><body>\n'
++_WRAP_TAIL = "\n</body></html>"
++
++
++def _wrapped(page: str) -> str:
++    """What the artifact service stores: our page between its own head and tail."""
++    return _WRAP_HEAD + page + _WRAP_TAIL
++
++
++def test_every_rendered_page_carries_a_consistent_fingerprint():
++    render_guides = _render_guides()
++    for path, page in render_guides.rendered_pages().items():
++        stamp = render_guides._DIGEST_COMMENT.search(page)
++        assert stamp and page.splitlines()[1].startswith("<!-- fleet-guide-digest: "), "the stamp is on line 2"
++        assert render_guides.verify_digest(page) == (stamp.group(1), "")
++        assert f"頁面版本碼 <code>{stamp.group(1)}</code>" in page
++        assert render_guides.DIGEST_PLACEHOLDER not in page
++        assert render_guides.published_core(_wrapped(page)) == page   # the host's wrapper does not disturb it
++
++
++def test_check_published_says_current_stale_or_altered(tmp_path, registry, catalog):
++    render_guides = _render_guides()
++    fresh = render_guides.rendered_pages()[render_guides.ROLLOUT_PAGE]
++    saved = tmp_path / "saved.html"
++
++    saved.write_text(_wrapped(fresh), encoding="utf-8")
++    assert render_guides.check_published("rollout", saved)[0] == "current"
++
++    older_registry = copy.deepcopy(registry)
++    older_registry["updated_at"] = "2020-01-01"                        # an earlier, untouched render of the same page
++    older = render_guides.render_rollout_register(catalog, older_registry, render_guides.load_glossary())
++    assert older != fresh
++    saved.write_text(_wrapped(older), encoding="utf-8")
++    verdict, why = render_guides.check_published("rollout", saved)
++    assert verdict == "stale" and "直接發布" in why
++
++    edited = fresh.replace("機隊一致性登記冊", "機隊一致性登記冊（手改）", 1)   # someone edited the published text
++    saved.write_text(_wrapped(edited), encoding="utf-8")
++    assert render_guides.check_published("rollout", saved)[0] == "altered"
++
++    unstamped = render_guides._DIGEST_COMMENT.sub("", fresh)             # a page from before version codes existed
++    saved.write_text(_wrapped(unstamped), encoding="utf-8")
++    verdict, why = render_guides.check_published("rollout", saved)
++    assert verdict == "altered" and "沒有版本碼" in why
++
++    saved.write_text(_wrapped(fresh), encoding="utf-8")                  # the other page's file is not this page
++    assert render_guides.check_published("risk", saved)[0] == "stale"
++
++
++def test_check_published_cli_exit_codes(tmp_path, capsys):
++    render_guides = _render_guides()
++    fresh = render_guides.rendered_pages()[render_guides.RISK_PAGE]
++    good, bad = tmp_path / "good.html", tmp_path / "bad.html"
++    good.write_text(_wrapped(fresh), encoding="utf-8")
++    bad.write_text(_wrapped(fresh.replace("機隊風險登記冊", "x", 1)), encoding="utf-8")
++    assert render_guides.main(["--check-published", "risk", str(good)]) == 0
++    assert "risk: CURRENT" in capsys.readouterr().out
++    assert render_guides.main(["--check-published", "risk", str(bad)]) == 2
++    assert render_guides.main(["--check-published", "risk", str(good), "--check-published", "rollout", str(good)]) == 1
++
++
++def _verdict(render_guides, tmp_path, page, kind="rollout"):
++    saved = tmp_path / "saved.html"
++    saved.write_text(_wrapped(page), encoding="utf-8")
++    return render_guides.check_published(kind, saved)
++
++
++def test_changing_only_the_footer_version_code_is_altered(tmp_path):
++    """Review of #195 (BLOCK-1): the footer code used to be masked out of the hash and never compared with line 2."""
++    render_guides = _render_guides()
++    fresh = render_guides.rendered_pages()[render_guides.ROLLOUT_PAGE]
++    code = render_guides._DIGEST_COMMENT.search(fresh).group(1)
++    tampered = fresh.replace(f"頁面版本碼 <code>{code}</code>", "頁面版本碼 <code>0000000000000000</code>")
++    assert tampered != fresh
++    verdict, why = _verdict(render_guides, tmp_path, tampered)
++    assert verdict == "altered" and "不一樣" in why
++    assert _verdict(render_guides, tmp_path, fresh)[0] == "current"          # the unmodified page still passes
++
++
++def test_inserting_the_old_placeholder_text_into_the_body_is_altered(tmp_path):
++    """Review of #195 (BLOCK-2): the placeholder was deleted from the whole page before hashing, so text added with that
++    name vanished from the hash input."""
++    render_guides = _render_guides()
++    fresh = render_guides.rendered_pages()[render_guides.ROLLOUT_PAGE]
++    for sneaky in (render_guides.DIGEST_PLACEHOLDER, "0" * 16, "頁面版本碼 <code>" + "a" * 16 + "</code>", "<!-- fleet-guide-digest: " + "b" * 16 + " -->"):
++        edited = fresh.replace("<h1>機隊一致性登記冊</h1>", "<h1>機隊一致性登記冊" + sneaky + "</h1>", 1)
++        assert edited != fresh
++        assert _verdict(render_guides, tmp_path, edited)[0] == "altered", sneaky
++
++
++def test_missing_or_duplicated_version_codes_are_altered(tmp_path):
++    render_guides = _render_guides()
++    fresh = render_guides.rendered_pages()[render_guides.ROLLOUT_PAGE]
++    code = render_guides._DIGEST_COMMENT.search(fresh).group(1)
++    footer = f"頁面版本碼 <code>{code}</code>"
++    assert _verdict(render_guides, tmp_path, fresh.replace(footer, "頁面版本碼"))[0] == "altered"                 # footer code removed
++    assert _verdict(render_guides, tmp_path, fresh.replace(footer, footer + " " + footer, 1))[0] == "altered"    # footer code twice
++    stamp = f"<!-- fleet-guide-digest: {code} -->"
++    assert _verdict(render_guides, tmp_path, fresh.replace(stamp, stamp + stamp, 1))[0] == "altered"            # line-2 code twice
++
++
++def test_the_page_templates_have_exactly_one_footer_placeholder():
++    render_guides = _render_guides()
++    import pytest as _pytest
++    with _pytest.raises(ValueError, match="exactly once"):
++        render_guides._page("t", "no placeholder here", {}, "")
++    with _pytest.raises(ValueError, match="exactly once"):
++        render_guides._page("t", render_guides.DIGEST_PLACEHOLDER * 2, {}, "")
++    with _pytest.raises(ValueError, match="exactly once"):
++        render_guides._page("t", render_guides.DIGEST_PLACEHOLDER, {"x": render_guides.DIGEST_PLACEHOLDER}, "")
