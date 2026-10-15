@@ -216,3 +216,20 @@ def test_a_registry_null_is_an_invalid_value_not_a_missing_field(tmp_path, capsy
     reg.write_text((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"), encoding="utf-8")
     assert cpl.main(["--items-json", str(f), "--registry", str(reg)]) == 1
     assert "其中 1 項連了登記冊格子" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("literal", [
+    "{id:\"f\", status:\"done\", 'registry':[\"cap:x.cap@momentum\"]},",                 # single-quoted key (third review)
+    "{id:\"f\", status:\"done\", `registry`:[\"cap:x.cap@momentum\"]},",                  # back-quoted key
+    "{id:\"f\", status:\"done\", \"registry\":[\"cap:x.cap@momentum\"]},",              # quoted key inside a JS-literal item
+    "{id:\"f\", status:\"done\", 'registry' :[\"cap:x.cap@momentum\"]},",                 # space before the colon
+    "{\"id\": \"f\", status:\"done\", 'registry':[\"cap:x.cap@momentum\"]},",           # quoted id but not valid JSON
+])
+def test_every_spelling_of_the_registry_key_in_an_unreadable_item_is_an_error(literal):
+    with pytest.raises(ValueError, match="registry"):
+        cpl.extract_items("var ITEMS = [\n    " + literal + "\n  ];")
+
+
+def test_registry_in_ordinary_text_without_a_colon_is_not_a_field():
+    page = 'var ITEMS = [\n    {"id": "a", "status": "done", "detail": "加 registry 欄與 the registry (cells)"},\n  ];'
+    assert [i["id"] for i in cpl.extract_items(page)] == ["a"]

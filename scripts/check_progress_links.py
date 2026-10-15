@@ -64,10 +64,11 @@ def _json_objects(region: str, key: str) -> list[dict[str, Any]]:
         position = end
 
 
-_REGISTRY_KEY = re.compile(r'(?<!\\)"registry"\s*:')
-#: A JS-literal item (`{id:"x", registry:[...]}`) has an unquoted key position: after `{` or `,`.  It can never be read, so
-#: each one counts as a registry field that was not read.
-_UNQUOTED_REGISTRY_KEY = re.compile(r'[{,]\s*registry\s*:')
+#: Any way of writing the key `registry` that a JS object could use -- double, single or back quotes, or none -- followed by a
+#: colon.  The check is "fail closed": every such spot must be a field of an item that was read, so a form this script cannot read
+#: (single-quoted, unquoted, a JS literal item ...) is an error instead of a link that quietly checks nothing.  Text inside a
+#: string that merely looks like `registry:` is a loud false alarm, never a silent pass.
+_REGISTRY_KEY = re.compile(r"""(?<![\w\\.])(["'`]?)registry\1\s*:""")
 
 
 def _block(page_html: str, name: str) -> str | None:
@@ -86,7 +87,7 @@ def extract_items(page_html: str) -> list[dict[str, Any]]:
     if block is None:
         raise ValueError("no `var ITEMS = [ ... ];` block in the page")
     items = _json_objects(block, "id")
-    in_text = len(_REGISTRY_KEY.findall(block)) + len(_UNQUOTED_REGISTRY_KEY.findall(block))
+    in_text = len(_REGISTRY_KEY.findall(block))
     in_items = sum(1 for item in items if "registry" in item)
     if in_text != in_items:
         raise ValueError(f"頁面 ITEMS 裡有 {in_text} 處 registry 欄，只讀得到 {in_items} 個項目帶它：有項目的寫法讀不懂"
