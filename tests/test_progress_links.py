@@ -233,3 +233,80 @@ def test_every_spelling_of_the_registry_key_in_an_unreadable_item_is_an_error(li
 def test_registry_in_ordinary_text_without_a_colon_is_not_a_field():
     page = 'var ITEMS = [\n    {"id": "a", "status": "done", "detail": "加 registry 欄與 the registry (cells)"},\n  ];'
     assert [i["id"] for i in cpl.extract_items(page)] == ["a"]
+
+
+# --- phase-sync5: the page is a static shell, the items are checked from a database export ---------------------------
+
+def _export(tmp_path, items, watch=({"id": "w-1", "note": "n"},), watch_raw=None):
+    (tmp_path / "checklist").mkdir()
+    (tmp_path / "meta").mkdir()
+    for it in items:
+        (tmp_path / "checklist" / f"{it['id']}.json").write_text(json.dumps(it), encoding="utf-8")
+    (tmp_path / "meta" / "watch.json").write_text(watch_raw if watch_raw is not None else json.dumps({"items": list(watch)}), encoding="utf-8")
+    return tmp_path
+
+
+def test_a_db_export_is_read_and_checked(tmp_path, capsys):
+    reg = tmp_path / "registry.json"
+    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    reg.write_text(json.dumps(real), encoding="utf-8")
+    cap = next(c for c in real["capabilities"] if any(s["state"] == "pending" for s in c["status"].values()))
+    project = next(p for p, s in cap["status"].items() if s["state"] == "pending")
+    export = tmp_path / "db"
+    export.mkdir()
+    _export(export, [{"id": "plain", "status": "todo", "title": "t"},
+                     {"id": "bad", "status": "done", "title": "t", "registry": [f"cap:{cap['id']}@{project}"]}])
+    assert cpl.main(["--db-dir", str(export), "--registry", str(reg)]) == 1
+    assert "已完成" in capsys.readouterr().out
+    items, watch = cpl.load_db_export(export)
+    assert {i["id"] for i in items} == {"plain", "bad"} and watch == {"w-1"}
+
+
+def test_watch_ids_from_the_export_exempt_an_open_item(tmp_path):
+    export = _export(tmp_path, [{"id": "w-1", "status": "waiting", "title": "t", "registry": ["cap:x.cap@seykota"]}])
+    items, watch = cpl.load_db_export(export)
+    assert cpl.link_problems(items, registry(), watch) == []
+    assert cpl.link_problems(items, registry(), set())          # without the exemption the finished cell says close it
+
+
+def test_an_unreadable_db_export_is_an_error_never_an_empty_list(tmp_path):
+    with pytest.raises(ValueError, match="沒有任何項目檔"):
+        cpl.load_db_export(tmp_path)                             # no checklist directory at all
+    (tmp_path / "checklist").mkdir()
+    with pytest.raises(ValueError, match="沒有任何項目檔"):
+        cpl.load_db_export(tmp_path)                             # directory present, nothing in it
+
+
+@pytest.mark.parametrize("name, content, message", [
+    ("a.json", "{not json", "不是有效的 JSON"),
+    ("a.json", "[1, 2]", "不是 JSON 物件"),
+    ("a.json", json.dumps({"id": "other", "status": "todo"}), "跟檔名不一致"),
+    ("a.json", json.dumps({"status": "todo"}), "跟檔名不一致"),
+])
+def test_a_bad_item_file_in_the_export_is_an_error(tmp_path, name, content, message):
+    (tmp_path / "checklist").mkdir()
+    (tmp_path / "checklist" / name).write_text(content, encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        cpl.load_db_export(tmp_path)
+
+
+@pytest.mark.parametrize("watch_raw", [None, "{broken", json.dumps({"items": "no"}), json.dumps({"items": [{"note": "no id"}]}),
+                                       json.dumps([1])])
+def test_a_missing_or_broken_watch_list_is_an_error(tmp_path, watch_raw):
+    export = _export(tmp_path, [{"id": "a", "status": "todo", "title": "t"}], watch_raw="x")
+    if watch_raw is None:
+        (export / "meta" / "watch.json").unlink()
+    else:
+        (export / "meta" / "watch.json").write_text(watch_raw, encoding="utf-8")
+    with pytest.raises(ValueError):
+        cpl.load_db_export(export)
+
+
+def test_the_cli_takes_exactly_one_source_and_the_static_shell_page_is_refused(tmp_path, capsys):
+    with pytest.raises(SystemExit):
+        cpl.main(["--db-dir", str(tmp_path), "--items-json", str(tmp_path / "x.json")])
+    shell = tmp_path / "shell.html"
+    shell.write_text("<script>var WATCH = [];</script>", encoding="utf-8")        # a shell has no ITEMS block
+    assert cpl.main([str(shell), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
+    assert "--db-dir" in capsys.readouterr().out
+    assert cpl.main(["--db-dir", str(tmp_path / "missing")]) == 1                 # unreadable export exits 1, not 0

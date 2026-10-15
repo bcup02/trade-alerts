@@ -2,8 +2,16 @@
 """Check that the progress page and the rollout registry agree about what is finished (phase-sync3).
 
     git fetch origin   # the registry is read from origin/main
-    python scripts/check_progress_links.py <progress page .html>        # items are read from the page's ITEMS
+    python scripts/check_progress_links.py --db-dir <dir>               # items exported from the page's database (phase-sync5)
     python scripts/check_progress_links.py --items-json items.json      # or from a JSON list of items
+    python scripts/check_progress_links.py <progress page .html>        # old pages that still carry `var ITEMS = [...]`
+
+Since phase-sync5 the progress page is a static shell and the items live in its database.  Export them with
+``ArtifactData action=list collection=checklist out_dir=<dir>`` and the same for ``collection=meta`` (one fresh,
+empty directory per run -- a leftover file from an older export would be read as a current item), then point
+``--db-dir`` at <dir>: it reads ``<dir>/checklist/*.json`` (one item per file, named by its id) and
+``<dir>/meta/watch.json`` (the 觀察區).  Anything it cannot read -- no checklist files, a file that is not a JSON
+object, an ``id`` that is not the file name, no or broken watch.json -- is an error, never an empty list.
 
 A progress item may carry ``"registry": ["cap:<capability id>@seykota,momentum", "rule:<catalog code>#emits_event", ...]``
 -- the registry cells it is about (``@`` names the strategies, ``#`` one aspect of a rule; without them every strategy
@@ -85,7 +93,7 @@ def extract_items(page_html: str) -> list[dict[str, Any]]:
     the block must equal the number found in the items that were read."""
     block = _block(page_html, "ITEMS")
     if block is None:
-        raise ValueError("no `var ITEMS = [ ... ];` block in the page")
+        raise ValueError("no `var ITEMS = [ ... ];` block in the page（靜態外殼的頁面沒有資料：改用 --db-dir 檢查資料庫匯出）")
     items = _json_objects(block, "id")
     in_text = len(_REGISTRY_KEY.findall(block))
     in_items = sum(1 for item in items if "registry" in item)
@@ -99,6 +107,34 @@ def extract_watch_ids(page_html: str) -> set[str]:
     """The item ids in the page's ``var WATCH = [ ... ];`` (the 觀察區), read the same way as the items."""
     block = _block(page_html, "WATCH")
     return set() if block is None else {o["id"] for o in _json_objects(block, "id") if isinstance(o.get("id"), str)}
+
+
+def load_db_export(directory: Path) -> tuple[list[dict[str, Any]], set[str]]:
+    """``(items, watch ids)`` from an ArtifactData export of the progress page's database (see the module docstring)."""
+    checklist = directory / "checklist"
+    files = sorted(checklist.glob("*.json")) if checklist.is_dir() else []
+    if not files:
+        raise ValueError(f"{checklist} 沒有任何項目檔：匯出是空的或路徑不對，不能當作『沒有項目』")
+    items: list[dict[str, Any]] = []
+    for path in files:
+        try:
+            item = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError as exc:
+            raise ValueError(f"{path.name} 不是有效的 JSON：{exc}") from exc
+        if not isinstance(item, dict):
+            raise ValueError(f"{path.name} 不是 JSON 物件")
+        if item.get("id") != path.stem:
+            raise ValueError(f"{path.name} 裡的 id {item.get('id')!r} 跟檔名不一致：匯出不完整或混到別的目錄")
+        items.append(item)
+    watch_file = directory / "meta" / "watch.json"
+    try:
+        watch = json.loads(watch_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"讀不到 {watch_file}（觀察區清單）：{exc}") from exc
+    entries = watch.get("items") if isinstance(watch, dict) else None
+    if not isinstance(entries, list) or not all(isinstance(e, dict) and isinstance(e.get("id"), str) for e in entries):
+        raise ValueError("meta/watch.json 的 items 要是有 id 的物件清單")
+    return items, {e["id"] for e in entries}
 
 
 # --- the registry side --------------------------------------------------------------------------------------------
@@ -191,13 +227,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("page", nargs="?", type=Path, help="the progress page .html (its ITEMS are checked)")
     parser.add_argument("--items-json", type=Path, help="a JSON list of items instead of a page")
+    parser.add_argument("--db-dir", type=Path, help="an ArtifactData export of the progress page's database (checklist/ and meta/)")
     parser.add_argument("--registry", type=Path, help="a registry JSON file (default: origin/main of this repo; run `git fetch` first)")
     args = parser.parse_args(argv)
-    if bool(args.page) == bool(args.items_json):
-        parser.error("give exactly one of: the page, or --items-json")
+    if sum(map(bool, (args.page, args.items_json, args.db_dir))) != 1:
+        parser.error("give exactly one of: --db-dir, --items-json, or the page")
     watch: set[str] = set()
     try:
-        if args.items_json:
+        if args.db_dir:
+            items, watch = load_db_export(args.db_dir)
+        elif args.items_json:
             items = json.loads(args.items_json.read_text(encoding="utf-8"))
         else:
             text = args.page.read_text(encoding="utf-8")
