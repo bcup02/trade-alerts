@@ -806,7 +806,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "src/reconcile_compare.py:85 把環境變數 RECONCILE_PENDING_MAX_SECONDS（預設共用庫 DEFAULT_PENDING_MAX_SECONDS＝24 小時）傳給共用比對（:72）；超過上限的位置對帳標記（時間讀不出，或比現在晚超過 5 分鐘，也視為逾時）不再讓狀態停在 PENDING：部位與成交對不上仍判對不上，對得上則 RECONCILED，並在證據 pending_expired 列出被放棄等待的標記（共用庫 v0.30.0 ledger_reconcile，審閱 bcup02/trade-alerts#162）。src/reconcile_apply.py:150 結清工具接受「RECONCILED 且帶 pending_expired」（逾時後狀態已不是 PENDING），:173 起只結清該狀態點名的標記，狀態寫出之後才出現的新標記一律拒絕（審閱 BLOCK-135-01）。",
+          "evidence": "src/reconcile_compare.py:85 把環境變數 RECONCILE_PENDING_MAX_SECONDS（預設共用庫 DEFAULT_PENDING_MAX_SECONDS＝24 小時）傳給共用比對（:72）；超過上限的位置對帳標記（時間讀不出，或比現在晚超過 5 分鐘，也視為逾時）不再讓狀態停在 PENDING：部位與成交對不上仍判對不上，對得上則 RECONCILED，並在證據 pending_expired 列出被放棄等待的標記（共用庫 v0.30.0 ledger_reconcile，審閱 bcup02/trade-alerts#162）。src/reconcile_apply.py:150 結清工具接受「RECONCILED 且帶 pending_expired」（逾時後狀態已不是 PENDING），:173 起只結清該狀態點名的標記，狀態寫出之後才出現的新標記一律拒絕（審閱 BLOCK-135-01）；自 f-32 起預覽與結清都另要求交易所快照 fetched_at 在 3600 秒內（src/reconcile_apply.py:113，可用 --max-snapshot-age-seconds 調整；讀不出或超前超過 5 分鐘也拒絕），過舊要先重跑對帳抓取（A1 每 15 分鐘一輪）。",
           "verified_at": "2026-10-11",
           "limit": "A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
         },
@@ -2183,7 +2183,7 @@
       "id": "reconcile.pending_age_cap",
       "type": "updated",
       "project": "momentum",
-      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+      "note": "引用行號隨 sources 換版更新；並補上 f-32 的快照新鮮度前提（審閱 #204 要求）。"
     },
     {
       "kind": "rule",
