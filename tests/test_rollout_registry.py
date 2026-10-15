@@ -548,3 +548,53 @@ def test_rollout_page_lists_only_phases_that_still_have_pending_cells(registry, 
     assert data["phase_order"] == [k for k in registry["phases"] if data["phase_counts"][k] > 0]
     assert all(data["phase_counts"][k] > 0 for k in data["phase_order"])
     assert set(data["phase_counts"]) == set(registry["phases"])  # the counts still cover every phase
+
+
+# --- a pending cell that waits for a deployment names the commit (phase-sync1) --------------------------------
+
+
+def _first_pending_cap(reg):
+    for capability in reg["capabilities"]:
+        for project, status in capability["status"].items():
+            if status["state"] == "pending":
+                return capability, project, status
+    raise AssertionError("the live registry has no pending capability cell")
+
+
+def test_a_reason_that_promises_a_deployment_must_name_the_commit(registry, catalog):
+    reg = copy.deepcopy(registry)
+    _, _, status = _first_pending_cap(reg)
+    status["reason"] = "已在開發主幹實作，還沒上正式機，上線後改已做。"
+    status.pop("awaits_commit", None)
+    problems = [p for p in registry_problems(reg, catalog) if "awaits_commit" in p]
+    assert len(problems) == 1 and "names no commit" in problems[0]
+    status["awaits_commit"] = "0123456789abcdef0123456789abcdef01234567"
+    assert not [p for p in registry_problems(reg, catalog) if "awaits_commit" in p]
+    status["awaits_commit"] = "0123abc"  # a short hash is enough to find the commit
+    assert not [p for p in registry_problems(reg, catalog) if "awaits_commit" in p]
+
+
+@pytest.mark.parametrize("bad", ["", "XYZ", "0123ab", "0123456789ABCDEF", 12345, "g" * 40])
+def test_awaits_commit_must_look_like_a_commit(registry, catalog, bad):
+    reg = copy.deepcopy(registry)
+    _, _, status = _first_pending_cap(reg)
+    status["awaits_commit"] = bad
+    assert [p for p in registry_problems(reg, catalog) if "awaits_commit must be" in p]
+
+
+def test_awaits_commit_only_belongs_on_pending_cells(registry, catalog):
+    reg = copy.deepcopy(registry)
+    capability = next(c for c in reg["capabilities"] if any(s["state"] == "done" for s in c["status"].values()))
+    status = next(s for s in capability["status"].values() if s["state"] == "done")
+    status["awaits_commit"] = "0123456789abcdef0123456789abcdef01234567"
+    assert [p for p in registry_problems(reg, catalog) if "only belongs on a pending cell" in p]
+
+
+def test_a_pending_reason_that_does_not_promise_a_deployment_needs_no_commit(registry, catalog):
+    """'Waits for a phone test / x3e / a decision' is not a deployment; those cells stay as they are."""
+    reg = copy.deepcopy(registry)
+    _, _, status = _first_pending_cap(reg)
+    status["reason"] = "要等 x5 測試網實測，驗過才改已做。"
+    status.pop("awaits_commit", None)
+    assert not [p for p in registry_problems(reg, catalog) if "awaits_commit" in p]
+    assert not [p for p in registry_problems(registry, catalog) if "awaits_commit" in p]  # the shipped registry is clean

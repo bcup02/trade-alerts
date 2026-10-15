@@ -44,6 +44,11 @@
           "type": "string",
           "minLength": 1,
           "description": "pending / n/a: plain-language current state or why it does not apply."
+        },
+        "awaits_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{7,40}$",
+          "description": "pending: the commit (in this strategy's repo) whose deployment to the live host makes this cell true; the observation watch flags the cell once that commit is running on A1."
         }
       },
       "allOf": [
