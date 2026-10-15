@@ -43,7 +43,8 @@ from typing import Any, Iterable, Mapping
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from trade_alerts.rollout_registry import STRATEGY_PROJECTS, load_rollout_registry  # noqa: E402
+from trade_alerts.fleet_event_log import load_error_catalog  # noqa: E402
+from trade_alerts.rollout_registry import STRATEGY_PROJECTS, load_rollout_registry, registry_problems  # noqa: E402
 
 _LINK = re.compile(r"^(cap|rule):([A-Za-z0-9_.]+)(?:#(behaviour|emits_event))?(?:@([a-z\-]+(?:,[a-z\-]+)*))?$")
 ASPECTS = ("behaviour", "emits_event")
@@ -232,6 +233,14 @@ def check_registry_shape(registry: Any) -> None:
             for aspect in aspects:
                 if not isinstance(entry.get(aspect), dict):
                     raise ValueError(f"登記冊 {key} 的 {entry[name_key]} 缺少 {aspect}（要是物件）")
+    # the shell is right; now every cell (state, evidence/reason...) must obey the registry's own rules -- the same
+    # `registry_problems` CI runs -- so a cell without `state`, or `done` without evidence, cannot pass as finished
+    try:
+        problems = registry_problems(registry, load_error_catalog())
+    except Exception as exc:    # noqa: BLE001 -- whatever the validator trips over, the registry is unreadable, not fine
+        raise ValueError(f"登記冊結構無法驗證（{type(exc).__name__}: {exc}）") from exc
+    if problems:
+        raise ValueError(f"登記冊本身不符合登記冊的規則（{len(problems)} 處）：" + "；".join(problems[:3]) + ("…" if len(problems) > 3 else ""))
 
 
 def load_registry_from_main(root: Path = ROOT) -> dict[str, Any]:
@@ -271,7 +280,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"✗ 讀不到登記冊：{exc}")
         return 1
     linked = [i for i in items if "registry" in i]
-    problems = link_problems(items, registry, watch)
+    try:
+        problems = link_problems(items, registry, watch)
+    except (KeyError, TypeError, AttributeError) as exc:    # a shape the checks above did not foresee: an error, not a traceback
+        print(f"✗ 連結檢查讀不懂資料：{type(exc).__name__}: {exc}")
+        return 1
     print(f"進度項目 {len(items)} 項，其中 {len(linked)} 項連了登記冊格子；問題 {len(problems)} 個")
     for line in problems:
         print("  ✗ " + line)

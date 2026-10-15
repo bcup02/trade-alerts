@@ -378,3 +378,52 @@ def test_a_registry_with_the_wrong_shape_is_an_error_not_a_silent_pass(tmp_path,
 def test_the_real_registry_has_the_shape_the_checker_requires():
     real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
     cpl.check_registry_shape(real)
+
+
+def _first_cap_and_project(real):
+    cap = real["capabilities"][0]
+    return cap, next(iter(cap["status"]))
+
+
+@pytest.mark.parametrize("name, cell", [
+    ("cell is an empty object (no state)", lambda st: {}),
+    ("done without evidence", lambda st: {"state": "done"}),
+    ("unknown state", lambda st: {"state": "finished", "evidence": "e"}),
+    ("pending without reason", lambda st: {"state": "pending"}),
+    ("cell is not an object", lambda st: "done"),
+])
+def test_a_registry_cell_that_breaks_the_registry_rules_cannot_pass_as_finished(tmp_path, capsys, name, cell):
+    """Review of #206 (round 4): a cell without `state` raised KeyError; `done` without evidence counted as finished."""
+    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    cap, project = _first_cap_and_project(real)
+    cap["status"][project] = cell(cap["status"][project])
+    reg = tmp_path / "reg.json"
+    reg.write_text(json.dumps(real), encoding="utf-8")
+    (tmp_path / "db").mkdir()
+    export = _export(tmp_path / "db", [{"id": "i-1", "status": "done", "title": "t", "registry": [f"cap:{cap['id']}@{project}"]}])
+    assert cpl.main(["--db-dir", str(export), "--registry", str(reg)]) == 1, name
+    assert "讀不到登記冊" in capsys.readouterr().out
+
+
+def test_a_rule_cell_without_state_is_refused_too(tmp_path, capsys):
+    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    row = real["catalog"][0]
+    project = next(iter(row["behaviour"]))
+    row["behaviour"][project] = {}
+    reg = tmp_path / "reg.json"
+    reg.write_text(json.dumps(real), encoding="utf-8")
+    (tmp_path / "db").mkdir()
+    export = _export(tmp_path / "db", [{"id": "i-1", "status": "done", "title": "t", "registry": [f"rule:{row['code']}#behaviour"]}])
+    assert cpl.main(["--db-dir", str(export), "--registry", str(reg)]) == 1
+    assert "讀不到登記冊" in capsys.readouterr().out
+
+
+def test_an_unforeseen_shape_in_the_link_check_is_an_error_not_a_traceback(tmp_path, capsys, monkeypatch):
+    (tmp_path / "db").mkdir()
+    export = _export(tmp_path / "db", [{"id": "i-1", "status": "done", "title": "t", "registry": ["cap:x@seykota"]}])
+
+    def boom(items, registry, watch_ids=()):
+        raise KeyError("state")
+    monkeypatch.setattr(cpl, "link_problems", boom)
+    assert cpl.main(["--db-dir", str(export), "--registry", str(_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json")]) == 1
+    assert "連結檢查讀不懂資料" in capsys.readouterr().out
