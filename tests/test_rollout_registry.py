@@ -509,3 +509,42 @@ def test_updated_recent_change_is_accepted_and_flagged(registry, catalog):
     reg["recent_changes"] = [{"kind": "cap", "id": capability["id"], "type": "updated", "note": "x"}]
     items = {i["anchor"]: i for i in _render_guides().rollout_items(catalog, reg)}
     assert items["cap-" + capability["id"]]["added_recent"] is True
+
+
+def _page_data(html: str) -> dict:
+    import re
+
+    match = re.search(r'<script type="application/json" id="data">\n(.*?)\n</script>', html, re.S)
+    assert match, "the rollout page has no embedded data"
+    return json.loads(match.group(1))
+
+
+def test_recent_summary_lists_a_rule_once_when_both_aspects_flipped(registry, catalog):
+    """A rule whose behaviour and event-log aspects both became true needs two recent_changes entries (the
+    validator wants the aspect), but the 'what changed' box must show one line, not two identical ones."""
+    render_guides = _render_guides()
+    reg = copy.deepcopy(registry)
+    code, project = next(
+        (row["code"], p) for row in reg["catalog"] for p in row["behaviour"]
+        if row["behaviour"][p]["state"] == "done" and row["emits_event"][p]["state"] == "done"
+    )
+    reg["recent_changes"] = [
+        {"kind": "rule", "id": code, "project": project, "aspect": aspect, "type": "completed", "note": "同一句話"}
+        for aspect in ("behaviour", "emits_event")
+    ]
+    assert not [p for p in registry_problems(reg, catalog) if "recent_changes" in p]
+    data = _page_data(render_guides.render_rollout_register(catalog, reg, render_guides.load_glossary()))
+    assert [r["note"] for r in data["recent_summary"]] == ["同一句話"]
+    # a different note for the same rule is a different line
+    reg["recent_changes"][1]["note"] = "另一句話"
+    data = _page_data(render_guides.render_rollout_register(catalog, reg, render_guides.load_glossary()))
+    assert sorted(r["note"] for r in data["recent_summary"]) == ["另一句話", "同一句話"]
+
+
+def test_rollout_page_lists_only_phases_that_still_have_pending_cells(registry, catalog):
+    """'預定的關卡' is what is still to do: a phase with no pending cell left is history, not a plan."""
+    render_guides = _render_guides()
+    data = _page_data(render_guides.render_rollout_register(catalog, registry, render_guides.load_glossary()))
+    assert data["phase_order"] == [k for k in registry["phases"] if data["phase_counts"][k] > 0]
+    assert all(data["phase_counts"][k] > 0 for k in data["phase_order"])
+    assert set(data["phase_counts"]) == set(registry["phases"])  # the counts still cover every phase

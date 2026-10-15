@@ -497,6 +497,7 @@ DATA.project_order.forEach(function(p){
   var t=DATA.totals[p]; d.appendChild(document.createTextNode("已做 "+t.done+"｜未做 "+t.pending+"｜不適用 "+t["n/a"])); sum.appendChild(d);
 });
 var phaseHost=document.getElementById("phases");
+if(!DATA.phase_order.length) phaseHost.appendChild(el("p","group-sub","目前沒有未做的格子。"));
 DATA.phase_order.forEach(function(k){
   var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜未做 "+DATA.phase_counts[k]+" 格")); phaseHost.appendChild(c);
 });
@@ -659,18 +660,25 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
     n_pending = len(items) - n_done
     by_key = {(i["kind"], i["id"]): i for i in items}
     recent_summary = []
+    seen_recent: set[tuple[str, str | None, str]] = set()
     for change in registry.get("recent_changes") or []:
         item = by_key.get((change["kind"], change["id"]))
         if item is None:
             continue
         project = change.get("project")
+        # A rule whose behaviour and event-log aspects both flipped has two entries (the validator wants
+        # the aspect); with the same note they are one line on the page.
+        key = (item["anchor"], project, change["note"])
+        if key in seen_recent:
+            continue
+        seen_recent.add(key)
         recent_summary.append({
             "anchor": item["anchor"], "title": item["title"],
             "project": projects[project] if project else None, "note": change["note"],
         })
     data = {
         "projects": projects, "project_order": list(STRATEGY_PROJECTS), "phases": phases,
-        "phase_order": list(phases), "phase_counts": phase_counts, "totals": totals, "items": items,
+        "phase_order": [k for k in phases if phase_counts[k]], "phase_counts": phase_counts, "totals": totals, "items": items,
         "recent_summary": recent_summary, "glossary": _glossary_groups(glossary),
     }
     sources = "；".join(
@@ -713,7 +721,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
   <div id="done"></div>
 
   <div class="group-head" id="group-phases" style="--c:var(--ink-soft)"><h2>預定的關卡</h2></div>
-  <p class="group-sub">「未做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
+  <p class="group-sub">只列還有未做格子的關卡；「未做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
   <div id="phases" class="phase-list"></div>
 
   <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">{len(glossary['entries'])} 條</span></div>

@@ -177,8 +177,8 @@
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
   <div class="big">
-    <a class="c-pending" href="#group-pending"><b>39</b><span>項未完成——還有策略沒做到</span></a>
-    <a class="c-done" href="#group-done"><b>58</b><span>項已完成——四支都到位，不用再動</span></a>
+    <a class="c-pending" href="#group-pending"><b>24</b><span>項未完成——還有策略沒做到</span></a>
+    <a class="c-done" href="#group-done"><b>73</b><span>項已完成——四支都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
   <p class="dot-legend">
@@ -193,23 +193,23 @@
   </div>
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
-  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">39 項</span></div>
+  <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">24 項</span></div>
   <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
-  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">58 項</span></div>
+  <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">73 項</span></div>
   <p class="group-sub">每支相關的策略都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
   <div id="done"></div>
 
   <div class="group-head" id="group-phases" style="--c:var(--ink-soft)"><h2>預定的關卡</h2></div>
-  <p class="group-sub">「未做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
+  <p class="group-sub">只列還有未做格子的關卡；「未做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
   <div id="phases" class="phase-list"></div>
 
   <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">50 條</span></div>
   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
   <div id="glossaryHost"></div>
   <div class="foot">
-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-14 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-15 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column/ed-seykota-systematic-trend-following@operations 489bbcd</code>；動能策略 <code>AI-for-column/mexc-4h-momentum-trailing-stop@operations 53e04ce</code>；加密策略 <code>AI-for-column/my-crypto-bot@operations 2ee102c</code>；競賽策略 <code>AI-for-column/btc-bull-market-competition@operations 7d499bb</code>。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
   </div>
@@ -1028,14 +1028,14 @@
   {
    "added_recent": false,
    "anchor": "cap-latch.restart_only_clear",
-   "complete": false,
+   "complete": true,
    "dots": {
     "btc-competition": "na",
     "momentum": "na",
     "mycrypto": "na",
-    "seykota": "pending"
+    "seykota": "recent"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "latch.restart_only_clear",
    "kind": "cap",
    "rows": [
@@ -1044,9 +1044,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
-       "state": "pending",
-       "text": "已知缺陷：EXCHANGE_TARGET_UNSAFE／FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 改好設定重啟後，沒有任何程式清除暫停（src/seykota_bot/bot.py 守衛通過後直接停在「已暫停」），解除工具又刻意拒絕這兩類（src/seykota_bot/safe_halt_resume.py:134），目前只能手改 state 檔。　2026-10-01：已在開發主幹的 f-12 趨勢 PR 實作（守衛通過後自動清除並記 safe_halt_cleared），還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed 只處理 EXCHANGE_TARGET_UNSAFE 與 FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 兩種：重啟後把原本擋下的守門檢查再跑一次，通過就追加 safe_halt_cleared（method=config_fixed_restart）、清掉暫停並記 safe_halt_cleared_after_config_fix（:599）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫它；解除工具 src/seykota_bot/safe_halt_resume.py:134 仍刻意拒絕這兩類（只准改好設定重啟）。PR #79（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419（改好設定重啟後暫停被清掉）、tests/test_safe_halt_model_migration.py:304（解除工具拒絕這兩類）。限制：A1 沒有發生過這兩類設定錯誤暫停，沒有實際觸發過；錯誤清單 ERR-009／ERR-010 的處理步驟與追查指令仍寫「已知缺陷：重啟後清不掉」，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
       }
      ]
     },
@@ -1342,10 +1342,10 @@
    "dots": {
     "btc-competition": "na",
     "momentum": "done",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "repair_bot.detect_propose",
    "kind": "cap",
    "rows": [
@@ -1404,10 +1404,10 @@
    "dots": {
     "btc-competition": "na",
     "momentum": "done",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "repair_bot.verified_close",
    "kind": "cap",
    "rows": [
@@ -1466,10 +1466,10 @@
    "dots": {
     "btc-competition": "na",
     "momentum": "done",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "done"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "repair_bot.pause_brake",
    "kind": "cap",
    "rows": [
@@ -1524,14 +1524,14 @@
   {
    "added_recent": false,
    "anchor": "cap-ops_export.writer",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "done",
     "mycrypto": "done",
     "seykota": "done"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "ops_export.writer",
    "kind": "cap",
    "rows": [
@@ -1573,9 +1573,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
-       "state": "pending",
-       "text": "匯出檔已經有了：src/btc_competition/unrecorded_fill.py:219 每輪（含跳過）重寫 audit/ops_export.json（g1-5，2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤），目前只帶帳本少記成交的通知。策略自己的安全暫停（下單結果不明、帳本持倉出現負數、連續 3 天零成交）還沒寫進事件日誌，所以還不會出現在匯出檔；第 8 關接上後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/unrecorded_fill.py:219 每輪（含跳過）重寫 audit/ops_export.json（g1-5，2026-09-26 01:16 UTC 上正式機）；策略自己的安全暫停與狀態事件也寫進事件日誌，由同一個作業轉成匯出檔：src/btc_competition/runner.py:629 _record_halt（下單結果不明、帳本持倉出現負數、連續 3 天零成交、狀態檔損毀，等級表 :538）、src/btc_competition/interrupted_orders.py:181（被中斷的單補記）。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 的競賽沒有自己偵測到過這些暫停；2026-10-11 台北的受控測試（見 notify.line_first_notice）用人工寫的測試事件驗過匯出檔→維運通知→手機這條路。"
       }
      ]
     }
@@ -1650,12 +1650,12 @@
    "anchor": "cap-notify.line_first_notice",
    "complete": false,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "done",
     "mycrypto": "pending",
     "seykota": "done"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "notify.line_first_notice",
    "kind": "cap",
    "rows": [
@@ -1686,7 +1686,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+       "phase": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7",
        "state": "pending",
        "text": "2026-10-14 台北 12:05：A1 維運通知對加密的匯出轉送已開、匯出檔軸 OK，策略端的事件日誌與匯出檔也已上線；還沒有實際經這條路送到你手機（加密 OFFLINE、沒有真實事件，也還沒做受控測試事件）。受控測試通過、手機確認收到之後才改已做。"
       }
@@ -1697,9 +1697,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
-       "state": "pending",
-       "text": "2026-09-22 實查：正式機的維運通知只設 LINE（符合計畫「LINE 只發第一則、避開月額度」），但這支策略的匯出轉送開關在正式機還沒開，所以實際上還沒有任何通知送得到 LINE。開發機沒有 LINE 憑證（LINE_ALERTS_ENABLED=false），那台的維運通知改用 Telegram 暫代——這是「先讓通知能動」留下的權宜設定；7e 已取消（2026-10-12），開發機維運通知保留 Telegram 單向發送是否沿用，另議。　這支策略目前還沒有任何會通知人的事件來源。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/unrecorded_fill.py:219 寫出的匯出檔由 A1 維運通知轉送（OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on，2026-09-26）。2026-10-11 台北 A1 受控測試：競賽 ERR-023（下單結果不明）標明「測試」的事件經匯出檔與維運通知送出，你手機收到兩則（第一則通知本文、第二則給 AI 的追查指令）。限制：事件是人工寫的測試事件，競賽自己偵測到暫停的路徑在 A1 沒被實際觸發過。"
       }
      ]
     }
@@ -1770,7 +1770,7 @@
    "title": "需要人處理的通知在 Telegram 持續提醒，並附「開始處理」「處理完成」按鈕（已取消）"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-ops_notify.units_axis",
    "complete": true,
    "dots": {
@@ -1894,7 +1894,7 @@
    "title": "資金費同步"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-reconcile.google_projection_grace",
    "complete": false,
    "dots": {
@@ -1925,7 +1925,7 @@
        "aspect": null,
        "phase": null,
        "state": "done",
-       "text": "src/google_reconcile.py:91 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（同上三項）。A1 正式機（新）執行環境（唯讀查證）：operations 71ccee3 於 2026-10-07 台北 16:07（A1 日誌 JST 17:07）部署；/opt 的 src/google_reconcile.py（48433a6）、pyproject.toml（5628afd）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.27.7，其共用庫對帳模組檔（trade_alerts 套件的 ledger_reconcile 模組）的 blob（fca13c4）與 tag v0.27.7 同檔；部署後手動一輪對帳台北 16:08（JST 17:08）RECONCILED。動機：2026-10-05～06 兩天 7 輪 DIVERGED 讀數、5 次 ERR-044 告警都是動能進場／平倉後對帳比同步先讀。限制：部署時動能空手，之後最早的進場在台北 20:00 的 K 棒，部署當下還沒看到它實際擋掉一次誤報。"
+       "text": "src/google_reconcile.py:91 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒；守門測試 tests/test_google_reconcile.py（同上三項）。A1 正式機（新）執行環境（唯讀查證）：operations 71ccee3 於 2026-10-07 台北 16:07（A1 日誌 JST 17:07）部署；/opt 的 src/google_reconcile.py（48433a6）、pyproject.toml（5628afd）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.27.7，其共用庫對帳模組檔（trade_alerts 套件的 ledger_reconcile 模組）的 blob（fca13c4）與 tag v0.27.7 同檔；部署後手動一輪對帳台北 16:08（JST 17:08）RECONCILED。動機：2026-10-05～06 兩天 7 輪 DIVERGED 讀數、5 次 ERR-044 告警都是動能進場／平倉後對帳比同步先讀。2026-10-09 台北動能進場後（04:15 那輪兩筆、12:01 一筆），A1 對帳讀數是 RECONCILED，04:15 那輪的證據帶 2 筆 projection_pending（寬限中），其後沒有 DIVERGED 也沒有 ERR-044，寬限在 A1 實際擋掉了誤報（進度頁 f-22f）。限制：只在動能的進場看到過。"
       }
      ]
     },
@@ -1934,9 +1934,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+       "phase": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7",
        "state": "pending",
-       "text": "加密仍釘共用庫 v0.15.0，沒有這個寬限；換 Binance（x3）升級共用庫時一併具備。加密這兩天的 Google 表對帳沒有 DIVERGED 讀數（只看了維運通知的狀態轉換，沒有逐日核對帳本）。"
+       "text": "共用庫已隨 x3b 升到 v0.30.7；google_reconcile.py:87 呼叫的 sheet_ledger_compare 沒有傳 projection_grace_seconds，所以已套用共用庫預設的 3600 秒寬限。尚缺：加密沒有這一格的守門測試（趨勢、動能有 tests/test_google_reconcile.py 的剛進場、剛平倉、老交易缺列三項）；加密的 Google 表目前走舊的寫入路徑（沒有 v2 投影佇列，『新交易等同步』的情境要等 x3e 才存在），A1 加密 OFFLINE 也沒有遇過。補守門測試並在 x3e 之後驗證寬限路徑，才改已做。加密這兩天的 Google 表對帳沒有 DIVERGED 讀數（只看了維運通知的狀態轉換，沒有逐日核對帳本）。"
       }
      ]
     },
@@ -2120,7 +2120,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+       "phase": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7",
        "state": "pending",
        "text": "帳本更正事件的讀取端（對帳、Google 表 correct_close_v2、投資人快照）要跟 Google 新版投影（x3e）一起接上；修復機器人已接上（x3d），但自動產生更正沒做（單號不能證明是自己下的）。"
       }
@@ -2182,7 +2182,7 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+       "phase": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7",
        "state": "pending",
        "text": "通知已具備並在 A1 運作（repair_bot.py:215 UnrecordedFillAdapter(client_ids=False)、repair_bot.py:244 run_unrecorded_fill_round：不查交易所、不寫帳本，交易所有成交而帳本沒記一律 ERR-042 R3 開請求並通知）；『以交易所為準自動更正』沒有：這支的單號（open-<時間>／close-<時間>）不能證明是自己下的，且更正要有 Google 新版投影（x3e）。"
       }
@@ -2206,11 +2206,11 @@
   {
    "added_recent": false,
    "anchor": "cap-repair_bot.recurrence_escalation",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "done",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "done"
    },
    "has_recent": true,
@@ -2255,9 +2255,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
-       "state": "pending",
-       "text": "VERIFIED_CLOSE_AUTO_REPAIRED 是 R1（自動補寫、不通知），事件日誌有紀錄但沒有人被告知；trade_alerts/repair_runner.py 的計數（_failures_since_last_escalation）只算同一 trade_id 連續失敗，不算成功修補的次數，也不跨交易累計。若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 不會被發現。這支還沒有修復機器人（見第 8 關），接上時要一併具備。"
+       "phase": null,
+       "state": "n/a",
+       "text": "競賽是現貨再平衡，沒有開倉／平倉配對，也沒有漏記平倉的修復機器人（見能力『修復機器人：抓錯並提出修復建議』等三格，競賽都是不適用），所以沒有『自動補寫』可以重複發生。競賽帳本少記成交走另一條路：每次補記都立刻發 R3 通知（BTC.UNRECORDED_FILL_CORRECTED，ERR-040），不是 R1 靜默補寫。2026-10-15 使用者決定列不適用。"
       }
      ]
     }
@@ -2266,16 +2266,16 @@
    "title": "自動修補重複發生時升格通知"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-notify.error_id",
    "complete": false,
    "dots": {
-    "btc-competition": "pending",
-    "momentum": "pending",
+    "btc-competition": "recent",
+    "momentum": "recent",
     "mycrypto": "pending",
-    "seykota": "pending"
+    "seykota": "recent"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "notify.error_id",
    "kind": "cap",
    "rows": [
@@ -2284,9 +2284,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
-       "state": "pending",
-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：已實作、都在開發主幹、未部署——共用庫 v0.25.0（策略白話警報第一行＝【ERR-編號】＋目錄標題，給 AI 的指令獨立成第二則）與維運通知（bcup02/ops-notify#31：發兩則、自己的對帳狀態告警也帶編號，標題從目錄讀）。上正式機並確認手機收到兩則後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "scripts/repair_bot.py:234 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。限制：策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-037（交易所有成交、帳本沒記）。"
       }
      ]
     },
@@ -2295,9 +2295,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
-       "state": "pending",
-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：已實作、都在開發主幹、未部署——共用庫 v0.25.0（策略白話警報第一行＝【ERR-編號】＋目錄標題，給 AI 的指令獨立成第二則）與維運通知（bcup02/ops-notify#31：發兩則、自己的對帳狀態告警也帶編號，標題從目錄讀）。上正式機並確認手機收到兩則後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "scripts/repair_bot.py:176 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。限制：策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-015（移動停損無法驗證）。"
       }
      ]
     },
@@ -2306,9 +2306,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
+       "phase": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7",
        "state": "pending",
-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：已實作、都在開發主幹、未部署——共用庫 v0.25.0（策略白話警報第一行＝【ERR-編號】＋目錄標題，給 AI 的指令獨立成第二則）與維運通知（bcup02/ops-notify#31：發兩則、自己的對帳狀態告警也帶編號，標題從目錄讀）。上正式機並確認手機收到兩則後改已做。"
+       "text": "加密的匯出檔（ops_export_refresh.py:28 每分鐘刷新）與 A1 維運通知的轉送在 2026-10-14 隨 x3c 上線，共用庫已是 v0.30.7，通知第一行的版面與其他三支用同一個共用函式；但加密沒有實際把通知送到手機過（A1 加密 OFFLINE，LINE 受控測試你決定先不做，見 notify.line_first_notice），所以這格維持未做。受控測試通過、手機確認收到兩則之後改已做。"
       }
      ]
     },
@@ -2317,9 +2317,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "錯誤編號：錯誤目錄每條配固定編號（ERR-001…），所有通知第一行＝【編號】＋目錄標題；對帳狀態告警也補進目錄。併入通知分兩則（v3）同一次改",
-       "state": "pending",
-       "text": "使用者 2026-09-24 要求：每種錯誤有固定編號，傳給使用者的每則訊息一定附編號，標題與風險登記冊一字不差。現況：錯誤目錄每條已有固定編號（ERR-001 起，2026-09-30 e1，風險登記冊已顯示），但通知還沒帶編號——策略白話警報（ops_export）有目錄標題但只附內部代碼；ops-notify 的對帳狀態告警（「⚠️ 對帳狀態異常」等）是自己組的文字，完全沒有對應到目錄條目。 2026-10-02：已實作、都在開發主幹、未部署——共用庫 v0.25.0（策略白話警報第一行＝【ERR-編號】＋目錄標題，給 AI 的指令獨立成第二則）與維運通知（bcup02/ops-notify#31：發兩則、自己的對帳狀態告警也帶編號，標題從目錄讀）。上正式機並確認手機收到兩則後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/unrecorded_fill.py:219 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。限制：策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-023（下單結果不明）。"
       }
      ]
     }
@@ -2390,7 +2390,7 @@
    "title": "收到停止訊號時等當輪做完再結束"
   },
   {
-   "added_recent": true,
+   "added_recent": false,
    "anchor": "cap-recovery.interrupted_order",
    "complete": true,
    "dots": {
@@ -2452,7 +2452,7 @@
    "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-reconcile.adopted_fills",
    "complete": false,
    "dots": {
@@ -2492,9 +2492,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+       "phase": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7",
        "state": "pending",
-       "text": "加密策略同樣會寫沒有訂單編號的接手紀錄（development 7a59081 的 mexc_futures_bot.py 兩處 position_recovered，entry_order_id 為 None；operations 分支沒有另外查），對帳卻是舊版共用庫 v0.15.0，沒有這個配對。目標：換 Binance 時（x3）升級共用庫並接上，升級後仍要整合與端到端驗證，配對才算具備。"
+       "text": "共用庫已隨 x3b 升到 v0.30.7：reconcile_compare.py:67 呼叫的 exchange_ledger_compare 內建『同交易對、方向、數量、價格、時間都對得上才算帳本有記』的接手成交配對，reconcile_compare.py:53 也把 position_recovered 算作開倉（原本寫的『對帳是舊版共用庫 v0.15.0，沒有這個配對』已不成立）。加密的接手紀錄仍沒有訂單編號（mexc_futures_bot.py:2088、:2104 兩處 position_recovered）。尚缺：加密自己的配對守門測試與端到端驗證（要在 x5 測試網走一次接手→對帳），驗過才改已做。"
       }
      ]
     },
@@ -2514,7 +2514,7 @@
    "title": "接手倉位與原生停損平倉的成交，對帳不再誤判成「帳本沒記」"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-projection.park_unconfirmed_correction",
    "complete": false,
    "dots": {
@@ -2554,9 +2554,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+       "phase": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7",
        "state": "pending",
-       "text": "加密仍釘共用庫 v0.15.0，沒有 v2 Google 投影，也就沒有這個佇列；換 Binance（x3）升級共用庫並接上新版投影時一併具備。"
+       "text": "加密仍走舊的 Google 寫入路徑（mexc_futures_bot.py:698 post_trade_close_to_sheet 逐筆單列更新），沒有 v2 Google 投影、同步佇列與 google_projection_worker，所以沒有可以停放的佇列；共用庫已升到 v0.30.7，要等 x3e（Google 新版投影）接上才一併具備。"
       }
      ]
     },
@@ -2576,7 +2576,7 @@
    "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-projection.requeue_parked",
    "complete": false,
    "dots": {
@@ -2616,9 +2616,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+       "phase": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7",
        "state": "pending",
-       "text": "加密仍釘共用庫 v0.15.0，沒有 v2 Google 投影佇列；換 Binance（x3）時一併具備。"
+       "text": "同上：加密沒有 v2 投影佇列，也就沒有被停放、需要重新排入的紀錄；共用庫已升到 v0.30.7，等 x3e 接上新版投影時一併具備。"
       }
      ]
     },
@@ -2638,7 +2638,7 @@
    "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
   },
   {
-   "added_recent": false,
+   "added_recent": true,
    "anchor": "cap-google.close_whole_trade_entry",
    "complete": false,
    "dots": {
@@ -2678,9 +2678,9 @@
      "lines": [
       {
        "aspect": null,
-       "phase": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備",
+       "phase": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7",
        "state": "pending",
-       "text": "加密仍釘共用庫 v0.15.0，沒有 v2 Google 投影（平倉不走這個接收端動作）；換 Binance（x3）接上新版投影時一併具備。"
+       "text": "加密的平倉仍走舊路徑（mexc_futures_bot.py:698 post_trade_close_to_sheet 填那一列的平倉欄位），不是 v2 投影的平倉動作，所以沒有『整筆加權進場價與總量寫回 G、I 欄』這件事；共用庫已升到 v0.30.7，等 x3e 接上新版投影時一併具備。"
       }
      ]
     },
@@ -3113,7 +3113,7 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "SEY.EXCHANGE_TARGET_UNSAFE",
    "kind": "rule",
    "rows": [
@@ -3122,9 +3122,9 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
-       "state": "pending",
-       "text": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。"
+       "phase": null,
+       "state": "done",
+       "text": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419、tests/test_safe_halt_model_migration.py:304。限制：A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令仍寫『已知缺陷：重啟後清不掉』，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
       },
       {
        "aspect": "寫進事件日誌",
@@ -3148,7 +3148,7 @@
     "mycrypto": "none",
     "seykota": "pending"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
    "kind": "rule",
    "rows": [
@@ -3157,9 +3157,9 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
-       "state": "pending",
-       "text": "暫停本身正確，但改好設定重啟後清不掉（見能力「latch.restart_only_clear」）。"
+       "phase": null,
+       "state": "done",
+       "text": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419、tests/test_safe_halt_model_migration.py:304。限制：A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令仍寫『已知缺陷：重啟後清不掉』，是過時文字，要改錯誤清單發新版（進度頁 f-46）。"
       },
       {
        "aspect": "寫進事件日誌",
@@ -3316,14 +3316,14 @@
   {
    "added_recent": false,
    "anchor": "rule-MOM.PROTECTION_UNVERIFIED",
-   "complete": false,
+   "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "pending",
+    "momentum": "recent",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "MOM.PROTECTION_UNVERIFIED",
    "kind": "rule",
    "rows": [
@@ -3338,9 +3338,9 @@
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
-       "state": "pending",
-       "text": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+       "phase": null,
+       "state": "done",
+       "text": "src/strategy.py:1391 暫停前寫 R3 事件 PROTECTION_UNVERIFIED（src/fleet_events.py:23），由動能修復機器人每輪（scripts/repair_bot.py:176）刷新匯出檔交給維運通知。PR #108（8a）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。驗證：2026-10-11 台北 A1 受控測試——ERR-015 測試事件你手機收到兩則。限制：測試事件是人工寫的，動能自己偵測到『移動停損無法驗證』的路徑在 A1 沒被實際觸發過。"
       }
      ]
     }
@@ -3351,14 +3351,14 @@
   {
    "added_recent": false,
    "anchor": "rule-MOM.STATE_REPAIRED_SAFE_HALT",
-   "complete": false,
+   "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "pending",
+    "momentum": "recent",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "MOM.STATE_REPAIRED_SAFE_HALT",
    "kind": "rule",
    "rows": [
@@ -3373,9 +3373,9 @@
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
-       "state": "pending",
-       "text": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+       "phase": null,
+       "state": "done",
+       "text": "src/safe_halt_state_repair.py:163 修復工具修完本地紀錄、主動安全暫停時寫 R3 事件 STATE_REPAIRED_SAFE_HALT（src/fleet_events.py:24），由動能修復機器人每輪刷新匯出檔交給維運通知。PR #108（8a）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。限制：A1 沒有跑過這個修復工具，事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路用 ERR-015 受控測試事件驗過，不是這個事件。"
       }
      ]
     }
@@ -3386,14 +3386,14 @@
   {
    "added_recent": false,
    "anchor": "rule-MOM.RUNTIME_CYCLE_FAILED",
-   "complete": false,
+   "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "pending",
+    "momentum": "recent",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "MOM.RUNTIME_CYCLE_FAILED",
    "kind": "rule",
    "rows": [
@@ -3408,9 +3408,9 @@
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
-       "state": "pending",
-       "text": "目前只寫 state／心跳，沒有寫進共用事件日誌，所以不會有白話通知。"
+       "phase": null,
+       "state": "done",
+       "text": "src/fleet_events.py:65 record_cycle_failure 寫 R0 事件 RUNTIME_CYCLE_FAILED（一段連續失敗的第一輪才寫一行），由 src/main.py:336 在 run_forever 抓到例外時呼叫；R0 只記錄、不通知。PR #108（8a）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。"
       }
      ]
     }
@@ -3526,14 +3526,14 @@
   {
    "added_recent": false,
    "anchor": "rule-BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
    "kind": "rule",
    "rows": [
@@ -3548,9 +3548,9 @@
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
-       "state": "pending",
-       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/runner.py:488 呼叫 :629 _record_halt，把安全暫停寫進事件日誌（等級表 :538：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
       }
      ]
     }
@@ -3568,7 +3568,7 @@
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "BTC.EXECUTION_BLOCKED_ZERO_FILLS",
    "kind": "rule",
    "rows": [
@@ -3583,9 +3583,9 @@
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
-       "state": "pending",
-       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/runner.py:488 呼叫 :629 _record_halt，把安全暫停寫進事件日誌（等級表 :538：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
       }
      ]
     }
@@ -3596,14 +3596,14 @@
   {
    "added_recent": false,
    "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "BTC.ORDER_STATUS_UNKNOWN",
    "kind": "rule",
    "rows": [
@@ -3618,9 +3618,9 @@
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
-       "state": "pending",
-       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/runner.py:488 呼叫 :629 _record_halt，把安全暫停寫進事件日誌（等級表 :538：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
       }
      ]
     }
@@ -3631,14 +3631,14 @@
   {
    "added_recent": false,
    "anchor": "rule-BTC.REBALANCE_PENDING",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "BTC.REBALANCE_PENDING",
    "kind": "rule",
    "rows": [
@@ -3653,9 +3653,9 @@
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
-       "state": "pending",
-       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（暫停／狀態寫進共用事件日誌，由 unrecorded-fill 作業每輪匯出給維運通知）；還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/runner.py:492 部分成交、目標權重沒達成時寫 R0 事件 REBALANCE_PENDING（只記錄、不通知），下一輪續做。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：R0 本來就不通知；A1 沒有發生過部分成交的調整。"
       }
      ]
     }
@@ -4265,10 +4265,10 @@
    "dots": {
     "btc-competition": "none",
     "momentum": "none",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MYC.UNRECORDED_FILL_UNRESOLVED",
    "kind": "rule",
    "rows": [
@@ -4898,14 +4898,14 @@
   {
    "added_recent": false,
    "anchor": "rule-MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
-   "complete": false,
+   "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "pending",
+    "momentum": "recent",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
    "kind": "rule",
    "rows": [
@@ -4914,15 +4914,15 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "2026-10-01 已在開發主幹的 f-12 動能 PR 實作（沿用 trade_id 接管＋補寫 trade_open）；還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/strategy.py:947 _append_position_recovered 補寫接管事件 position_recovered；src/strategy.py:1625 接管時沿用被中斷那次進場的 trade_id，先存狀態再寫帳本，並補寫該次進場沒來得及寫的 trade_open；之後 :1658 呼叫 _record_position_adoption。PR #108（f-12）、#112（f-16）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。驗證：開發機 DEMO 用強制終止模擬被殺（2026-10-02、10-03，三種情形都補寫 position_recovered、開倉列排隊並送到 Google 表）。限制：A1 正式機沒有發生過被中斷的進場，沒有實際觸發過。"
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "同上：接管時寫 R3 事件日誌，等 f-12 動能 PR 上正式機。"
+       "phase": null,
+       "state": "done",
+       "text": "src/strategy.py:1503 _record_position_adoption 把接管寫成 R3 事件 POSITION_ADOPTED_AFTER_INTERRUPTION（src/fleet_events.py:26），kind 分 interrupted_entry／unknown_origin，呼叫點 src/strategy.py:1658；事件由動能修復機器人每輪（scripts/repair_bot.py:176）刷新匯出檔交給維運通知。PR #108（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ce51083）；/opt 的 src/strategy.py（blob 27358c8）、src/fleet_events.py（ac38de8）、src/main.py（8db128a）、src/safe_halt_state_repair.py（4cae2ec）與 A1 現行 operations 71e6047 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 53e04ce 也是同一份。限制：這個事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路只用受控測試事件（ERR-015）驗過，不是這個事件。"
       }
      ]
     }
@@ -4933,14 +4933,14 @@
   {
    "added_recent": false,
    "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
-   "complete": false,
+   "complete": true,
    "dots": {
     "btc-competition": "none",
     "momentum": "none",
     "mycrypto": "none",
-    "seykota": "pending"
+    "seykota": "recent"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
    "kind": "rule",
    "rows": [
@@ -4949,15 +4949,15 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "2026-10-01 已在開發主幹的 f-12 趨勢 PR 實作（沿用 trade_id 找回進場、補寫 trade_open、原價重掛被中斷的停損）；還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/seykota_bot/bot.py:1261 送單前先記下進場意圖 entry_intent；src/seykota_bot/bot.py:1458 重啟後依 entry_intent 找回被中斷的進場，沿用同一個 trade_id，並由 :1478 補寫該次進場沒來得及寫的 trade_open；src/seykota_bot/bot.py:1385 停損掛到一半被中斷時，用記下的原價重新掛上。PR #79（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/fleet_events.py（1896da8）、scripts/repair_bot.py（a397ec7）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 489bbcd 也是同一份。驗證：開發機 DEMO 強制終止實測（2026-10-02 開 XRP 小部位後 SIGKILL，30 秒內自動重啟、接管部位、帳本單一 trade_id、補掛停損）。限制：A1 正式機沒有發生過被中斷的進場，沒有實際觸發過。"
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "同上：接管時寫 R3 事件日誌，等 f-12 趨勢 PR 上正式機。"
+       "phase": null,
+       "state": "done",
+       "text": "src/seykota_bot/bot.py:1403 _record_position_adoption 把接管寫成 R3 事件 POSITION_ADOPTED_AFTER_INTERRUPTION（src/seykota_bot/fleet_events.py:23，風險分級 :44），kind 有 interrupted_entry／stop_rearmed／unknown_origin 三種，呼叫點 src/seykota_bot/bot.py:1547，一次接管通知一次；事件由趨勢修復機器人每輪刷新匯出檔（scripts/repair_bot.py:234）交給維運通知。PR #79（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/fleet_events.py（1896da8）、scripts/repair_bot.py（a397ec7）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 489bbcd 也是同一份。限制：這個事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路只用受控測試事件（ERR-037）驗過，不是這個事件。"
       }
      ]
     }
@@ -4968,14 +4968,14 @@
   {
    "added_recent": false,
    "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
    "kind": "rule",
    "rows": [
@@ -4984,15 +4984,15 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（送單前寫 order_attempt、被中斷的單由 unrecorded-fill 作業照交易所補記並以交易所 order_id 去重）；還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/runner.py:300 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:100 recover 讀沒結清的 order_attempt，依交易所對該自訂編號的回答把已成交的補記成現貨成交（reason interrupted_order_recovered，:51；以交易所 order_id 去重），由 src/btc_competition/unrecorded_fill.py:275 的計時器作業每輪先跑。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。驗證：開發機 DEMO。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "同上：補記時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/interrupted_orders.py:181 補記一張被中斷的單時寫 R3 事件 ORDER_RECOVERED_AFTER_INTERRUPTION（src/btc_competition/fleet_events.py:30），同一個作業（src/btc_competition/unrecorded_fill.py:219）刷新匯出檔交給維運通知。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
       }
      ]
     }
@@ -5003,14 +5003,14 @@
   {
    "added_recent": false,
    "anchor": "rule-BTC.STATE_FILE_CORRUPT",
-   "complete": false,
+   "complete": true,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "none",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "BTC.STATE_FILE_CORRUPT",
    "kind": "rule",
    "rows": [
@@ -5019,15 +5019,15 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "2026-10-01 已在開發主幹的 f-12 競賽 PR 實作（狀態檔讀不出來就鎖安全暫停、留損毀備份，不再當成第一次執行重新調倉）；還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/runner.py:642 _halt_on_unreadable_state：狀態檔存在但讀不出來時鎖安全暫停 STATE_FILE_CORRUPT、另存損毀備份（evidence.damaged_copy）、這輪不送單，不再把它當成第一次執行而整本重新調倉；src/btc_competition/safe_halt_resume.py:120 解除工具對這個代碼多印提醒（解除後從全新狀態開始，要先決定是否還原備份）。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。測試：tests/test_graceful_stop.py:160（狀態檔損毀→安全暫停、事件 R3）。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "同上：暫停時寫 R3 事件日誌，等 f-12 競賽 PR 上正式機。"
+       "phase": null,
+       "state": "done",
+       "text": "src/btc_competition/runner.py:662 呼叫 :629 _record_halt 寫 R3 事件（等級表 :538），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。限制：A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
       }
      ]
     }
@@ -5038,14 +5038,14 @@
   {
    "added_recent": false,
    "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
-   "complete": false,
+   "complete": true,
    "dots": {
     "btc-competition": "none",
-    "momentum": "pending",
+    "momentum": "recent",
     "mycrypto": "none",
     "seykota": "none"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
    "kind": "rule",
    "rows": [
@@ -5054,15 +5054,15 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；動能策略升級共用庫並部署後才會發，上正式機後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "scripts/repair_bot.py:176 呼叫 run_repair_round，其中的共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+       "phase": null,
+       "state": "done",
+       "text": "scripts/repair_bot.py:176 的同一輪把事件寫進 audit/fleet_event_log.jsonl（R3）並刷新匯出檔，由維運通知轉送；共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
       }
      ]
     }
@@ -5073,14 +5073,14 @@
   {
    "added_recent": false,
    "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
-   "complete": false,
+   "complete": true,
    "dots": {
     "btc-competition": "none",
     "momentum": "none",
     "mycrypto": "none",
-    "seykota": "pending"
+    "seykota": "recent"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
    "kind": "rule",
    "rows": [
@@ -5089,15 +5089,15 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "2026-10-02 共用庫（v0.25.0，未發版）的修復執行器已實作；趨勢策略升級共用庫並部署後才會發，上正式機後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "scripts/repair_bot.py:234 呼叫 run_repair_round，其中的共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
-       "state": "pending",
-       "text": "同上：事件寫進 audit/fleet_event_log.jsonl 由匯出檔通知，等升級共用庫上正式機。"
+       "phase": null,
+       "state": "done",
+       "text": "scripts/repair_bot.py:234 的同一輪把事件寫進 audit/fleet_event_log.jsonl（R3）並刷新匯出檔，由維運通知轉送；共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。限制：尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
       }
      ]
     }
@@ -5110,12 +5110,12 @@
    "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
    "complete": false,
    "dots": {
-    "btc-competition": "pending",
+    "btc-competition": "recent",
     "momentum": "pending",
     "mycrypto": "na",
     "seykota": "pending"
    },
-   "has_recent": false,
+   "has_recent": true,
    "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
    "kind": "rule",
    "rows": [
@@ -5124,9 +5124,9 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
-       "state": "pending",
-       "text": "2026-10-02 共用庫 v0.25.1 已實作，動能、趨勢已釘 v0.26.0 並部署開發機；還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。限制：A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
       },
       {
        "aspect": "寫進事件日誌",
@@ -5141,9 +5141,9 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
-       "state": "pending",
-       "text": "2026-10-02 共用庫 v0.25.1 已實作，動能、趨勢已釘 v0.26.0 並部署開發機；還沒上正式機，上線後改已做。"
+       "phase": null,
+       "state": "done",
+       "text": "src/google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。限制：A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
       },
       {
        "aspect": "寫進事件日誌",
@@ -5175,15 +5175,15 @@
      "lines": [
       {
        "aspect": "行為",
-       "phase": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
-       "state": "pending",
-       "text": "競賽策略開發主幹釘共用庫 v0.25.0、正式機釘 v0.23.0，都沒有停放功能（v0.25.1 起才有）；升級共用庫時一併具備。"
+       "phase": null,
+       "state": "n/a",
+       "text": "競賽是現貨，Google 表只收成交（append_fill_v2，見能力『現貨成交用專屬的寫入動作』），沒有平倉投影，所以不會有找不到開倉列的平倉；同類的『帳本更正卡在被停放的平倉後面』那一格也已列不適用（src/btc_competition/google_projection_worker.py:90 只轉送共用庫的送出函式）。"
       },
       {
        "aspect": "寫進事件日誌",
-       "phase": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
-       "state": "pending",
-       "text": "同上，且要先升級共用庫。"
+       "phase": null,
+       "state": "n/a",
+       "text": "競賽是現貨，Google 表只收成交（append_fill_v2，見能力『現貨成交用專屬的寫入動作』），沒有平倉投影，所以不會有找不到開倉列的平倉；同類的『帳本更正卡在被停放的平倉後面』那一格也已列不適用（src/btc_competition/google_projection_worker.py:90 只轉送共用庫的送出函式）。"
       }
      ]
     }
@@ -5373,10 +5373,10 @@
    "dots": {
     "btc-competition": "none",
     "momentum": "none",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MYC.VERIFIED_CLOSE_AUTO_REPAIRED",
    "kind": "rule",
    "rows": [
@@ -5408,10 +5408,10 @@
    "dots": {
     "btc-competition": "none",
     "momentum": "none",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MYC.VERIFIED_CLOSE_REPAIR_BLOCKED",
    "kind": "rule",
    "rows": [
@@ -5443,10 +5443,10 @@
    "dots": {
     "btc-competition": "none",
     "momentum": "none",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MYC.VERIFIED_CLOSE_REPAIR_FAILED",
    "kind": "rule",
    "rows": [
@@ -5478,10 +5478,10 @@
    "dots": {
     "btc-competition": "none",
     "momentum": "none",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MYC.VERIFIED_CLOSE_REPAIR_RECURRING",
    "kind": "rule",
    "rows": [
@@ -5513,10 +5513,10 @@
    "dots": {
     "btc-competition": "none",
     "momentum": "none",
-    "mycrypto": "recent",
+    "mycrypto": "done",
     "seykota": "none"
    },
-   "has_recent": true,
+   "has_recent": false,
    "id": "MYC.POSITION_ADOPTED_AFTER_INTERRUPTION",
    "kind": "rule",
    "rows": [
@@ -5544,14 +5544,14 @@
  ],
  "phase_counts": {
   "7e": 0,
-  "8-btc-competition": 8,
-  "8-momentum": 4,
+  "8-btc-competition": 1,
+  "8-momentum": 1,
   "8-mycrypto": 0,
-  "8-seykota": 19,
+  "8-seykota": 16,
   "binance-funding-sync": 0,
-  "error-ids": 4,
-  "f-12": 12,
-  "f-16": 3,
+  "error-ids": 0,
+  "f-12": 0,
+  "f-16": 0,
   "f-26a": 0,
   "f-28b": 0,
   "h4-trade-correction": 0,
@@ -5559,40 +5559,20 @@
   "hotfix-seykota-order-resend": 0,
   "hotfix-seykota-stop-resolution": 0,
   "naming-rollout": 0,
-  "repair-recurrence": 1,
+  "repair-recurrence": 0,
   "t9-competition-retry": 0,
   "unrecorded-fill": 0,
   "v2-W2": 0,
   "v2-W3": 0,
   "v2-W4": 0,
   "v2-W6": 0,
-  "x3-crypto-binance": 8
+  "x3-crypto-binance": 9
  },
  "phase_order": [
-  "v2-W2",
-  "v2-W3",
-  "v2-W4",
-  "v2-W6",
   "8-momentum",
   "8-seykota",
-  "8-mycrypto",
   "8-btc-competition",
-  "binance-funding-sync",
-  "naming-rollout",
-  "7e",
-  "hotfix-seykota-order-resend",
-  "unrecorded-fill",
-  "repair-recurrence",
-  "error-ids",
-  "hotfix-btc-order-resend",
-  "h4-trade-correction",
-  "hotfix-seykota-stop-resolution",
-  "f-12",
-  "f-16",
-  "x3-crypto-binance",
-  "t9-competition-retry",
-  "f-26a",
-  "f-28b"
+  "x3-crypto-binance"
  ],
  "phases": {
   "7e": "第 7 關 e：Telegram 警報流程（ops-control 持續提醒＋「開始處理」「處理完成」按鈕）——2026-10-12 使用者決定取消：停用 Telegram 遙控，持續提醒改由維運通知發送（f-39），不做按鈕",
@@ -5611,14 +5591,14 @@
   "hotfix-seykota-order-resend": "緊急修正：趨勢策略市價單送出後查不到就重送，2026-09-21 真倉因此重複開倉（ed-seykota PR #65）",
   "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
   "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
-  "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作（7 天內 ≥2 次通知一次、之後 7 天不重發）；加密、競賽尚無修復機器人，接上時一併具備",
+  "repair-recurrence": "g2：自動修補重複發生時通知——共用庫的修復執行器已實作並已上 A1（趨勢、動能、加密各自接上）；競賽沒有修復機器人，列不適用",
   "t9-competition-retry": "t9：競賽策略失敗時當天重試（同一程序內每 15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.6 錯誤清單已改；競賽程式在 PR #45（審閱中，合併後上開發機實測），之後才部署 A1 正式機（新）",
   "unrecorded-fill": "g1：帳本少記交易所成交——共用處理程式 trade_alerts.unrecorded_fill 偵測並判斷；只有確定是策略自己重複送單（自訂編號相同）才自動更正並立刻通知（R3），其他一律不寫帳本、開請求並通知（R3）。四支一起：趨勢、動能接修復機器人；競賽、加密新增計時器與通知管道（加密不帶自訂編號，只通知）。",
   "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
   "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
   "v2-W4": "分級 v2：趨勢策略的修復機器人升到完整版",
   "v2-W6": "分級 v2：部署到開發機與正式機",
-  "x3-crypto-binance": "加密策略換到 Binance（x 系列）時，共用庫從 v0.15.0 升到現行版（x3），接手成交配對隨之具備"
+  "x3-crypto-binance": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7"
  },
  "project_order": [
   "seykota",
@@ -5634,124 +5614,208 @@
  },
  "recent_summary": [
   {
-   "anchor": "cap-repair_bot.detect_propose",
-   "note": "x3d：加密修復機器人（my-crypto-bot #77）2026-10-14 台北約 17:27 上 A1 正式機（新）；A1 目前 exchange.env 是 mexc，補寫路徑要等 Binance 切換才生效。",
-   "project": "加密策略",
-   "title": "修復機器人：抓錯並提出修復建議"
+   "anchor": "cap-latch.restart_only_clear",
+   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
+   "project": "趨勢策略",
+   "title": "「改好設定重啟」就能解除的安全暫停真的會被清掉"
   },
   {
-   "anchor": "cap-repair_bot.verified_close",
-   "note": "x3d：加密修復機器人（my-crypto-bot #77）2026-10-14 台北約 17:27 上 A1 正式機（新）；A1 目前 exchange.env 是 mexc，補寫路徑要等 Binance 切換才生效。",
-   "project": "加密策略",
-   "title": "修復機器人：自動補寫漏記平倉"
+   "anchor": "cap-ops_export.writer",
+   "note": "競賽自己的安全暫停與狀態事件 10/4 起就寫進事件日誌並匯出，之前沒更新：改已做。",
+   "project": "競賽策略",
+   "title": "把要通知的事寫成匯出檔"
   },
   {
-   "anchor": "cap-repair_bot.pause_brake",
-   "note": "x3d：加密修復機器人（my-crypto-bot #77）2026-10-14 台北約 17:27 上 A1 正式機（新）；A1 目前 exchange.env 是 mexc，補寫路徑要等 Binance 切換才生效。",
+   "anchor": "cap-notify.line_first_notice",
+   "note": "10/11 競賽 ERR-023 受控測試你手機收到兩則：改已做。",
+   "project": "競賽策略",
+   "title": "需要人處理的通知真的送到 LINE（只發第一則）"
+  },
+  {
+   "anchor": "cap-notify.error_id",
+   "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。",
+   "project": "趨勢策略",
+   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+  },
+  {
+   "anchor": "cap-notify.error_id",
+   "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。",
+   "project": "動能策略",
+   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+  },
+  {
+   "anchor": "cap-notify.error_id",
+   "note": "10/11 受控測試手機收到兩則、第一行【ERR-編號】＋標題：改已做（f-23e）。",
+   "project": "競賽策略",
+   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+  },
+  {
+   "anchor": "cap-reconcile.google_projection_grace",
+   "note": "把『還沒看到擋掉誤報』的限制更正：10/9 已在 A1 實際看到（f-22f）。",
+   "project": "動能策略",
+   "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上"
+  },
+  {
+   "anchor": "cap-notify.error_id",
+   "note": "未做的理由改寫成現況（加密還沒實際把通知送到手機）。",
    "project": "加密策略",
-   "title": "修復機器人：停用開關"
+   "title": "通知一定附錯誤編號，標題與風險登記冊一致"
+  },
+  {
+   "anchor": "cap-reconcile.google_projection_grace",
+   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
+   "project": "加密策略",
+   "title": "帳本↔Google 表對帳：剛開／剛平、還在等同步的交易不算對不上"
+  },
+  {
+   "anchor": "cap-reconcile.adopted_fills",
+   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
+   "project": "加密策略",
+   "title": "接手倉位與原生停損平倉的成交，對帳不再誤判成「帳本沒記」"
+  },
+  {
+   "anchor": "cap-projection.park_unconfirmed_correction",
+   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
+   "project": "加密策略",
+   "title": "Google 表同步佇列：帳本更正卡在被停放的平倉後面時，也會停放，不再擋住後面的紀錄"
+  },
+  {
+   "anchor": "cap-projection.requeue_parked",
+   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
+   "project": "加密策略",
+   "title": "停放（REJECTED）的 Google 投影可以用正式的方式重新排入"
+  },
+  {
+   "anchor": "cap-google.close_whole_trade_entry",
+   "note": "更正過時的『加密仍釘共用庫 v0.15.0』：共用庫已是 v0.30.7，改寫成實際還缺什麼。",
+   "project": "加密策略",
+   "title": "平倉寫回 Google 表時，進場價與數量是整筆交易的（有加碼的交易不再只顯示第一次進場）"
   },
   {
    "anchor": "cap-repair_bot.recurrence_escalation",
-   "note": "x3d：加密修復機器人（my-crypto-bot #77）2026-10-14 台北約 17:27 上 A1 正式機（新）；A1 目前 exchange.env 是 mexc，補寫路徑要等 Binance 切換才生效。",
-   "project": "加密策略",
+   "note": "競賽沒有漏記平倉修復機器人：依你的決定改不適用。",
+   "project": "競賽策略",
    "title": "自動修補重複發生時升格通知"
   },
   {
-   "anchor": "cap-ops_notify.units_axis",
-   "note": "x3d：修復機器人 service／timer 加進 A1 維運通知盯清單。",
-   "project": "加密策略",
-   "title": "維運通知盯背景服務有沒有掛掉（部署設定）"
+   "anchor": "rule-SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
+   "project": "趨勢策略",
+   "title": "R3｜重啟後接管了一個沒記完的部位，或補上了被中斷的停損"
   },
   {
-   "anchor": "rule-MYC.VERIFIED_CLOSE_AUTO_REPAIRED",
-   "note": "x3d：加密修復機器人上 A1（目前 exchange.env 是 mexc，補寫要等 Binance 切換）。",
-   "project": "加密策略",
-   "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
-  },
-  {
-   "anchor": "rule-MYC.VERIFIED_CLOSE_AUTO_REPAIRED",
-   "note": "x3d：加密修復機器人上 A1（目前 exchange.env 是 mexc，補寫要等 Binance 切換）。",
-   "project": "加密策略",
-   "title": "R1｜無歧義的漏記平倉已自動補寫進帳本"
-  },
-  {
-   "anchor": "rule-MYC.VERIFIED_CLOSE_REPAIR_BLOCKED",
-   "note": "x3d：加密修復機器人上 A1（目前 exchange.env 是 mexc，補寫要等 Binance 切換）。",
-   "project": "加密策略",
-   "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
-  },
-  {
-   "anchor": "rule-MYC.VERIFIED_CLOSE_REPAIR_BLOCKED",
-   "note": "x3d：加密修復機器人上 A1（目前 exchange.env 是 mexc，補寫要等 Binance 切換）。",
-   "project": "加密策略",
-   "title": "R3｜自動修復停手：帳本已有修復痕跡或整批寫入失敗"
-  },
-  {
-   "anchor": "rule-MYC.VERIFIED_CLOSE_REPAIR_FAILED",
-   "note": "x3d：加密修復機器人上 A1（目前 exchange.env 是 mexc，補寫要等 Binance 切換）。",
-   "project": "加密策略",
-   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
-  },
-  {
-   "anchor": "rule-MYC.VERIFIED_CLOSE_REPAIR_FAILED",
-   "note": "x3d：加密修復機器人上 A1（目前 exchange.env 是 mexc，補寫要等 Binance 切換）。",
-   "project": "加密策略",
-   "title": "R2｜漏記平倉自動補寫失敗（連續失敗才通知）"
-  },
-  {
-   "anchor": "rule-MYC.VERIFIED_CLOSE_REPAIR_RECURRING",
-   "note": "x3d：加密修復機器人上 A1（目前 exchange.env 是 mexc，補寫要等 Binance 切換）。",
-   "project": "加密策略",
-   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
-  },
-  {
-   "anchor": "rule-MYC.VERIFIED_CLOSE_REPAIR_RECURRING",
-   "note": "x3d：加密修復機器人上 A1（目前 exchange.env 是 mexc，補寫要等 Binance 切換）。",
-   "project": "加密策略",
-   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
-  },
-  {
-   "anchor": "rule-MYC.POSITION_ADOPTED_AFTER_INTERRUPTION",
-   "note": "x3d：加密的接管通知（ERR-066）與少記成交通知（ERR-042）上 A1。",
-   "project": "加密策略",
+   "anchor": "rule-MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
+   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
+   "project": "動能策略",
    "title": "R3｜重啟後接管了一個帳本沒有記完的部位"
   },
   {
-   "anchor": "rule-MYC.POSITION_ADOPTED_AFTER_INTERRUPTION",
-   "note": "x3d：加密的接管通知（ERR-066）與少記成交通知（ERR-042）上 A1。",
-   "project": "加密策略",
-   "title": "R3｜重啟後接管了一個帳本沒有記完的部位"
+   "anchor": "rule-BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
+   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
+   "project": "競賽策略",
+   "title": "R3｜每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記"
   },
   {
-   "anchor": "rule-MYC.UNRECORDED_FILL_UNRESOLVED",
-   "note": "x3d：加密的接管通知（ERR-066）與少記成交通知（ERR-042）上 A1。",
-   "project": "加密策略",
-   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+   "anchor": "rule-BTC.STATE_FILE_CORRUPT",
+   "note": "10/4 隨 f-12 已上 A1，這格之前沒更新：改已做並補 A1 查證。",
+   "project": "競賽策略",
+   "title": "R3｜狀態檔存在但讀不出來，已安全暫停（不當成第一次執行）"
   },
   {
-   "anchor": "rule-MYC.UNRECORDED_FILL_UNRESOLVED",
-   "note": "x3d：加密的接管通知（ERR-066）與少記成交通知（ERR-042）上 A1。",
-   "project": "加密策略",
-   "title": "R3｜交易所有成交、帳本沒記，無法自動更正"
+   "anchor": "rule-BTC.BOOK_CORRUPT_NEGATIVE_BALANCE",
+   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
+   "project": "競賽策略",
+   "title": "R3｜出現負／不可能的餘額，本地帳本本身不可信"
   },
   {
-   "anchor": "cap-recovery.interrupted_order",
-   "note": "x3d：接管通知（ERR-066）已上 A1，更正這格過時的『接管只寫稽核日誌』。",
-   "project": "加密策略",
-   "title": "被硬殺後重啟，接回原本的交易而不是另開一筆"
+   "anchor": "rule-BTC.EXECUTION_BLOCKED_ZERO_FILLS",
+   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
+   "project": "競賽策略",
+   "title": "R2｜連續 3 天該再平衡卻零成交"
+  },
+  {
+   "anchor": "rule-BTC.ORDER_STATUS_UNKNOWN",
+   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
+   "project": "競賽策略",
+   "title": "R3｜送出的單 60 秒內確定不了有沒有成交"
+  },
+  {
+   "anchor": "rule-BTC.REBALANCE_PENDING",
+   "note": "安全暫停／狀態事件 10/4 起就寫進事件日誌：改已做。",
+   "project": "競賽策略",
+   "title": "R0｜部分成交，目標權重尚未達成"
+  },
+  {
+   "anchor": "rule-MOM.PROTECTION_UNVERIFIED",
+   "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。",
+   "project": "動能策略",
+   "title": "R3｜原生移動停損無法驗證"
+  },
+  {
+   "anchor": "rule-MOM.STATE_REPAIRED_SAFE_HALT",
+   "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。",
+   "project": "動能策略",
+   "title": "R3｜工具修復本地 state 後主動 latch，等人明確解除"
+  },
+  {
+   "anchor": "rule-MOM.RUNTIME_CYCLE_FAILED",
+   "note": "動能的暫停事件 10/4 起就寫進事件日誌（8a）：改已做。",
+   "project": "動能策略",
+   "title": "R0｜run_tick 未分類例外（不 latch，寫 ERROR heartbeat 後重試）"
+  },
+  {
+   "anchor": "rule-MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "note": "共用修復執行器的『重複發生升格』已在 A1：改已做。",
+   "project": "動能策略",
+   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
+  },
+  {
+   "anchor": "rule-SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+   "note": "共用修復執行器的『重複發生升格』已在 A1：改已做。",
+   "project": "趨勢策略",
+   "title": "R3｜自動補寫漏記平倉一直在發生，請追查為什麼一直漏記"
+  },
+  {
+   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+   "note": "平倉找不到開倉列的停放已在 A1：行為改已做。",
+   "project": "動能策略",
+   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+  },
+  {
+   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+   "note": "平倉找不到開倉列的停放已在 A1：行為改已做。",
+   "project": "趨勢策略",
+   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+  },
+  {
+   "anchor": "rule-FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+   "note": "競賽是現貨、沒有平倉投影：改不適用。",
+   "project": "競賽策略",
+   "title": "R1｜Google 表同步佇列停放了一筆找不到開倉列的平倉"
+  },
+  {
+   "anchor": "rule-SEY.EXCHANGE_TARGET_UNSAFE",
+   "note": "改好設定重啟後暫停會被程式清掉（f-12，10/4 起在 A1）：行為改已做。",
+   "project": "趨勢策略",
+   "title": "R3｜執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）"
+  },
+  {
+   "anchor": "rule-SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+   "note": "改好設定重啟後暫停會被程式清掉（f-12，10/4 起在 A1）：行為改已做。",
+   "project": "趨勢策略",
+   "title": "R3｜真倉固定訂單識別能力不足"
   }
  ],
  "totals": {
   "btc-competition": {
-   "done": 32,
-   "n/a": 20,
-   "pending": 15
+   "done": 43,
+   "n/a": 23,
+   "pending": 1
   },
   "momentum": {
-   "done": 49,
+   "done": 58,
    "n/a": 12,
-   "pending": 10
+   "pending": 1
   },
   "mycrypto": {
    "done": 50,
@@ -5759,9 +5823,9 @@
    "pending": 9
   },
   "seykota": {
-   "done": 55,
+   "done": 64,
    "n/a": 11,
-   "pending": 25
+   "pending": 16
   }
  }
 }
@@ -5899,6 +5963,7 @@ DATA.project_order.forEach(function(p){
   var t=DATA.totals[p]; d.appendChild(document.createTextNode("已做 "+t.done+"｜未做 "+t.pending+"｜不適用 "+t["n/a"])); sum.appendChild(d);
 });
 var phaseHost=document.getElementById("phases");
+if(!DATA.phase_order.length) phaseHost.appendChild(el("p","group-sub","目前沒有未做的格子。"));
 DATA.phase_order.forEach(function(k){
   var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜未做 "+DATA.phase_counts[k]+" 格")); phaseHost.appendChild(c);
 });
