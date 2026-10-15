@@ -5,7 +5,7 @@ The observation area lists things that can only be verified when something happe
 status alert, the next real trade, the crypto strategy going flat ...).  Each *check* here knows
 
   * how to see that the event happened (read-only: files under /opt/<repo>/audit, /var/lib/..., the ops-notify journal,
-    the commit a strategy clone on A1 is at),
+    the commit a strategy clone on A1 is at, the blobs of cited files in those clones),
   * what "as expected" means mechanically, and what "not as expected" means,
   * whether a mechanical pass is enough to close the item (``closable``) or the operator must still look at a phone
     (``needs_human``).
@@ -83,6 +83,24 @@ ALLOWED_PATHS = _allowed_paths()
 #: commit that was deployed.  Exactly these directories, and only ``rev-parse HEAD``, may be asked.
 A1_CLONES = {key: f"/home/ubuntu/src/{name}" for key, name in REPOS.items()}
 _SHA40 = re.compile(r"[0-9a-f]{40}")
+_SAFE_PATH = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*")
+_LS_TREE_LINE = re.compile(r"^\d{6} blob ([0-9a-f]{40})\t(.+)$")
+
+
+def _parse_ls_tree(text: str, source: str = "git ls-tree") -> dict[str, str]:
+    """``{path: blob}`` from ``git ls-tree`` output.  A non-empty line that is not ``<mode> blob <sha>\\t<path>`` is an error:
+    quietly skipping it would turn "could not read the tree" into "the file is not there" (review of #199)."""
+    found: dict[str, str] = {}
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        match = _LS_TREE_LINE.match(line)
+        if not match:
+            raise RemoteError(f"{source}: unrecognised output line {line[:80]!r}")
+        found[match.group(2)] = match.group(1)
+    return found
+
+
 ALLOWED_UNITS = frozenset({"ops-notify.service"})
 _SINCE_RE = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
@@ -129,6 +147,22 @@ class Remote:
         if not _SHA40.fullmatch(sha):
             raise RemoteError(f"{host}: {key}: unexpected rev-parse output {sha[:60]!r}")
         return sha
+
+    def git_blobs(self, host: str, key: str, paths: list[str]) -> dict[str, str]:
+        """``{path: blob sha}`` of ``paths`` in the HEAD of strategy ``key``'s deploy clone on A1; a path the clone does not
+        have is simply absent.  Only ``git ls-tree -r HEAD -- <paths>``; every path must look like a repo-relative path."""
+        if host != "a1" or key not in A1_CLONES:
+            raise RemoteError(f"git blobs not allowed: {host!r} {key!r}")
+        bad = [p for p in paths if not _SAFE_PATH.fullmatch(p) or ".." in p.split("/")]
+        if bad:
+            raise RemoteError(f"git blobs: refusing paths {bad[:3]!r}")
+        directory, found = A1_CLONES[key], {}
+        for start in range(0, len(paths), 80):
+            chunk = paths[start:start + 80]
+            if chunk:
+                out = self._run(host, ["git", "-c", f"safe.directory={directory}", "-C", directory, "ls-tree", "-r", "HEAD", "--", *chunk])
+                found.update(_parse_ls_tree(out, "A1 " + key))
+        return found
 
     def journal(self, host: str, unit: str, since_utc: str) -> str:
         if unit not in ALLOWED_UNITS or not _SINCE_RE.fullmatch(since_utc):
@@ -558,15 +592,10 @@ def check_registry_awaits(ctx: Context) -> Result:
     cells that had been live since 10-04.  A cell that waits for a deployment names the commit (``awaits_commit``);
     this check asks A1 which commit each strategy's deploy clone is at and whether the awaited commit is part of it."""
     root = repos_root()
-    ta = root / "trade-alerts"
-    if _refresh(ta) is False:
-        # Reading the old origin/main here would answer "nothing to compare" about a registry that may already hold
-        # the cells this check is for (review of #193): say the source could not be refreshed instead.
-        raise RemoteError(f"cannot refresh {ta} (git fetch failed): the registry on origin/main may be out of date")
-    shown = _git(ta, "show", f"{os.environ.get('OBSERVATION_WATCH_REGISTRY_REF', 'origin/main')}:{REGISTRY_RELATIVE}")
-    if shown.returncode != 0:
-        raise RemoteError(f"cannot read the registry from {ta}: {shown.stderr.strip()[:120]}")
-    cells = awaiting_cells(json.loads(shown.stdout))
+    # Reading an old origin/main here would answer "nothing to compare" about a registry that may already hold the cells this
+    # check is for (review of #193): a registry that cannot be refreshed is an error (see _load_registry).
+    registry = _load_registry(root)
+    cells = awaiting_cells(registry)
     if not cells:
         return Result(WAITING, "登記冊沒有帶『等哪個提交』的未做格子，沒有東西要比對。")
     heads: dict[str, str] = {}
@@ -589,6 +618,102 @@ def check_registry_awaits(ctx: Context) -> Result:
     return Result(WAITING, f"登記冊有 {len(open_)} 格在等部署，等的提交都還沒上 A1。", open_)
 
 
+# --- files the registry cites that changed on A1 since the registry's sources commit (phase-sync4) ------------------
+
+#: The same shape trade-alerts' verify_registry_evidence.py recognises as a file citation.
+_CITED_FILE = re.compile(r"(?<![\w./-])((?:(?:src|scripts|tools|tests|docs|deploy)/[\w./-]+\.\w+)|[\w-]+\.py)(?::\d+)?")
+
+
+def cited_files(registry: Mapping[str, Any]) -> dict[str, dict[str, list[str]]]:
+    """``{project: {path: [cell labels]}}`` for every file a ``done`` cell cites (a done claim is what drift can falsify)."""
+    out: dict[str, dict[str, list[str]]] = {}
+
+    def add(label: str, project: str, status: Mapping[str, Any]) -> None:
+        if status.get("state") != "done":
+            return
+        for match in _CITED_FILE.finditer(str(status.get("evidence", ""))):
+            labels = out.setdefault(project, {}).setdefault(match.group(1), [])
+            if label not in labels:
+                labels.append(label)
+
+    for capability in registry.get("capabilities") or []:
+        for project, status in (capability.get("status") or {}).items():
+            add(f"能力 {capability['id']}", project, status)
+    for row in registry.get("catalog") or []:
+        for aspect in ("behaviour", "emits_event"):
+            for project, status in (row.get(aspect) or {}).items():
+                add(f"規則 {row['code']} {aspect}", project, status)
+    return out
+
+
+def _load_registry(root: Path) -> dict[str, Any]:
+    ta = root / "trade-alerts"
+    if _refresh(ta) is False:
+        raise RemoteError(f"cannot refresh {ta} (git fetch failed): the registry on origin/main may be out of date")
+    shown = _git(ta, "show", f"{os.environ.get('OBSERVATION_WATCH_REGISTRY_REF', 'origin/main')}:{REGISTRY_RELATIVE}")
+    if shown.returncode != 0:
+        raise RemoteError(f"cannot read the registry from {ta}: {shown.stderr.strip()[:120]}")
+    return json.loads(shown.stdout)
+
+
+def _blobs_at(repo: Path, commit: str, paths: list[str]) -> dict[str, str]:
+    found: dict[str, str] = {}
+    for start in range(0, len(paths), 80):
+        chunk = paths[start:start + 80]
+        done = _git(repo, "ls-tree", "-r", commit, "--", *chunk)
+        if done.returncode != 0:
+            raise RemoteError(f"git ls-tree {commit[:7]} in {repo}: {done.stderr.strip()[:120]}")
+        found.update(_parse_ls_tree(done.stdout, f"git ls-tree {commit[:7]} in {repo.name}"))
+    return found
+
+
+def check_registry_drift(ctx: Context) -> Result:
+    """phase-sync4: a file a ``done`` cell cites differs on A1 from the registry's ``sources`` commit.
+
+    The cell's file:line evidence points at the ``sources`` commit; once the file on A1 is a different version, the line may
+    have moved and the claim may no longer hold (10-04 and 10-15: cells stayed "done" or "pending" while the code under
+    them changed).  This compares, for every cited file, the blob in the A1 deploy clone's HEAD with the blob at ``sources``;
+    a difference means the cell needs re-verifying (and ``sources`` moving on, the f-27 way)."""
+    root = repos_root()
+    registry = _load_registry(root)
+    drifted: list[tuple[str, str, str, str, list[str]]] = []
+    checked = 0
+    for project, files in sorted(cited_files(registry).items()):
+        source = (registry.get("sources") or {}).get(project) or {}
+        commit = source.get("commit")
+        if not commit:
+            raise RemoteError(f"{project}: the registry has no sources commit")
+        repo = root / REPOS[project]
+        _refresh(repo)
+        if _git(repo, "cat-file", "-e", f"{commit}^{{commit}}").returncode != 0:
+            raise RemoteError(f"{project}: sources commit {commit[:7]} not found in {repo}")
+        paths = sorted(files)
+        at_sources = _blobs_at(repo, commit, paths)
+        asked = [p for p in paths if p in at_sources]
+        on_a1 = ctx.remote.git_blobs("a1", project, asked)
+        stray = sorted(set(on_a1) - set(asked))
+        if stray:
+            raise RemoteError(f"{project}: A1 answered about files that were not asked for: {stray[:3]!r}")
+        for path in paths:
+            if path not in at_sources:
+                continue                       # the citation names no file in that repo (verify_registry_evidence reports those)
+            checked += 1
+            if on_a1.get(path) != at_sources[path]:
+                a1_blob = on_a1.get(path)
+                drifted.append((project, path, a1_blob[:7] if a1_blob else "（A1 上沒有這個檔案）", at_sources[path][:7], files[path]))
+    if checked == 0 and cited_files(registry):
+        # every cited file is missing at the sources commit: that is a wrong sources commit or an unreadable tree, not "no drift"
+        raise RemoteError("登記冊引用了檔案，但在 sources 提交上一個都找不到：sources 提交或引用寫法有問題，沒辦法比對")
+    if not drifted:
+        return Result(WAITING, f"登記冊引用的 {checked} 個檔案，在 A1 部署複本上都和 sources 提交是同一份。")
+    cells = {label for *_, labels in drifted for label in labels}
+    evidence = [f"{project}／{path}：A1 {a1}，sources {src}；影響 {len(labels)} 格：" + "；".join(labels[:3]) + ("…" if len(labels) > 3 else "")
+                for project, path, a1, src, labels in drifted]
+    return Result(OBSERVED, f"登記冊引用的 {checked} 個檔案裡，{len(drifted)} 個在 A1 上和 sources 提交不一樣，影響 {len(cells)} 格："
+                  "行號可能位移、說法可能不再成立，要重驗並把 sources 換到 A1 現行版。",
+                  evidence, needs_human=True, key=",".join(f"{p}:{path}:{a1}" for p, path, a1, _, _ in drifted))
+
+
 CHECKS: tuple[Check, ...] = (
     Check("crypto-flat", "加密策略空手（開工 x1 的訊號）", ("phase-x1",), check_crypto_flat),
     Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
@@ -601,6 +726,7 @@ CHECKS: tuple[Check, ...] = (
     Check("repair-recurring", "自動補寫重複發生通知", ("phase-g2",), check_repair_recurring),
     Check("safe-halt-notice", "A1 第一則真實 R3 策略通知", ("f-35", "f-37"), check_safe_halt_notice),
     Check("registry-awaits", "登記冊等部署的格子：等的提交已上 A1", ("phase-sync1",), check_registry_awaits),
+    Check("registry-drift", "登記冊引用的檔案在 A1 上已和 sources 提交不同", ("phase-sync4",), check_registry_drift),
 )
 
 
