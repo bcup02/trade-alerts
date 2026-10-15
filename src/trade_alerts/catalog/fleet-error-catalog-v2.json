@@ -320,9 +320,11 @@
         "steps": [
           "檢查趨勢策略的執行模式設定與交易所連線目標，改成一致。",
           "改好後在 A1 正式機（新）重啟服務：`sudo systemctl restart seykota-bot.service`。",
-          "注意：目前有已知缺陷——改好設定重啟後，暫停狀態可能仍清不掉（解除工具會拒絕這一類）。遇到時把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+          "重啟後策略每一輪都會先把原本擋下的守門檢查再跑一次：通過就自動清掉安全暫停，並在帳本記一筆 safe_halt_cleared（方式 config_fixed_restart）；沒通過就維持暫停、下一輪再試。這一類暫停沒有、也不能用解除工具（解除工具會刻意拒絕），只靠改好設定＋重啟。",
+          "確認現在還有沒有暫停：在 A1 正式機（新）執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview`（只讀、不寫任何東西）。印出「REFUSED: refusing to resume: safe_halt is not active」＝暫停已經清掉；印出一份內容（含 code 與 resume_path）＝暫停還在，這一類不用解除，照下一步處理。",
+          "暫停還在：先確認服務有重啟成功、正在跑（`sudo systemctl status seykota-bot.service --no-pager`），再確認設定真的改對了，等下一輪（可能要等一陣子）再預覽一次；不要只因為還沒清掉就斷定設定沒改對。確認都沒問題卻一直清不掉：把下方「給 AI 的追查指令」整段貼給 Claude。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「執行模式與交易所目標不符」：先確認目前設定與交易所目標各是什麼、為什麼會不一致；再檢查 src/seykota_bot/safe_halt_resume.py 為什麼拒絕清除這一類暫停（已知缺陷：改好設定重啟後仍清不掉），提出讓「改好設定＋重啟」就能恢復的修正。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「執行模式與交易所目標不符」：先確認目前設定與交易所目標各是什麼、為什麼會不一致；改好設定並重啟後若暫停仍沒清掉，讀 src/seykota_bot/bot.py 的 _clear_config_halt_if_fixed（每輪先呼叫，會重跑 _exchange_target_problem，通過才清掉並在帳本記 safe_halt_cleared、method=config_fixed_restart），找出守門檢查為什麼還是沒通過。這一類暫停不能用 seykota-resume 解除（解除工具會拒絕），不要試。"
       }
     },
     {
@@ -351,9 +353,11 @@
         "steps": [
           "確認交易所帳號權限與 API 設定（是否支援自訂訂單編號）。",
           "確認沒問題後在 A1 正式機（新）重啟服務：`sudo systemctl restart seykota-bot.service`。",
-          "注意：目前有已知缺陷——重啟後暫停狀態可能仍清不掉（解除工具會拒絕這一類）。遇到時把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
+          "重啟後策略每一輪都會先把原本擋下的守門檢查再跑一次：通過就自動清掉安全暫停，並在帳本記一筆 safe_halt_cleared（方式 config_fixed_restart）；沒通過就維持暫停、下一輪再試。這一類暫停沒有、也不能用解除工具（解除工具會刻意拒絕），只靠改好設定＋重啟。",
+          "確認現在還有沒有暫停：在 A1 正式機（新）執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview`（只讀、不寫任何東西）。印出「REFUSED: refusing to resume: safe_halt is not active」＝暫停已經清掉；印出一份內容（含 code 與 resume_path）＝暫停還在，這一類不用解除，照下一步處理。",
+          "暫停還在：先確認服務有重啟成功、正在跑（`sudo systemctl status seykota-bot.service --no-pager`），再確認設定真的改對了，等下一輪（可能要等一陣子）再預覽一次；不要只因為還沒清掉就斷定設定沒改對。確認都沒問題卻一直清不掉：把下方「給 AI 的追查指令」整段貼給 Claude。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「真倉固定訂單識別能力不足」：讀 src/seykota_bot/bot.py 的 _require_live_fixed_identifier_contract 看它檢查什麼、為什麼沒通過；並檢查 src/seykota_bot/safe_halt_resume.py 為什麼拒絕清除這一類暫停（已知缺陷），提出治本修正。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「真倉固定訂單識別能力不足」：讀 src/seykota_bot/bot.py 的 _require_live_fixed_identifier_contract 看它檢查什麼、為什麼沒通過；改好設定並重啟後若暫停仍沒清掉，讀 _clear_config_halt_if_fixed（每輪先呼叫，會重跑同一個檢查，通過才清掉並在帳本記 safe_halt_cleared、method=config_fixed_restart），找出為什麼還是沒通過。這一類暫停不能用 seykota-resume 解除（解除工具會拒絕），不要試。"
       }
     },
     {
@@ -1923,11 +1927,12 @@
         "steps": [
           "看訊息裡列出的交易編號、商品與標記時間。",
           "到交易所確認這些商品確實沒有持倉（結清工具不會替你查交易所）。",
+          "預覽與結清都會檢查對帳快照（exchange_state.json）夠不夠新：超過 3600 秒沒更新、讀不出時間，或時間比現在晚超過 5 分鐘，都會被拒絕，訊息會說「請重新執行 fetcher」。A1 每 15 分鐘自動抓一次，通常不會碰到；碰到就先在 A1 正式機（新）執行 `sudo systemctl start mexc-momentum-reconcile-fetch.service` 重抓。注意這會跑完整套對帳（抓取交易所資料、帳本比對、與 Google 表核對，跟排程每 15 分鐘做的一樣）：只更新狀態檔，不下單、不寫 Google 表、不改帳本交易列。",
           "在 A1 正式機（新）以服務帳號進入 /opt/mexc-4h-momentum-trailing-stop，先預覽：sudo -u mexc-momentum .venv/bin/python src/reconcile_apply.py --ledger-status audit/ledger_status.json --exchange-state audit/exchange_state.json --ledger audit/trading_ledger.jsonl --state state/state.json（不寫入，印出確認碼與建議補列）。",
           "確認預覽內容無誤後，再加上 --apply --confirm \"<確認碼>\" --exchange-verified 執行結清；這個聲明會寫進帳本。",
           "交易所其實還有部位，或結清工具拒絕：不要硬做，把下方「給 AI 的追查指令」整段貼給 Claude。"
         ],
-        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼平倉標記一直沒結清：讀 audit/ledger_status.json 的 evidence.pending_expired（交易編號、symbol、event_time、expired_reason），對照 audit/trading_ledger.jsonl 裡這些 trade_id 的全部紀錄（trade_open、position_reconciliation_pending 與有沒有 trade_close），再用只讀的方式到交易所查這些商品的持倉與歷史成交；判斷是交易所真的沒有成交證據（可以用 src/reconcile_apply.py 結清）、還是有成交但帳本沒補（要走 fetch_verified_close_evidence 與 append_reconciled_close），並找出平倉時為什麼沒有拿到成交證據，提出治本修正與回歸測試。注意 src/reconcile_apply.py 預覽與結清都需要使用者先到交易所確認已平倉並自己下 --exchange-verified。"
+        "ai_prompt": "請在 mexc-4h-momentum-trailing-stop 追查為什麼平倉標記一直沒結清：讀 audit/ledger_status.json 的 evidence.pending_expired（交易編號、symbol、event_time、expired_reason），對照 audit/trading_ledger.jsonl 裡這些 trade_id 的全部紀錄（trade_open、position_reconciliation_pending 與有沒有 trade_close），再用只讀的方式到交易所查這些商品的持倉與歷史成交；判斷是交易所真的沒有成交證據（可以用 src/reconcile_apply.py 結清）、還是有成交但帳本沒補（要走 fetch_verified_close_evidence 與 append_reconciled_close），並找出平倉時為什麼沒有拿到成交證據，提出治本修正與回歸測試。注意 src/reconcile_apply.py 預覽與結清都需要使用者先到交易所確認已平倉並自己下 --exchange-verified；對帳快照超過 3600 秒（--max-snapshot-age-seconds）、讀不出時間或比現在晚超過 5 分鐘會被拒絕，要先重跑對帳抓取。"
       }
     },
     {
