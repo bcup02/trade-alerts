@@ -39,12 +39,12 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "53e04ced2b0c5f823cbcb71293fa94cbf76f9615"
+      "commit": "71e60471cb7f76ab8409ac6524cd77b3df4ad2ec"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "489bbcdd253d2acb8cedc056ad8357f4b5717146"
+      "commit": "9e487c0e6705fca7405de6c83a87845dc45891d4"
     },
     "mycrypto": {
       "repo": "AI-for-column/my-crypto-bot",
@@ -54,7 +54,7 @@
     "btc-competition": {
       "repo": "AI-for-column/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "7d499bbc5827bd14da434fc598993aab092f524c"
+      "commit": "a8a1ba1ac8871be6866bf6659c73af26905fef8c"
     }
   },
   "capabilities": [
@@ -229,7 +229,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:178 run_repair_round（共用修復執行器以 detect_repair_candidates 找漏記平倉；v2 起不再只提建議，能對應就直接補）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         },
         "seykota": {
           "state": "done",
@@ -254,7 +254,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 run_repair_round＋scripts/repair_bot.py:96 staging_ledger（本策略帳本寫入器整批原子寫入）；自動補寫開關已拿掉（v2-W3）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:178 run_repair_round＋scripts/repair_bot.py:98 staging_ledger（本策略帳本寫入器整批原子寫入）；自動補寫開關已拿掉（v2-W3）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         },
         "seykota": {
           "state": "done",
@@ -279,7 +279,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 run_repair_round 由共用修復執行器讀 MOMENTUM_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔、不查交易所不寫帳本；正式機每輪輸出都帶 paused 欄位。"
+          "evidence": "scripts/repair_bot.py:178 run_repair_round 由共用修復執行器讀 MOMENTUM_REPAIR_PAUSED（trade_alerts.repair_runner.repair_paused），為真就整輪只刷新匯出檔、不查交易所不寫帳本；正式機每輪輸出都帶 paused 欄位。"
         },
         "seykota": {
           "state": "done",
@@ -304,7 +304,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
+          "evidence": "scripts/repair_bot.py:178 run_repair_round 每輪（含暫停時）刷新 audit/ops_export.json（fleet-ops-export/v2）；2026-09-24 正式機查證每輪 ops_export_written=true。"
         },
         "seykota": {
           "state": "done",
@@ -329,7 +329,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機另計（2026-09-17 已開）。"
+          "evidence": "scripts/repair_bot.py:178 寫出的匯出檔由正式機維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-09-24 19:10 UTC 設 OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on，首輪匯出軸 OK、零誤發。開發機另計（2026-09-17 已開）。"
         },
         "seykota": {
           "state": "done",
@@ -357,7 +357,7 @@
         },
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 受控測試事件 3ee1c8c932f14b0e8ba7ca0ba4bf31b8（標明測試、只寫事件未開請求）19:20 UTC sent=1、使用者手機確認收到、19:30 attempted=0 未重送。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
+          "evidence": "scripts/repair_bot.py:178 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 受控測試事件 3ee1c8c932f14b0e8ba7ca0ba4bf31b8（標明測試、只寫事件未開請求）19:20 UTC sent=1、使用者手機確認收到、19:30 attempted=0 未重送。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
         },
         "mycrypto": {
           "state": "pending",
@@ -551,7 +551,7 @@
         },
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 修復機器人每輪先跑修復輪，scripts/repair_bot.py:179 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:163 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:617 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+          "evidence": "scripts/repair_bot.py:178 修復機器人每輪先跑修復輪，scripts/repair_bot.py:181 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:165 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:617 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
         },
         "mycrypto": {
           "state": "pending",
@@ -571,7 +571,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 呼叫共用修復執行器 run_repair_round；共用庫 trade_alerts/repair_runner.py（git tag v0.26.0＝e266a673ba406f112e0ab30c29883582f74e392e，檔案 blob cd00814a845f75dd6648d337c11c77d0b15a36b9，與 v0.25.0 的同檔 blob 相同）第 226 行每輪呼叫 _check_recurring、第 248 行定義：同一支策略最近 7 天內自動補寫達 2 次（第 83–84 行 RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次，窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）。",
+          "evidence": "scripts/repair_bot.py:178 呼叫共用修復執行器 run_repair_round；共用庫 trade_alerts/repair_runner.py（git tag v0.26.0＝e266a673ba406f112e0ab30c29883582f74e392e，檔案 blob cd00814a845f75dd6648d337c11c77d0b15a36b9，與 v0.25.0 的同檔 blob 相同）第 226 行每輪呼叫 _check_recurring、第 248 行定義：同一支策略最近 7 天內自動補寫達 2 次（第 83–84 行 RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次，窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）。",
           "verified_at": "2026-10-04",
           "limit": "尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）；升格邏輯本身只在共用庫測試與開發機驗證，沒有在正式機製造修補去觸發。"
         },
@@ -600,7 +600,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。",
+          "evidence": "scripts/repair_bot.py:178 每輪刷新匯出檔 audit/ops_export.json（共用庫 trade-alerts ≥ v0.25.0）。通知第一行是【ERR-編號】＋錯誤清單標題：版面由共用庫產生匯出檔通知文字（trade_alerts.ops_export）、維運通知照錯誤清單讀標題，標題不一致有自動檢查擋（e3）。A1 驗證：2026-10-11 台北受控測試（人工寫的測試事件）你手機收到兩則，第一則第一行【ERR-編號】＋標題、第二則給 AI 的追查指令；2026-10-09 維運通知 ERR-044 第一行與風險登記冊標題一字不差；2026-10-14 A1 第一則真實狀態告警 ERR-048 兩則都收到。",
           "limit": "策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-015（移動停損無法驗證）。"
         },
         "seykota": {
@@ -806,7 +806,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "src/reconcile_compare.py:85 把環境變數 RECONCILE_PENDING_MAX_SECONDS（預設共用庫 DEFAULT_PENDING_MAX_SECONDS＝24 小時）傳給共用比對（:72）；超過上限的位置對帳標記（時間讀不出，或比現在晚超過 5 分鐘，也視為逾時）不再讓狀態停在 PENDING：部位與成交對不上仍判對不上，對得上則 RECONCILED，並在證據 pending_expired 列出被放棄等待的標記（共用庫 v0.30.0 ledger_reconcile，審閱 bcup02/trade-alerts#162）。src/reconcile_apply.py:105 結清工具接受「RECONCILED 且帶 pending_expired」（逾時後狀態已不是 PENDING），:127 起只結清該狀態點名的標記，狀態寫出之後才出現的新標記一律拒絕（審閱 BLOCK-135-01）。",
+          "evidence": "src/reconcile_compare.py:85 把環境變數 RECONCILE_PENDING_MAX_SECONDS（預設共用庫 DEFAULT_PENDING_MAX_SECONDS＝24 小時）傳給共用比對（:72）；超過上限的位置對帳標記（時間讀不出，或比現在晚超過 5 分鐘，也視為逾時）不再讓狀態停在 PENDING：部位與成交對不上仍判對不上，對得上則 RECONCILED，並在證據 pending_expired 列出被放棄等待的標記（共用庫 v0.30.0 ledger_reconcile，審閱 bcup02/trade-alerts#162）。src/reconcile_apply.py:150 結清工具接受「RECONCILED 且帶 pending_expired」（逾時後狀態已不是 PENDING），:173 起只結清該狀態點名的標記，狀態寫出之後才出現的新標記一律拒絕（審閱 BLOCK-135-01）；自 f-32 起預覽與結清都另要求交易所快照 fetched_at 在 3600 秒內（src/reconcile_apply.py:113，可用 --max-snapshot-age-seconds 調整；讀不出或超前超過 5 分鐘也拒絕），過舊要先重跑對帳抓取（A1 每 15 分鐘一輪）。",
           "verified_at": "2026-10-11",
           "limit": "A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
         },
@@ -1068,7 +1068,7 @@
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "src/strategy.py:1391 暫停前寫 R3 事件 PROTECTION_UNVERIFIED（src/fleet_events.py:23），由動能修復機器人每輪（scripts/repair_bot.py:176）刷新匯出檔交給維運通知。PR #108（8a）。",
+          "evidence": "src/strategy.py:1391 暫停前寫 R3 事件 PROTECTION_UNVERIFIED（src/fleet_events.py:23），由動能修復機器人每輪（scripts/repair_bot.py:178）刷新匯出檔交給維運通知。PR #108（8a）。",
           "verified_at": "2026-10-15",
           "limit": "測試事件是人工寫的，動能自己偵測到『移動停損無法驗證』的路徑在 A1 沒被實際觸發過。"
         }
@@ -1112,13 +1112,13 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:178 run_repair_round（trade_alerts.repair_runner）：能對應就以交易所為準補寫、不通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+          "evidence": "scripts/repair_bot.py:178 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
         }
       }
     },
@@ -1127,13 +1127,13 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:178 run_repair_round（trade_alerts.repair_runner）：帳本已有修復痕跡或整批寫入失敗就停手、開請求、R3 通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+          "evidence": "scripts/repair_bot.py:178 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
         }
       }
     },
@@ -1142,13 +1142,13 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:178 run_repair_round（trade_alerts.repair_runner）：查不到或結構對不上每輪記一次失敗，同一 trade_id 連續 3 次才升格通知。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
+          "evidence": "scripts/repair_bot.py:178 共用修復執行器寫進 audit/fleet_event_log.jsonl（v2 等級標籤）。"
         }
       }
     },
@@ -1427,13 +1427,13 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 修復機器人每輪先跑修復輪，scripts/repair_bot.py:179 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:163 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:617 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+          "evidence": "scripts/repair_bot.py:178 修復機器人每輪先跑修復輪，scripts/repair_bot.py:181 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:165 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:617 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:179 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+          "evidence": "scripts/repair_bot.py:181 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
         }
       }
     },
@@ -1442,13 +1442,13 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 修復機器人每輪先跑修復輪，scripts/repair_bot.py:179 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:163 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:617 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+          "evidence": "scripts/repair_bot.py:178 修復機器人每輪先跑修復輪，scripts/repair_bot.py:181 接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；scripts/repair_bot.py:165 歸因只認 src/client_ids.py:59 is_own_client_id（動能自有的 mo- 編號，超過 36 字元一律不認）；src/strategy.py:617 原生移動停損每次掛單帶 src/client_ids.py:55 trailing_stop_id 產生的唯一編號，觸發後出場單帶同一個編號（2026-09-25 Binance 測試網實測），所以停損出場單可歸因。確定是自己重複送單且已平倉、同筆其他未記單都能歸因才自動追加帳本更正，其餘開請求通知。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:179 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+          "evidence": "scripts/repair_bot.py:181 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ops_export.writer 已做）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
         }
       }
     },
@@ -1663,7 +1663,7 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on）。"
+          "evidence": "scripts/repair_bot.py:178 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_MOMENTUM_OPS_EXPORT=on）。"
         },
         "seykota": {
           "state": "done",
@@ -1789,7 +1789,7 @@
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "src/strategy.py:1503 _record_position_adoption 把接管寫成 R3 事件 POSITION_ADOPTED_AFTER_INTERRUPTION（src/fleet_events.py:26），kind 分 interrupted_entry／unknown_origin，呼叫點 src/strategy.py:1658；事件由動能修復機器人每輪（scripts/repair_bot.py:176）刷新匯出檔交給維運通知。PR #108（f-12）。",
+          "evidence": "src/strategy.py:1503 _record_position_adoption 把接管寫成 R3 事件 POSITION_ADOPTED_AFTER_INTERRUPTION（src/fleet_events.py:26），kind 分 interrupted_entry／unknown_origin，呼叫點 src/strategy.py:1658；事件由動能修復機器人每輪（scripts/repair_bot.py:178）刷新匯出檔交給維運通知。PR #108（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "這個事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路只用受控測試事件（ERR-015）驗過，不是這個事件。"
         }
@@ -1838,7 +1838,7 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:642 _halt_on_unreadable_state：狀態檔存在但讀不出來時鎖安全暫停 STATE_FILE_CORRUPT、另存損毀備份（evidence.damaged_copy）、這輪不送單，不再把它當成第一次執行而整本重新調倉；src/btc_competition/safe_halt_resume.py:120 解除工具對這個代碼多印提醒（解除後從全新狀態開始，要先決定是否還原備份）。PR #41（f-12）。",
+          "evidence": "src/btc_competition/runner.py:642 _halt_on_unreadable_state：狀態檔存在但讀不出來時鎖安全暫停 STATE_FILE_CORRUPT、另存損毀備份（evidence.damaged_copy）、這輪不送單，不再把它當成第一次執行而整本重新調倉；src/btc_competition/safe_halt_resume.py:121 解除工具對這個代碼多印提醒（解除後從全新狀態開始，要先決定是否還原備份）。PR #41（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
@@ -1857,14 +1857,14 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 呼叫 run_repair_round，其中的共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。",
+          "evidence": "scripts/repair_bot.py:178 呼叫 run_repair_round，其中的共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。",
           "limit": "尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
         }
       },
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 的同一輪把事件寫進 audit/fleet_event_log.jsonl（R3）並刷新匯出檔，由維運通知轉送；共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。",
+          "evidence": "scripts/repair_bot.py:178 的同一輪把事件寫進 audit/fleet_event_log.jsonl（R3）並刷新匯出檔，由維運通知轉送；共用修復執行器（trade_alerts.repair_runner 的 _check_recurring）：同一支策略最近 7 天內自動補寫達 2 次（RECURRING_THRESHOLD=2、RECURRING_WINDOW_DAYS=7）就通知一次、窗口內已有通知就不重發（使用者 2026-10-01 核可門檻）；A1 實際載入的共用庫模組讀回門檻值 2／7 與每 15 分鐘排程的細節見能力『自動修補重複發生時升格通知』（repair_bot.recurrence_escalation，2026-10-04 台北唯讀查）。",
           "limit": "尚未觸發過（正式機沒有發生自動補寫，7 天內不會自己達到門檻）。"
         }
       }
@@ -1985,7 +1985,7 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 run_repair_round（共用庫 repair_runner）每輪讀 audit/ledger_status.json 的 evidence.pending_expired，對還沒通知過的逾時標記寫一筆事件日誌 LEDGER_PENDING_EXPIRED（R3，錯誤清單 ERR-060）；同一筆標記不重發（已通知名單從事件日誌讀回，讀與寫同一把鎖），只有狀態是 RECONCILED 才通知，讀寫失敗只記警告、下輪重試（共用庫 repair_runner 模組的 _check_pending_expired（錯誤清單 ERR-060 的來源是它發事件的那一行），審閱 bcup02/trade-alerts#162 兩輪）。",
+          "evidence": "scripts/repair_bot.py:178 run_repair_round（共用庫 repair_runner）每輪讀 audit/ledger_status.json 的 evidence.pending_expired，對還沒通知過的逾時標記寫一筆事件日誌 LEDGER_PENDING_EXPIRED（R3，錯誤清單 ERR-060）；同一筆標記不重發（已通知名單從事件日誌讀回，讀與寫同一把鎖），只有狀態是 RECONCILED 才通知，讀寫失敗只記警告、下輪重試（共用庫 repair_runner 模組的 _check_pending_expired（錯誤清單 ERR-060 的來源是它發事件的那一行），審閱 bcup02/trade-alerts#162 兩輪）。",
           "verified_at": "2026-10-11",
           "limit": "A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
         }
@@ -1993,7 +1993,7 @@
       "emits_event": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:176 同一個修復輪寫事件日誌 audit/fleet_event_log.jsonl 後刷新匯出檔 audit/ops_export.json，ERR-060 通知（含結清步驟與給 AI 的追查指令）由維運通知轉送；動能的結清工具與步驟一致（src/reconcile_apply.py:105）。A1 的匯出檔寫入與維運通知轉送是既有路徑（修復輪 ops_export_written、維運通知手動一輪 notices=0）。",
+          "evidence": "scripts/repair_bot.py:178 同一個修復輪寫事件日誌 audit/fleet_event_log.jsonl 後刷新匯出檔 audit/ops_export.json，ERR-060 通知（含結清步驟與給 AI 的追查指令）由維運通知轉送；動能的結清工具與步驟一致（src/reconcile_apply.py:150）。A1 的匯出檔寫入與維運通知轉送是既有路徑（修復輪 ops_export_written、維運通知手動一輪 notices=0）。",
           "verified_at": "2026-10-11",
           "limit": "A1 的動能目前沒有未結清的標記，超過 24 小時的行為與 ERR-060 通知在 A1 沒有實際被觸發過，只在測試驗證（動能 tests/test_reconcile_compare.py、tests/test_reconcile_apply.py 的 f-30 測試，與登記冊自我檢查 tests/test_rollout_registry_self_check.py 的行為檢查）；開發機同樣沒有逾時案例。"
         }
@@ -2114,5 +2114,202 @@
       }
     }
   ],
-  "recent_changes": []
+  "recent_changes": [
+    {
+      "kind": "cap",
+      "id": "repair_bot.detect_propose",
+      "type": "updated",
+      "project": "momentum",
+      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.verified_close",
+      "type": "updated",
+      "project": "momentum",
+      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.pause_brake",
+      "type": "updated",
+      "project": "momentum",
+      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "cap",
+      "id": "ops_export.writer",
+      "type": "updated",
+      "project": "momentum",
+      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "cap",
+      "id": "ops_notify.export_relay_enabled",
+      "type": "updated",
+      "project": "momentum",
+      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "cap",
+      "id": "notify.line_first_notice",
+      "type": "updated",
+      "project": "momentum",
+      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.unrecorded_fill_handling",
+      "type": "updated",
+      "project": "momentum",
+      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.recurrence_escalation",
+      "type": "updated",
+      "project": "momentum",
+      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "cap",
+      "id": "notify.error_id",
+      "type": "updated",
+      "project": "momentum",
+      "note": "引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.pending_age_cap",
+      "type": "updated",
+      "project": "momentum",
+      "note": "引用行號隨 sources 換版更新；並補上 f-32 的快照新鮮度前提（審閱 #204 要求）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.PROTECTION_UNVERIFIED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_REPAIR_FAILED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.UNRECORDED_FILL_CORRECTED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.UNRECORDED_FILL_CORRECTED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.UNRECORDED_FILL_UNRESOLVED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
+      "type": "updated",
+      "project": "momentum",
+      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "type": "updated",
+      "project": "momentum",
+      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "BTC.STATE_FILE_CORRUPT",
+      "type": "updated",
+      "project": "btc-competition",
+      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "type": "updated",
+      "project": "momentum",
+      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "type": "updated",
+      "project": "momentum",
+      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.LEDGER_PENDING_EXPIRED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "行為格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MOM.LEDGER_PENDING_EXPIRED",
+      "type": "updated",
+      "project": "momentum",
+      "note": "事件日誌格的引用行號隨 sources 換到 A1 現行版而更新（同一行程式文字，說法未變）。"
+    }
+  ]
 }
