@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-15",
+  "updated_at": "2026-10-16",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -30,7 +30,7 @@
     "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
     "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
     "f-16": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
-    "x3-crypto-binance": "加密策略換到 Binance（x 系列）的剩餘項目：x3e 接上 Google 新版投影（平倉整筆寫入、同步佇列、帳本更正讀取端），接手成交配對與寬限的守門測試要補，並在 x5 測試網驗證；共用庫已隨 x3b 升到 v0.30.7",
+    "x3-crypto-binance": "加密策略換到 Binance（x 系列）的剩餘項目：人工更正工具（x3e-6）、接手成交配對的帳本對交易所守門測試，並在 x5 測試網驗證；Google 新版投影（x3e-1～x3e-5）已於 2026-10-16 上 A1，共用庫已隨 x3b 升到 v0.30.7",
     "t9-competition-retry": "t9：競賽策略失敗時當天重試（同一程序內每 15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.6 錯誤清單已改；競賽程式在 PR #45（審閱中，合併後上開發機實測），之後才部署 A1 正式機（新）",
     "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
     "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）"
@@ -49,7 +49,7 @@
     "mycrypto": {
       "repo": "AI-for-column/my-crypto-bot",
       "branch": "operations",
-      "commit": "2ee102c1371b48f66b378113089d683cb0a3a28c"
+      "commit": "4af261ada14a1f2cbf88e77e6b04876fcb783c1b"
     },
     "btc-competition": {
       "repo": "AI-for-column/btc-bull-market-competition",
@@ -144,7 +144,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "failure_episodes.py:135 FailureEpisodes.failure：同一段失敗連續 3 次（failure_episodes.py:54 THRESHOLD）才升格並只寫一則事件，成功就結束這一段，狀態存在 state/failure-episodes.json、重啟接續、事件編號由失敗期間推導（重啟後不重複通知）；mexc_futures_bot.py:2338 run_forever 整輪例外連續 3 輪才通知（ERR-027）；mexc_futures_bot.py:1267 沒有交易所端停損連續 3 輪（ERR-029／031）；mexc_futures_bot.py:1277 殘留停損單取消連續 3 次（ERR-032）。my-crypto-bot #73（審閱 3 輪）。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "evidence": "failure_episodes.py:135 FailureEpisodes.failure：同一段失敗連續 3 次（failure_episodes.py:54 THRESHOLD）才升格並只寫一則事件，成功就結束這一段，狀態存在 state/failure-episodes.json、重啟接續、事件編號由失敗期間推導（重啟後不重複通知）；mexc_futures_bot.py:2201 run_forever 整輪例外連續 3 輪才通知（ERR-027）；mexc_futures_bot.py:1138 沒有交易所端停損連續 3 輪（ERR-029／031）；mexc_futures_bot.py:1148 殘留停損單取消連續 3 次（ERR-032）。my-crypto-bot #73（審閱 3 輪）。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
           "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         },
         "btc-competition": {
@@ -168,7 +168,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "portfolio_snapshot_adapter.py:76 _runtime_status（strategy.runtime_status）"
+          "evidence": "portfolio_snapshot_adapter.py:77 _runtime_status（strategy.runtime_status）"
         },
         "btc-competition": {
           "state": "done",
@@ -237,7 +237,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 run_repair_round（共用修復執行器）每 15 分鐘（deploy/my-crypto-repair-bot.timer:8）找「帳本有開倉、交易所已無部位」的候選，repair_bot.py:132 fetch_evidence 用 Binance 唯讀成交建證據（成交量須剛好等於開倉量、開倉模式缺值或與帳戶不符一律拒絕、整頁成交都滿也拒絕）；非 Binance 時以暫停模式跑只刷新匯出檔（repair_bot.py:233、:238）。",
+          "evidence": "repair_bot.py:240 run_repair_round（共用修復執行器）每 15 分鐘（deploy/my-crypto-repair-bot.timer:8）找「帳本有開倉、交易所已無部位」的候選，repair_bot.py:132 fetch_evidence 用 Binance 唯讀成交建證據（成交量須剛好等於開倉量、開倉模式缺值或與帳戶不符一律拒絕、整頁成交都滿也拒絕）；非 Binance 時以暫停模式跑只刷新匯出檔（repair_bot.py:235、:240）。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
@@ -262,9 +262,9 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 run_repair_round 照證據補寫：repair_bot.py:185 staging_ledger 用策略自己的 TradeLedger 整批寫入、一輪最多一筆，repair_bot.py:196 補寫後以 mexc_futures_bot.py:698 post_trade_close_to_sheet 把 Google 表那一列的平倉欄位填上（請求與正常平倉共用 mexc_futures_bot.py:670）。",
-          "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "evidence": "repair_bot.py:240 run_repair_round 照證據補寫：repair_bot.py:185 staging_ledger 用策略自己的 TradeLedger 整批寫入、一輪最多一筆；補寫後 repair_bot.py:188 queue_projection（:198 呼叫 queue_trade_event）把平倉排入 Google 新版投影佇列，與正常平倉同一條路（mexc_futures_bot.py:874 _queue_close_projection）。",
+          "verified_at": "2026-10-16",
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -287,7 +287,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:233 讀 MYCRYPTO_REPAIR_PAUSED（共用庫 repair_paused），為真時 run_repair_round 以暫停模式跑（repair_bot.py:238）、少記成交處理也跳過（repair_bot.py:244）；deploy/my-crypto-bot.env.example:87 預設 false。",
+          "evidence": "repair_bot.py:235 讀 MYCRYPTO_REPAIR_PAUSED（共用庫 repair_paused），為真時 run_repair_round 以暫停模式跑（repair_bot.py:240）、少記成交處理也跳過（repair_bot.py:246）；deploy/my-crypto-bot.env.example:92 預設 false。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
@@ -460,9 +460,10 @@
           "limit": "只在動能的進場看到過。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "x3-crypto-binance",
-          "reason": "共用庫已隨 x3b 升到 v0.30.7；google_reconcile.py:87 呼叫的 sheet_ledger_compare 沒有傳 projection_grace_seconds，所以已套用共用庫預設的 3600 秒寬限。尚缺：加密沒有這一格的守門測試（趨勢、動能有 tests/test_google_reconcile.py 的剛進場、剛平倉、老交易缺列三項）；加密的 Google 表目前走舊的寫入路徑（沒有 v2 投影佇列，『新交易等同步』的情境要等 x3e 才存在），A1 加密 OFFLINE 也沒有遇過。補守門測試並在 x3e 之後驗證寬限路徑，才改已做。加密這兩天的 Google 表對帳沒有 DIVERGED 讀數（只看了維運通知的狀態轉換，沒有逐日核對帳本）。"
+          "state": "done",
+          "evidence": "google_reconcile.py:87 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒（A1 venv trade-alerts 0.30.7）；守門測試 tests/test_google_reconcile.py:551、:559、:565（剛進場、剛平倉不算對不上；老交易缺列仍 DIVERGED）。my-crypto-bot #85（x3e-3）。",
+          "verified_at": "2026-10-16",
+          "limit": "A1 加密仍 OFFLINE，寬限路徑在 A1 沒有實際遇到「新交易等同步」，只有單元測試；真實交易走過 Google 新版投影才算實測。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -508,7 +509,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:493 只呼叫一次 create_market_order、失敗記帳後往外拋（不帶 client id，MEXC 端無從去重）；ccxt 4.5.71 預設不重試，:392 init_exchange 沒開 maxRetriesOnFailure；mexc_futures_bot.py:2333 run_forever 例外後睡 POLLING_SECONDS 才跑下一輪；:1800 每輪開頭先查部位、:1822 有部位就只管理不開新倉，查部位失敗則在送任何單之前就丟例外；平倉 :2172 帶 reduceOnly。2026-09-24 h7 查核＋模擬測試確認；回歸測試 my-crypto-bot #49。"
+          "evidence": "mexc_futures_bot.py:491 只呼叫一次 create_market_order、失敗記帳後往外拋（不帶 client id，MEXC 端無從去重）；ccxt 4.5.71 預設不重試，:390 init_exchange 沒開 maxRetriesOnFailure；mexc_futures_bot.py:2196 run_forever 例外後睡 POLLING_SECONDS 才跑下一輪；:1652 每輪開頭先查部位、:1674 有部位就只管理不開新倉，查部位失敗則在送任何單之前就丟例外；平倉 :2031 帶 reduceOnly。2026-09-24 h7 查核＋模擬測試確認；回歸測試 my-crypto-bot #49。"
         },
         "btc-competition": {
           "state": "done",
@@ -530,9 +531,10 @@
           "evidence": "src/reconcile_compare.py:68 帳本對交易所走共用 exchange_ledger_compare，更正涵蓋的單號算已記、部位不變；src/google_ledger_provenance.py:99 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正，src/google_ledger_provenance.py:224 依佇列的 ledger digest 選擇；src/google_projection_worker.py:75 送出時帶入該 digest；src/portfolio_snapshot_adapter.py:184 LINE 查詢快照套用 apply_trade_corrections；scripts/append_trade_correction.py:151 兩段式人工更正工具（預覽→確認碼→寫入）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "x3-crypto-binance",
-          "reason": "帳本更正事件的讀取端（對帳、Google 表 correct_close_v2、投資人快照）要跟 Google 新版投影（x3e）一起接上；修復機器人已接上（x3d），但自動產生更正沒做（單號不能證明是自己下的）。"
+          "state": "done",
+          "evidence": "portfolio_snapshot_adapter.py:171 settled_trades（LINE 查詢快照）與 investor_snapshot.py:52（投資人累計損益）先套用 apply_trade_corrections，更正失效就讓快照失敗、不靜默略過；帳本對交易所（reconcile_compare.py:67 exchange_ledger_compare）與帳本對 Google 表（google_reconcile.py:87 sheet_ledger_compare）的更正套用在共用庫；google_ledger_provenance.py:102 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正；google_projection_worker.py:32 queue_trade_event 可指定哪一筆更正。my-crypto-bot #85（x3e-3）。",
+          "verified_at": "2026-10-16",
+          "limit": "A1 加密仍 OFFLINE、沒有真實交易走過；目前沒有人工產生 trade_correction 的工具（x3e-6），修復機器人也不自動產生更正，所以 A1 帳本沒有更正事件，讀取端只有單元測試驗證。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -556,7 +558,7 @@
         "mycrypto": {
           "state": "pending",
           "phase": "x3-crypto-binance",
-          "reason": "通知已具備並在 A1 運作（repair_bot.py:215 UnrecordedFillAdapter(client_ids=False)、repair_bot.py:244 run_unrecorded_fill_round：不查交易所、不寫帳本，交易所有成交而帳本沒記一律 ERR-042 R3 開請求並通知）；『以交易所為準自動更正』沒有：這支的單號（open-<時間>／close-<時間>）不能證明是自己下的，且更正要有 Google 新版投影（x3e）。"
+          "reason": "通知已具備並在 A1 運作（repair_bot.py:217 UnrecordedFillAdapter(client_ids=False)、repair_bot.py:246 run_unrecorded_fill_round：不查交易所、不寫帳本，交易所有成交而帳本沒記一律 ERR-042 R3 開請求並通知）；『以交易所為準自動更正』沒有：這支的單號（open-<時間>／close-<時間>）不能證明是自己下的，（Google 新版投影 x3e 已在 A1，缺的是能證明單號的方式）；人工更正工具見 x3e-6。"
         },
         "btc-competition": {
           "state": "done",
@@ -583,7 +585,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 經共用修復執行器每輪檢查「7 天內自動補寫達 2 次就通知一次、之後 7 天不重發」（trade-alerts v0.30.7 repair_runner 的 _check_recurring，ERR-065）；加密的 ERR-062～065 規則在錯誤清單 v0.30.7。",
+          "evidence": "repair_bot.py:240 經共用修復執行器每輪檢查「7 天內自動補寫達 2 次就通知一次、之後 7 天不重發」（trade-alerts v0.30.7 repair_runner 的 _check_recurring，ERR-065）；加密的 ERR-062～065 規則在錯誤清單 v0.30.7。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
@@ -635,7 +637,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "graceful_stop.py:54 install_signal_handlers；mexc_futures_bot.py:2328 啟動時安裝；deploy/my-crypto-bot.service:20 TimeoutStopSec=180。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。同日 17:50 重開機時服務乾淨結束（systemd 回報 Deactivated successfully），重啟後讀回持倉與交易所停損單都在；這支停止時沒有專屬的結束日誌，所以只確認乾淨結束，沒有逐步確認「當輪做完才停」。"
+          "evidence": "graceful_stop.py:54 install_signal_handlers；mexc_futures_bot.py:2191 啟動時安裝；deploy/my-crypto-bot.service:20 TimeoutStopSec=180。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。同日 17:50 重開機時服務乾淨結束（systemd 回報 Deactivated successfully），重啟後讀回持倉與交易所停損單都在；這支停止時沒有專屬的結束日誌，所以只確認乾淨結束，沒有逐步確認「當輪做完才停」。"
         },
         "btc-competition": {
           "state": "done",
@@ -659,7 +661,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:1061 ENTRY_PENDING；mexc_futures_bot.py:1897 開倉前先存 entry_pending 狀態（含 trade_id、external_id）；mexc_futures_bot.py:1487 _adopt_pending_entry 重啟後接管開到一半的部位並沿用 trade_id、補掛停損。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。接管通知：2026-10-14 台北約 17:27 隨 A1 正式機分支 operations 2ee102c 上線，接管會寫 R3 事件並通知（ERR-066，見 MYC.POSITION_ADOPTED_AFTER_INTERRUPTION 的格子；mexc_futures_bot.py:1092、:1534 就是這條接管路徑的通知點）。",
+          "evidence": "mexc_futures_bot.py:798 ENTRY_PENDING；mexc_futures_bot.py:1749 開倉前先存 entry_pending 狀態（含 trade_id、external_id）；mexc_futures_bot.py:1346 _adopt_pending_entry 重啟後接管開到一半的部位並沿用 trade_id、補掛停損。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。接管通知：2026-10-14 台北約 17:27 隨 A1 正式機分支 operations 2ee102c 上線，接管會寫 R3 事件並通知（ERR-066，見 MYC.POSITION_ADOPTED_AFTER_INTERRUPTION 的格子；mexc_futures_bot.py:963、:1386 就是這條接管路徑的通知點）。",
           "limit": "A1 正式機沒有發生過被中斷的進場，接管與通知都沒有實機觸發過。這支要搬到 Binance（進度頁 x 系列），這份 MEXC 版程式碼之後會重寫。"
         },
         "btc-competition": {
@@ -686,7 +688,7 @@
         "mycrypto": {
           "state": "pending",
           "phase": "x3-crypto-binance",
-          "reason": "共用庫已隨 x3b 升到 v0.30.7：reconcile_compare.py:67 呼叫的 exchange_ledger_compare 內建『同交易對、方向、數量、價格、時間都對得上才算帳本有記』的接手成交配對，reconcile_compare.py:53 也把 position_recovered 算作開倉（原本寫的『對帳是舊版共用庫 v0.15.0，沒有這個配對』已不成立）。加密的接手紀錄仍沒有訂單編號（mexc_futures_bot.py:2088、:2104 兩處 position_recovered）。尚缺：加密自己的配對守門測試與端到端驗證（要在 x5 測試網走一次接手→對帳），驗過才改已做。"
+          "reason": "共用庫已隨 x3b 升到 v0.30.7：reconcile_compare.py:67 呼叫的 exchange_ledger_compare 內建『同交易對、方向、數量、價格、時間都對得上才算帳本有記』的接手成交配對，reconcile_compare.py:53 也把 position_recovered 算作開倉（原本寫的『對帳是舊版共用庫 v0.15.0，沒有這個配對』已不成立）。加密的接手紀錄仍沒有訂單編號（mexc_futures_bot.py:1938、:1961 兩處 position_recovered）。Google 對帳端已有接手部位三項守門測試（tests/test_google_reconcile.py:524 起，x3e-3）；尚缺：帳本對交易所的配對守門測試與端到端驗證（要在 x5 測試網走一次接手→對帳），驗過才改已做。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -710,9 +712,10 @@
           "limit": "同趨勢，A1 上停放路徑沒有實際被觸發過。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "x3-crypto-binance",
-          "reason": "加密仍走舊的 Google 寫入路徑（mexc_futures_bot.py:698 post_trade_close_to_sheet 逐筆單列更新），沒有 v2 Google 投影、同步佇列與 google_projection_worker，所以沒有可以停放的佇列；共用庫已升到 v0.30.7，要等 x3e（Google 新版投影）接上才一併具備。"
+          "state": "done",
+          "evidence": "google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫 projection_outbox，A1 venv trade-alerts 0.30.7 的 CORRECTION_PARKED_CODE，策略沒有自己的實作）；drain 指令稿 scripts/drain_google_projection_outbox.py:46 與投影計時器走同一條送出路徑。my-crypto-bot #81（x3e-1）。",
+          "verified_at": "2026-10-16",
+          "limit": "A1 加密沒有任何更正事件，停放路徑只在共用庫與策略端測試驗證，沒在 A1 觸發過。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -736,9 +739,10 @@
           "limit": "只在測試與趨勢的開發機實測驗證；動能的指令稿本身沒在任何主機上實際執行過。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "x3-crypto-binance",
-          "reason": "同上：加密沒有 v2 投影佇列，也就沒有被停放、需要重新排入的紀錄；共用庫已升到 v0.30.7，等 x3e 接上新版投影時一併具備。"
+          "state": "done",
+          "evidence": "scripts/requeue_projection_intents.py:46 呼叫 requeue_rejected_projection_intents（:38 只收單一 --trade-id、:44 沒有佇列檔就停）。my-crypto-bot #81（x3e-1）。",
+          "verified_at": "2026-10-16",
+          "limit": "A1 沒有被停放的紀錄，這個指令稿沒有在任何主機上實際執行過，只有測試（tests/test_requeue_projection_intents.py）驗證。"
         },
         "btc-competition": {
           "state": "done",
@@ -764,9 +768,10 @@
           "limit": "動能沒有加碼，這格對它只是把同樣的值再寫一次；沒有在 A1 實際看到寫回後的儲存格。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "x3-crypto-binance",
-          "reason": "加密的平倉仍走舊路徑（mexc_futures_bot.py:698 post_trade_close_to_sheet 填那一列的平倉欄位），不是 v2 投影的平倉動作，所以沒有『整筆加權進場價與總量寫回 G、I 欄』這件事；共用庫已升到 v0.30.7，等 x3e 接上新版投影時一併具備。"
+          "state": "done",
+          "evidence": "google_ledger_provenance.py:270 與 :272 的平倉投影（update_close_v2）帶 entry_price、entry_volume（取自帳本平倉列）；平倉由 mexc_futures_bot.py:874 _queue_close_projection 排入佇列（開倉一定排在前面），再由 mexc_futures_bot.py:914 _catch_up_projection_queue 從帳本補排。my-crypto-bot #81、#83（x3e-1／x3e-2）。",
+          "verified_at": "2026-10-16",
+          "limit": "A1 加密仍 OFFLINE，沒有真實平倉走過這條路徑，也沒有在 A1 看到寫回後的儲存格；接收端寫回 G／I 欄的路徑只在接收端 Node 測試驗證。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -1241,13 +1246,13 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:839 只記錄差額，不影響交易（Phase 4e 定案）"
+          "evidence": "mexc_futures_bot.py:583 只記錄差額，不影響交易（Phase 4e 定案）"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:839 append_fleet_event（R0）"
+          "evidence": "mexc_futures_bot.py:583 append_fleet_event（R0）"
         }
       }
     },
@@ -1256,14 +1261,14 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2338 run_forever 整輪例外下一輪照常重試，連續 3 輪失敗才升格並通知一次（failure_episodes.py:135；從 R2 的『3 次』規則）；2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "evidence": "mexc_futures_bot.py:2201 run_forever 整輪例外下一輪照常重試，連續 3 輪失敗才升格並通知一次（failure_episodes.py:135；從 R2 的『3 次』規則）；2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
           "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2338 _count_failure(RUNTIME_CYCLE_FAILED) → mexc_futures_bot.py:1239 _emit_escalation 寫 R2 已升格事件（等級 fleet_events.py:43，有測試核對等於錯誤目錄），匯出檔轉給維運通知。只數真倉與測試網的失敗。限制同上：A1 沒被觸發過。"
+          "evidence": "mexc_futures_bot.py:2201 _count_failure(RUNTIME_CYCLE_FAILED) → mexc_futures_bot.py:1110 _emit_escalation 寫 R2 已升格事件（等級 fleet_events.py:43，有測試核對等於錯誤目錄），匯出檔轉給維運通知。只數真倉與測試網的失敗。限制同上：A1 沒被觸發過。"
         }
       }
     },
@@ -1272,13 +1277,13 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:1991 只通知、不自動下單（現行行為即符合 v2）"
+          "evidence": "mexc_futures_bot.py:1834 只通知、不自動下單（現行行為即符合 v2）"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2003 開倉後停損單被拒時立刻寫 R3 事件（fleet_events.py:37 RISK_TIER），匯出檔轉給維運通知；事件文字只含交易對、方向、trade_id、停損價與已遮金鑰並截斷的交易所錯誤訊息。my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "evidence": "mexc_futures_bot.py:1846 開倉後停損單被拒時立刻寫 R3 事件（fleet_events.py:37 RISK_TIER），匯出檔轉給維運通知；事件文字只含交易對、方向、trade_id、停損價與已遮金鑰並截斷的交易所錯誤訊息。my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
           "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       }
@@ -1288,14 +1293,14 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2015 開倉後查不到部位時記一次失敗；下一輪本來就會重查部位並補掛停損（原有行為），與搬移停損失敗共用同一段失敗期間，連續 3 輪沒掛成功才升格；停損掛上、交易所看得到停損或空手就結束。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "evidence": "mexc_futures_bot.py:1858 開倉後查不到部位時記一次失敗；下一輪本來就會重查部位並補掛停損（原有行為），與搬移停損失敗共用同一段失敗期間，連續 3 輪沒掛成功才升格；停損掛上、交易所看得到停損或空手就結束。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
           "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2015 _protection_failed(PROTECTION_PLACEMENT_NO_POSITION) → mexc_futures_bot.py:1239 _emit_escalation 寫 R2 已升格事件（fleet_events.py:40）。限制同上：A1 沒被觸發過。"
+          "evidence": "mexc_futures_bot.py:1858 _protection_failed(PROTECTION_PLACEMENT_NO_POSITION) → mexc_futures_bot.py:1110 _emit_escalation 寫 R2 已升格事件（fleet_events.py:40）。限制同上：A1 沒被觸發過。"
         }
       }
     },
@@ -1304,13 +1309,13 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2019 只通知、不自動下單（現行行為即符合 v2）"
+          "evidence": "mexc_futures_bot.py:1862 只通知、不自動下單（現行行為即符合 v2）"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2024 掛開倉停損單時拋例外，立刻寫 R3 事件（fleet_events.py:37 RISK_TIER），匯出檔轉給維運通知。my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "evidence": "mexc_futures_bot.py:1867 掛開倉停損單時拋例外，立刻寫 R3 事件（fleet_events.py:37 RISK_TIER），匯出檔轉給維運通知。my-crypto-bot #71。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
           "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       }
@@ -1320,14 +1325,14 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2272 搬移（或重新掛）停損失敗清掉失效單號，下一輪自動重掛（原有行為）；mexc_futures_bot.py:2284 例外分支同；連續 3 輪沒掛成功才升格通知一次。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "evidence": "mexc_futures_bot.py:2131 搬移（或重新掛）停損失敗清掉失效單號，下一輪自動重掛（原有行為）；mexc_futures_bot.py:2143 例外分支同；連續 3 輪沒掛成功才升格通知一次。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
           "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2272 _protection_failed(PROTECTION_REPLACE_FAILED) → mexc_futures_bot.py:1239 _emit_escalation 寫 R2 已升格事件（fleet_events.py:41）。限制同上：A1 沒被觸發過。"
+          "evidence": "mexc_futures_bot.py:2131 _protection_failed(PROTECTION_REPLACE_FAILED) → mexc_futures_bot.py:1110 _emit_escalation 寫 R2 已升格事件（fleet_events.py:41）。限制同上：A1 沒被觸發過。"
         }
       }
     },
@@ -1336,14 +1341,14 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2202 平倉後取消殘留停損單失敗時記住單號；mexc_futures_bot.py:1283 _retry_orphan_cancels 空手時每輪重試（先看交易所停損清單，已不在清單就算完成，清單讀不出來算一次失敗），只取消自己記錄的單號；連續 3 次失敗才升格；mexc_futures_bot.py:1316 重試前又開了新部位則條件不成立、立刻通知。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
+          "evidence": "mexc_futures_bot.py:2061 平倉後取消殘留停損單失敗時記住單號；mexc_futures_bot.py:1154 _retry_orphan_cancels 空手時每輪重試（先看交易所停損清單，已不在清單就算完成，清單讀不出來算一次失敗），只取消自己記錄的單號；連續 3 次失敗才升格；mexc_futures_bot.py:1187 重試前又開了新部位則條件不成立、立刻通知。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
           "limit": "A1 加密目前 OFFLINE，這條路徑在 A1 沒被實際觸發過，只有測試（CI 與開發機）驗證。"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:2202 _orphan_failed → mexc_futures_bot.py:1239 _emit_escalation 寫 R2 已升格事件（fleet_events.py:42）。限制同上：A1 沒被觸發過。"
+          "evidence": "mexc_futures_bot.py:2061 _orphan_failed → mexc_futures_bot.py:1110 _emit_escalation 寫 R2 已升格事件（fleet_events.py:42）。限制同上：A1 沒被觸發過。"
         }
       }
     },
@@ -1487,7 +1492,7 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:215 UnrecordedFillAdapter(client_ids=False)、repair_bot.py:244 run_unrecorded_fill_round：交易所有成交而帳本沒記時一律不寫帳本、不下單，開一個請求（同一張單只開一次）並通知（R3，ERR-042）；帳本之後記到那張單時請求自動撤回。非 Binance 時（目前 A1）這段仍照跑，只受 MYCRYPTO_REPAIR_PAUSED 停用。",
+          "evidence": "repair_bot.py:217 UnrecordedFillAdapter(client_ids=False)、repair_bot.py:246 run_unrecorded_fill_round：交易所有成交而帳本沒記時一律不寫帳本、不下單，開一個請求（同一張單只開一次）並通知（R3，ERR-042）；帳本之後記到那張單時請求自動撤回。非 Binance 時（目前 A1）這段仍照跑，只受 MYCRYPTO_REPAIR_PAUSED 停用。",
           "verified_at": "2026-10-14",
           "limit": "A1 沒有發生過少記成交，通知只在測試驗證。"
         }
@@ -1495,7 +1500,7 @@
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:244 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ERR-042）。",
+          "evidence": "repair_bot.py:246 共用處理程式 trade_alerts.unrecorded_fill 直接把事件寫進事件日誌、請求寫進請求佇列，同一輪刷新 audit/ops_export.json 交給維運通知（ERR-042）。",
           "verified_at": "2026-10-14",
           "limit": "事件到手機的最後一段沒有實機跑過。"
         }
@@ -1592,7 +1597,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "portfolio_snapshot_adapter.py:76 _runtime_status 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
+          "evidence": "portfolio_snapshot_adapter.py:77 _runtime_status 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
         },
         "btc-competition": {
           "state": "done",
@@ -1900,8 +1905,10 @@
           "limit": "A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
         },
         "mycrypto": {
-          "state": "n/a",
-          "reason": "加密策略沒有 Google 表同步佇列（沒有 v2 投影，開發機表也是空的、正式機直接對帳），不會有找不到開倉列的平倉。"
+          "state": "done",
+          "evidence": "google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox（A1 venv trade-alerts 0.30.7 的 ORPHAN_CLOSE_PARKED_CODE）：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED，後面的紀錄照常送出。",
+          "verified_at": "2026-10-16",
+          "limit": "A1 加密沒有真實交易，沒遇到過被停放的平倉，只在共用庫與策略端測試驗證。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -1920,8 +1927,9 @@
           "reason": "同上：只記在 Google 同步紀錄，還沒寫進共用事件日誌。"
         },
         "mycrypto": {
-          "state": "n/a",
-          "reason": "加密策略沒有 Google 表同步佇列（沒有 v2 投影，開發機表也是空的、正式機直接對帳），不會有找不到開倉列的平倉。"
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "同動能：停放只記在 Google 同步紀錄（REJECTED／orphan_close_no_open_row），沒有寫進共用事件日誌；R1 本來就不通知，等第 8 關補寫事件日誌。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -2023,7 +2031,7 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：證據對得上就以交易所為準補寫、不通知（R1）。",
+          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:240 run_repair_round 運作：證據對得上就以交易所為準補寫、不通知（R1）。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
@@ -2031,7 +2039,7 @@
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 同一輪寫進 audit/fleet_event_log.jsonl（R1 事件 VERIFIED_CLOSE_AUTO_REPAIRED）並刷新匯出檔。",
+          "evidence": "repair_bot.py:240 同一輪寫進 audit/fleet_event_log.jsonl（R1 事件 VERIFIED_CLOSE_AUTO_REPAIRED）並刷新匯出檔。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
@@ -2042,7 +2050,7 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：帳本已有修復痕跡或整批寫入失敗就停手、開請求並通知（R3）。",
+          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:240 run_repair_round 運作：帳本已有修復痕跡或整批寫入失敗就停手、開請求並通知（R3）。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
@@ -2050,7 +2058,7 @@
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 同一輪寫事件日誌與請求佇列，匯出檔經維運通知轉送（ERR-063）。",
+          "evidence": "repair_bot.py:240 同一輪寫事件日誌與請求佇列，匯出檔經維運通知轉送（ERR-063）。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
@@ -2061,7 +2069,7 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：查不到或結構對不上每輪記一次失敗，同一筆連續 3 次才升格通知（R2，ERR-064）。",
+          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:240 run_repair_round 運作：查不到或結構對不上每輪記一次失敗，同一筆連續 3 次才升格通知（R2，ERR-064）。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
@@ -2069,7 +2077,7 @@
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 同一輪寫事件日誌（升格時標已重試用盡）並刷新匯出檔，由維運通知轉送。",
+          "evidence": "repair_bot.py:240 同一輪寫事件日誌（升格時標已重試用盡）並刷新匯出檔，由維運通知轉送。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
@@ -2080,7 +2088,7 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:238 run_repair_round 運作：7 天內自動補寫達 2 次通知一次、之後 7 天不重發（R3，ERR-065）。",
+          "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:240 run_repair_round 運作：7 天內自動補寫達 2 次通知一次、之後 7 天不重發（R3，ERR-065）。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
@@ -2088,7 +2096,7 @@
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:238 同一輪寫事件日誌並刷新匯出檔，由維運通知轉送。",
+          "evidence": "repair_bot.py:240 同一輪寫事件日誌並刷新匯出檔，由維運通知轉送。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
@@ -2099,7 +2107,7 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:1092 _record_adoption_event 把重啟接管寫成 R3 事件並通知：進場被中斷接管 mexc_futures_bot.py:1534（interrupted_entry），找不到追蹤紀錄而重建 mexc_futures_bot.py:2091（unknown_origin）；同一次接管只通知一次（事件編號由 trade_id 或方向|數量|進場價推導，寫前查日誌）；舊版 state.json 補欄位不通知。",
+          "evidence": "mexc_futures_bot.py:963 _record_adoption_event 把重啟接管寫成 R3 事件並通知：進場被中斷接管 mexc_futures_bot.py:1386（interrupted_entry），找不到追蹤紀錄而重建 mexc_futures_bot.py:1944（unknown_origin）；同一次接管只通知一次（事件編號由 trade_id 或方向|數量|進場價推導，寫前查日誌）；舊版 state.json 補欄位不通知。",
           "verified_at": "2026-10-14",
           "limit": "A1 沒有發生過被中斷的進場或遺失狀態，只有單元測試；接管本身（沿用 trade_id、補掛停損）自 f-12 起就在 A1。"
         }
@@ -2107,7 +2115,7 @@
       "emits_event": {
         "mycrypto": {
           "state": "done",
-          "evidence": "fleet_events.py:30 POSITION_ADOPTED_AFTER_INTERRUPTION、fleet_events.py:45 風險分級 R3；mexc_futures_bot.py:1092 經 _record_fleet_event 寫入（永不丟例外，記警告失敗也被吞），由修復機器人與匯出檔計時器刷新 audit/ops_export.json 交給維運通知；測試 tests/test_graceful_stop.py 以 build_ops_export 驗證變成 critical 的 ERR-066 通知。",
+          "evidence": "fleet_events.py:30 POSITION_ADOPTED_AFTER_INTERRUPTION、fleet_events.py:45 風險分級 R3；mexc_futures_bot.py:963 經 _record_fleet_event 寫入（永不丟例外，記警告失敗也被吞），由修復機器人與匯出檔計時器刷新 audit/ops_export.json 交給維運通知；測試 tests/test_graceful_stop.py 以 build_ops_export 驗證變成 critical 的 ERR-066 通知。",
           "verified_at": "2026-10-14",
           "limit": "事件到手機的最後一段沒有實機跑過。"
         }
@@ -2117,24 +2125,67 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "latch.restart_only_clear",
+      "id": "ledger.trade_correction",
+      "type": "completed",
+      "project": "mycrypto",
+      "note": "x3e：加密 Google 新版投影（my-crypto-bot #81、#83、#85、#87、#89）2026-10-16 台北已在 A1 正式機（新）operations 4af261a；A1 加密仍 OFFLINE、沒有真實交易走過。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.google_projection_grace",
+      "type": "completed",
+      "project": "mycrypto",
+      "note": "x3e：加密 Google 新版投影（my-crypto-bot #81、#83、#85、#87、#89）2026-10-16 台北已在 A1 正式機（新）operations 4af261a；A1 加密仍 OFFLINE、沒有真實交易走過。"
+    },
+    {
+      "kind": "cap",
+      "id": "projection.park_unconfirmed_correction",
+      "type": "completed",
+      "project": "mycrypto",
+      "note": "x3e：加密 Google 新版投影（my-crypto-bot #81、#83、#85、#87、#89）2026-10-16 台北已在 A1 正式機（新）operations 4af261a；A1 加密仍 OFFLINE、沒有真實交易走過。"
+    },
+    {
+      "kind": "cap",
+      "id": "projection.requeue_parked",
+      "type": "completed",
+      "project": "mycrypto",
+      "note": "x3e：加密 Google 新版投影（my-crypto-bot #81、#83、#85、#87、#89）2026-10-16 台北已在 A1 正式機（新）operations 4af261a；A1 加密仍 OFFLINE、沒有真實交易走過。"
+    },
+    {
+      "kind": "cap",
+      "id": "google.close_whole_trade_entry",
+      "type": "completed",
+      "project": "mycrypto",
+      "note": "x3e：加密 Google 新版投影（my-crypto-bot #81、#83、#85、#87、#89）2026-10-16 台北已在 A1 正式機（新）operations 4af261a；A1 加密仍 OFFLINE、沒有真實交易走過。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.verified_close",
       "type": "updated",
-      "project": "seykota",
-      "note": "限制句更新：ERR-009／010 的過時處理步驟已隨共用庫 v0.30.8 上 A1（f-46／f-48）。"
+      "project": "mycrypto",
+      "note": "補寫後的 Google 步驟改成排入新版投影佇列（原本寫的直寫函式已在 x3e-5 刪除）。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.unrecorded_fill_handling",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "限制句更新：Google 新版投影已在 A1，仍未做的原因只剩單號不能證明是自己下的。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.adopted_fills",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "行號隨 sources 更新，並補上 Google 對帳端已有接手部位守門測試；仍是未做。"
     },
     {
       "kind": "rule",
-      "id": "SEY.EXCHANGE_TARGET_UNSAFE",
-      "type": "updated",
-      "project": "seykota",
-      "note": "行為格限制句更新：處理步驟已改成現況（共用庫 v0.30.8 上 A1）。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
-      "type": "updated",
-      "project": "seykota",
-      "note": "行為格限制句更新：處理步驟已改成現況（共用庫 v0.30.8 上 A1）。"
+      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+      "type": "completed",
+      "project": "mycrypto",
+      "note": "x3e：加密 Google 新版投影（my-crypto-bot #81、#83、#85、#87、#89）2026-10-16 台北已在 A1 正式機（新）operations 4af261a；A1 加密仍 OFFLINE、沒有真實交易走過。",
+      "aspect": "behaviour"
     }
   ]
 }

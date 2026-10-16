@@ -65,7 +65,7 @@
       "a1_check": "A1 正式機（新）實際執行環境（2026-10-04 台北約 20:16 唯讀查）：seykota-repair-shadow.service 的 ExecStart 是 /opt/ed-seykota-systematic-trend-following/.venv/bin/python /opt/ed-seykota-systematic-trend-following/scripts/repair_bot.py；該 venv 載入的 trade-alerts 是 0.26.0（模組 /opt/ed-seykota-systematic-trend-following/.venv/lib/python3.12/site-packages/trade_alerts/repair_runner.py，在 A1 上 git hash-object 為 cd00814a845f75dd6648d337c11c77d0b15a36b9，與上述 blob 相同；執行時讀回 RECURRING_THRESHOLD 2、RECURRING_WINDOW_DAYS 7）；seykota-repair-shadow.timer 每 15 分鐘排程（台北 20:05 東京 21:05 的那一輪日誌輸出 candidates／repaired／failed／escalated 全為空，paused false）。2026-10-04 台北 17:18–17:22 隨 A1 部署（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。"
     },
     "cap:repair_bot.verified_close|mycrypto": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-16 台北）：operations 4af261a（my-crypto-bot #81、#83、#85、#87、#89 都在內，A1 repo 乾淨）；repair_bot.py（fa7e82c）、google_projection_worker.py（0eff45c）、mexc_futures_bot.py（780a652）與該 commit 同檔相同；venv trade-alerts 0.30.7；修復輪因 exchange.env 是 mexc 略過；A1 STRATEGY_MODE=OFFLINE、exchange.env 是 mexc；my-crypto-google-projection.timer enabled＋active、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261016-registry-x3e7）。"
     },
     "rule:BTC.BOOK_CORRUPT_NEGATIVE_BALANCE:emits_event|btc-competition": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ac99132）；/opt 的 src/btc_competition/runner.py（blob 4278c03）、src/btc_competition/interrupted_orders.py（573a295）、src/btc_competition/fleet_events.py（d437e81）、src/btc_competition/unrecorded_fill.py（7461592）、src/btc_competition/state.py（82ec3f4）與 A1 現行 operations a8a1ba1 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 7d499bb 也是同一份。"
@@ -180,6 +180,24 @@
     },
     "rule:SEY.POSITION_ADOPTED_AFTER_INTERRUPTION:emits_event|seykota": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/fleet_events.py（1896da8）、scripts/repair_bot.py（a397ec7）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 489bbcd 也是同一份。"
+    },
+    "cap:ledger.trade_correction|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-16 台北）：operations 4af261a（my-crypto-bot #81、#83、#85、#87、#89 都在內，A1 repo 乾淨）；portfolio_snapshot_adapter.py（f717397）、investor_snapshot.py（59dad47）、reconcile_compare.py（210b368）、google_reconcile.py（86a1fd4）、google_ledger_provenance.py（483492a）、google_projection_worker.py（0eff45c）與該 commit 同檔相同；venv trade-alerts 0.30.7，其 ledger_reconcile 的 fold_ledger_trades（第 872 行）與 recorded_order_ids（第 276 行）套用更正；A1 STRATEGY_MODE=OFFLINE、exchange.env 是 mexc；my-crypto-google-projection.timer enabled＋active、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261016-registry-x3e7）。"
+    },
+    "cap:reconcile.google_projection_grace|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-16 台北）：operations 4af261a（my-crypto-bot #81、#83、#85、#87、#89 都在內，A1 repo 乾淨）；google_reconcile.py（86a1fd4）與該 commit 同檔相同；venv trade-alerts 0.30.7（sheet_ledger_compare 的寬限預設值在共用庫）；A1 STRATEGY_MODE=OFFLINE、exchange.env 是 mexc；my-crypto-google-projection.timer enabled＋active、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261016-registry-x3e7）。"
+    },
+    "cap:projection.park_unconfirmed_correction|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-16 台北）：operations 4af261a（my-crypto-bot #81、#83、#85、#87、#89 都在內，A1 repo 乾淨）；google_projection_worker.py（0eff45c）、scripts/drain_google_projection_outbox.py（7ed6f7b）與該 commit 同檔相同；venv trade-alerts 0.30.7 的 projection_outbox 有 CORRECTION_PARKED_CODE（第 44 行）與 dispatch_next_projection（第 238 行）；A1 STRATEGY_MODE=OFFLINE、exchange.env 是 mexc；my-crypto-google-projection.timer enabled＋active、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261016-registry-x3e7）。"
+    },
+    "cap:projection.requeue_parked|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-16 台北）：operations 4af261a（my-crypto-bot #81、#83、#85、#87、#89 都在內，A1 repo 乾淨）；scripts/requeue_projection_intents.py（5e9be0d）與該 commit 同檔相同；venv trade-alerts 0.30.7 的 projection_outbox 有 requeue_rejected_projection_intents（第 302 行）；A1 STRATEGY_MODE=OFFLINE、exchange.env 是 mexc；my-crypto-google-projection.timer enabled＋active、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261016-registry-x3e7）。"
+    },
+    "cap:google.close_whole_trade_entry|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-16 台北）：operations 4af261a（my-crypto-bot #81、#83、#85、#87、#89 都在內，A1 repo 乾淨）；google_ledger_provenance.py（483492a）、mexc_futures_bot.py（780a652）、google_projection_worker.py（0eff45c）與該 commit 同檔相同；x3e-4 當天送到 Google 表的測試列為 CONFIRMED（來源 my-crypto-prod，依部署紀錄，本次未重測）；A1 STRATEGY_MODE=OFFLINE、exchange.env 是 mexc；my-crypto-google-projection.timer enabled＋active、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261016-registry-x3e7）。"
+    },
+    "rule:FLEET.PROJECTION_ORPHAN_CLOSE_PARKED:behaviour|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-16 台北）：operations 4af261a（my-crypto-bot #81、#83、#85、#87、#89 都在內，A1 repo 乾淨）；google_projection_worker.py（0eff45c）與該 commit 同檔相同；venv trade-alerts 0.30.7 的 projection_outbox 有 ORPHAN_CLOSE_PARKED_CODE（第 35 行）；A1 STRATEGY_MODE=OFFLINE、exchange.env 是 mexc；my-crypto-google-projection.timer enabled＋active、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261016-registry-x3e7）。"
     }
   }
 }
