@@ -239,7 +239,7 @@
           "state": "done",
           "evidence": "repair_bot.py:240 run_repair_round（共用修復執行器）每 15 分鐘（deploy/my-crypto-repair-bot.timer:8）找「帳本有開倉、交易所已無部位」的候選，repair_bot.py:132 fetch_evidence 用 Binance 唯讀成交建證據（成交量須剛好等於開倉量、開倉模式缺值或與帳戶不符一律拒絕、整頁成交都滿也拒絕）；非 Binance 時以暫停模式跑只刷新匯出檔（repair_bot.py:235、:240）。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -289,7 +289,7 @@
           "state": "done",
           "evidence": "repair_bot.py:235 讀 MYCRYPTO_REPAIR_PAUSED（共用庫 repair_paused），為真時 run_repair_round 以暫停模式跑（repair_bot.py:240）、少記成交處理也跳過（repair_bot.py:246）；deploy/my-crypto-bot.env.example:92 預設 false。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -587,7 +587,7 @@
           "state": "done",
           "evidence": "repair_bot.py:240 經共用修復執行器每輪檢查「7 天內自動補寫達 2 次就通知一次、之後 7 天不重發」（trade-alerts v0.30.7 repair_runner 的 _check_recurring，ERR-065）；加密的 ERR-062～065 規則在錯誤清單 v0.30.7。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -2033,7 +2033,7 @@
           "state": "done",
           "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:240 run_repair_round 運作：證據對得上就以交易所為準補寫、不通知（R1）。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       },
       "emits_event": {
@@ -2041,7 +2041,7 @@
           "state": "done",
           "evidence": "repair_bot.py:240 同一輪寫進 audit/fleet_event_log.jsonl（R1 事件 VERIFIED_CLOSE_AUTO_REPAIRED）並刷新匯出檔。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       }
     },
@@ -2052,7 +2052,7 @@
           "state": "done",
           "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:240 run_repair_round 運作：帳本已有修復痕跡或整批寫入失敗就停手、開請求並通知（R3）。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       },
       "emits_event": {
@@ -2060,7 +2060,7 @@
           "state": "done",
           "evidence": "repair_bot.py:240 同一輪寫事件日誌與請求佇列，匯出檔經維運通知轉送（ERR-063）。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       }
     },
@@ -2071,7 +2071,7 @@
           "state": "done",
           "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:240 run_repair_round 運作：查不到或結構對不上每輪記一次失敗，同一筆連續 3 次才升格通知（R2，ERR-064）。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       },
       "emits_event": {
@@ -2079,7 +2079,7 @@
           "state": "done",
           "evidence": "repair_bot.py:240 同一輪寫事件日誌（升格時標已重試用盡）並刷新匯出檔，由維運通知轉送。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       }
     },
@@ -2090,7 +2090,7 @@
           "state": "done",
           "evidence": "共用修復執行器（trade-alerts v0.30.7 repair_runner）經 repair_bot.py:240 run_repair_round 運作：7 天內自動補寫達 2 次通知一次、之後 7 天不重發（R3，ERR-065）。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       },
       "emits_event": {
@@ -2098,7 +2098,7 @@
           "state": "done",
           "evidence": "repair_bot.py:240 同一輪寫事件日誌並刷新匯出檔，由維運通知轉送。",
           "verified_at": "2026-10-14",
-          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、填 Google 表）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
+          "limit": "A1 加密仍 OFFLINE、exchange.env 是 mexc，Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）在 A1 沒有被實際跑到，只有單元測試（假客戶端）；要等 x5 測試網實測與 x6 切換才會真的生效。"
         }
       }
     },
