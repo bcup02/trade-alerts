@@ -39,17 +39,17 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "71e60471cb7f76ab8409ac6524cd77b3df4ad2ec"
+      "commit": "b92a10b13bea301d8285a2ffc17ce1044d2f731e"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "9e487c0e6705fca7405de6c83a87845dc45891d4"
+      "commit": "ef0d809b7b6093cb3639005cf80f889d8c051f94"
     },
     "mycrypto": {
       "repo": "AI-for-column/my-crypto-bot",
       "branch": "operations",
-      "commit": "a0727d3d38a2b83e18898d3583843c53aba5bb60"
+      "commit": "096b9e8d5a99390eceb42431e65472702cc80cb9"
     },
     "btc-competition": {
       "repo": "AI-for-column/btc-bull-market-competition",
@@ -827,6 +827,35 @@
           "state": "done",
           "evidence": "src/btc_competition/reconcile_compare.py:65 _PENDING_MAX_SECONDS（24 小時）；:210 回 PENDING 只在「剛到的交易所成交還沒進帳本」或「未收尾的批次／快照後成交還沒過期」；:179 起算與過期判定（時間讀不出，或比現在晚超過 :266 _CLOCK_SKEW_SECONDS 的 300 秒，視為已過期、不再等）；:302 環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS；過期後比對餘額，證據帶 pending_expired（:188 reason：waited_over_limit／time_unreadable／time_in_future）。",
           "limit": "A1 的競賽目前沒有未收尾的項目，超過 24 小時的行為在 A1 沒有實際被觸發過；只在測試與開發機實測（開發機 8 天的 PENDING 在 2026-10-10 台北 20:35 部署後恢復為 RECONCILED，證據記的是等了 197.6 小時）。"
+        }
+      }
+    },
+    {
+      "id": "orders.step_rounding_decimal",
+      "title": "下單數量與價格取整不多捨去一檔（工具庫 0.4.1）",
+      "description": "下單數量與停損價要對齊交易所的最小單位。共用下單工具庫舊版（0.4.0）用浮點除法取整，約三成的價格、一成三的數量會被多捨去一檔（停損少 0.1、平倉數量少一手會留殘倉）；0.4.1 改十進位。這一格看各策略有沒有釘到修正後的工具庫、並有守門測試擋退版。",
+      "status": {
+        "seykota": {
+          "state": "done",
+          "evidence": "pyproject.toml:19 與 deploy/install_systemd.sh:174、requirements.lock:4 把 binance-trading-toolkit 釘在 b5858cb（0.4.1，toolkit #12 的十進位取整）；tests/test_toolkit_round_to_step.py:9、:16、:21 釘選守門測試（對齊的價格與數量原樣保留、不對齊的往下捨、版本 ≥ 0.4.1）。ed-seykota #127（審閱 PASS）。2026-10-17 台北 23:00～23:15 隨 A1 正式機（新）依序部署（部署前後單元清單、啟用狀態、模式檔與環境檔雜湊完全相同、0 個失敗單元；A1 venv 的工具庫 0.4.1，round_to_step(85721.9, 0.1) 回 85721.9；部署後對帳 RECONCILED）。",
+          "verified_at": "2026-10-17",
+          "limit": "新版 round_to_step 對非有限數字（NaN／無限大）丟 ValueError，不會被工具庫的 except BinanceAPIError 接住；下單輸入都是策略自己算出的有限數字，沒有實際遇到過，只有工具庫測試驗證。"
+        },
+        "momentum": {
+          "state": "done",
+          "evidence": "pyproject.toml:26 與 deploy/install_systemd.sh:205 把 binance-trading-toolkit 釘在 b5858cb（0.4.1，toolkit #12 的十進位取整）；tests/test_toolkit_round_to_step.py:9、:16、:21 釘選守門測試。mexc-4h-momentum #153（審閱 PASS）。2026-10-17 台北 23:00～23:15 隨 A1 正式機（新）依序部署（部署前後單元清單、啟用狀態、模式檔與環境檔雜湊完全相同、0 個失敗單元；A1 venv 的工具庫 0.4.1，round_to_step(85721.9, 0.1) 回 85721.9；部署後對帳 RECONCILED）。",
+          "verified_at": "2026-10-17",
+          "limit": "新版 round_to_step 對非有限數字（NaN／無限大）丟 ValueError，不會被工具庫的 except BinanceAPIError 接住；下單輸入都是策略自己算出的有限數字，沒有實際遇到過，只有工具庫測試驗證。"
+        },
+        "mycrypto": {
+          "state": "done",
+          "evidence": "pyproject.toml:12、deploy/install_systemd.sh:27、.github/workflows/ci.yml:51 把 binance-trading-toolkit 釘在 b5858cb（0.4.1，toolkit #12 的十進位取整）；tests/test_toolkit_round_to_step.py:9、:16、:21 釘選守門測試。my-crypto-bot #98（審閱 PASS）。2026-10-17 台北 23:00～23:15 隨 A1 正式機（新）依序部署（部署前後單元清單、啟用狀態、模式檔與環境檔雜湊完全相同、0 個失敗單元；A1 venv 的工具庫 0.4.1，round_to_step(85721.9, 0.1) 回 85721.9；部署後對帳 RECONCILED）。加密的第一筆真倉停損價就是因舊版取整少了一檔才發現（交易所 85721.8、策略要 85721.9）。",
+          "verified_at": "2026-10-17",
+          "limit": "新版 round_to_step 對非有限數字（NaN／無限大）丟 ValueError，不會被工具庫的 except BinanceAPIError 接住；下單輸入都是策略自己算出的有限數字，沒有實際遇到過，只有工具庫測試驗證。"
+        },
+        "btc-competition": {
+          "state": "n/a",
+          "reason": "競賽策略不用 binance-trading-toolkit，自己在 src/btc_competition/rebalance.py:126 取整（floor(value / step + 1e-10) * step，已加誤差補丁），沒有發現同樣的少一檔問題。"
         }
       }
     }
@@ -2125,157 +2154,10 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "latch.consecutive_failure_counter",
-      "type": "updated",
+      "id": "orders.step_rounding_decimal",
+      "type": "added",
       "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.detect_propose",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.verified_close",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.pause_brake",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.google_projection_grace",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "cap",
-      "id": "ledger.trade_correction",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.recurrence_escalation",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "cap",
-      "id": "notify.error_id",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.adopted_fills",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.park_unconfirmed_correction",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.close_whole_trade_entry",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.RUNTIME_CYCLE_FAILED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_PLACEMENT_REJECTED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_PLACEMENT_NO_POSITION",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_PLACEMENT_ERROR",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_REPLACE_FAILED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_ORPHAN_CANCEL_FAILED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.VERIFIED_CLOSE_AUTO_REPAIRED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.VERIFIED_CLOSE_REPAIR_BLOCKED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.VERIFIED_CLOSE_REPAIR_FAILED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.VERIFIED_CLOSE_REPAIR_RECURRING",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（第一筆持倉中）；這條路徑到目前還沒被實際觸發，狀態不變。"
+      "note": "新增一列：共用下單工具庫舊版取整會多捨去一檔（價格約三成、數量約一成三），已修正到 0.4.1，趨勢、動能、加密三支已換釘並部署 A1（2026-10-17 台北）；競賽不用這個工具庫。"
     }
   ]
 }
