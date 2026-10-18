@@ -198,6 +198,12 @@
     },
     "rule:FLEET.PROJECTION_ORPHAN_CLOSE_PARKED:behaviour|mycrypto": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-16 台北）：operations 4af261a（my-crypto-bot #81、#83、#85、#87、#89 都在內，A1 repo 乾淨）；google_projection_worker.py（0eff45c）與該 commit 同檔相同；venv trade-alerts 0.30.7 的 projection_outbox 有 ORPHAN_CLOSE_PARKED_CODE（第 35 行）；A1 STRATEGY_MODE=OFFLINE、exchange.env 是 mexc；my-crypto-google-projection.timer enabled＋active、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261016-registry-x3e7）。"
+    },
+    "cap:notify.line_first_notice|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（受控測試後唯讀查證，2026-10-18 台北）：operations 096b9e8；11:27 以服務帳號 my-crypto-bot 用 fleet_events.record 往 /opt/my-crypto-bot/audit/fleet_event_log.jsonl 寫一則標明【測試】的 ERR-066 事件（details.test，event_id controlled-test-x3-e74a9ad139f94cf4；沒開請求、沒下單、持倉與停損沒動）。匯出檔多 1 則通知、請求 0 個；維運通知 11:30 那輪 attempted=2 sent=2、送失敗 0 次，11:40 那輪 attempted=0 沒有重送；使用者手機收到兩則。"
+    },
+    "cap:notify.error_id|mycrypto": {
+      "a1_check": "A1 正式機（新）執行環境（受控測試後唯讀查證，2026-10-18 台北）：operations 096b9e8；11:27 以服務帳號 my-crypto-bot 用 fleet_events.record 往 /opt/my-crypto-bot/audit/fleet_event_log.jsonl 寫一則標明【測試】的 ERR-066 事件（details.test，event_id controlled-test-x3-e74a9ad139f94cf4；沒開請求、沒下單、持倉與停損沒動）。匯出檔多 1 則通知、請求 0 個；維運通知 11:30 那輪 attempted=2 sent=2、送失敗 0 次，11:40 那輪 attempted=0 沒有重送；使用者手機收到兩則。手機端實際內容（使用者貼回原文）：第一則通知第一行「【ERR-066】重啟後接管了一個帳本沒有記完的部位」，第二行「需要人工處理｜加密策略」，之後依序是發生什麼事／解決方向／處理步驟／技術細節（【測試】說明），末尾事件時間 2026-10-18 11:27（台北）、通知時間 11:30（台北）；第二則第一行「【ERR-066】給 AI 的追查指令（整段貼給 Claude）」，附錯誤碼 mycrypto/POSITION_ADOPTED_AFTER_INTERRUPTION、事件編號與事件資料。第一行格式【ERR 編號】＋目錄標題與其他三支一致。"
     }
   }
 }
