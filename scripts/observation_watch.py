@@ -68,6 +68,12 @@ class RemoteError(RuntimeError):
     """A read failed (host unreachable, file missing, path not on the whitelist)."""
 
 
+class RemoteFileMissing(RemoteError):
+    """``cat`` ran on the host and said the file is not there -- the only failure a caller may read as "nothing to see".
+    A refused permission, a failed ``sudo``, an unreachable host or a timeout stay plain ``RemoteError`` (an unobservable
+    state must never look like "the event has not happened")."""
+
+
 def _allowed_paths() -> frozenset[str]:
     """Exactly the files the checks below read -- nothing else under /opt, /var/lib or anywhere is readable."""
     paths = {"/var/lib/portfolio-query/my-crypto-bot/current.json", "/var/lib/ops-notify/state.json",
@@ -75,6 +81,7 @@ def _allowed_paths() -> frozenset[str]:
     for key in REPOS:
         paths |= {audit(key, name) for name in ("ledger_status.json", "google_reconcile_status.json", "trading_ledger.jsonl")}
     paths |= {audit(key, "fleet_event_log.jsonl") for key in ("seykota", "momentum", "btc-competition")}
+    paths.add(f"/opt/{REPOS['mycrypto']}/state/state.json")      # x5b: a moved stop shows up only as a new stop_plan_order_id
     return frozenset(paths)
 
 
@@ -130,7 +137,11 @@ class Remote:
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise RemoteError(f"{host}: {type(exc).__name__}: {exc}") from exc
         if done.returncode != 0:
-            raise RemoteError(f"{host}: {' '.join(words[:2])} exit {done.returncode}: {done.stderr.strip()[:120]}")
+            message = f"{host}: {' '.join(words[:2])} exit {done.returncode}: {done.stderr.strip()[:120]}"
+            if (words[0] == "cat" and done.returncode == 1 and len(words) == 2
+                    and done.stderr.strip() == f"cat: {words[1]}: No such file or directory"):
+                raise RemoteFileMissing(message)
+            raise RemoteError(message)
         return done.stdout
 
     def read(self, host: str, path: str) -> str:
@@ -389,6 +400,61 @@ def check_dev_trend_entry(ctx: Context) -> Result:
     if verdict == "diverged":
         return Result(FAILED, "開發機趨勢策略有進場，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"])
     return Result(WAITING, "開發機趨勢策略有進場，等進場寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {status.get('checked_at')}"])
+
+
+_X5B_BASELINE = datetime(2026, 10, 18, 8, 0, tzinfo=timezone.utc)   # 台北 16:00: after the hand-made duplicate-send tests of that day
+
+
+def _own_dev_crypto_trades(events: Iterable[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """(entries, stop closes) the dev crypto strategy made by itself after the baseline: an ``entry_signal`` testnet entry,
+    and the native-stop close of one of those trades.  Hand-made test rows (``x5b_test``) and old trades never count."""
+    after = [e for e in events if (parse_time(e.get("event_time")) or _X5B_BASELINE) > _X5B_BASELINE
+             and str(e.get("execution_mode") or "").upper() == "DEMO"]
+    entries = [e for e in after if e.get("event_type") == "trade_open" and e.get("source") == "entry_signal"]
+    own = {e.get("trade_id") for e in entries}
+    stops = [e for e in after if e.get("event_type") == "trade_close" and str(e.get("source") or "").startswith("native_stop")
+             and e.get("trade_id") in own]
+    return entries, stops
+
+
+def check_dev_crypto_x5b(ctx: Context) -> Result:
+    """x5b: what the dev host's crypto strategy has to do by itself before the last testnet checks can run --
+    open a position on a signal, move its stop (cancel the old order, place a new one), and get stopped out.
+
+    Nothing here closes the item: the clean take-over test and the checks of ledger, sheet and ids need a person (and the
+    user's per-item authorisation).  A move is seen as a changed ``stop_plan_order_id`` of the same trade between two runs
+    (the move is not ledgered), so a move and the close between two 30-minute runs can be missed."""
+    events = list(jsonl(ctx.remote.read("dev", audit("mycrypto", "trading_ledger.jsonl"))))
+    entries, stops = _own_dev_crypto_trades(events)
+    seen: dict[str, list[str]] = {k: list(v) for k, v in dict(ctx.previous.get("stops") or {}).items()}
+    if not entries:
+        return Result(WAITING, "開發機加密策略還沒有因進場訊號而下的測試網單。", extra={"stops": seen})
+    try:
+        state = load_json(ctx.remote, "dev", f"/opt/{REPOS['mycrypto']}/state/state.json")
+    except RemoteFileMissing:
+        state = {}                                    # flat: the strategy has no state file; nothing to learn about a stop
+    if state.get("trade_id") and state.get("stop_plan_order_id") is not None:
+        ids = seen.setdefault(str(state["trade_id"]), [])
+        if str(state["stop_plan_order_id"]) not in ids:
+            ids.append(str(state["stop_plan_order_id"]))
+    own_trades = {e.get("trade_id") for e in entries}
+    seen = {t: ids for t, ids in seen.items() if t in own_trades}      # nothing else is ever looked at, so nothing else is kept
+    moved = sorted(t for t, ids in seen.items() if len(ids) >= 2)
+    last = max(parse_time(e["event_time"]) for e in entries)
+    status = load_json(ctx.remote, "dev", audit("mycrypto", "google_reconcile_status.json"))
+    if reconcile_covers(status, last, ctx.now) == "diverged":
+        return Result(FAILED, "開發機加密策略有依訊號的進場，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"],
+                      extra={"stops": seen})
+    stages = ["entry"] + (["move"] if moved else []) + (["stop"] if stops else [])
+    done = len(stages) == 3
+    summary = ("開發機加密策略依訊號進場、移動停損撤舊再掛、停損也觸發過了：x5b 的三項都觀察到，可以逐項查證。" if done else
+               "開發機加密策略已依訊號進場，可以開始 x5b 測試（乾淨接手要你逐項授權）；" +
+               ("停損已移動過、" if moved else "還沒看到停損移動、") + ("停損已觸發。" if stops else "停損還沒觸發。"))
+    evidence = [f"{len(entries)} 筆進場；最近 {taipei(last)}（台北）；trade_id {entries[-1].get('trade_id')}",
+                f"停損單號變動：{', '.join(f'{t}={len(seen[t])} 個' for t in moved) or '尚無'}",
+                f"停損觸發的平倉：{', '.join(str(e.get('trade_id'))[:8] for e in stops) or '尚無'}"]
+    return Result(OBSERVED, summary, evidence, needs_human=True,
+                  key="|".join([*stages, *sorted(str(e.get("trade_id")) for e in entries)]), extra={"stops": seen})
 
 
 _NOTICE_LINE = re.compile(r"notices=(\d+) attempted=(\d+) sent=(\d+) consecutive_send_failures=(\d+)")
@@ -720,6 +786,7 @@ CHECKS: tuple[Check, ...] = (
     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
     Check("trend-addon", "A1 趨勢策略加碼交易", ("e-5",), check_trend_addon),
     Check("dev-trend-entry", "開發機趨勢策略依訊號進場", ("f-7",), check_dev_trend_entry),
+    Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
     Check("status-alerts", "A1 第一則真實狀態告警", ("f-23", "f-40", "f-41"), check_status_alerts),
     Check("reminders", "A1 持續提醒", ("f-39",), check_reminders),
     Check("pending-expired", "對帳標記逾時通知", ("f-30",), check_pending_expired),
