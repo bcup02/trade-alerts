@@ -832,7 +832,7 @@
       "title": "本地帳本與交易所回報損益差額超過容忍值",
       "project": "mycrypto",
       "sources": [
-        "mexc_futures_bot.py:713"
+        "mexc_futures_bot.py:583"
       ],
       "current": {
         "latch": null,
@@ -860,7 +860,7 @@
       "title": "未分類的執行期例外（catch-all）",
       "project": "mycrypto",
       "sources": [
-        "mexc_futures_bot.py:1512"
+        "mexc_futures_bot.py:2201"
       ],
       "current": {
         "latch": null,
@@ -891,7 +891,7 @@
       "title": "開倉停損單被交易所拒絕，部位可能沒有交易所端保護",
       "project": "mycrypto",
       "sources": [
-        "mexc_futures_bot.py:1266"
+        "mexc_futures_bot.py:1846"
       ],
       "current": {
         "latch": null,
@@ -922,7 +922,7 @@
       "title": "開倉後查不到部位資訊，無法掛停損單",
       "project": "mycrypto",
       "sources": [
-        "mexc_futures_bot.py:1273"
+        "mexc_futures_bot.py:1858"
       ],
       "current": {
         "latch": null,
@@ -953,7 +953,7 @@
       "title": "掛停損單時拋出例外，部位本身已開",
       "project": "mycrypto",
       "sources": [
-        "mexc_futures_bot.py:1279"
+        "mexc_futures_bot.py:1867"
       ],
       "current": {
         "latch": null,
@@ -984,8 +984,8 @@
       "title": "搬移移動停損單失敗，交易所端目前沒有停損保護",
       "project": "mycrypto",
       "sources": [
-        "mexc_futures_bot.py:1494",
-        "mexc_futures_bot.py:1503"
+        "mexc_futures_bot.py:2131",
+        "mexc_futures_bot.py:2143"
       ],
       "current": {
         "latch": null,
@@ -1016,7 +1016,7 @@
       "title": "平倉後取消殘留停損單失敗",
       "project": "mycrypto",
       "sources": [
-        "mexc_futures_bot.py:1427"
+        "mexc_futures_bot.py:2061"
       ],
       "current": {
         "latch": null,
@@ -2124,8 +2124,9 @@
       "title": "重啟後接管了一個帳本沒有記完的部位",
       "project": "mycrypto",
       "sources": [
-        "mexc_futures_bot.py:1439",
-        "mexc_futures_bot.py:2019"
+        "mexc_futures_bot.py:963",
+        "mexc_futures_bot.py:1386",
+        "mexc_futures_bot.py:1944"
       ],
       "current": {
         "latch": null,
