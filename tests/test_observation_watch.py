@@ -61,7 +61,8 @@ def hours_ago(n):
 @pytest.mark.parametrize("path", [
     "/etc/passwd", "/opt/my-crypto-bot/audit/../../../etc/shadow", "/opt/my-crypto-bot/audit/x.json; rm -rf /",
     "/opt/other-repo/audit/ledger_status.json", "/var/lib/ops-notify/../x.json", "/opt/my-crypto-bot/audit/a b.json",
-    "/opt/my-crypto-bot/state/state.json", "/var/lib/portfolio-query/my-crypto-bot/current.json\n",
+    "/opt/my-crypto-bot/state/state.json.bak-x5-kill", "/opt/my-crypto-bot/state/../state/state.json", "/opt/my-crypto-bot/state/",
+    "/opt/btc-bull-market-competition/state/state.json", "/var/lib/portfolio-query/my-crypto-bot/current.json\n",
     # shaped like an allowed file but not one the checks read (review of #183: the whitelist must be the exact list)
     "/opt/my-crypto-bot/audit/private.json", "/opt/ed-seykota-systematic-trend-following/audit/error_requests.jsonl",
     "/var/lib/portfolio-query/seykota-btcusdt-4h/current.json", "/var/lib/ops-notify/other.json",
@@ -436,7 +437,7 @@ def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
     assert len(ids) == len(set(ids))
     assert all(c.covers and c.title for c in ow.CHECKS)
     covered = {i for c in ow.CHECKS for i in c.covers}
-    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x1"} <= covered
+    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x1", "phase-x5b"} <= covered
 
 
 # --- deployment files ----------------------------------------------------------------------------------------------
@@ -926,3 +927,101 @@ def test_the_unit_lets_the_watcher_fetch_every_clone_it_refreshes():
     writable = " ".join(line.split("=", 1)[1] for line in unit.splitlines() if line.startswith("ReadWritePaths="))
     for name in ("trade-alerts", *ow.REPOS.values()):
         assert f"-/home/@WATCH_USER@/{name}/.git" in writable.split(), name
+
+
+# --- x5b: the dev crypto strategy opens a testnet position by itself ----------------------------------------------------
+
+X5B_NOW = datetime(2026, 10, 19, 6, 0, tzinfo=timezone.utc)
+STATE_PATH = "/opt/my-crypto-bot/state/state.json"
+
+
+def x5b_ctx(remote, previous=None):
+    return ow.Context(remote, X5B_NOW, previous or {})
+
+
+def x5b_ev(hours, kind, **extra):
+    stamp = iso(X5B_NOW - timedelta(hours=hours))
+    return {"event_type": kind, "event_time": stamp, "event_id": f"x{hours}{kind}", "execution_mode": "DEMO", **extra}
+
+
+def x5b_remote(events, *, state=None, reconcile="RECONCILED"):
+    r = FakeRemote()
+    put(r, "dev", "mycrypto", "trading_ledger.jsonl", events, jsonl=True)
+    put(r, "dev", "mycrypto", "google_reconcile_status.json",
+        {"value": reconcile, "checked_at": iso(X5B_NOW - timedelta(minutes=5)), "note": "n"})
+    if state is not None:
+        r.files[("dev", STATE_PATH)] = json.dumps(state)
+    return r
+
+
+def test_the_dev_crypto_state_file_is_the_only_new_readable_path():
+    assert STATE_PATH in ow.ALLOWED_PATHS
+    assert STATE_PATH == f"/opt/{ow.REPOS['mycrypto']}/state/state.json"
+
+
+@pytest.mark.parametrize("events", [
+    [],
+    [x5b_ev(2, "trade_open", source="x5b_test", trade_id="T")],                     # the hand-made duplicate-send test rows
+    [x5b_ev(2, "trade_open", source="position_recovered", trade_id="T")],            # an adoption is not an entry on a signal
+    [dict(x5b_ev(2, "trade_open", source="entry_signal", trade_id="T"), execution_mode="LIVE")],
+    [dict(x5b_ev(2, "trade_open", source="entry_signal", trade_id="T"), event_time="2026-10-18T07:00:00+00:00")],   # before the baseline
+])
+def test_x5b_waits_until_the_strategy_enters_by_itself(events):
+    result = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events)))
+    assert result.state == ow.WAITING
+
+
+def test_x5b_reports_the_first_own_entry_once_and_needs_a_person():
+    r = x5b_remote([x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1")],
+                   state={"trade_id": "T1", "stop_plan_order_id": 111})
+    result = ow.check_dev_crypto_x5b(x5b_ctx(r))
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable
+    assert "可以開始 x5b" in result.summary and "還沒看到停損移動" in result.summary and "T1" in result.evidence[0]
+    assert result.extra["stops"] == {"T1": ["111"]}
+
+
+def test_x5b_sees_a_moved_stop_as_a_new_order_id_of_the_same_trade_between_runs():
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1")]
+    first = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events, state={"trade_id": "T1", "stop_plan_order_id": 111})))
+    second = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events, state={"trade_id": "T1", "stop_plan_order_id": 222}), first.extra))
+    assert "停損已移動過" in second.summary and second.key != first.key
+    again = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events, state={"trade_id": "T1", "stop_plan_order_id": 222}), second.extra))
+    assert again.key == second.key                       # the same observation is announced once (notify keys on it)
+
+
+def test_x5b_an_unmoved_stop_or_another_trades_stop_is_not_a_move():
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1")]
+    r = x5b_remote(events, state={"trade_id": "T1", "stop_plan_order_id": 111})
+    prev = {"stops": {"OLD": ["1", "2"]}}                # an unrelated trade with two stop ids
+    result = ow.check_dev_crypto_x5b(x5b_ctx(r, prev))
+    assert "還沒看到停損移動" in result.summary
+
+
+def test_x5b_all_three_observed_is_still_not_closable_by_the_machine():
+    events = [x5b_ev(3, "trade_open", source="entry_signal", trade_id="T1"),
+              x5b_ev(1, "trade_close", source="native_stop_reconciled", trade_id="T1")]
+    r = x5b_remote(events, state={"trade_id": "T1", "stop_plan_order_id": 222})
+    result = ow.check_dev_crypto_x5b(x5b_ctx(r, {"stops": {"T1": ["111"]}}))
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable
+    assert "三項都觀察到" in result.summary and result.key.startswith("entry|move|stop|")
+
+
+def test_x5b_a_close_by_the_hand_made_test_or_another_source_is_not_a_stop_trigger():
+    events = [x5b_ev(3, "trade_open", source="entry_signal", trade_id="T1"),
+              x5b_ev(1, "trade_close", source="exit_signal", trade_id="T1"),
+              x5b_ev(1, "trade_close", source="native_stop_reconciled", trade_id="OTHER")]
+    result = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events)))
+    assert "停損還沒觸發" in result.summary
+
+
+def test_x5b_a_missing_state_file_when_flat_is_not_an_error():
+    events = [x5b_ev(3, "trade_open", source="entry_signal", trade_id="T1"),
+              x5b_ev(1, "trade_close", source="native_stop_reconciled", trade_id="T1")]
+    result = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events)))       # no state file served
+    assert result.state == ow.OBSERVED and "停損已觸發" in result.summary
+
+
+def test_x5b_fails_when_the_sheet_disagrees_after_the_grace():
+    events = [x5b_ev(3, "trade_open", source="entry_signal", trade_id="T1")]
+    result = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events, reconcile="DIVERGED")))
+    assert result.state == ow.FAILED

@@ -56,3 +56,12 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項�
 在 `tests/test_observation_watch.py` 用 `FakeRemote` 寫：等待、通過、失敗各一個測試。判斷不到的事（手機上看到的樣子）設 `needs_human=True`，不要假裝能自動驗證。
 
 - 狀態檔在取得檔案鎖「之後」才讀（`run` 與 `ack` 都是）：排在另一輪後面的那一輪，依前一輪存下的結果決定要不要通知，不會用鎖之前讀到的舊狀態重複發送。`ack` 會等鎖（等到前一輪結束），`run` 遇到鎖仍是略過這一輪。
+
+## 開發機加密策略的 x5b 測試網檢查（`dev-crypto-x5b`，phase-x5b）
+x5b 剩下三件事要等開發機加密策略**自己**出訊號才驗得到（乾淨接手、停損真的觸發、移動停損撤舊再掛）。這個檢查只負責「看到」，不結案：
+
+- **進場**：開發機帳本在 `2026-10-18 08:00 UTC`（手動重複送單測試之後）之後，有 `source=entry_signal`、`execution_mode=DEMO` 的 `trade_open`。手動測試列（`x5b_test`）、接手列、舊交易、真倉都不算。看到時發一則「可以開始 x5b 測試」，之後的接手測試要使用者逐項授權。
+- **停損移動**：移動不寫進帳本，只能看開發機 `state/state.json` 的 `stop_plan_order_id`：同一個 `trade_id` 在兩輪之間出現新編號，就是撤舊再掛。這個檔案是這次唯一新增的可讀路徑（確切一個）。限制：兩輪（30 分鐘）之間移動又平倉可能看不到。
+- **停損觸發**：自己進場的交易，出現 `source` 以 `native_stop` 開頭的 `trade_close`。
+- 進場後過了寬限，Google 表對帳仍 `DIVERGED` 時回報失敗。
+- 三項都看到時仍是 `observed` ＋ `needs_human`，不會是 `closable`：帳本、Google 表、出場單編號（`mc-t-`）要人（Claude 加使用者授權）逐項查證。
