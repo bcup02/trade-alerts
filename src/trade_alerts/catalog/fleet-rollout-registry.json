@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-17",
+  "updated_at": "2026-10-18",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -30,7 +30,7 @@
     "hotfix-seykota-stop-resolution": "緊急修正：趨勢策略停損單被交易所拒絕、或取消停損一直失敗時，程式無限重試卡住（2026-09-24 h5／h11 以 Binance 測試網查證；ed-seykota PR #72、#74）",
     "f-12": "A1 優雅停止與重啟後復原（f-12）：收到停止訊號時等當輪做完、被硬殺後重啟能接回原本的交易、孤兒部位要通知",
     "f-16": "f-16：Google 表同步佇列不被找不到開倉列的平倉卡死（共用庫停放找不到開倉列的平倉＋對帳忽略清單，v0.25.1／v0.26.0）",
-    "x3-crypto-binance": "加密策略換到 Binance（x 系列）：2026-10-17 台北 17:30 起 A1 加密是 Binance 主網真倉（第一筆空 0.001 BTC 持倉中，觀察一週）；x4 等價驗證、x5 開發機測試網實測已結案。剩餘項目：接手成交配對的帳本對交易所守門測試與乾淨的端到端驗證、人工更正工具對真實 Binance 的端到端、真實平倉與停損觸發走過 Google 新版投影；Google 新版投影（x3e-1～x3e-5）與人工更正工具（x3e-6）已於 2026-10-16 上 A1，共用庫已隨 x3b 升到 v0.30.7",
+    "x3-crypto-binance": "加密策略換到 Binance（x 系列）：2026-10-17 台北 17:30 起 A1 加密是 Binance 主網真倉（第一筆空 0.001 BTC 持倉中，觀察一週）；x4 等價驗證、x5 開發機測試網實測已結案。剩餘項目：接手成交配對的帳本對交易所守門測試與乾淨的端到端驗證、自動更正（單號不能證明是自己下的）、人工更正工具對真實 Binance 的端到端、真實平倉與停損觸發走過 Google 新版投影（通知經 A1 送到手機已於 2026-10-18 驗過）；Google 新版投影（x3e-1～x3e-5）與人工更正工具（x3e-6）已於 2026-10-16 上 A1，共用庫已隨 x3b 升到 v0.30.7",
     "t9-competition-retry": "t9：競賽策略失敗時當天重試（同一程序內每 15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.6 錯誤清單已改；競賽程式在 PR #45（審閱中，合併後上開發機實測），之後才部署 A1 正式機（新）",
     "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
     "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）"
@@ -338,7 +338,7 @@
         "mycrypto": {
           "state": "done",
           "evidence": "ops_export_refresh.py:28 寫出的匯出檔由 A1 維運通知轉送：/etc/ops-notify/ops-notify.env 於 2026-10-14 台北 12:05 設 OPS_NOTIFY_MYCRYPTO_OPS_EXPORT=on（備份 ops-notify.env.bak-x3c4-202610141305），手動一輪維運通知讀到加密的匯出檔軸 OK、notices=0、零誤發。",
-          "limit": "還沒有實際經這條路送到手機的通知（見「需要人處理的通知真的送到 LINE」）。開發機另計，尚未開。"
+          "limit": "2026-10-18 台北的 A1 受控測試事件已經這條路送到你手機（見「需要人處理的通知真的送到 LINE」）；加密策略自己偵測到的真實事件在 A1 還沒發生過。開發機另計，尚未開。"
         },
         "btc-competition": {
           "state": "done",
@@ -360,9 +360,10 @@
           "evidence": "scripts/repair_bot.py:178 匯出的 R3 通知經正式機維運通知送到 LINE：2026-09-24 受控測試事件 3ee1c8c932f14b0e8ba7ca0ba4bf31b8（標明測試、只寫事件未開請求）19:20 UTC sent=1、使用者手機確認收到、19:30 attempted=0 未重送。開發機仍無 LINE 帳號（Telegram 暫代，見計畫 WP2）。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "x3-crypto-binance",
-          "reason": "2026-10-14 台北 12:05：A1 維運通知對加密的匯出轉送已開、匯出檔軸 OK，策略端的事件日誌與匯出檔也已上線；還沒有實際經這條路送到你手機（加密 OFFLINE、沒有真實事件，也還沒做受控測試事件）。受控測試通過、手機確認收到之後才改已做。"
+          "state": "done",
+          "evidence": "fleet_events.py:51 record（策略自己的事件寫入函式）把一則事件寫進 audit/fleet_event_log.jsonl，ERR-066 的代碼 fleet_events.py:30 POSITION_ADOPTED_AFTER_INTERRUPTION、等級表 fleet_events.py:37 RISK_TIER 為 R3；ops_export_refresh.py:28 refresh_ops_export 每分鐘（deploy/my-crypto-ops-export-refresh.timer:5）轉成匯出檔，A1 維運通知轉送。2026-10-18 台北 11:27 A1 受控測試：以服務帳號用 record 寫一則標明【測試】的 ERR-066 事件（details.test，event_id controlled-test-x3-e74a9ad139f94cf4；沒有開請求、沒下單、持倉與停損沒動），匯出檔多 1 則通知、請求 0 個；維運通知 11:30 那輪 sent=2、送失敗 0 次，你手機收到兩則（第一則通知本文、第二則給 AI 的追查指令，內文都有【測試】），11:40 那輪 attempted=0 沒有重送。",
+          "verified_at": "2026-10-18",
+          "limit": "事件是人工寫的測試事件，加密策略自己偵測到的真實事件在 A1 還沒發生過（A1 沒有任何需要通知的狀況），所以只驗到匯出檔→維運通知→手機這條路，不是策略偵測路徑。"
         },
         "btc-competition": {
           "state": "done",
@@ -611,9 +612,10 @@
           "limit": "策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-037（交易所有成交、帳本沒記）。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "x3-crypto-binance",
-          "reason": "加密的匯出檔（ops_export_refresh.py:28 每分鐘刷新）與 A1 維運通知的轉送在 2026-10-14 隨 x3c 上線，共用庫已是 v0.30.7，通知第一行的版面與其他三支用同一個共用函式；但加密還沒有經 A1 實際把通知送到手機過（A1 加密 2026-10-17 台北 17:30 起是真倉，目前沒有需要通知的事件；LINE 受控測試你決定先不做，見 notify.line_first_notice。開發機測試網 x5 曾把 ERR-066、ERR-043 送到你手機，那是開發機，不算 A1），所以這格維持未做。受控測試通過、手機確認收到兩則之後改已做。"
+          "state": "done",
+          "evidence": "fleet_events.py:51 record（策略自己的事件寫入函式）把一則事件寫進 audit/fleet_event_log.jsonl，ERR-066 的代碼 fleet_events.py:30 POSITION_ADOPTED_AFTER_INTERRUPTION、等級表 fleet_events.py:37 RISK_TIER 為 R3；ops_export_refresh.py:28 refresh_ops_export 每分鐘（deploy/my-crypto-ops-export-refresh.timer:5）轉成匯出檔，A1 維運通知轉送。2026-10-18 台北 11:27 A1 受控測試：以服務帳號用 record 寫一則標明【測試】的 ERR-066 事件（details.test，event_id controlled-test-x3-e74a9ad139f94cf4；沒有開請求、沒下單、持倉與停損沒動），匯出檔多 1 則通知、請求 0 個；維運通知 11:30 那輪 sent=2、送失敗 0 次，你手機收到兩則（第一則通知本文、第二則給 AI 的追查指令，內文都有【測試】），11:40 那輪 attempted=0 沒有重送。",
+          "verified_at": "2026-10-18",
+          "limit": "事件是人工寫的測試事件，加密策略自己偵測到的真實事件在 A1 還沒發生過（A1 沒有任何需要通知的狀況），所以只驗到匯出檔→維運通知→手機這條路，不是策略偵測路徑。"
         },
         "btc-competition": {
           "state": "done",
@@ -2154,10 +2156,24 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "orders.step_rounding_decimal",
-      "type": "added",
+      "id": "notify.line_first_notice",
+      "type": "completed",
       "project": "mycrypto",
-      "note": "新增一列：共用下單工具庫舊版取整會多捨去一檔（價格約三成、數量約一成三），已修正到 0.4.1，趨勢、動能、加密三支已換釘並部署 A1（2026-10-17 台北）；競賽不用這個工具庫。"
+      "note": "2026-10-18 台北 A1 受控測試：標明【測試】的 ERR-066 事件經匯出檔與維運通知送到手機（兩則收到、下一輪沒重送）；改已做。限制：事件是人工寫的測試事件，策略自己偵測的真實事件在 A1 還沒發生過。"
+    },
+    {
+      "kind": "cap",
+      "id": "notify.error_id",
+      "type": "completed",
+      "project": "mycrypto",
+      "note": "2026-10-18 台北 A1 受控測試：標明【測試】的 ERR-066 事件經匯出檔與維運通知送到手機（兩則收到、下一輪沒重送）；改已做。限制：事件是人工寫的測試事件，策略自己偵測的真實事件在 A1 還沒發生過。"
+    },
+    {
+      "kind": "cap",
+      "id": "ops_notify.export_relay_enabled",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "限制句更新：A1 受控測試事件已經匯出轉送送到手機；真實事件還沒發生過。"
     }
   ]
 }
