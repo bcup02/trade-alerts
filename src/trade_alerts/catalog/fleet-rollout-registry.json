@@ -16,7 +16,7 @@
     "v2-W6": "分級 v2：部署到開發機與正式機",
     "8-momentum": "第 8 關：動能策略的錯誤條目全部接上事件日誌與白話通知",
     "8-seykota": "第 8 關：趨勢策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；修掉「改設定重啟也清不掉暫停」",
-    "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試；漏記平倉修復（需 MEXC 成交查詢）",
+    "8-mycrypto": "第 8 關：加密策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試（大部分隨加密換 Binance 由 x3 完成；剩停放的平倉寫進事件日誌）",
     "8-btc-competition": "第 8 關：競賽策略的錯誤條目接上事件日誌、白話通知與 v2 自動重試",
     "binance-funding-sync": "尚未排定：需要先幫共用的 binance-trading-toolkit 加上資金費查詢能力，兩支策略才能各自接上",
     "naming-rollout": "用詞統一：各 repo 的文件與訊息改用中英對照表的統一名詞",
@@ -437,7 +437,9 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "sync_funding_fees_entry.py（固定查 BTC_USDT，配 my-crypto-bot-funding-sync.service/.timer，正式機 2026-09-18 確認執行成功，帳本持續累積資金費紀錄）"
+          "evidence": "sync_funding_fees_entry.py:480 main 依 exchange.env 選分支：EXCHANGE=binance 走 :457～473 的 Binance 分支（共用 Binance 工具的 sync_funding_fees，固定查 BTCUSDT〔:55〕，整批驗證後寫進本機帳本，:473 記 funding_sync_done）；EXCHANGE=mexc 才走 :505 的 MEXC 分支。配 my-crypto-bot-funding-sync.service／.timer（每 4 小時）；帳本寫好後把累計資金費同步到 Google『帳戶餘額總表』分頁。",
+          "verified_at": "2026-10-18",
+          "limit": "A1 的 Binance 資金費紀錄目前只有 3 筆（每 8 小時結算一次），多頁分頁沒有用真資料驗過。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -510,7 +512,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:491 只呼叫一次 create_market_order、失敗記帳後往外拋（不帶 client id，MEXC 端無從去重）；ccxt 4.5.71 預設不重試，:390 init_exchange 沒開 maxRetriesOnFailure；mexc_futures_bot.py:2196 run_forever 例外後睡 POLLING_SECONDS 才跑下一輪；:1652 每輪開頭先查部位、:1674 有部位就只管理不開新倉，查部位失敗則在送任何單之前就丟例外；平倉 :2031 帶 reduceOnly。2026-09-24 h7 查核＋模擬測試確認；回歸測試 my-crypto-bot #49。"
+          "evidence": "Binance（A1 現況）：mexc_futures_bot.py:476 _place_market_order_with_ledger 只呼叫一次下單（mexc_futures_bot.py:491），Binance 時帶 clientOrderId（mexc_futures_bot.py:483、mexc_futures_bot.py:485），失敗記帳後往外拋；binance_exchange.py:237 create_market_order 只在『時間戳被拒（-1021，交易所沒處理這張單）』時對時後重試一次（binance_exchange.py:122 _mutate、binance_exchange.py:127、binance_exchange.py:248 retry=client_id is not None），其餘錯誤不重試；進場單號 mexc_futures_bot.py:1747、平倉單號 mexc_futures_bot.py:2032；mexc_futures_bot.py:1652 每輪先查部位、mexc_futures_bot.py:1674 有部位只管理不開新倉，查部位失敗在送單之前就丟例外；平倉 mexc_futures_bot.py:2031 帶 reduceOnly。MEXC 路徑（ccxt、不帶單號）只在 EXCHANGE=mexc 時走。my-crypto-bot #49、#65。"
         },
         "btc-competition": {
           "state": "done",
@@ -559,7 +561,8 @@
         "mycrypto": {
           "state": "pending",
           "phase": "x3-crypto-binance",
-          "reason": "通知已具備並在 A1 運作（repair_bot.py:217 UnrecordedFillAdapter(client_ids=False)、repair_bot.py:246 run_unrecorded_fill_round：不查交易所、不寫帳本，交易所有成交而帳本沒記一律 ERR-042 R3 開請求並通知）；『以交易所為準自動更正』沒有：這支的單號（open-<時間>／close-<時間>）不能證明是自己下的；Google 新版投影與人工更正工具（scripts/append_trade_correction.py）已在 A1，缺的是能證明單號是自己下的方式。"
+          "reason": "通知已具備並在 A1 運作（repair_bot.py:217、:246：交易所有成交而帳本沒記一律 ERR-042 R3 開請求並通知，不寫帳本）。『確定是自己重複送單才自動更正』程式已完成並上開發機（my-crypto-bot #102：mc- 單號、停損 clientAlgoId、Binance 轉接器；trade-alerts v0.30.9 ERR-067），開發機測試網故意重複送單實測通過（2026-10-18）；還沒上 A1，排在 x7 觀察一週之後（g1-7）。",
+          "awaits_commit": "5007695"
         },
         "btc-competition": {
           "state": "done",
@@ -664,7 +667,7 @@
         "mycrypto": {
           "state": "done",
           "evidence": "mexc_futures_bot.py:798 ENTRY_PENDING；mexc_futures_bot.py:1749 開倉前先存 entry_pending 狀態（含 trade_id、external_id）；mexc_futures_bot.py:1346 _adopt_pending_entry 重啟後接管開到一半的部位並沿用 trade_id、補掛停損。PR #55（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations b5a605f；/opt 內 src、scripts、deploy 與根目錄 .py 共 37 檔與該 commit 逐檔雜湊相同）。接管通知：2026-10-14 台北約 17:27 隨 A1 正式機分支 operations 2ee102c 上線，接管會寫 R3 事件並通知（ERR-066，見 MYC.POSITION_ADOPTED_AFTER_INTERRUPTION 的格子；mexc_futures_bot.py:963、:1386 就是這條接管路徑的通知點）。",
-          "limit": "A1 正式機沒有發生過被中斷的進場，接管與通知都沒有實機觸發過。這支要搬到 Binance（進度頁 x 系列），這份 MEXC 版程式碼之後會重寫。"
+          "limit": "A1 沒有發生過被中斷的進場，接管與通知都沒有在 A1 實機觸發過（2026-10-17 起 A1 是 Binance 主網真倉）；接管流程在開發機測試網走過（x5）。"
         },
         "btc-competition": {
           "state": "done",
@@ -690,7 +693,7 @@
         "mycrypto": {
           "state": "pending",
           "phase": "x3-crypto-binance",
-          "reason": "共用庫已隨 x3b 升到 v0.30.7：reconcile_compare.py:67 呼叫的 exchange_ledger_compare 內建『同交易對、方向、數量、價格、時間都對得上才算帳本有記』的接手成交配對，reconcile_compare.py:53 也把 position_recovered 算作開倉（原本寫的『對帳是舊版共用庫 v0.15.0，沒有這個配對』已不成立）。加密的接手紀錄仍沒有訂單編號（mexc_futures_bot.py:1938、:1961 兩處 position_recovered）。Google 對帳端已有接手部位三項守門測試（tests/test_google_reconcile.py:524 起，x3e-3）；尚缺：帳本對交易所的配對守門測試與乾淨的端到端驗證（x5 測試網走過接手→對帳，但當時測試造成同一持倉有多筆開著的帳本紀錄，對帳只顯示持倉不一致，沒有得到乾淨的成交配對驗證），驗過才改已做。"
+          "reason": "共用庫 v0.30.7 的 exchange_ledger_compare（reconcile_compare.py:67）內建同交易對、方向、數量、價格、時間都對得上才算帳本有記的接手成交配對，reconcile_compare.py:53 把 position_recovered 算作開倉；加密的接手紀錄沒有訂單編號（mexc_futures_bot.py:1938、:1961）。守門測試：Google 對帳端 tests/test_google_reconcile.py:524 起（x3e-3）；帳本對交易所 my-crypto-bot #100（13 個測試，在開發主幹、未上 A1）。尚缺乾淨的端到端驗證（開發機 x5b，等策略自己出訊號開倉），驗過才改已做。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -1524,14 +1527,16 @@
         "mycrypto": {
           "state": "pending",
           "phase": "8-mycrypto",
-          "reason": "g1-6 進行中：加密換 Binance 後每張單改帶自己的 mc- 編號，確定是自己重複送單且已平倉才自動更正帳本；程式還沒合併、沒上 A1（排在 x7 觀察一週之後）。"
+          "reason": "程式已合併（my-crypto-bot #102）並上開發機，開發機測試網實測通過（2026-10-18）；還沒上 A1，排在 x7 觀察一週之後（g1-7，部署前先問你）。",
+          "awaits_commit": "5007695"
         }
       },
       "emits_event": {
         "mycrypto": {
           "state": "pending",
           "phase": "8-mycrypto",
-          "reason": "同上：自動更正時由共用處理程式寫事件日誌與匯出檔，要等加密程式上 A1 才有。"
+          "reason": "同上：自動更正時由共用處理程式寫事件日誌與匯出檔；開發機測試網已寫出 ERR-067 事件（2026-10-18），開發機的通知還沒轉送到手機（f-51），A1 要等 g1-7。",
+          "awaits_commit": "5007695"
         }
       }
     },
@@ -1540,7 +1545,7 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:217 UnrecordedFillAdapter(client_ids=False)、repair_bot.py:246 run_unrecorded_fill_round：交易所有成交而帳本沒記時一律不寫帳本、不下單，開一個請求（同一張單只開一次）並通知（R3，ERR-042）；帳本之後記到那張單時請求自動撤回。非 Binance 時（目前 A1）這段仍照跑，只受 MYCRYPTO_REPAIR_PAUSED 停用。",
+          "evidence": "repair_bot.py:217 UnrecordedFillAdapter(client_ids=False)、repair_bot.py:246 run_unrecorded_fill_round：交易所有成交而帳本沒記時一律不寫帳本、不下單，開一個請求（同一張單只開一次）並通知（R3，ERR-042）；帳本之後記到那張單時請求自動撤回。A1 現在是 Binance，這段照跑（只受 MYCRYPTO_REPAIR_PAUSED 停用）；仍只通知、不自動更正，自動更正見 MYC.UNRECORDED_FILL_CORRECTED（g1-6／g1-7）。",
           "verified_at": "2026-10-14",
           "limit": "A1 沒有發生過少記成交，通知只在測試驗證。"
         }
@@ -2173,10 +2178,52 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "orders.step_rounding_decimal",
+      "id": "reconcile.funding_fee_sync",
       "type": "updated",
-      "project": "btc-competition",
-      "note": "不適用理由補上 2026-10-18 查證：競賽送單前由 ccxt 依交易所精度格式化數量，四種步長各 40 萬筆對照十進位精確值沒有少捨或多進一手；沒有改程式。"
+      "project": "mycrypto",
+      "note": "證據補上 Binance 分支（原本只寫 MEXC 的固定 BTC_USDT 與 2026-09-18 查證）；2026-10-18 台北 A1 唯讀重查：Binance 資金費同步 exit 0、新增 1 筆、總表寫入成功。"
+    },
+    {
+      "kind": "cap",
+      "id": "orders.single_send",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "證據改成 Binance 現況：下單帶單號、只在時間戳被拒（交易所沒處理）時重試一次；舊證據寫的是 MEXC（不帶單號、ccxt 不重試）。"
+    },
+    {
+      "kind": "cap",
+      "id": "recovery.interrupted_order",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "限制句改掉過時的「要搬到 Binance、MEXC 版之後會重寫」（已用翻譯層搬完、沒有重寫）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.UNRECORDED_FILL_UNRESOLVED",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "證據改掉「非 Binance 時（目前 A1）」的過時說法。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.UNRECORDED_FILL_CORRECTED",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "兩格的未做理由更新：程式已合併並上開發機、測試網實測通過，等 g1-7 上 A1（填 awaits_commit）。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.unrecorded_fill_handling",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "未做理由更新：自動更正程式已完成上開發機（#102），等 g1-7 上 A1（填 awaits_commit）。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.adopted_fills",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "未做理由更新：帳本對交易所的配對守門測試已有（#100），尚缺乾淨端到端驗證（x5b）。"
     }
   ]
 }
