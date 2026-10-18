@@ -1,6 +1,6 @@
 {
   "glossary_version": "fleet-glossary/v1",
-  "updated_at": "2026-09-29",
+  "updated_at": "2026-10-18",
   "note": "機隊全專案中文用詞對照表。給人看的文字一律用 zh；retired 是不要再用的舊叫法，tests/test_fleet_glossary.py 會掃描 trade-alerts 內給人看的文字，出現就擋。英文代號只如實列出，不在這裡改。",
   "entries": [
     {
@@ -44,7 +44,7 @@
         "my-crypto-bot",
         "MYC."
       ],
-      "definition": "在 MEXC 做 BTC 永續合約的策略。",
+      "definition": "在 Binance 做 BTC 永續合約的策略（2026-10-17 起正式機用 Binance 主網真倉；開發機用 Binance 測試網的模擬倉）。",
       "retired": [],
       "note": "中文句子裡提到它時用「加密策略」，不要直接寫 my-crypto。"
     },
