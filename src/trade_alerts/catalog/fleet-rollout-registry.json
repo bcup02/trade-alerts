@@ -1311,7 +1311,8 @@
       "behaviour": {
         "mycrypto": {
           "state": "done",
-          "evidence": "mexc_futures_bot.py:1834 只通知、不自動下單（現行行為即符合 v2）"
+          "evidence": "mexc_futures_bot.py:1834 只通知、不自動下單（現行行為即符合 v2）",
+          "limit": "另外：Binance 條件單的觸發價若已越過現價（以標記價格判斷）會被交易所拒絕（-2021），重掛會一直失敗，程式尚未特別處理（f-54）。"
         }
       },
       "emits_event": {
@@ -1360,7 +1361,7 @@
         "mycrypto": {
           "state": "done",
           "evidence": "mexc_futures_bot.py:2131 搬移（或重新掛）停損失敗清掉失效單號，下一輪自動重掛（原有行為）；mexc_futures_bot.py:2143 例外分支同；連續 3 輪沒掛成功才升格通知一次。2026-10-14 台北 12:05 隨 A1 正式機（新）部署（operations 0757c6f；A1 /opt 內根目錄 .py 與 deploy 檔逐檔雜湊與該 commit 相同，部署前後單元清單只多了新的匯出計時器與服務、0 個失敗單元）。",
-          "limit": "A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉運作（第一筆持倉中），這條路徑到目前還沒被實際觸發過，只有測試（CI 與開發機測試網）驗證。"
+          "limit": "A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉運作（第一筆持倉中），這條路徑到目前還沒被實際觸發過，只有測試（CI 與開發機測試網）驗證。 另外：Binance 條件單的觸發價若已越過現價（以標記價格判斷）會被交易所拒絕（-2021），重掛會一直失敗，程式尚未特別處理（f-54）。"
         }
       },
       "emits_event": {
@@ -2224,6 +2225,20 @@
       "type": "updated",
       "project": "mycrypto",
       "note": "未做理由更新：帳本對交易所的配對守門測試已有（#100），尚缺乾淨端到端驗證（x5b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.PROTECTION_REPLACE_FAILED",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "限制句補上：Binance 觸發價已越過現價會被拒（-2021），重掛會一直失敗，程式尚未特別處理（f-54）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MYC.PROTECTION_PLACEMENT_REJECTED",
+      "type": "updated",
+      "project": "mycrypto",
+      "note": "限制句補上同一個 Binance 行為差異（f-54）。"
     }
   ]
 }
