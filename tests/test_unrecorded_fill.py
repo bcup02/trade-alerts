@@ -718,3 +718,61 @@ def test_a_manual_fix_or_incomplete_evidence_is_reported_not_guessed(tmp_path):
     result = _round(adapter, paths)
     assert _announced(paths) == ["corr-1"]                       # nothing picked for the incomplete evidence
     assert any(r.get("evidence_path", "").endswith("x.json") and "error" in r for r in result["replayed"])
+
+
+# --- f-50: the trade's newest fills may not be listed yet --------------------- #
+NEWEST_B_MS = 1790172695572   # the trade_close event of TRADE_B: the newest thing known about the trade
+
+
+class _ExitNotListedYet(Exchange):
+    """The exit order's fills are missing from the exchange read, as when the snapshot skipped fresh fills."""
+
+    def fetch_fills(self, _symbol: str, order_ids: list[str]) -> list[dict]:
+        return [f for f in super().fetch_fills(_symbol, order_ids) if str(f["order_id"]) != EXIT]
+
+
+def _at(offset_minutes: float) -> datetime:
+    return datetime.fromtimestamp(NEWEST_B_MS / 1000 + offset_minutes * 60, tz=timezone.utc)
+
+
+def test_a_trade_that_is_not_flat_while_its_newest_fills_are_young_waits_instead_of_opening_a_request(tmp_path):
+    paths = _setup(tmp_path)
+    result = _round(_trade_adapter(paths, _ExitNotListedYet(_client_ids())), paths, now=_at(10))
+
+    assert result["unresolved"] == [] and result["corrected"] == []
+    assert any("settle" in d["reason"] for d in result["deferred"])
+    assert _codes(paths) == [] and outstanding_error_requests(paths.request_queue) == []
+    assert not [e for e in read_ledger(paths.ledger) if e.get("event_type") == TRADE_CORRECTION_EVENT]
+
+
+def test_the_wait_ends_and_the_request_opens_when_the_trade_is_still_not_flat(tmp_path):
+    paths = _setup(tmp_path)
+    result = _round(_trade_adapter(paths, _ExitNotListedYet(_client_ids())), paths, now=_at(25))
+
+    [item] = result["unresolved"]
+    assert item["reason_code"] == "NOT_RESTATABLE" and result["deferred"] == []
+    assert _codes(paths) == [CODE_UNRESOLVED] and len(outstanding_error_requests(paths.request_queue)) == 1
+
+
+def test_a_young_trade_is_corrected_in_the_next_round_once_the_fills_are_listed(tmp_path):
+    paths = _setup(tmp_path)
+    waiting = _round(_trade_adapter(paths, _ExitNotListedYet(_client_ids())), paths, now=_at(10))
+    assert waiting["corrected"] == [] and waiting["unresolved"] == []
+
+    done = _round(_trade_adapter(paths, Exchange(_client_ids())), paths, now=_at(20))
+
+    [fixed] = done["corrected"]
+    assert fixed["trade_id"] == TRADE_B and done["unresolved"] == []
+    assert _codes(paths) == [CODE_CORRECTED]
+
+
+def test_only_a_not_flat_error_waits_a_failed_exchange_read_does_not(tmp_path):
+    class _Broken(Exchange):
+        def fetch_fills(self, _symbol, _order_ids):
+            raise ConnectionError("read timed out")
+
+    paths = _setup(tmp_path)
+    result = _round(_trade_adapter(paths, _Broken(_client_ids())), paths, now=_at(10))
+
+    [item] = result["unresolved"]
+    assert item["reason_code"] == "NOT_RESTATABLE" and result["deferred"] == []
