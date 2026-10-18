@@ -646,6 +646,315 @@
       ],
       "definition": "登記冊頁面第 2 行與頁尾的 16 位代碼，由頁面內容算出；拿已發布頁面的版本碼跟 main 現在產生的比，就知道要不要重發、頁面有沒有被改過。",
       "retired": []
+    },
+    {
+      "id": "source.atr_trailing_stop",
+      "category": "帳本來源代碼",
+      "zh": "ATR 移動停損出場",
+      "en": [
+        "atr_trailing_stop"
+      ],
+      "definition": "價格跌破 ATR 移動停損線，策略自己判斷出場、主動平倉（趨勢策略）。Google 表「出場原因」欄。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.trend_reversal",
+      "category": "帳本來源代碼",
+      "zh": "趨勢反轉平倉",
+      "en": [
+        "trend_reversal"
+      ],
+      "definition": "均線（EMA9 與 EMA21）交叉，策略判斷趨勢反轉、主動用市價單平倉（加密策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.native_stop_reconciled",
+      "category": "帳本來源代碼",
+      "zh": "交易所停損觸發（事後補記）",
+      "en": [
+        "native_stop_reconciled"
+      ],
+      "definition": "交易所端的停損單觸發把部位平掉，機器人醒來才發現、依成交紀錄補記。",
+      "note": "手動在交易所 App 平倉也會標成這個，因為機器人分不出兩者。",
+      "retired": []
+    },
+    {
+      "id": "source.native_stop",
+      "category": "帳本來源代碼",
+      "zh": "交易所停損觸發",
+      "en": [
+        "native_stop"
+      ],
+      "definition": "交易所端的停損單觸發平倉，機器人當場看到（趨勢策略開發機）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.native_trailing_stop",
+      "category": "帳本來源代碼",
+      "zh": "交易所移動停損觸發",
+      "en": [
+        "native_trailing_stop"
+      ],
+      "definition": "動能策略掛在交易所的移動停損單觸發平倉。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.native_stop_price_estimate",
+      "category": "帳本來源代碼",
+      "zh": "交易所停損觸發（出場價為估算）",
+      "en": [
+        "native_stop_price_estimate"
+      ],
+      "definition": "停損觸發了，但當時查不到成交，出場價是估算值（加密策略 MEXC 時期的舊紀錄）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.stop_breached_market_close",
+      "category": "帳本來源代碼",
+      "zh": "停損已被越過，改用市價平倉",
+      "en": [
+        "stop_breached_market_close"
+      ],
+      "definition": "新的停損觸發價已被越過、Binance 不收這張停損單，機器人改用市價單平倉（f-54，加密策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.exchange_history_reconciliation",
+      "category": "帳本來源代碼",
+      "zh": "依交易所成交歷史補記",
+      "en": [
+        "exchange_history_reconciliation"
+      ],
+      "definition": "交易所已經平倉、機器人找不到對應的停損單，事後依成交歷史補記（動能策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.central_verified_reconciliation",
+      "category": "帳本來源代碼",
+      "zh": "驗證後補記（對帳補列）",
+      "en": [
+        "central_verified_reconciliation"
+      ],
+      "definition": "9 月事故後用對帳補列工具驗證補入的平倉（動能策略）。",
+      "note": "寫入位置我在程式裡沒找到，是從註解與帳本推測的意思。",
+      "retired": []
+    },
+    {
+      "id": "source.reconcile_apply",
+      "category": "帳本來源代碼",
+      "zh": "人工對帳套用",
+      "en": [
+        "reconcile_apply"
+      ],
+      "definition": "用對帳工具人工套用的更正（動能策略；帳本還沒出現過）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.emergency_close_after_protection_failure",
+      "category": "帳本來源代碼",
+      "zh": "停損掛失敗後緊急平倉",
+      "en": [
+        "emergency_close_after_protection_failure"
+      ],
+      "definition": "開倉後停損單掛不上，機器人緊急平倉（動能策略；帳本還沒出現過）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.dry_run_simulated",
+      "category": "帳本來源代碼",
+      "zh": "紙上模擬平倉",
+      "en": [
+        "dry_run_simulated"
+      ],
+      "definition": "紙上模擬的平倉，沒有真的下單。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.dry_run_signal",
+      "category": "帳本來源代碼",
+      "zh": "紙上模擬進場",
+      "en": [
+        "dry_run_signal"
+      ],
+      "definition": "紙上模擬的進場，沒有真的下單。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.backfilled_historical_trade",
+      "category": "帳本來源代碼",
+      "zh": "歷史交易回填",
+      "en": [
+        "backfilled_historical_trade"
+      ],
+      "definition": "事後回填的舊交易（加密策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.backfilled_untracked_deploy_day_trade",
+      "category": "帳本來源代碼",
+      "zh": "部署當天未追蹤交易回填",
+      "en": [
+        "backfilled_untracked_deploy_day_trade"
+      ],
+      "definition": "部署日機器人沒追蹤到、事後回填的交易（加密策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.daily_rebalance",
+      "category": "帳本來源代碼",
+      "zh": "每日再平衡成交",
+      "en": [
+        "daily_rebalance"
+      ],
+      "definition": "競賽策略每天依目標比例調整持倉的現貨成交。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.unrecorded_fill",
+      "category": "帳本來源代碼",
+      "zh": "帳本少記的成交（自動補記）",
+      "en": [
+        "unrecorded_fill"
+      ],
+      "definition": "交易所有成交、帳本漏記，系統確定後自動補記（競賽策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.interrupted_order_recovery",
+      "category": "帳本來源代碼",
+      "zh": "中斷的單補記",
+      "en": [
+        "interrupted_order_recovery"
+      ],
+      "definition": "下單到一半被中斷，重啟後補記（競賽策略；帳本還沒出現過）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.spot_fill",
+      "category": "帳本來源代碼",
+      "zh": "現貨成交",
+      "en": [
+        "spot_fill"
+      ],
+      "definition": "競賽表上的單筆現貨成交列（競賽策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.smoke_test",
+      "category": "帳本來源代碼",
+      "zh": "實機冒煙測試",
+      "en": [
+        "live_smoke_test",
+        "mexc_futures_toolkit_smoke_test"
+      ],
+      "definition": "手動驗證用的小單（動能策略開發機）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.g1_5_dev_verification",
+      "category": "帳本來源代碼",
+      "zh": "g1-5 開發機驗證",
+      "en": [
+        "g1_5_dev_verification"
+      ],
+      "definition": "2026-09-25 在開發機故意重複送單的驗證（競賽策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.entry_signal",
+      "category": "帳本來源代碼",
+      "zh": "進場訊號開倉",
+      "en": [
+        "entry_signal"
+      ],
+      "definition": "策略依進場訊號開倉（加密策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.entry_signal_recovered",
+      "category": "帳本來源代碼",
+      "zh": "進場中斷後接手補記",
+      "en": [
+        "entry_signal_recovered"
+      ],
+      "definition": "開倉到一半被中斷，重啟後接手補記（加密策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.exchange_fill",
+      "category": "帳本來源代碼",
+      "zh": "依交易所成交開倉",
+      "en": [
+        "exchange_fill"
+      ],
+      "definition": "依成交明細記下的開倉（趨勢、動能策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.add",
+      "category": "帳本來源代碼",
+      "zh": "加碼",
+      "en": [
+        "add"
+      ],
+      "definition": "趨勢策略的加碼。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.state_missing_or_stale",
+      "category": "帳本來源代碼",
+      "zh": "狀態檔遺失或過舊，依交易所部位接手",
+      "en": [
+        "state_missing_or_stale"
+      ],
+      "definition": "機器人發現交易所有部位、自己的狀態檔卻遺失或過舊，依交易所部位接手（加密策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.exchange_position_sync",
+      "category": "帳本來源代碼",
+      "zh": "依交易所部位接手",
+      "en": [
+        "exchange_position_sync"
+      ],
+      "definition": "依交易所現有部位接手紀錄（趨勢、動能策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.legacy_state_backfill",
+      "category": "帳本來源代碼",
+      "zh": "舊狀態檔補填接手",
+      "en": [
+        "legacy_state_backfill"
+      ],
+      "definition": "用舊版狀態檔補填的接手紀錄（加密策略）。",
+      "note": "",
+      "retired": []
     }
   ]
 }

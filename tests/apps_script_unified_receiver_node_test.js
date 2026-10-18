@@ -176,6 +176,16 @@ assert.deepEqual(fCalls, ['setNumberFormat', 'setValue']);
 // column N (=14) '-0.1' is not datetime-shaped -> setValue only, no @.
 assert.deepEqual(callLog.filter(c => c.column === 14).map(c => c.op), ['setValue']);
 
+// f-56: the legacy path shows column P in Chinese too (append and update); an unknown code is written as is.
+assert.equal(route({secret: legacySecret, sheet_name: source.sheet_name, action: 'update_by_trade_id', trade_id: 'legacy-trade-1', updates: {P: 'trend_reversal'}}).ok, true);
+assert.equal(projectSheet.rows[1][15], '趨勢反轉平倉');
+assert.equal(route({secret: legacySecret, sheet_name: source.sheet_name, action: 'update_by_trade_id', trade_id: 'legacy-trade-1', updates: {P: 'brand_new_code'}}).ok, true);
+assert.equal(projectSheet.rows[1][15], 'brand_new_code');
+const legacyWithSource = route({...legacyOpen, common: {...legacyOpen.common, trade_id: 'legacy-src-1', source: 'dry_run_signal'}});
+assert.equal(legacyWithSource.ok, true);
+assert.equal(projectSheet.rows[legacyWithSource.row - 1][15], '紙上模擬進場');
+projectSheet.rows.splice(legacyWithSource.row - 1, 1);
+
 const accountSheet = createSheet('帳戶餘額總表', [['id', 'project'], ['', 'my-crypto-bot']]);
 callLog.length = 0;
 const legacyKeyUpdate = route({secret: legacySecret, sheet_name: '帳戶餘額總表', action: 'update_by_key', key_column: 'B', key_value: 'my-crypto-bot', updates: {G: '0.0234', F: '2026-08-26 0:00:49'}});
@@ -299,7 +309,7 @@ assert.equal(projectSheet.rows[fillRow - 1][0], 'ETHBTC-5551212');
 assert.equal(projectSheet.rows[fillRow - 1][3], 'BUY');
 assert.equal(projectSheet.rows[fillRow - 1][6], 0.03);      // G price
 assert.equal(projectSheet.rows[fillRow - 1][8], 1.5);       // I quantity
-assert.equal(projectSheet.rows[fillRow - 1][15], 'spot_fill');  // P source marks it as a standalone fill
+assert.equal(projectSheet.rows[fillRow - 1][15], '現貨成交');  // P shows the source code spot_fill in Chinese (f-56); the signed projection keeps spot_fill
 assert.deepEqual(route(fillWrite), {ok: true, row: fillRow, idempotent: true});
 // a fill is not an open: the wrong event type or a missing / different source marker is refused and audited
 const fillAsOpen = v2Write({action: 'append_fill_v2', eventType: 'trade_open', tradeId: 'ETHBTC-9', projection: {...fillProjection, trade_id: 'ETHBTC-9'}, requestId: '00000000-0000-4000-8000-000000000041'});
