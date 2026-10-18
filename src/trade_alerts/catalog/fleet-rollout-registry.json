@@ -361,9 +361,9 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "fleet_events.py:51 record（策略自己的事件寫入函式）把一則事件寫進 audit/fleet_event_log.jsonl，ERR-066 的代碼 fleet_events.py:30 POSITION_ADOPTED_AFTER_INTERRUPTION、等級 fleet_events.py:45 風險分級 R3；ops_export_refresh.py:28 refresh_ops_export 每分鐘（deploy/my-crypto-ops-export-refresh.timer:5）轉成匯出檔，A1 維運通知轉送。2026-10-18 台北 11:27 A1 受控測試：以服務帳號用 record 寫一則標明【測試】的 ERR-066 事件（details.test，event_id controlled-test-x3-e74a9ad139f94cf4；沒有開請求、沒下單、持倉與停損沒動），匯出檔多 1 則通知、請求 0 個；維運通知 11:30 那輪 sent=2、送失敗 0 次，你手機收到兩則（第一則通知本文、第二則給 AI 的追查指令，內文都有【測試】），11:40 那輪 attempted=0 沒有重送。",
+          "evidence": "fleet_events.py:51 record 把事件寫進 audit/fleet_event_log.jsonl，ERR-066 的代碼在 fleet_events.py:30、等級 R3 在 fleet_events.py:45；ops_export_refresh.py:28 refresh_ops_export 每分鐘（deploy/my-crypto-ops-export-refresh.timer:5）轉成匯出檔，A1 維運通知轉送到手機。",
           "verified_at": "2026-10-18",
-          "limit": "事件是人工寫的測試事件，加密策略自己偵測到的真實事件在 A1 還沒發生過（A1 沒有任何需要通知的狀況），所以只驗到匯出檔→維運通知→手機這條路，不是策略偵測路徑。"
+          "limit": "事件是人工寫的測試事件；策略自己偵測到的真實事件在 A1 還沒發生過，只驗到匯出檔→維運通知→手機這條路。"
         },
         "btc-competition": {
           "state": "done",
@@ -613,9 +613,9 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "fleet_events.py:51 record（策略自己的事件寫入函式）把一則事件寫進 audit/fleet_event_log.jsonl，ERR-066 的代碼 fleet_events.py:30 POSITION_ADOPTED_AFTER_INTERRUPTION、等級 fleet_events.py:45 風險分級 R3；ops_export_refresh.py:28 refresh_ops_export 每分鐘（deploy/my-crypto-ops-export-refresh.timer:5）轉成匯出檔，A1 維運通知轉送。2026-10-18 台北 11:27 A1 受控測試：以服務帳號用 record 寫一則標明【測試】的 ERR-066 事件（details.test，event_id controlled-test-x3-e74a9ad139f94cf4；沒有開請求、沒下單、持倉與停損沒動），匯出檔多 1 則通知、請求 0 個；維運通知 11:30 那輪 sent=2、送失敗 0 次，你手機收到兩則（第一則通知本文、第二則給 AI 的追查指令，內文都有【測試】），11:40 那輪 attempted=0 沒有重送。手機端實際內容（使用者貼回原文）：第一則通知第一行是「【ERR-066】重啟後接管了一個帳本沒有記完的部位」，第二行「需要人工處理｜加密策略」，之後依序是發生什麼事／解決方向／處理步驟／技術細節（【測試】說明）和事件時間 2026-10-18 11:27（台北）、通知時間 11:30（台北）；第二則第一行是「【ERR-066】給 AI 的追查指令（整段貼給 Claude）」，附錯誤碼 mycrypto/POSITION_ADOPTED_AFTER_INTERRUPTION、事件編號 controlled-test-x3-e74a9ad139f94cf4 與事件資料。第一行格式【ERR 編號】＋目錄標題與其他三支一致。",
+          "evidence": "fleet_events.py:51 record 把事件寫進 audit/fleet_event_log.jsonl，ERR-066 的代碼在 fleet_events.py:30、等級 R3 在 fleet_events.py:45；ops_export_refresh.py:28 refresh_ops_export 每分鐘（deploy/my-crypto-ops-export-refresh.timer:5）轉成匯出檔，A1 維運通知轉送到手機。",
           "verified_at": "2026-10-18",
-          "limit": "事件是人工寫的測試事件，加密策略自己偵測到的真實事件在 A1 還沒發生過（A1 沒有任何需要通知的狀況），所以只驗到匯出檔→維運通知→手機這條路，不是策略偵測路徑。"
+          "limit": "事件是人工寫的測試事件；策略自己偵測到的真實事件在 A1 還沒發生過，只驗到匯出檔→維運通知→手機這條路。"
         },
         "btc-competition": {
           "state": "done",
@@ -2147,7 +2147,7 @@
         "mycrypto": {
           "state": "done",
           "evidence": "fleet_events.py:30 POSITION_ADOPTED_AFTER_INTERRUPTION、fleet_events.py:45 風險分級 R3；mexc_futures_bot.py:963 經 _record_fleet_event 寫入（永不丟例外，記警告失敗也被吞），由修復機器人與匯出檔計時器刷新 audit/ops_export.json 交給維運通知；測試 tests/test_graceful_stop.py 以 build_ops_export 驗證變成 critical 的 ERR-066 通知。",
-          "verified_at": "2026-10-18",
+          "verified_at": "2026-10-14",
           "limit": "2026-10-18 台北 A1 受控測試：人工寫入、標明【測試】的 ERR-066 事件經匯出檔與維運通知送到手機（見 notify.line_first_notice），事件到手機的最後一段已實機跑過；策略自己偵測到接管並寫出事件的路徑在 A1 還沒發生過。"
         }
       }
