@@ -857,7 +857,7 @@
         },
         "btc-competition": {
           "state": "n/a",
-          "reason": "競賽策略不用 binance-trading-toolkit，自己在 src/btc_competition/rebalance.py:126 取整（floor(value / step + 1e-10) * step，已加誤差補丁），沒有發現同樣的少一檔問題。"
+          "reason": "競賽策略不用 binance-trading-toolkit，自己在 src/btc_competition/rebalance.py:126 取整（floor(value / step + 1e-10) * step，已加誤差補丁）。2026-10-18 查證：送單前 ccxt 4.5.71 會再依交易所精度格式化數量（Binance 公開資料：BTC/USDT 1e-5、ETH/BTC 與 ETH/USDT 1e-4、BNB/BTC 與 SOL/BTC 1e-3）；四種步長各 40 萬筆對照十進位精確值，沒有少捨或多進一手。"
         }
       }
     }
@@ -2172,39 +2172,11 @@
   ],
   "recent_changes": [
     {
-      "kind": "rule",
-      "id": "MYC.UNRECORDED_FILL_CORRECTED",
-      "type": "added",
-      "project": "mycrypto",
-      "note": "新增列（ERR-067）：加密換 Binance 後可自動更正自己重複送單造成的帳本少記；程式與部署都還沒做，兩格未做。"
-    },
-    {
       "kind": "cap",
-      "id": "notify.line_first_notice",
-      "type": "completed",
-      "project": "mycrypto",
-      "note": "2026-10-18 台北 A1 受控測試：標明【測試】的 ERR-066 事件經匯出檔與維運通知送到手機（兩則收到、下一輪沒重送）；改已做。限制：事件是人工寫的測試事件，策略自己偵測的真實事件在 A1 還沒發生過。"
-    },
-    {
-      "kind": "cap",
-      "id": "notify.error_id",
-      "type": "completed",
-      "project": "mycrypto",
-      "note": "2026-10-18 台北 A1 受控測試：標明【測試】的 ERR-066 事件經匯出檔與維運通知送到手機（兩則收到、下一輪沒重送）；改已做。限制：事件是人工寫的測試事件，策略自己偵測的真實事件在 A1 還沒發生過。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.export_relay_enabled",
+      "id": "orders.step_rounding_decimal",
       "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 受控測試事件已經匯出轉送送到手機；真實事件還沒發生過。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.POSITION_ADOPTED_AFTER_INTERRUPTION",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句更新：A1 受控測試的 ERR-066 事件已送到手機；策略自己偵測的路徑還沒發生過。"
+      "project": "btc-competition",
+      "note": "不適用理由補上 2026-10-18 查證：競賽送單前由 ccxt 依交易所精度格式化數量，四種步長各 40 萬筆對照十進位精確值沒有少捨或多進一手；沒有改程式。"
     }
   ]
 }
