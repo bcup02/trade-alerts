@@ -1519,6 +1519,23 @@
       }
     },
     {
+      "code": "MYC.UNRECORDED_FILL_CORRECTED",
+      "behaviour": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "g1-6 進行中：加密換 Binance 後每張單改帶自己的 mc- 編號，確定是自己重複送單且已平倉才自動更正帳本；程式還沒合併、沒上 A1（排在 x7 觀察一週之後）。"
+        }
+      },
+      "emits_event": {
+        "mycrypto": {
+          "state": "pending",
+          "phase": "8-mycrypto",
+          "reason": "同上：自動更正時由共用處理程式寫事件日誌與匯出檔，要等加密程式上 A1 才有。"
+        }
+      }
+    },
+    {
       "code": "MYC.UNRECORDED_FILL_UNRESOLVED",
       "behaviour": {
         "mycrypto": {
@@ -2154,6 +2171,13 @@
     }
   ],
   "recent_changes": [
+    {
+      "kind": "rule",
+      "id": "MYC.UNRECORDED_FILL_CORRECTED",
+      "type": "added",
+      "project": "mycrypto",
+      "note": "新增列（ERR-067）：加密換 Binance 後可自動更正自己重複送單造成的帳本少記；程式與部署都還沒做，兩格未做。"
+    },
     {
       "kind": "cap",
       "id": "notify.line_first_notice",

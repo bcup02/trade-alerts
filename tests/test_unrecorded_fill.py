@@ -282,11 +282,10 @@ def test_nothing_happens_unless_the_verdict_is_diverged(tmp_path):
 
 def test_the_catalog_carries_every_code_an_adapter_can_emit():
     tiers = {e["code"]: e["risk_tier"] for e in CATALOG["entries"]}
-    for prefix in ("SEY", "MOM", "BTC"):
+    # g1-6: mycrypto gained its own client-order-id scheme on Binance, so it has both codes now.
+    for prefix in ("SEY", "MOM", "BTC", "MYC"):
         for code in (CODE_CORRECTED, CODE_UNRESOLVED):
             assert tiers[f"{prefix}.{code}"] == "R3"
-    assert any(e["code"] == "MYC." + CODE_UNRESOLVED for e in CATALOG["entries"])
-    assert not any(e["code"] == "MYC." + CODE_CORRECTED for e in CATALOG["entries"])
 
 
 def test_an_adapter_that_corrects_must_say_how():

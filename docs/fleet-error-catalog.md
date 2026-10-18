@@ -193,7 +193,8 @@ btc 是唯一已經把「未完成」（`pending_target_weights`）跟「故障�
 | `MYC.PROTECTION_PLACEMENT_ERROR` | `PROTECTIVE_STOP_FAILED` | JUDGEMENT | R3 | **P3** 改名 / P5 |
 | `MYC.PROTECTION_REPLACE_FAILED` | `PROTECTIVE_STOP_FAILED` ×2 | JUDGEMENT | R2 | P8（v2） |
 | `MYC.PROTECTION_ORPHAN_CANCEL_FAILED` | `PROTECTIVE_STOP_CANCEL_FAILED` | JUDGEMENT | R2 | P8（v2） |
-| `MYC.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上；下單不帶自訂編號，只通知） | JUDGEMENT | R3 | P8（v2） |
+| `MYC.UNRECORDED_FILL_CORRECTED` | 未發出（g1-6；加密換 Binance 後每張單帶自己的 mc- 編號，確定是自己重複送單才自動更正，ERR-067） | JUDGEMENT | R3 | P8（v2） |
+| `MYC.UNRECORDED_FILL_UNRESOLVED` | 未發出（共用 unrecorded_fill，g1 接上；非 Binance 或不能確定來源時只通知，ERR-042） | JUDGEMENT | R3 | P8（v2） |
 
 **my-crypto 不加 latch**（使用者 2026-09-12 定案）。兩個叫 `SAFE_HALT` 的事件名宣稱一個這支程式
 根本沒有的安全暫停行為——bot 發完通知照常繼續交易。替一支目前沒有這個概念的 LIVE bot 新增安全暫停行為，
