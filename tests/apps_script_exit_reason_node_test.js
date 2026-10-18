@@ -8,6 +8,8 @@ const expected = {};
 glossary.entries.filter(e => e.category === '帳本來源代碼').forEach(e => e.en.forEach(code => { expected[code] = e.zh; }));
 
 const sheets = [];
+const formulaAt = {};   // 'sheet:row:column' -> formula text; the cell's computed value sits in data
+const writes = [];     // every single-cell write, in order
 function makeSheet(name, header, rows) {
   const data = [header, ...rows];
   const sheet = {
@@ -18,7 +20,10 @@ function makeSheet(name, header, rows) {
       return {
         getValue() { return (data[row - 1] || [])[column - 1] ?? ''; },
         getValues() { return data.slice(row - 1, row - 1 + height).map(r => { const c = r.slice(column - 1, column - 1 + width); while (c.length < width) c.push(''); return c; }); },
-        setValues(values) { values.forEach((r, i) => r.forEach((v, j) => { while (data[row - 1 + i].length < column + j) data[row - 1 + i].push(''); data[row - 1 + i][column - 1 + j] = v; })); },
+        getFormulas() { return data.slice(row - 1, row - 1 + height).map((r, i) => [(formulaAt[`${name}:${row + i}:${column}`]) || '']); },
+        setValue(value) { while (data.length < row) data.push([]); while (data[row - 1].length < column) data[row - 1].push(''); data[row - 1][column - 1] = value; delete formulaAt[`${name}:${row}:${column}`]; writes.push([row, column]); },
+        setValues(values) {
+          assert.fail('setValues must not be used: it would overwrite formula cells with their values'); values.forEach((r, i) => r.forEach((v, j) => { while (data[row - 1 + i].length < column + j) data[row - 1 + i].push(''); data[row - 1 + i][column - 1 + j] = v; })); },
       };
     },
   };
@@ -28,7 +33,8 @@ function makeSheet(name, header, rows) {
 const header = Array(21).fill('');
 header[15] = '出場原因';
 const row = code => { const r = Array(21).fill(''); r[0] = 't'; r[15] = code; return r; };
-const project = makeSheet('project', header, [row('atr_trailing_stop'), row('現貨成交'), row('something_new'), row(''), row('spot_fill')]);
+const project = makeSheet('project', header, [row('atr_trailing_stop'), row('現貨成交'), row('something_new'), row(''), row('spot_fill'), row('native_stop')]);
+formulaAt['project:7:16'] = '=IF(A7="","","native_stop")';   // P7 shows a known code but is a formula: must survive
 const other = makeSheet('帳戶餘額總表', ['id', 'project'], [['', 'native_stop']]);
 const audit = makeSheet('Google_Provenance_Audit', header, [row('trend_reversal')]);
 
@@ -48,7 +54,7 @@ assert.equal(context.exitReasonLabel('something_new'), 'something_new');   // un
 assert.equal(context.exitReasonLabel(''), '');
 assert.equal(context.exitReasonLabel(7), 7);
 assert.equal(context.exitReasonLabel('toString'), 'toString');             // no prototype lookups
-assert.equal(context.sheetValue('source', 'native_stop_reconciled'), '交易所停損觸發（事後補記）');
+assert.equal(context.sheetValue('source', 'native_stop_reconciled'), '停損觸發或手動平倉（事後補記）');
 assert.equal(context.sheetValue('source', null), '');
 assert.equal(context.sheetValue('notes', 'native_stop'), 'native_stop');   // only the source column is translated
 
@@ -61,7 +67,9 @@ assert.equal(JSON.stringify(sheets.map(s => s.data)), before);
 // apply converts exactly the known English codes, once
 const applied = JSON.parse(JSON.stringify(context.convertExitReasonsToChinese()));
 assert.deepEqual(applied, [{sheet: 'project', cells_changed: 2}]);
-assert.deepEqual(project.data.slice(1).map(r => r[15]), ['ATR 移動停損出場', '現貨成交', 'something_new', '', '現貨成交']);
+assert.deepEqual(project.data.slice(1).map(r => r[15]), ['ATR 移動停損出場', '現貨成交', 'something_new', '', '現貨成交', 'native_stop']);
+assert.deepEqual(writes, [[2, 16], [6, 16]]);                       // only the two matching plain cells were written
+assert.equal(formulaAt['project:7:16'], '=IF(A7="","","native_stop")');   // the formula cell is untouched
 assert.equal(other.data[1][1], 'native_stop');
 assert.equal(audit.data[1][15], 'trend_reversal');
 assert.deepEqual(JSON.parse(JSON.stringify(context.convertExitReasonsToChinese())), [{sheet: 'project', cells_changed: 0}]);   // idempotent

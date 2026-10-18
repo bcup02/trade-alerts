@@ -105,7 +105,7 @@ const EXIT_REASON_ZH = {
   "mexc_futures_toolkit_smoke_test": "實機冒煙測試",
   "native_stop": "交易所停損觸發",
   "native_stop_price_estimate": "交易所停損觸發（出場價為估算）",
-  "native_stop_reconciled": "交易所停損觸發（事後補記）",
+  "native_stop_reconciled": "停損觸發或手動平倉（事後補記）",
   "native_trailing_stop": "交易所移動停損觸發",
   "reconcile_apply": "人工對帳套用",
   "spot_fill": "現貨成交",
@@ -563,9 +563,15 @@ function convertExitReasons_(apply) {
     if (last < 2) { report.push({sheet: name, cells_changed: 0}); return; }
     const range = sheet.getRange(2, EXIT_REASON_COLUMN, last - 1, 1);
     const before = range.getValues();
-    const after = before.map(row => [exitReasonLabel(row[0])]);
-    const changed = after.filter((row, index) => row[0] !== before[index][0]).length;
-    if (apply && changed > 0) range.setValues(after);
+    const formulas = range.getFormulas();
+    let changed = 0;
+    before.forEach((row, index) => {
+      if (formulas[index][0] !== '') return;                 // a formula cell is never overwritten with its computed value
+      const label = exitReasonLabel(row[0]);
+      if (label === row[0]) return;
+      changed += 1;
+      if (apply) sheet.getRange(2 + index, EXIT_REASON_COLUMN).setValue(label);   // one matching cell at a time, never the whole range
+    });
     report.push({sheet: name, cells_changed: changed});
   });
   Logger.log(JSON.stringify({applied: apply, tabs: report}));

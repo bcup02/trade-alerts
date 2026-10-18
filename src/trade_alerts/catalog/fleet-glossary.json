@@ -672,7 +672,7 @@
     {
       "id": "source.native_stop_reconciled",
       "category": "帳本來源代碼",
-      "zh": "交易所停損觸發（事後補記）",
+      "zh": "停損觸發或手動平倉（事後補記）",
       "en": [
         "native_stop_reconciled"
       ],
