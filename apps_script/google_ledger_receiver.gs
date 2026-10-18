@@ -79,6 +79,48 @@ const CLOSE_COLUMN_MAP = {exit_time: 'F', exit_price: 'H', entry_price: 'G', ent
 const CORRECTION_FIELDS = CLOSE_FIELDS.concat(['corrects_payload_digest', 'reason_code', 'notes']);
 const CORRECTION_REQUIRED_FIELDS = CLOSE_REQUIRED_FIELDS.concat(['corrects_payload_digest', 'reason_code', 'notes']);
 const CORRECTION_COLUMN_MAP = Object.assign({entry_price: 'G', entry_volume: 'I', notes: 'U'}, CLOSE_COLUMN_MAP);
+// Column P (出場原因) shows the ledger's `source` code in Chinese (f-56).  Only what is WRITTEN to the cell is translated;
+// the signed projection, its digests, the audit sheet and the ledger keep the English code.  A code that is not listed is
+// written unchanged -- never dropped.  The block is generated from the glossary; see scripts/sync_receiver_exit_reasons.py.
+// BEGIN EXIT_REASON_ZH (generated from trade-alerts fleet-glossary.json by scripts/sync_receiver_exit_reasons.py -- do not edit by hand)
+const EXIT_REASON_ZH = {
+  "add": "加碼",
+  "atr_trailing_stop": "ATR 移動停損出場",
+  "backfilled_historical_trade": "歷史交易回填",
+  "backfilled_untracked_deploy_day_trade": "部署當天未追蹤交易回填",
+  "central_verified_reconciliation": "驗證後補記（對帳補列）",
+  "daily_rebalance": "每日再平衡成交",
+  "dry_run_signal": "紙上模擬進場",
+  "dry_run_simulated": "紙上模擬平倉",
+  "emergency_close_after_protection_failure": "停損掛失敗後緊急平倉",
+  "entry_signal": "進場訊號開倉",
+  "entry_signal_recovered": "進場中斷後接手補記",
+  "exchange_fill": "依交易所成交開倉",
+  "exchange_history_reconciliation": "依交易所成交歷史補記",
+  "exchange_position_sync": "依交易所部位接手",
+  "g1_5_dev_verification": "g1-5 開發機驗證",
+  "interrupted_order_recovery": "中斷的單補記",
+  "legacy_state_backfill": "舊狀態檔補填接手",
+  "live_smoke_test": "實機冒煙測試",
+  "mexc_futures_toolkit_smoke_test": "實機冒煙測試",
+  "native_stop": "交易所停損觸發",
+  "native_stop_price_estimate": "交易所停損觸發（出場價為估算）",
+  "native_stop_reconciled": "停損觸發或手動平倉（事後補記）",
+  "native_trailing_stop": "交易所移動停損觸發",
+  "reconcile_apply": "人工對帳套用",
+  "spot_fill": "現貨成交",
+  "state_missing_or_stale": "狀態檔遺失或過舊，依交易所部位接手",
+  "stop_breached_market_close": "停損已被越過，改用市價平倉",
+  "trend_reversal": "趨勢反轉平倉",
+  "unrecorded_fill": "帳本少記的成交（自動補記）"
+};
+// END EXIT_REASON_ZH
+function exitReasonLabel(value) {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(EXIT_REASON_ZH, value) ? EXIT_REASON_ZH[value] : value;
+}
+const EXIT_REASON_COLUMN = 16;                 // P
+const EXIT_REASON_HEADER = '出場原因';
+
 const NUMERIC_PROJECTION_FIELDS = new Set(['entry_price', 'exit_price', 'volume', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin']);
 // Time cells (E entry_time / F exit_time) are Taipei-local *text*, e.g.
 // "2026-08-26 0:00:49", matching the rows the strategies wrote before v2. The
@@ -165,7 +207,7 @@ function handleLegacyAppend(sheet, sheetName, data) {
     common.trade_id, common.execution_mode, common.symbol, common.side,
     common.entry_time, common.exit_time, common.entry_price, common.exit_price,
     common.volume, common.leverage, common.entry_fee, common.exit_fee,
-    common.gross_pnl, common.net_pnl, common.return_on_margin, common.source,
+    common.gross_pnl, common.net_pnl, common.return_on_margin, exitReasonLabel(common.source),
     common.entry_order_id, common.exit_order_id, common.stop_plan_order_id,
     common.exit_anomaly, common.notes,
   ].concat(Array.isArray(data.extra) ? data.extra : []).map(value => value === undefined || value === null ? '' : value);
@@ -194,7 +236,7 @@ function handleLegacyUpdateByTradeId(sheet, sheetName, data) {
   keys.forEach(letter => {
     const column = columnIndex(letter);
     if (!column) return;
-    const value = updates[letter];
+    const value = letter === 'P' ? exitReasonLabel(updates[letter]) : updates[letter];
     const cell = sheet.getRange(row, column);
     // @ format BEFORE setValue: otherwise Sheets first parses a datetime-shaped
     // string into a Date serial (dropping seconds if the inherited number
@@ -226,7 +268,7 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
   keys.forEach(letter => {
     const updateColumn = columnIndex(letter);
     if (!updateColumn) return;
-    const value = updates[letter];
+    const value = letter === 'P' ? exitReasonLabel(updates[letter]) : updates[letter];
     const cell = sheet.getRange(row, updateColumn);
     // @ format BEFORE setValue -- see handleLegacyUpdateByTradeId.
     if (needsTextFormat(value)) cell.setNumberFormat('@');
@@ -410,6 +452,7 @@ function writeProjection(sheet, row, projection, mapping) {
 
 function sheetValue(key, value) {
   if (value === null) return '';
+  if (key === 'source') return exitReasonLabel(value);
   if (SHEET_TIME_KEYS.has(key)) return formatSheetTime(value);
   if (!NUMERIC_PROJECTION_FIELDS.has(key)) return value;
   if (typeof value !== 'string' || !/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/.test(value)) throw new Error('invalid_numeric_projection');
@@ -506,3 +549,33 @@ function quarantineOnlyWithExplicitDeploymentFlag(data) {
 function jsonOut(value) {
   return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);
 }
+
+// ---- One-time conversion of the rows already on the sheet (f-56).  Run from the Apps Script editor by the sheet's owner:
+// first previewExitReasonConversion() (changes nothing, logs how many cells per tab), then convertExitReasonsToChinese().
+// Only a project tab whose P1 header is 出場原因 is touched, only a cell holding exactly a known English code is replaced,
+// and running it again changes nothing.
+function convertExitReasons_(apply) {
+  const report = [];
+  SpreadsheetApp.getActiveSpreadsheet().getSheets().forEach(sheet => {
+    const name = sheet.getName();
+    if (name === V2_AUDIT_SHEET || String(sheet.getRange(1, EXIT_REASON_COLUMN).getValue()).trim() !== EXIT_REASON_HEADER) return;
+    const last = sheet.getLastRow();
+    if (last < 2) { report.push({sheet: name, cells_changed: 0}); return; }
+    const range = sheet.getRange(2, EXIT_REASON_COLUMN, last - 1, 1);
+    const before = range.getValues();
+    const formulas = range.getFormulas();
+    let changed = 0;
+    before.forEach((row, index) => {
+      if (formulas[index][0] !== '') return;                 // a formula cell is never overwritten with its computed value
+      const label = exitReasonLabel(row[0]);
+      if (label === row[0]) return;
+      changed += 1;
+      if (apply) sheet.getRange(2 + index, EXIT_REASON_COLUMN).setValue(label);   // one matching cell at a time, never the whole range
+    });
+    report.push({sheet: name, cells_changed: changed});
+  });
+  Logger.log(JSON.stringify({applied: apply, tabs: report}));
+  return report;
+}
+function previewExitReasonConversion() { return convertExitReasons_(false); }
+function convertExitReasonsToChinese() { return convertExitReasons_(true); }
