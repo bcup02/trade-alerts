@@ -1083,4 +1083,8 @@ trade-alerts：v0.30.9（錯誤清單新增 ERR-067 MYC.UNRECORDED_FILL_CORRECTE
 變更摘要：1. 新增 ERR-067（加密自動更正帳本少記成交，R3 通知），照動能 ERR-038 的寫法；ERR-042 的處理說明改成「非 Binance 或不能確定來源才走這條」。
           2. 兩張登記冊新增 MYC.UNRECORDED_FILL_CORRECTED 列（兩格未做，等加密程式上 A1）；頁面重新產生。
           3. 沒有程式或函式簽名變更；只有錯誤清單資料、測試期望（引用數 24、四支策略都有兩個代碼）與版本號。
+trade-alerts：v0.30.10（自動更正碰到「出場單剛成交」不再直接開請求；f-50）
+變更摘要：1. 共用處理程式 unrecorded_fill：重述時成交對不平（TradeNotFlatError，含「沒有出場成交」）而交易最新一張單還不滿 20 分鐘（SETTLE_GRACE_MS），改記入 deferred、下一輪再試，不開請求；超過 20 分鐘仍不平才照舊走 ERR-042。原因：對帳快照不列未滿 5 分鐘的成交，輪詢每 15 分鐘。
+          2. trade_correction 新增 TradeNotFlatError（TradeCorrectionError 的子類，已從套件匯出）；其他錯誤與抓成交失敗行為不變。
+          3. 沒有函式簽名變更；錯誤清單 trade-alerts 引用行號 +12（651→663、695→707、725→737）；新增 4 個測試。
 ```

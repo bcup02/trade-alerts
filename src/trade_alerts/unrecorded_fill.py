@@ -63,7 +63,7 @@ from .ledger_reconcile import (
 )
 from .notice_replay import events_for, read_evidence_files, replay_unannounced_requests
 from .ops_export import build_ops_export, write_ops_export
-from .trade_correction import TRADE_CORRECTION_EVENT, build_trade_correction
+from .trade_correction import TRADE_CORRECTION_EVENT, TradeNotFlatError, build_trade_correction
 
 LOGGER = logging.getLogger("trade_alerts.unrecorded_fill")
 
@@ -89,6 +89,10 @@ TRADE_SLACK_MS = 10 * 60 * 1000
 #: An order that cannot be looked up is retried silently for this long, then
 #: reported: a network blip must not page anyone, a lasting one must.
 LOOKUP_GRACE_MS = 2 * 60 * 60 * 1000
+#: A trade whose newest order is younger than this may still have fills the reconcile snapshot has not listed
+#: yet (it skips fills under five minutes old, and rounds run every fifteen), so "enters X, exits less" is
+#: retried next round instead of opening a request that never retries.
+SETTLE_GRACE_MS = 20 * 60 * 1000
 REPLAY_STATE_NAME = "replay-first-seen.json"
 
 
@@ -610,6 +614,14 @@ class _Round:
                 evidence_source=self.adapter.evidence_source, qty_multiplier=self.adapter.qty_multiplier,
             )
         except Exception as exc:  # noqa: BLE001 -- TradeCorrectionError or a fetch failure: cannot restate
+            newest = max([o["time_ms"] for o in group if o["time_ms"] is not None]
+                         + [int(order["time_ms"] or 0)]
+                         + [ms for ms in (_event_ms(e) for e in [*opens, *closes]) if ms is not None])
+            if isinstance(exc, TradeNotFlatError) and self.moment_ms - newest < SETTLE_GRACE_MS:
+                self.result["deferred"].append({
+                    "order_id": order["order_id"],
+                    "reason": f"waiting for the trade's newest fills to settle: {exc}"})
+                return {"order_ids": group_ids}
             self._unresolved(order, NOT_RESTATABLE, f"交易所成交無法完整重述交易 {trade_id}：{type(exc).__name__}: {exc}",
                              match=match, order_ids=group_ids)
             return {"order_ids": group_ids}

@@ -67,6 +67,12 @@ class TradeCorrectionError(ValueError):
     """A correction cannot be built, or an appended one no longer applies."""
 
 
+class TradeNotFlatError(TradeCorrectionError):
+    """The fills enter and exit different quantities.  Either the trade really is not flat, or the last
+    fills are not visible yet (the reconcile snapshot skips fills younger than five minutes), so callers that
+    see it right after the trade may wait a round instead of giving up."""
+
+
 # --------------------------------------------------------------------------- #
 # helpers
 # --------------------------------------------------------------------------- #
@@ -282,14 +288,14 @@ def build_trade_correction(
         leg = [f for f in rows if str(f.get("side")).lower() == wanted]
         qty = sum(_num(f["quantity"]) for f in leg)
         if qty <= 0:
-            raise TradeCorrectionError(f"no {wanted} fills for {trade_id}")
+            raise TradeNotFlatError(f"no {wanted} fills for {trade_id}")
         vwap = sum(_num(f["quantity"]) * _num(f["price"]) for f in leg) / qty
         return qty, vwap, sum(_num(f["commission"]) for f in leg)
 
     entry_qty, entry_price, entry_fee = _leg(entry_side)
     exit_qty, exit_price, exit_fee = _leg(exit_side)
     if abs(entry_qty - exit_qty) > _ABS_TOL * max(1.0, entry_qty):
-        raise TradeCorrectionError(
+        raise TradeNotFlatError(
             f"{trade_id} is not flat on the exchange fills (entered {entry_qty}, exited {exit_qty})"
         )
     direction = 1.0 if side == "long" else -1.0

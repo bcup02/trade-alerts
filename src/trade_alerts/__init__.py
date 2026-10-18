@@ -138,6 +138,7 @@ from .trade_correction import (
     TRADE_CORRECTION_EVENT,
     TRADE_CORRECTION_SCHEMA,
     TradeCorrectionError,
+    TradeNotFlatError,
     apply_trade_corrections,
     build_trade_correction,
     correction_order_ids,
@@ -181,6 +182,7 @@ __all__ = [
     "TRADE_CORRECTION_EVENT",
     "TRADE_CORRECTION_SCHEMA",
     "TradeCorrectionError",
+    "TradeNotFlatError",
     "apply_trade_corrections",
     "build_trade_correction",
     "correction_order_ids",
@@ -343,4 +345,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.30.9"
+__version__ = "0.30.10"
