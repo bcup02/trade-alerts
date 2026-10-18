@@ -37,7 +37,7 @@ class FakeRemote(ow.Remote):
         try:
             return self.files[(host, path)]
         except KeyError:
-            raise ow.RemoteError(f"missing {host}:{path}") from None
+            raise ow.RemoteFileMissing(f"missing {host}:{path}") from None
 
     def journal(self, host, unit, since_utc):
         return self.journals.get((host, unit), "")
@@ -995,6 +995,7 @@ def test_x5b_an_unmoved_stop_or_another_trades_stop_is_not_a_move():
     prev = {"stops": {"OLD": ["1", "2"]}}                # an unrelated trade with two stop ids
     result = ow.check_dev_crypto_x5b(x5b_ctx(r, prev))
     assert "還沒看到停損移動" in result.summary
+    assert set(result.extra["stops"]) == {"T1"}          # and it is dropped, not carried for ever
 
 
 def test_x5b_all_three_observed_is_still_not_closable_by_the_machine():
@@ -1025,3 +1026,45 @@ def test_x5b_fails_when_the_sheet_disagrees_after_the_grace():
     events = [x5b_ev(3, "trade_open", source="entry_signal", trade_id="T1")]
     result = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events, reconcile="DIVERGED")))
     assert result.state == ow.FAILED
+
+
+class _FailingRead(FakeRemote):
+    def __init__(self, error, **kw):
+        super().__init__(**kw)
+        self.error = error
+
+    def read(self, host, path):
+        if path == STATE_PATH:
+            raise self.error
+        return super().read(host, path)
+
+
+@pytest.mark.parametrize("message", [
+    "dev: cat /opt/my-crypto-bot/state/state.json exit 1: cat: /opt/my-crypto-bot/state/state.json: Permission denied",
+    "dev: sudo -n exit 1: sudo: a password is required",
+    "dev: TimeoutExpired: timed out after 60 seconds",
+    "a1: cat /x exit 255: ssh: connect to host port 22: Connection timed out",
+])
+def test_x5b_an_unreadable_state_file_is_an_error_not_a_flat_strategy(message):
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1")]
+    base = x5b_remote(events)
+    r = _FailingRead(ow.RemoteError(message), files=base.files)
+    with pytest.raises(ow.RemoteError):
+        ow.check_dev_crypto_x5b(x5b_ctx(r))
+    state = ow.run_checks(r, X5B_NOW, {}, checks=[c for c in ow.CHECKS if c.id == "dev-crypto-x5b"])
+    assert state["dev-crypto-x5b"]["state"] == ow.ERROR           # shown as a broken check, never as "no stop move yet"
+
+
+@pytest.mark.parametrize("stderr, returncode, expected", [
+    ("cat: /opt/my-crypto-bot/state/state.json: No such file or directory\n", 1, ow.RemoteFileMissing),
+    ("cat: /opt/my-crypto-bot/state/state.json: Permission denied\n", 1, ow.RemoteError),
+    ("cat: /other/path: No such file or directory\n", 1, ow.RemoteError),              # a different file named in the message
+    ("Warning: Identity file k not accessible: No such file or directory.\n", 255, ow.RemoteError),   # ssh, not cat
+    ("sudo: a password is required\n", 1, ow.RemoteError),
+])
+def test_only_a_cat_that_says_the_file_is_missing_counts_as_missing(monkeypatch, stderr, returncode, expected):
+    import subprocess
+    monkeypatch.setattr(ow.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a[0], returncode, "", stderr))
+    with pytest.raises(ow.RemoteError) as caught:
+        ow.Remote("k")._run("dev", ["cat", STATE_PATH])
+    assert type(caught.value) is expected

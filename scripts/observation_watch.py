@@ -68,6 +68,12 @@ class RemoteError(RuntimeError):
     """A read failed (host unreachable, file missing, path not on the whitelist)."""
 
 
+class RemoteFileMissing(RemoteError):
+    """``cat`` ran on the host and said the file is not there -- the only failure a caller may read as "nothing to see".
+    A refused permission, a failed ``sudo``, an unreachable host or a timeout stay plain ``RemoteError`` (an unobservable
+    state must never look like "the event has not happened")."""
+
+
 def _allowed_paths() -> frozenset[str]:
     """Exactly the files the checks below read -- nothing else under /opt, /var/lib or anywhere is readable."""
     paths = {"/var/lib/portfolio-query/my-crypto-bot/current.json", "/var/lib/ops-notify/state.json",
@@ -131,7 +137,11 @@ class Remote:
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise RemoteError(f"{host}: {type(exc).__name__}: {exc}") from exc
         if done.returncode != 0:
-            raise RemoteError(f"{host}: {' '.join(words[:2])} exit {done.returncode}: {done.stderr.strip()[:120]}")
+            message = f"{host}: {' '.join(words[:2])} exit {done.returncode}: {done.stderr.strip()[:120]}"
+            if (words[0] == "cat" and done.returncode == 1 and len(words) == 2
+                    and done.stderr.strip() == f"cat: {words[1]}: No such file or directory"):
+                raise RemoteFileMissing(message)
+            raise RemoteError(message)
         return done.stdout
 
     def read(self, host: str, path: str) -> str:
@@ -421,13 +431,15 @@ def check_dev_crypto_x5b(ctx: Context) -> Result:
         return Result(WAITING, "開發機加密策略還沒有因進場訊號而下的測試網單。", extra={"stops": seen})
     try:
         state = load_json(ctx.remote, "dev", f"/opt/{REPOS['mycrypto']}/state/state.json")
-    except RemoteError:
-        state = {}                                    # flat: no state file; nothing new to learn about a stop
+    except RemoteFileMissing:
+        state = {}                                    # flat: the strategy has no state file; nothing to learn about a stop
     if state.get("trade_id") and state.get("stop_plan_order_id") is not None:
         ids = seen.setdefault(str(state["trade_id"]), [])
         if str(state["stop_plan_order_id"]) not in ids:
             ids.append(str(state["stop_plan_order_id"]))
-    moved = sorted(t for t, ids in seen.items() if len(ids) >= 2 and t in {e.get("trade_id") for e in entries})
+    own_trades = {e.get("trade_id") for e in entries}
+    seen = {t: ids for t, ids in seen.items() if t in own_trades}      # nothing else is ever looked at, so nothing else is kept
+    moved = sorted(t for t, ids in seen.items() if len(ids) >= 2)
     last = max(parse_time(e["event_time"]) for e in entries)
     status = load_json(ctx.remote, "dev", audit("mycrypto", "google_reconcile_status.json"))
     if reconcile_covers(status, last, ctx.now) == "diverged":
