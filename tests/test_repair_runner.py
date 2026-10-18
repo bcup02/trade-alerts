@@ -536,9 +536,9 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
             assert f"code={constant}" in call, source
             cited += 1
     # 4 runner codes x 3 strategies (momentum, seykota, mycrypto); FAILED is emitted from two call sites.
-    # g1: UNRECORDED_FILL_CORRECTED for 3 strategies, UNRESOLVED for all 4.
+    # g1: UNRECORDED_FILL_CORRECTED for 3 strategies (g1-6: mycrypto too, 4), UNRESOLVED for all 4.
     # f-30: the pending-expired notice is emitted from one call site.
-    assert cited == 15 + 7 + 1
+    assert cited == 15 + 8 + 1
 
 
 # --------------------------------------------------------------------------- #
