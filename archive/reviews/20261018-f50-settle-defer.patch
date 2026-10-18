@@ -1,0 +1,267 @@
+diff --git a/docs/consumer-release-runbook.md b/docs/consumer-release-runbook.md
+index 73d1927..7139727 100644
+--- a/docs/consumer-release-runbook.md
++++ b/docs/consumer-release-runbook.md
+@@ -1083,4 +1083,8 @@ trade-alerts：v0.30.9（錯誤清單新增 ERR-067 MYC.UNRECORDED_FILL_CORRECTE
+ 變更摘要：1. 新增 ERR-067（加密自動更正帳本少記成交，R3 通知），照動能 ERR-038 的寫法；ERR-042 的處理說明改成「非 Binance 或不能確定來源才走這條」。
+           2. 兩張登記冊新增 MYC.UNRECORDED_FILL_CORRECTED 列（兩格未做，等加密程式上 A1）；頁面重新產生。
+           3. 沒有程式或函式簽名變更；只有錯誤清單資料、測試期望（引用數 24、四支策略都有兩個代碼）與版本號。
++trade-alerts：v0.30.10（自動更正碰到「出場單剛成交」不再直接開請求；f-50）
++變更摘要：1. 共用處理程式 unrecorded_fill：重述時成交對不平（TradeNotFlatError，含「沒有出場成交」）而交易最新一張單還不滿 20 分鐘（SETTLE_GRACE_MS），改記入 deferred、下一輪再試，不開請求；超過 20 分鐘仍不平才照舊走 ERR-042。原因：對帳快照不列未滿 5 分鐘的成交，輪詢每 15 分鐘。
++          2. trade_correction 新增 TradeNotFlatError（TradeCorrectionError 的子類，已從套件匯出）；其他錯誤與抓成交失敗行為不變。
++          3. 沒有函式簽名變更；錯誤清單 trade-alerts 引用行號 +12（651→663、695→707、725→737）；新增 4 個測試。
+ ```
+diff --git a/pyproject.toml b/pyproject.toml
+index 1d7abfa..fea09e6 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.9"
++version = "0.30.10"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 6f1ccc5..9bf6cdf 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -138,6 +138,7 @@ from .trade_correction import (
+     TRADE_CORRECTION_EVENT,
+     TRADE_CORRECTION_SCHEMA,
+     TradeCorrectionError,
++    TradeNotFlatError,
+     apply_trade_corrections,
+     build_trade_correction,
+     correction_order_ids,
+@@ -181,6 +182,7 @@ __all__ = [
+     "TRADE_CORRECTION_EVENT",
+     "TRADE_CORRECTION_SCHEMA",
+     "TradeCorrectionError",
++    "TradeNotFlatError",
+     "apply_trade_corrections",
+     "build_trade_correction",
+     "correction_order_ids",
+@@ -343,4 +345,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.9"
++__version__ = "0.30.10"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index c4e3a26..ae28d94 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -1141,7 +1141,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "seykota",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:651"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
+       ],
+       "current": {
+         "latch": null,
+@@ -1171,7 +1171,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "seykota",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:725"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
+       ],
+       "current": {
+         "latch": null,
+@@ -1203,7 +1203,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "momentum",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:651"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
+       ],
+       "current": {
+         "latch": null,
+@@ -1233,7 +1233,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "momentum",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:725"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
+       ],
+       "current": {
+         "latch": null,
+@@ -1265,7 +1265,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "btc-competition",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:695"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:707"
+       ],
+       "current": {
+         "latch": null,
+@@ -1295,7 +1295,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "btc-competition",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:725"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
+       ],
+       "current": {
+         "latch": null,
+@@ -1327,7 +1327,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "mycrypto",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:651"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
+       ],
+       "current": {
+         "latch": null,
+@@ -1357,7 +1357,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "mycrypto",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:725"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
+       ],
+       "current": {
+         "latch": null,
+diff --git a/src/trade_alerts/trade_correction.py b/src/trade_alerts/trade_correction.py
+index 1cecf6d..b91037c 100644
+--- a/src/trade_alerts/trade_correction.py
++++ b/src/trade_alerts/trade_correction.py
+@@ -67,6 +67,12 @@ class TradeCorrectionError(ValueError):
+     """A correction cannot be built, or an appended one no longer applies."""
+ 
+ 
++class TradeNotFlatError(TradeCorrectionError):
++    """The fills enter and exit different quantities.  Either the trade really is not flat, or the last
++    fills are not visible yet (the reconcile snapshot skips fills younger than five minutes), so callers that
++    see it right after the trade may wait a round instead of giving up."""
++
++
+ # --------------------------------------------------------------------------- #
+ # helpers
+ # --------------------------------------------------------------------------- #
+@@ -282,14 +288,14 @@ def build_trade_correction(
+         leg = [f for f in rows if str(f.get("side")).lower() == wanted]
+         qty = sum(_num(f["quantity"]) for f in leg)
+         if qty <= 0:
+-            raise TradeCorrectionError(f"no {wanted} fills for {trade_id}")
++            raise TradeNotFlatError(f"no {wanted} fills for {trade_id}")
+         vwap = sum(_num(f["quantity"]) * _num(f["price"]) for f in leg) / qty
+         return qty, vwap, sum(_num(f["commission"]) for f in leg)
+ 
+     entry_qty, entry_price, entry_fee = _leg(entry_side)
+     exit_qty, exit_price, exit_fee = _leg(exit_side)
+     if abs(entry_qty - exit_qty) > _ABS_TOL * max(1.0, entry_qty):
+-        raise TradeCorrectionError(
++        raise TradeNotFlatError(
+             f"{trade_id} is not flat on the exchange fills (entered {entry_qty}, exited {exit_qty})"
+         )
+     direction = 1.0 if side == "long" else -1.0
+diff --git a/src/trade_alerts/unrecorded_fill.py b/src/trade_alerts/unrecorded_fill.py
+index 0df1b63..2726d08 100644
+--- a/src/trade_alerts/unrecorded_fill.py
++++ b/src/trade_alerts/unrecorded_fill.py
+@@ -63,7 +63,7 @@ from .ledger_reconcile import (
+ )
+ from .notice_replay import events_for, read_evidence_files, replay_unannounced_requests
+ from .ops_export import build_ops_export, write_ops_export
+-from .trade_correction import TRADE_CORRECTION_EVENT, build_trade_correction
++from .trade_correction import TRADE_CORRECTION_EVENT, TradeNotFlatError, build_trade_correction
+ 
+ LOGGER = logging.getLogger("trade_alerts.unrecorded_fill")
+ 
+@@ -89,6 +89,10 @@ TRADE_SLACK_MS = 10 * 60 * 1000
+ #: An order that cannot be looked up is retried silently for this long, then
+ #: reported: a network blip must not page anyone, a lasting one must.
+ LOOKUP_GRACE_MS = 2 * 60 * 60 * 1000
++#: A trade whose newest order is younger than this may still have fills the reconcile snapshot has not listed
++#: yet (it skips fills under five minutes old, and rounds run every fifteen), so "enters X, exits less" is
++#: retried next round instead of opening a request that never retries.
++SETTLE_GRACE_MS = 20 * 60 * 1000
+ REPLAY_STATE_NAME = "replay-first-seen.json"
+ 
+ 
+@@ -610,6 +614,14 @@ class _Round:
+                 evidence_source=self.adapter.evidence_source, qty_multiplier=self.adapter.qty_multiplier,
+             )
+         except Exception as exc:  # noqa: BLE001 -- TradeCorrectionError or a fetch failure: cannot restate
++            newest = max([o["time_ms"] for o in group if o["time_ms"] is not None]
++                         + [int(order["time_ms"] or 0)]
++                         + [ms for ms in (_event_ms(e) for e in [*opens, *closes]) if ms is not None])
++            if isinstance(exc, TradeNotFlatError) and self.moment_ms - newest < SETTLE_GRACE_MS:
++                self.result["deferred"].append({
++                    "order_id": order["order_id"],
++                    "reason": f"waiting for the trade's newest fills to settle: {exc}"})
++                return {"order_ids": group_ids}
+             self._unresolved(order, NOT_RESTATABLE, f"交易所成交無法完整重述交易 {trade_id}：{type(exc).__name__}: {exc}",
+                              match=match, order_ids=group_ids)
+             return {"order_ids": group_ids}
+diff --git a/tests/test_unrecorded_fill.py b/tests/test_unrecorded_fill.py
+index 1e3a6e7..1fa5722 100644
+--- a/tests/test_unrecorded_fill.py
++++ b/tests/test_unrecorded_fill.py
+@@ -718,3 +718,61 @@ def test_a_manual_fix_or_incomplete_evidence_is_reported_not_guessed(tmp_path):
+     result = _round(adapter, paths)
+     assert _announced(paths) == ["corr-1"]                       # nothing picked for the incomplete evidence
+     assert any(r.get("evidence_path", "").endswith("x.json") and "error" in r for r in result["replayed"])
++
++
++# --- f-50: the trade's newest fills may not be listed yet --------------------- #
++NEWEST_B_MS = 1790172695572   # the trade_close event of TRADE_B: the newest thing known about the trade
++
++
++class _ExitNotListedYet(Exchange):
++    """The exit order's fills are missing from the exchange read, as when the snapshot skipped fresh fills."""
++
++    def fetch_fills(self, _symbol: str, order_ids: list[str]) -> list[dict]:
++        return [f for f in super().fetch_fills(_symbol, order_ids) if str(f["order_id"]) != EXIT]
++
++
++def _at(offset_minutes: float) -> datetime:
++    return datetime.fromtimestamp(NEWEST_B_MS / 1000 + offset_minutes * 60, tz=timezone.utc)
++
++
++def test_a_trade_that_is_not_flat_while_its_newest_fills_are_young_waits_instead_of_opening_a_request(tmp_path):
++    paths = _setup(tmp_path)
++    result = _round(_trade_adapter(paths, _ExitNotListedYet(_client_ids())), paths, now=_at(10))
++
++    assert result["unresolved"] == [] and result["corrected"] == []
++    assert any("settle" in d["reason"] for d in result["deferred"])
++    assert _codes(paths) == [] and outstanding_error_requests(paths.request_queue) == []
++    assert not [e for e in read_ledger(paths.ledger) if e.get("event_type") == TRADE_CORRECTION_EVENT]
++
++
++def test_the_wait_ends_and_the_request_opens_when_the_trade_is_still_not_flat(tmp_path):
++    paths = _setup(tmp_path)
++    result = _round(_trade_adapter(paths, _ExitNotListedYet(_client_ids())), paths, now=_at(25))
++
++    [item] = result["unresolved"]
++    assert item["reason_code"] == "NOT_RESTATABLE" and result["deferred"] == []
++    assert _codes(paths) == [CODE_UNRESOLVED] and len(outstanding_error_requests(paths.request_queue)) == 1
++
++
++def test_a_young_trade_is_corrected_in_the_next_round_once_the_fills_are_listed(tmp_path):
++    paths = _setup(tmp_path)
++    waiting = _round(_trade_adapter(paths, _ExitNotListedYet(_client_ids())), paths, now=_at(10))
++    assert waiting["corrected"] == [] and waiting["unresolved"] == []
++
++    done = _round(_trade_adapter(paths, Exchange(_client_ids())), paths, now=_at(20))
++
++    [fixed] = done["corrected"]
++    assert fixed["trade_id"] == TRADE_B and done["unresolved"] == []
++    assert _codes(paths) == [CODE_CORRECTED]
++
++
++def test_only_a_not_flat_error_waits_a_failed_exchange_read_does_not(tmp_path):
++    class _Broken(Exchange):
++        def fetch_fills(self, _symbol, _order_ids):
++            raise ConnectionError("read timed out")
++
++    paths = _setup(tmp_path)
++    result = _round(_trade_adapter(paths, _Broken(_client_ids())), paths, now=_at(10))
++
++    [item] = result["unresolved"]
++    assert item["reason_code"] == "NOT_RESTATABLE" and result["deferred"] == []
