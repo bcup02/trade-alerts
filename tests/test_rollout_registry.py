@@ -499,9 +499,8 @@ def test_updated_recent_change_is_accepted_and_flagged(registry, catalog):
     and show up in the page's 'recently changed' summary like added does."""
     import copy
 
-    capability = next(c for c in registry["capabilities"]
-                      if any(v.get("state") == "pending" for v in c["status"].values()))
     reg = copy.deepcopy(registry)
+    capability, _, _ = _first_pending_cap(reg)
     reg["recent_changes"] = [{"kind": "cap", "id": capability["id"], "type": "updated", "note": "x"}]
     assert not [p for p in registry_problems(reg, catalog) if "recent_changes" in p]
     reg["recent_changes"] = [{"kind": "cap", "id": "nonexistent.capability", "type": "updated", "note": "x"}]
@@ -554,11 +553,16 @@ def test_rollout_page_lists_only_phases_that_still_have_pending_cells(registry, 
 
 
 def _first_pending_cap(reg):
+    """A pending capability cell of ``reg``; once every capability cell has shipped (2026-10-19), the first done cell
+    of the copy is turned pending so these checks still have a cell to bend."""
     for capability in reg["capabilities"]:
         for project, status in capability["status"].items():
             if status["state"] == "pending":
                 return capability, project, status
-    raise AssertionError("the live registry has no pending capability cell")
+    capability = reg["capabilities"][0]
+    project = next(iter(capability["status"]))
+    capability["status"][project] = {"state": "pending", "phase": next(iter(reg["phases"])), "reason": "test"}
+    return capability, project, capability["status"][project]
 
 
 def test_a_reason_that_promises_a_deployment_must_name_the_commit(registry, catalog):
