@@ -1,0 +1,220 @@
+diff --git a/docs/observation-watch.md b/docs/observation-watch.md
+index 09d8c64..1075ffe 100644
+--- a/docs/observation-watch.md
++++ b/docs/observation-watch.md
+@@ -57,6 +57,15 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項
+ 
+ - 狀態檔在取得檔案鎖「之後」才讀（`run` 與 `ack` 都是）：排在另一輪後面的那一輪，依前一輪存下的結果決定要不要通知，不會用鎖之前讀到的舊狀態重複發送。`ack` 會等鎖（等到前一輪結束），`run` 遇到鎖仍是略過這一輪。
+ 
++## A1 加密權益提醒（`a1-crypto-equity`，f-55）
++2026-10-19 使用者決定接受「最小下單量讓風險超過 5%」的現況，只要權益低於提醒線就通知他決定（補錢或接受）。
++
++- **看什麼**：A1 加密的 `audit/exchange_state.json`（已在白名單，沒有新增可讀路徑）。權益 ＝ `balance.wallet_balance` ＋ 所有持倉的 `unrealized_pnl` 加總（Binance 的 `unRealizedProfit`，全倉與逐倉都算）。**不用** `balance.unrealized_pnl`：那個欄位來自 `crossUnPnl`，只含全倉持倉，會漏掉逐倉持倉的虧損，而 A1 加密的持倉是逐倉（2026-10-19 #246 審閱抓到：錢包 95、逐倉虧 20、`crossUnPnl` 為 0，會誤報權益 95）。限制：讀數只查策略自己的交易對，別的交易對的持倉不會被算進去。
++- **提醒線**：`EQUITY_REMINDER_USDT = 90`。最小單 0.001 BTC 約 82 USDT 名目（隨 BTC 價格變），權益低於約 82 時單筆停損會虧超過權益的 5%；90 是預留的緩衝。
++- **狀態**：權益 ≥ 90 為 `waiting`（報告裡直接寫現在的數字）；< 90 為 `observed` ＋ `needs_human`，發**一則** Telegram。每個 10 USDT 的區間（[80,90)、[70,80)、[60,70)…）各通知一次，回到 90 以上再跌破會再通知。
++- **不確定就是錯誤，不是沒事**：讀數超過 45 分鐘、讀到的不是真倉主網（`execution_mode` 不是 `LIVE` 或 `environment` 不是 `mainnet`）、這次交易所讀數不完整（`fetch_status.complete` 不是 true）、沒有 `wallet_balance`、持倉清單缺少或任何一筆持倉沒有有限的 `unrealized_pnl`、或加起來的權益不是有限數字（兩個有限數相加也可能溢位），一律當 `error`（連續 3 次才通知），不會顯示成「權益正常」。
++- 這個檢查只提醒，不碰下單量、不改任何設定；下單量的規則（`RISK_PER_TRADE_PCT` 與最小單）是使用者決定維持現狀。
++
+ ## 開發機加密策略的 x5b 測試網檢查（`dev-crypto-x5b`，phase-x5b）
+ x5b 剩下三件事要等開發機加密策略**自己**出訊號才驗得到（乾淨接手、停損真的觸發、移動停損撤舊再掛）。這個檢查只負責「看到」，不結案：
+ 
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index 2fbd672..26db4ec 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -303,6 +303,65 @@ def check_crypto_flat(ctx: Context) -> Result:
+                   needs_human=True, key=str(last.get("event_id") or "flat"))
+ 
+ 
++#: f-55 (2026-10-19, decided by the user): the exchange's minimum order is 0.001 BTC (about 82 USDT of notional at today's price),
++#: so once the A1 crypto account's equity falls below roughly that figure a stop-out costs MORE than the 5% of equity the sizing
++#: formula promises.  The user accepted the current rule and asked to be reminded below this line to decide (top up or accept).
++EQUITY_REMINDER_USDT = 90.0
++
++
++def _finite(value: Any) -> float | None:
++    try:
++        number = float(value)
++    except (TypeError, ValueError):
++        return None
++    return number if number == number and number not in (float("inf"), float("-inf")) else None
++
++
++def check_crypto_equity(ctx: Context) -> Result:
++    """f-55: the live A1 crypto account's equity is above the reminder line.
++
++    Equity = ``balance.wallet_balance`` + the sum of every open position's ``unrealized_pnl`` (Binance ``unRealizedProfit``,
++    which counts both cross and isolated positions).  The balance block's own ``unrealized_pnl`` is NOT used: the fetch fills it
++    from ``crossUnPnl``, which leaves an isolated position's loss out -- and A1's crypto position is isolated (2026-10-19 review of
++    #246).  Only the strategy's own symbol is queried, so a position on another symbol would not be counted.
++
++    Below the line the user is told once per 10-USDT band ([80,90), [70,80) ...), and again after it recovered above the line.  A stale
++    read, a read of something that is not the live account, an incomplete fetch or a missing/non-finite figure is an ``error`` --
++    never a quiet "all fine"."""
++    state = load_json(ctx.remote, "a1", audit("mycrypto", "exchange_state.json"))
++    fetched = parse_time(state.get("fetched_at"))
++    if not _fresh(fetched, ctx.now, 45):
++        raise RemoteError(f"加密策略的交易所讀數太舊，判斷不了權益（fetched_at={state.get('fetched_at')}）")
++    if state.get("execution_mode") != "LIVE" or state.get("environment") != "mainnet":
++        raise RemoteError(f"加密策略的讀數不是真倉主網（execution_mode={state.get('execution_mode')}、environment={state.get('environment')}）")
++    if (state.get("fetch_status") or {}).get("complete") is not True:
++        raise RemoteError("加密策略這次的交易所讀數不完整（fetch_status.complete 不是 true），持倉或餘額可能漏了")
++    balance = state.get("balance") if isinstance(state.get("balance"), Mapping) else {}
++    wallet = _finite(balance.get("wallet_balance"))
++    if wallet is None:
++        raise RemoteError(f"加密策略的讀數沒有可用的 wallet_balance（balance keys={sorted(balance)[:8]}）")
++    positions = state.get("positions")
++    if not isinstance(positions, list):
++        raise RemoteError("加密策略的讀數沒有持倉清單（positions 不是清單）")
++    unrealized = 0.0
++    for position in positions:
++        loss = _finite(position.get("unrealized_pnl")) if isinstance(position, Mapping) else None
++        if loss is None:
++            raise RemoteError(f"加密策略有一筆持倉沒有可用的 unrealized_pnl（{json.dumps(position, ensure_ascii=False)[:120]}）")
++        unrealized += loss
++    equity = _finite(wallet + unrealized)      # two finite numbers can still overflow to inf
++    if equity is None:
++        raise RemoteError(f"加密策略的權益算不出有限數字（wallet_balance={wallet}、持倉未實現損益合計={unrealized}）")
++    evidence = [f"錢包餘額 {wallet:.2f}、{len(positions)} 筆持倉的未實現損益合計 {unrealized:+.2f}（讀數 {taipei(fetched)} 台北）"]
++    if equity >= EQUITY_REMINDER_USDT:
++        return Result(WAITING, f"A1 加密權益 {equity:.2f} USDT，高於 {EQUITY_REMINDER_USDT:.0f} USDT 提醒線。", evidence)
++    low = int(equity // 10) * 10
++    return Result(OBSERVED, f"A1 加密權益 {equity:.2f} USDT，已低於 {EQUITY_REMINDER_USDT:.0f} USDT 提醒線。",
++                  evidence + ["最小下單量 0.001 BTC（約 82 USDT 名目，隨 BTC 價格變）：權益低於約 82 USDT 時，單筆停損會虧超過權益的 5%（f-55）。",
++                              "要補錢還是接受目前的風險比例，由你決定。"],
++                  needs_human=True, key=f"band-{low}-{low + 10}")
++
++
+ _F26_BASELINE = datetime(2026, 10, 9, 9, 30, tzinfo=timezone.utc)   # 2026-10-09 台北 17:30: tab names switched to Chinese
+ _TRADE_TYPES = ("trade_open", "trade_close", "spot_fill")
+ 
+@@ -782,6 +841,7 @@ def check_registry_drift(ctx: Context) -> Result:
+ 
+ CHECKS: tuple[Check, ...] = (
+     Check("crypto-flat", "加密策略空手（開工 x1 的訊號）", ("phase-x1",), check_crypto_flat),
++    Check("a1-crypto-equity", "A1 加密權益低於提醒線（最小手數風險）", ("f-55",), check_crypto_equity),
+     Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
+     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
+     Check("trend-addon", "A1 趨勢策略加碼交易", ("e-5",), check_trend_addon),
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index 6fe4323..00942b5 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -134,6 +134,117 @@ def test_crypto_stale_exchange_read_or_unreconciled_ledger_does_not_count_as_fla
+     assert ow.check_crypto_flat(ctx(crypto_remote(recon="DIVERGED"))).state == ow.WAITING
+ 
+ 
++# --- crypto equity reminder (f-55) --------------------------------------------------------------------------------
++
++def equity_remote(*, wallet=119.99, unrealized=0.0, fetched=None, mode="LIVE", environment="mainnet", balance=None,
++                  positions=None, complete=True, balance_unrealized=0.0):
++    """``unrealized`` is the (single) open position's unRealizedProfit; ``balance_unrealized`` is the balance block's crossUnPnl --
++    which stays 0 for an isolated position, exactly like A1's real reading (2026-10-19: balance 0.0, position -0.53)."""
++    r = FakeRemote()
++    if positions is None:
++        positions = [{"symbol": "BTC_USDT", "side": "short", "quantity": 0.001, "margin_type": "isolated", "unrealized_pnl": unrealized}]
++    put(r, "a1", "mycrypto", "exchange_state.json",
++        {"fetched_at": fetched or iso(NOW - timedelta(minutes=5)), "execution_mode": mode, "environment": environment,
++         "fetch_status": {"complete": complete, "errors": [] if complete else ["positions"]}, "positions": positions,
++         "balance": balance if balance is not None else {"wallet_balance": wallet, "unrealized_pnl": balance_unrealized}})
++    return r
++
++
++ONLY_EQUITY = lambda: [c for c in ow.CHECKS if c.id == "a1-crypto-equity"]   # noqa: E731
++
++
++def test_equity_above_the_reminder_line_keeps_waiting_and_shows_the_number():
++    result = ow.check_crypto_equity(ctx(equity_remote(wallet=119.99, unrealized=-0.53)))
++    assert result.state == ow.WAITING and not result.needs_human
++    assert "119.46" in result.summary and "90" in result.summary
++
++
++def test_equity_counts_an_isolated_positions_loss_that_the_balance_blocks_cross_figure_leaves_out():
++    """#246 review B1: wallet 95, isolated position -20, balance.unrealized_pnl (crossUnPnl) 0 -> real equity 75, not 95."""
++    result = ow.check_crypto_equity(ctx(equity_remote(wallet=95.0, unrealized=-20.0, balance_unrealized=0.0)))
++    assert result.state == ow.OBSERVED and result.needs_human and "75.00" in result.summary and result.key == "band-70-80"
++
++
++def test_equity_ignores_the_balance_blocks_own_unrealized_figure():
++    # a made-up crossUnPnl of -50 must not matter; only the positions' figures count
++    result = ow.check_crypto_equity(ctx(equity_remote(wallet=119.0, unrealized=-1.0, balance_unrealized=-50.0)))
++    assert result.state == ow.WAITING and "118.00" in result.summary
++
++
++def test_equity_sums_every_open_position_and_a_flat_account_is_just_the_wallet():
++    two = [{"unrealized_pnl": -10.0}, {"unrealized_pnl": 4.0}]
++    assert "94.00" in ow.check_crypto_equity(ctx(equity_remote(wallet=100.0, positions=two))).summary
++    flat = ow.check_crypto_equity(ctx(equity_remote(wallet=100.0, positions=[])))
++    assert flat.state == ow.WAITING and "100.00" in flat.summary
++
++
++def test_equity_exactly_on_the_line_is_still_waiting_and_just_below_is_observed():
++    assert ow.check_crypto_equity(ctx(equity_remote(wallet=90.0))).state == ow.WAITING
++    result = ow.check_crypto_equity(ctx(equity_remote(wallet=89.99)))
++    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and result.key == "band-80-90"
++    assert "89.99" in result.summary and any("82" in line for line in result.evidence)
++
++
++def test_equity_each_ten_usdt_band_is_its_own_notice():
++    below = ow.check_crypto_equity(ctx(equity_remote(wallet=95.0, unrealized=-8.0)))        # equity 87.0
++    assert below.state == ow.OBSERVED and below.key == "band-80-90"
++    lower = ow.check_crypto_equity(ctx(equity_remote(wallet=71.0)))
++    assert lower.state == ow.OBSERVED and lower.key == "band-70-80"
++
++
++def test_equity_notice_is_sent_once_per_band_and_again_after_it_recovered():
++    sent = []
++
++    def send(text):
++        sent.append(text)
++        return True
++
++    first = ow.run_checks(equity_remote(wallet=85.0), NOW, {}, ONLY_EQUITY())
++    assert ow.notify(first, send) == ["a1-crypto-equity"] and "85.00" in sent[0]
++    again = ow.run_checks(equity_remote(wallet=84.0), NOW, {"items": first}, ONLY_EQUITY())
++    assert ow.notify(again, send) == []                                                    # same band: no second message
++    lower = ow.run_checks(equity_remote(wallet=75.0), NOW, {"items": again}, ONLY_EQUITY())
++    assert ow.notify(lower, send) == ["a1-crypto-equity"]                                  # a lower band
++    recovered = ow.run_checks(equity_remote(wallet=110.0), NOW, {"items": lower}, ONLY_EQUITY())
++    assert recovered["a1-crypto-equity"]["state"] == ow.WAITING and recovered["a1-crypto-equity"]["notified_key"] is None
++    low_again = ow.run_checks(equity_remote(wallet=75.0), NOW, {"items": recovered}, ONLY_EQUITY())
++    assert ow.notify(low_again, send) == ["a1-crypto-equity"]                              # tells again after a recovery
++    assert len(sent) == 3
++
++
++@pytest.mark.parametrize("remote", [
++    equity_remote(fetched=hours_ago(3)),                                    # a stale read is not "all fine"
++    equity_remote(fetched="not-a-time"),
++    equity_remote(mode="DEMO"), equity_remote(environment="testnet"),       # not the live mainnet account
++    equity_remote(complete=False),                                          # an incomplete fetch may have lost the positions
++    equity_remote(balance={}), equity_remote(balance={"wallet_balance": "n/a"}),
++    equity_remote(balance={"wallet_balance": float("nan")}), equity_remote(balance={"wallet_balance": float("inf")}),
++    equity_remote(positions=[{"symbol": "BTC_USDT"}]),                      # a position without a figure
++    equity_remote(positions=[{"unrealized_pnl": None}]), equity_remote(positions=[{"unrealized_pnl": float("nan")}]),
++    equity_remote(positions="none"),
++    equity_remote(wallet=1e308, positions=[{"unrealized_pnl": 1e308}]),     # two finite numbers that overflow to inf (review B2)
++    equity_remote(wallet=-1e308, positions=[{"unrealized_pnl": -1e308}]),
++], ids=["stale", "bad-time", "demo", "testnet", "incomplete", "no-balance", "not-a-number", "nan", "inf", "position-without-pnl",
++        "position-pnl-none", "position-pnl-nan", "positions-not-a-list", "overflow-up", "overflow-down"])
++def test_equity_check_raises_instead_of_passing_when_it_cannot_tell(remote):
++    with pytest.raises(ow.RemoteError):
++        ow.check_crypto_equity(ctx(remote))
++
++
++def test_equity_check_that_cannot_tell_becomes_an_error_that_is_told_after_three_runs():
++    items = {}
++    for n in (1, 2, 3):
++        items = ow.run_checks(equity_remote(fetched=hours_ago(3)), NOW, {"items": items}, ONLY_EQUITY())
++        assert items["a1-crypto-equity"]["state"] == ow.ERROR and items["a1-crypto-equity"]["consecutive_errors"] == n
++        assert (ow.notice_for(items["a1-crypto-equity"]) is not None) == (n == 3)
++
++
++def test_equity_check_is_registered_for_f55_and_reads_only_the_whitelisted_file():
++    check = next(c for c in ow.CHECKS if c.id == "a1-crypto-equity")
++    assert check.covers == ("f-55",) and ow.EQUITY_REMINDER_USDT == 90.0
++    assert ow.audit("mycrypto", "exchange_state.json") in ow.ALLOWED_PATHS
++
++
+ # --- sheet tab names (f-26) -----------------------------------------------------------------------------------------
+ 
+ def trade(hours, kind="trade_close", **extra):
