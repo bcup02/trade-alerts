@@ -1092,3 +1092,7 @@ trade-alerts：v0.30.11（Google 表「備註」欄的更正說明改成中文�
 變更摘要：1. trade_correction 新增 correction_note 與 REASON_LABELS_ZH：備註改成「已更正（<中文原因>）：<說明>。淨損益 a → b USDT；數量 c → d。」，金額 2 位小數；之後產生的更正才套用（備註在簽章內容裡，舊列不變）。
           2. 名詞對照表新增「帳本更正原因代碼」3 條；接收端新增 previewCorrectionNoteConversion／convertCorrectionNotesToChinese 供表格擁有者搬舊備註（只改完全符合舊格式且代碼已知的儲存格、跳過公式、可重跑）。
           3. 策略要在改釘到 v0.30.11 後才會產生新格式；沒有函式簽名變更。
+trade-alerts：v0.30.12（錯誤清單新增 ERR-068 SEY.CORRECTION_BASE_MISMATCH；f-57）
+變更摘要：1. 新增 ERR-068（R1）：趨勢兩筆 2026-09 舊單（BTCUSDT-1139592365588、BTCUSDT-1142206675339）改釘 v0.30.11 後，若再做第二次帳本更正會被接收端以 correction_base_mismatch 拒收；附手動處理步驟（尚未演練）。
+          2. 兩張登記冊新增 SEY.CORRECTION_BASE_MISMATCH 列（行為格已做、事件日誌格未做）；頁面重新產生。
+          3. 沒有程式或函式簽名變更；只有錯誤清單與登記冊資料、版本號。消費專案不必為了它改釘，下次改釘自然帶上。

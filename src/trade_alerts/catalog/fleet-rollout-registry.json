@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-18",
+  "updated_at": "2026-10-19",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -2174,22 +2174,33 @@
           "limit": "2026-10-18 台北 A1 受控測試：人工寫入、標明【測試】的 ERR-066 事件經匯出檔與維運通知送到手機（見 notify.line_first_notice），事件到手機的最後一段已實機跑過；策略自己偵測到接管並寫出事件的路徑在 A1 還沒發生過。"
         }
       }
+    },
+    {
+      "code": "SEY.CORRECTION_BASE_MISMATCH",
+      "behaviour": {
+        "seykota": {
+          "state": "done",
+          "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection；src/seykota_bot/google_ledger_provenance.py:141／:144 更正鏈用上一次更正的完整投影摘要當下一次的 corrects_payload_digest；拒收與停放在共用庫：google_ledger_client 的 correction_base_mismatch 屬終態拒收（記 REJECTED、不重試），接收端比對在 Apps Script google_ledger_receiver.gs（錯誤清單 ERR-068）。",
+          "verified_at": "2026-10-19",
+          "limit": "A1 沒有真的遇到過：A1 趨勢仍是 v0.30.8，這個後果要等 v0.30.11 部署上 A1 才會生效；第二次更正被拒收後的手動處理步驟尚未實際演練，而且手動改儲存格不會更新接收端稽核摘要，之後對同一筆再更正仍會被拒收。"
+        }
+      },
+      "emits_event": {
+        "seykota": {
+          "state": "pending",
+          "phase": "8-seykota",
+          "reason": "拒收只記在 Google 同步紀錄（REJECTED／correction_base_mismatch），沒有寫進共用事件日誌；R1 本來就不通知，等第 8 關補寫事件日誌。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
       "kind": "rule",
-      "id": "MYC.PROTECTION_REPLACE_FAILED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句改成已實測的說法：Binance 對越界的整倉停損單回 -2021、同方向第二張回 -4130；移動停損先取消再掛，越界會留下沒停損的部位（f-54）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_PLACEMENT_REJECTED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "限制句改成已實測的說法：越界的整倉停損單被 Binance 以 -2021 拒絕、部位仍沒停損（f-54）。"
+      "id": "SEY.CORRECTION_BASE_MISMATCH",
+      "type": "added",
+      "project": "seykota",
+      "note": "新增列（ERR-068）：趨勢兩筆 2026-09 舊單改釘共用庫 v0.30.11 後，再做第二次帳本更正會被接收端拒收（備註文字改了，更正鏈摘要對不上）；行為做了、事件日誌還沒接（f-57）。"
     }
   ]
 }
