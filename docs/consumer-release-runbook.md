@@ -1088,3 +1088,7 @@ trade-alerts：v0.30.10（自動更正碰到「出場單剛成交」不再直接
           2. trade_correction 新增 TradeNotFlatError（TradeCorrectionError 的子類，已從套件匯出）；其他錯誤與抓成交失敗行為不變。
           3. 沒有函式簽名變更；錯誤清單 trade-alerts 引用行號 +12（651→663、695→707、725→737）；新增 4 個測試。
 ```
+trade-alerts：v0.30.11（Google 表「備註」欄的更正說明改成中文一句話；f-57）
+變更摘要：1. trade_correction 新增 correction_note 與 REASON_LABELS_ZH：備註改成「已更正（<中文原因>）：<說明>。淨損益 a → b USDT；數量 c → d。」，金額 2 位小數；之後產生的更正才套用（備註在簽章內容裡，舊列不變）。
+          2. 名詞對照表新增「帳本更正原因代碼」3 條；接收端新增 previewCorrectionNoteConversion／convertCorrectionNotesToChinese 供表格擁有者搬舊備註（只改完全符合舊格式且代碼已知的儲存格、跳過公式、可重跑）。
+          3. 策略要在改釘到 v0.30.11 後才會產生新格式；沒有函式簽名變更。

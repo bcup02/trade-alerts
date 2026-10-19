@@ -231,6 +231,7 @@ def test_the_fold_carries_the_corrected_close():
 # Google projection path (correct_close_v2)
 # --------------------------------------------------------------------------- #
 from trade_alerts import correction_projection_fields  # noqa: E402
+from trade_alerts.trade_correction import REASON_CODES, REASON_LABELS_ZH, correction_note  # noqa: E402
 from trade_alerts.ledger_integrity import (  # noqa: E402
     LedgerIntegrityError,
     build_provenance,
@@ -258,7 +259,7 @@ def test_projection_fields_carry_the_corrected_close_and_a_readable_note():
     assert fields["net_pnl"] == pytest.approx(-13.2331294)
     assert fields["exit_order_id"] == "1144042776223"
     assert fields["reason_code"] == "DUPLICATE_ENTRY_UNRECORDED"
-    assert "帳本更正" in fields["notes"] and "-13.2331294" in fields["notes"]
+    assert fields["notes"].startswith("已更正（重複送單，帳本漏記）：") and "-13.23" in fields["notes"] and "-13.2331294" not in fields["notes"]
     # exactly what the receiver's correct_close_v2 accepts on top of the close fields
     receiver = Path(__file__).resolve().parents[1] / "apps_script" / "google_ledger_receiver.gs"
     source = receiver.read_text("utf-8")
@@ -291,3 +292,23 @@ def test_an_action_must_match_its_ledger_event_type():
 def test_unknown_event_types_are_still_refused():
     with pytest.raises(LedgerIntegrityError, match="event_type"):
         _provenance("trade_adjustment", {"trade_id": TRADE_B})
+
+
+def test_correction_note_is_one_readable_chinese_sentence_with_rounded_numbers():
+    event = _correction_event()
+    event["reason"] = "策略重複送單：訂單 2 與訂單 1 用同一個自訂編號。"
+    event["previous"] = {**event["previous"], "net_pnl": -0.3272079900000262, "exit_volume": 0.003}
+    event["corrected"] = {**event["corrected"], "net_pnl": -0.436298870000035, "exit_volume": 0.004}
+    assert correction_note(event) == (
+        "已更正（重複送單，帳本漏記）：策略重複送單：訂單 2 與訂單 1 用同一個自訂編號。"
+        "淨損益 -0.33 → -0.44 USDT；數量 0.003 → 0.004。")
+    event["previous"] = {**event["previous"], "net_pnl": None, "exit_volume": ""}
+    assert "淨損益 未知 →" in correction_note(event) and "數量 未知 →" in correction_note(event)
+
+
+def test_reason_labels_equal_the_glossary_category():
+    import json
+    glossary = json.loads((Path(__file__).resolve().parents[1] / "src" / "trade_alerts" / "catalog" / "fleet-glossary.json").read_text("utf-8"))
+    expected = {code: e["zh"] for e in glossary["entries"] if e["category"] == "帳本更正原因代碼" for code in e["en"]}
+    assert REASON_LABELS_ZH == expected
+    assert set(REASON_LABELS_ZH) == set(REASON_CODES)

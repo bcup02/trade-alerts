@@ -1,6 +1,6 @@
 {
   "glossary_version": "fleet-glossary/v1",
-  "updated_at": "2026-10-18",
+  "updated_at": "2026-10-19",
   "note": "機隊全專案中文用詞對照表。給人看的文字一律用 zh；retired 是不要再用的舊叫法，tests/test_fleet_glossary.py 會掃描 trade-alerts 內給人看的文字，出現就擋。英文代號只如實列出，不在這裡改。",
   "entries": [
     {
@@ -953,6 +953,39 @@
         "legacy_state_backfill"
       ],
       "definition": "用舊版狀態檔補填的接手紀錄（加密策略）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "correction.duplicate_entry_unrecorded",
+      "category": "帳本更正原因代碼",
+      "zh": "重複送單，帳本漏記",
+      "en": [
+        "DUPLICATE_ENTRY_UNRECORDED"
+      ],
+      "definition": "策略把同一張單送了兩次（自訂編號一樣），帳本只記了一張；已依交易所成交重述整筆交易。 Google 表「備註」欄。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "correction.unrecorded_fill",
+      "category": "帳本更正原因代碼",
+      "zh": "成交帳本沒記",
+      "en": [
+        "UNRECORDED_FILL"
+      ],
+      "definition": "交易所有成交、帳本沒記，原因還沒查明；已依交易所成交更正。 Google 表「備註」欄。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "correction.estimated_fill_superseded",
+      "category": "帳本更正原因代碼",
+      "zh": "估算成交價被交易所實際成交取代",
+      "en": [
+        "ESTIMATED_FILL_SUPERSEDED"
+      ],
+      "definition": "帳本當時記的價格或手續費是估算值，後來以交易所實際成交取代。 Google 表「備註」欄。",
       "note": "",
       "retired": []
     }

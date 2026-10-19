@@ -44,6 +44,14 @@ REASON_CODES = frozenset({
     "ESTIMATED_FILL_SUPERSEDED",
 })
 
+#: Chinese name of each reason code, as shown in the Google sheet's 備註 column (kept equal to the glossary's
+#: 「帳本更正原因代碼」 category by tests/test_trade_correction.py).
+REASON_LABELS_ZH = {
+    "DUPLICATE_ENTRY_UNRECORDED": "重複送單，帳本漏記",
+    "UNRECORDED_FILL": "成交帳本沒記",
+    "ESTIMATED_FILL_SUPERSEDED": "估算成交價被交易所實際成交取代",
+}
+
 #: The close-summary fields a correction restates.  ``exit_order_id`` maps to
 #: the ``order_id`` of the ``trade_close`` it corrects.
 CORRECTED_FIELDS = (
@@ -201,6 +209,28 @@ def apply_trade_corrections(events: list[Mapping[str, Any]]) -> list[dict[str, A
     return out
 
 
+def _money(value: Any) -> str:
+    number = _num(value)
+    return "未知" if number is None else f"{number:.2f}"
+
+
+def _quantity(value: Any) -> str:
+    number = _num(value)
+    return "未知" if number is None else f"{number:.8f}".rstrip("0").rstrip(".")
+
+
+def correction_note(event: Mapping[str, Any]) -> str:
+    """The one-sentence 備註 a corrected row shows: that it was corrected, why, and what changed (2 decimals for money)."""
+    label = REASON_LABELS_ZH.get(event["reason_code"], event["reason_code"])
+    reason = str(event["reason"]).strip().rstrip("。.；;")
+    previous, corrected = event["previous"], event["corrected"]
+    return (
+        f"已更正（{label}）：{reason}。"
+        f"淨損益 {_money(previous.get('net_pnl'))} → {_money(corrected['net_pnl'])} USDT；"
+        f"數量 {_quantity(previous.get('exit_volume'))} → {_quantity(corrected['exit_volume'])}。"
+    )
+
+
 def correction_projection_fields(event: Mapping[str, Any]) -> dict[str, Any]:
     """The correction-specific part of a ``correct_close_v2`` projection.
 
@@ -217,11 +247,7 @@ def correction_projection_fields(event: Mapping[str, Any]) -> dict[str, Any]:
     fields = {name: corrected[name] for name in _PROJECTED_FIELDS}
     fields["exit_order_id"] = corrected["exit_order_id"]
     fields["reason_code"] = event["reason_code"]
-    fields["notes"] = (
-        f"帳本更正 {event['reason_code']}：{event['reason']}"
-        f"（淨損益 {_num(previous.get('net_pnl'))} → {_num(corrected['net_pnl'])}，"
-        f"數量 {_num(previous.get('exit_volume'))} → {_num(corrected['exit_volume'])}）"
-    )
+    fields["notes"] = correction_note(event)
     return fields
 
 
