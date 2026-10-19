@@ -4,6 +4,8 @@ const fs = require('fs');
 const vm = require('vm');
 
 const glossary = JSON.parse(fs.readFileSync('src/trade_alerts/catalog/fleet-glossary.json', 'utf8'));
+const expectedCorrection = {};
+glossary.entries.filter(e => e.category === '帳本更正原因代碼').forEach(e => e.en.forEach(code => { expectedCorrection[code] = e.zh; }));
 const expected = {};
 glossary.entries.filter(e => e.category === '帳本來源代碼').forEach(e => e.en.forEach(code => { expected[code] = e.zh; }));
 
@@ -73,5 +75,39 @@ assert.equal(formulaAt['project:7:16'], '=IF(A7="","","native_stop")');   // the
 assert.equal(other.data[1][1], 'native_stop');
 assert.equal(audit.data[1][15], 'trend_reversal');
 assert.deepEqual(JSON.parse(JSON.stringify(context.convertExitReasonsToChinese())), [{sheet: 'project', cells_changed: 0}]);   // idempotent
+
+
+// ---- f-57: old correction notes in column U
+assert.deepEqual(JSON.parse(JSON.stringify(vm.runInContext('CORRECTION_REASON_ZH', context))), expectedCorrection);
+const oldNote = '帳本更正 DUPLICATE_ENTRY_UNRECORDED：策略重複送單：訂單 28620601433 與帳本已記的訂單 28620601405 用同一個自訂編號 sk-6024ab7cfe0d4f668696ef271974109f，帳本漏記；以交易所成交重述整筆交易（一併納入同時段未記的訂單 28620601845）。（淨損益 -0.3272079900000262 → -0.436298870000035，數量 0.003 → 0.004）';
+assert.equal(context.correctionNoteLabel(oldNote),
+  '已更正（重複送單，帳本漏記）：策略重複送單：訂單 28620601433 與帳本已記的訂單 28620601405 用同一個自訂編號 sk-6024ab7cfe0d4f668696ef271974109f，帳本漏記；以交易所成交重述整筆交易（一併納入同時段未記的訂單 28620601845）。淨損益 -0.33 → -0.44 USDT；數量 0.003 → 0.004。');
+assert.equal(context.correctionNoteLabel('帳本更正 UNRECORDED_FILL：x（淨損益 None → 1.005，數量 0.1 → 0.30000000000000004）'), '已更正（成交帳本沒記）：x。淨損益 未知 → 1.00 USDT；數量 0.1 → 0.3。');
+const newNote = '已更正（成交帳本沒記）：x。淨損益 1.00 → 2.00 USDT；數量 0.1 → 0.2。';
+assert.equal(context.correctionNoteLabel(newNote), newNote);                                  // already converted: unchanged
+assert.equal(context.correctionNoteLabel('帳本更正 SOMETHING_NEW：x（淨損益 1 → 2，數量 3 → 4）'), '帳本更正 SOMETHING_NEW：x（淨損益 1 → 2，數量 3 → 4）');   // unknown code
+assert.equal(context.correctionNoteLabel('手動備註'), '手動備註');
+assert.equal(context.correctionNoteLabel(5), 5);
+
+// the same rounding table the Python test checks (tests/fixtures/note_rounding_cases.json): old notes render exactly as new ones
+JSON.parse(fs.readFileSync('tests/fixtures/note_rounding_cases.json', 'utf8')).forEach(([text, money, quantity]) => {
+  const out = context.correctionNoteLabel(`帳本更正 UNRECORDED_FILL：x（淨損益 ${text} → ${text}，數量 ${text} → ${text}）`);
+  assert.equal(out, `已更正（成交帳本沒記）：x。淨損益 ${money} → ${money} USDT；數量 ${quantity} → ${quantity}。`, text);
+});
+
+const noteHeader = Array(21).fill(''); noteHeader[20] = '備註';
+const noteRow = text => { const r = Array(21).fill(''); r[0] = 't'; r[20] = text; return r; };
+const notes = makeSheet('notes', noteHeader, [noteRow(oldNote), noteRow('手動備註'), noteRow('帳本更正 UNRECORDED_FILL：y（淨損益 1 → 2，數量 3 → 4）')]);
+formulaAt['notes:4:21'] = '=IF(A4="","","帳本更正 UNRECORDED_FILL：y（淨損益 1 → 2，數量 3 → 4）")';   // a formula that evaluates to an old note: untouched
+writes.length = 0;
+const notesBefore = JSON.stringify(notes.data);
+assert.deepEqual(JSON.parse(JSON.stringify(context.previewCorrectionNoteConversion())), [{sheet: 'notes', cells_changed: 1}]);
+assert.equal(JSON.stringify(notes.data), notesBefore);
+assert.deepEqual(JSON.parse(JSON.stringify(context.convertCorrectionNotesToChinese())), [{sheet: 'notes', cells_changed: 1}]);
+assert.deepEqual(writes, [[2, 21]]);
+assert.ok(notes.data[1][20].startsWith('已更正（重複送單，帳本漏記）：'));
+assert.equal(notes.data[2][20], '手動備註');
+assert.equal(formulaAt['notes:4:21'].startsWith('=IF('), true);
+assert.deepEqual(JSON.parse(JSON.stringify(context.convertCorrectionNotesToChinese())), [{sheet: 'notes', cells_changed: 0}]);   // idempotent
 
 console.log('apps_script_exit_reason_node_test: passed');

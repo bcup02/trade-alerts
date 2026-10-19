@@ -29,6 +29,7 @@ fields with its own ledger writer (which adds ``event_id`` / ``event_time``).
 from __future__ import annotations
 
 import math
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Iterable, Mapping
 
 TRADE_CORRECTION_EVENT = "trade_correction"
@@ -43,6 +44,14 @@ REASON_CODES = frozenset({
     # recorded price / fee were estimates; the exchange fill supersedes them
     "ESTIMATED_FILL_SUPERSEDED",
 })
+
+#: Chinese name of each reason code, as shown in the Google sheet's 備註 column (kept equal to the glossary's
+#: 「帳本更正原因代碼」 category by tests/test_trade_correction.py).
+REASON_LABELS_ZH = {
+    "DUPLICATE_ENTRY_UNRECORDED": "重複送單，帳本漏記",
+    "UNRECORDED_FILL": "成交帳本沒記",
+    "ESTIMATED_FILL_SUPERSEDED": "估算成交價被交易所實際成交取代",
+}
 
 #: The close-summary fields a correction restates.  ``exit_order_id`` maps to
 #: the ``order_id`` of the ``trade_close`` it corrects.
@@ -201,6 +210,47 @@ def apply_trade_corrections(events: list[Mapping[str, Any]]) -> list[dict[str, A
     return out
 
 
+#: A note shows "未知" for a number this large (money in USDT or a quantity): it is not a real trade figure, and past about
+#: 1e15 a float no longer holds 2 or 8 decimals anyway.  JavaScript's ``toFixed`` switches to exponent form from 1e21 and
+#: ``Decimal.quantize`` raises past its precision, so both sides apply the same bound instead.  Keep equal to
+#: NOTE_NUMBER_LIMIT in apps_script/google_ledger_receiver.gs.
+NOTE_NUMBER_LIMIT = 1e15
+
+
+def _fixed(number: float, places: int) -> str:
+    """``number`` to ``places`` decimals, ties rounded away from zero (on the exact binary value) -- the rule JavaScript's
+    ``toFixed`` follows, so the Apps Script receiver renders an old note exactly as this does a new one.  Python's own
+    ``:.2f`` rounds an exact tie to even (1.125 -> 1.12), JavaScript to 1.13."""
+    if number == 0:
+        number = 0.0                                   # -0.0 prints as 0.00 in JavaScript
+    return format(Decimal(number).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP), "f")
+
+
+def _money(value: Any) -> str:
+    number = _num(value)
+    return "未知" if number is None or abs(number) >= NOTE_NUMBER_LIMIT else _fixed(number, 2)
+
+
+def _quantity(value: Any) -> str:
+    number = _num(value)
+    if number is None or abs(number) >= NOTE_NUMBER_LIMIT:
+        return "未知"
+    text = _fixed(number, 8).rstrip("0").rstrip(".")
+    return "0" if text in ("", "-0") else text
+
+
+def correction_note(event: Mapping[str, Any]) -> str:
+    """The one-sentence 備註 a corrected row shows: that it was corrected, why, and what changed (2 decimals for money)."""
+    label = REASON_LABELS_ZH.get(event["reason_code"], event["reason_code"])
+    reason = str(event["reason"]).strip().rstrip("。.；;")
+    previous, corrected = event["previous"], event["corrected"]
+    return (
+        f"已更正（{label}）：{reason}。"
+        f"淨損益 {_money(previous.get('net_pnl'))} → {_money(corrected['net_pnl'])} USDT；"
+        f"數量 {_quantity(previous.get('exit_volume'))} → {_quantity(corrected['exit_volume'])}。"
+    )
+
+
 def correction_projection_fields(event: Mapping[str, Any]) -> dict[str, Any]:
     """The correction-specific part of a ``correct_close_v2`` projection.
 
@@ -217,11 +267,7 @@ def correction_projection_fields(event: Mapping[str, Any]) -> dict[str, Any]:
     fields = {name: corrected[name] for name in _PROJECTED_FIELDS}
     fields["exit_order_id"] = corrected["exit_order_id"]
     fields["reason_code"] = event["reason_code"]
-    fields["notes"] = (
-        f"帳本更正 {event['reason_code']}：{event['reason']}"
-        f"（淨損益 {_num(previous.get('net_pnl'))} → {_num(corrected['net_pnl'])}，"
-        f"數量 {_num(previous.get('exit_volume'))} → {_num(corrected['exit_volume'])}）"
-    )
+    fields["notes"] = correction_note(event)
     return fields
 
 

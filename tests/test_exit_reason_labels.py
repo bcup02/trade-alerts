@@ -27,3 +27,11 @@ def test_every_code_has_a_distinct_chinese_name_per_entry():
     assert len(entries) >= 28
     assert len({e["zh"] for e in entries}) == len(entries)
     assert all(re.fullmatch(r"[a-z0-9_]+", code) for e in entries for code in e["en"])
+
+
+def test_receiver_correction_labels_equal_glossary_and_correction_module():
+    from trade_alerts.trade_correction import REASON_LABELS_ZH
+
+    text = sync.RECEIVER.read_text(encoding="utf-8")
+    assert sync.current_block(text, sync.CBEGIN, sync.CEND) == sync.render_correction_block(), "run scripts/sync_receiver_exit_reasons.py"
+    assert sync.labels(sync.CORRECTION_CATEGORY) == REASON_LABELS_ZH

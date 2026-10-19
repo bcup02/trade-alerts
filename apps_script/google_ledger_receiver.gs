@@ -118,6 +118,15 @@ const EXIT_REASON_ZH = {
 function exitReasonLabel(value) {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(EXIT_REASON_ZH, value) ? EXIT_REASON_ZH[value] : value;
 }
+// BEGIN CORRECTION_REASON_ZH (generated from trade-alerts fleet-glossary.json by scripts/sync_receiver_exit_reasons.py -- do not edit by hand)
+const CORRECTION_REASON_ZH = {
+  "DUPLICATE_ENTRY_UNRECORDED": "重複送單，帳本漏記",
+  "ESTIMATED_FILL_SUPERSEDED": "估算成交價被交易所實際成交取代",
+  "UNRECORDED_FILL": "成交帳本沒記"
+};
+// END CORRECTION_REASON_ZH
+const NOTES_COLUMN = 21;                       // U
+const NOTES_HEADER = '備註';
 const EXIT_REASON_COLUMN = 16;                 // P
 const EXIT_REASON_HEADER = '出場原因';
 
@@ -579,3 +588,55 @@ function convertExitReasons_(apply) {
 }
 function previewExitReasonConversion() { return convertExitReasons_(false); }
 function convertExitReasonsToChinese() { return convertExitReasons_(true); }
+
+// ---- One-time conversion of the OLD correction notes in column U (f-57).  A new correction already carries the Chinese
+// sentence (trade-alerts correction_note).  An old one reads
+//   帳本更正 <CODE>：<reason>（淨損益 <a> → <b>，數量 <c> → <d>）
+// and becomes
+//   已更正（<中文原因>）：<reason>。淨損益 <a 2位> → <b 2位> USDT；數量 <c> → <d>。
+// Only a cell that matches that exact shape with a known code is rewritten; the free-text <reason> is kept as it is (an
+// English one has to be rewritten by hand).  Formula cells are skipped; running it again changes nothing.
+const OLD_CORRECTION_NOTE = /^帳本更正 ([A-Z_]+)：([\s\S]*?)（淨損益 (\S+) → (\S+)，數量 (\S+) → (\S+)）$/;
+function correctionNoteLabel(value) {
+  if (typeof value !== 'string') return value;
+  const match = OLD_CORRECTION_NOTE.exec(value);
+  if (!match || !Object.prototype.hasOwnProperty.call(CORRECTION_REASON_ZH, match[1])) return value;
+  // Same rule as trade-alerts _money/_quantity: ties away from zero (toFixed does that), no exponent, no trailing zeros.
+  // A number of 1e15 or more is shown as 未知 (equal to NOTE_NUMBER_LIMIT in trade_correction.py): toFixed turns exponent at 1e21.
+  const NOTE_NUMBER_LIMIT = 1e15;
+  const finite = text => text !== '' && text !== 'None' && isFinite(Number(text)) && Math.abs(Number(text)) < NOTE_NUMBER_LIMIT;
+  const money = text => finite(text) ? (Number(text) === 0 ? 0 : Number(text)).toFixed(2) : '未知';
+  const quantity = text => {
+    if (!finite(text)) return '未知';
+    const fixed = (Number(text) === 0 ? 0 : Number(text)).toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
+    return fixed === '' || fixed === '-0' ? '0' : fixed;
+  };
+  const reason = match[2].trim().replace(/[。.；;]+$/, '');
+  return '已更正（' + CORRECTION_REASON_ZH[match[1]] + '）：' + reason + '。淨損益 ' + money(match[3]) + ' → ' + money(match[4]) +
+    ' USDT；數量 ' + quantity(match[5]) + ' → ' + quantity(match[6]) + '。';
+}
+function convertCorrectionNotes_(apply) {
+  const report = [];
+  SpreadsheetApp.getActiveSpreadsheet().getSheets().forEach(sheet => {
+    const name = sheet.getName();
+    if (name === V2_AUDIT_SHEET || String(sheet.getRange(1, NOTES_COLUMN).getValue()).trim() !== NOTES_HEADER) return;
+    const last = sheet.getLastRow();
+    if (last < 2) { report.push({sheet: name, cells_changed: 0}); return; }
+    const range = sheet.getRange(2, NOTES_COLUMN, last - 1, 1);
+    const before = range.getValues();
+    const formulas = range.getFormulas();
+    let changed = 0;
+    before.forEach((row, index) => {
+      if (formulas[index][0] !== '') return;
+      const label = correctionNoteLabel(row[0]);
+      if (label === row[0]) return;
+      changed += 1;
+      if (apply) sheet.getRange(2 + index, NOTES_COLUMN).setValue(label);
+    });
+    report.push({sheet: name, cells_changed: changed});
+  });
+  Logger.log(JSON.stringify({applied: apply, tabs: report}));
+  return report;
+}
+function previewCorrectionNoteConversion() { return convertCorrectionNotes_(false); }
+function convertCorrectionNotesToChinese() { return convertCorrectionNotes_(true); }
