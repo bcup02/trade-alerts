@@ -104,9 +104,20 @@ def test_items_and_watch_ids_are_read_from_the_page_and_literal_lines_are_skippe
         cpl.extract_items("<html>no items here</html>")
 
 
+def _real_registry_with_a_pending_cap() -> dict:
+    """The shipped registry; once every capability cell has shipped (2026-10-19), the first one of the copy is turned
+    pending so the link checks still have a pending cell to point at."""
+    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    if not any(s["state"] == "pending" for c in real["capabilities"] for s in c["status"].values()):
+        first = real["capabilities"][0]
+        project = next(iter(first["status"]))
+        first["status"][project] = {"state": "pending", "phase": next(iter(real["phases"])), "reason": "test"}
+    return real
+
+
 def test_cli_exit_codes(tmp_path, capsys):
     reg_file, page = tmp_path / "registry.json", tmp_path / "page.html"
-    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    real = _real_registry_with_a_pending_cap()
     reg_file.write_text(json.dumps(real), encoding="utf-8")
     cap = next(c for c in real["capabilities"] if any(s["state"] == "pending" for s in c["status"].values()))
     pending_project = next(p for p, s in cap["status"].items() if s["state"] == "pending")
@@ -248,7 +259,7 @@ def _export(tmp_path, items, watch=({"id": "w-1", "note": "n"},), watch_raw=None
 
 def test_a_db_export_is_read_and_checked(tmp_path, capsys):
     reg = tmp_path / "registry.json"
-    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    real = _real_registry_with_a_pending_cap()
     reg.write_text(json.dumps(real), encoding="utf-8")
     cap = next(c for c in real["capabilities"] if any(s["state"] == "pending" for s in c["status"].values()))
     project = next(p for p, s in cap["status"].items() if s["state"] == "pending")
@@ -348,7 +359,7 @@ def test_an_unreadable_registry_is_a_controlled_error_with_exit_1(tmp_path, caps
 
 
 def _registry_file(tmp_path, mutate):
-    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    real = _real_registry_with_a_pending_cap()
     mutate(real)
     path = tmp_path / "reg.json"
     path.write_text(json.dumps(real), encoding="utf-8")
@@ -376,7 +387,7 @@ def test_a_registry_with_the_wrong_shape_is_an_error_not_a_silent_pass(tmp_path,
 
 
 def test_the_real_registry_has_the_shape_the_checker_requires():
-    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    real = _real_registry_with_a_pending_cap()
     cpl.check_registry_shape(real)
 
 
@@ -394,7 +405,7 @@ def _first_cap_and_project(real):
 ])
 def test_a_registry_cell_that_breaks_the_registry_rules_cannot_pass_as_finished(tmp_path, capsys, name, cell):
     """Review of #206 (round 4): a cell without `state` raised KeyError; `done` without evidence counted as finished."""
-    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    real = _real_registry_with_a_pending_cap()
     cap, project = _first_cap_and_project(real)
     cap["status"][project] = cell(cap["status"][project])
     reg = tmp_path / "reg.json"
@@ -406,7 +417,7 @@ def test_a_registry_cell_that_breaks_the_registry_rules_cannot_pass_as_finished(
 
 
 def test_a_rule_cell_without_state_is_refused_too(tmp_path, capsys):
-    real = json.loads((_ROOT / "src/trade_alerts/catalog/fleet-rollout-registry.json").read_text(encoding="utf-8"))
+    real = _real_registry_with_a_pending_cap()
     row = real["catalog"][0]
     project = next(iter(row["behaviour"]))
     row["behaviour"][project] = {}
