@@ -134,6 +134,77 @@ def test_crypto_stale_exchange_read_or_unreconciled_ledger_does_not_count_as_fla
     assert ow.check_crypto_flat(ctx(crypto_remote(recon="DIVERGED"))).state == ow.WAITING
 
 
+# --- crypto equity reminder (f-55) --------------------------------------------------------------------------------
+
+def equity_remote(*, wallet=119.99, unrealized=0.0, fetched=None, mode="LIVE", environment="mainnet", balance=None):
+    r = FakeRemote()
+    put(r, "a1", "mycrypto", "exchange_state.json",
+        {"fetched_at": fetched or iso(NOW - timedelta(minutes=5)), "execution_mode": mode, "environment": environment,
+         "balance": balance if balance is not None else {"wallet_balance": wallet, "unrealized_pnl": unrealized}})
+    return r
+
+
+def test_equity_above_the_reminder_line_keeps_waiting_and_shows_the_number():
+    result = ow.check_crypto_equity(ctx(equity_remote(wallet=119.99, unrealized=-0.53)))
+    assert result.state == ow.WAITING and not result.needs_human
+    assert "119.46" in result.summary and "90" in result.summary
+
+
+def test_equity_exactly_on_the_line_is_still_waiting_and_just_below_is_observed():
+    assert ow.check_crypto_equity(ctx(equity_remote(wallet=90.0))).state == ow.WAITING
+    result = ow.check_crypto_equity(ctx(equity_remote(wallet=89.99)))
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and result.key == "below-80"
+    assert "89.99" in result.summary and any("82" in line for line in result.evidence)
+
+
+def test_equity_unrealized_loss_counts_and_each_ten_usdt_band_is_its_own_notice():
+    below = ow.check_crypto_equity(ctx(equity_remote(wallet=95.0, unrealized=-8.0)))        # equity 87.0
+    assert below.state == ow.OBSERVED and below.key == "below-80"
+    lower = ow.check_crypto_equity(ctx(equity_remote(wallet=71.0)))
+    assert lower.state == ow.OBSERVED and lower.key == "below-70"
+
+
+def test_equity_notice_is_sent_once_per_band_and_again_after_it_recovered():
+    sent = []
+    first = ow.run_checks(equity_remote(wallet=85.0), NOW, {}, [c for c in ow.CHECKS if c.id == "a1-crypto-equity"])
+    assert ow.notify(first, lambda text: sent.append(text) or True) == ["a1-crypto-equity"] and "85.00" in sent[0]
+    again = ow.run_checks(equity_remote(wallet=84.0), NOW, {"items": first}, [c for c in ow.CHECKS if c.id == "a1-crypto-equity"])
+    assert ow.notify(again, lambda text: sent.append(text) or True) == []                  # same band: no second message
+    lower = ow.run_checks(equity_remote(wallet=75.0), NOW, {"items": again}, [c for c in ow.CHECKS if c.id == "a1-crypto-equity"])
+    assert ow.notify(lower, lambda text: sent.append(text) or True) == ["a1-crypto-equity"]  # a lower band
+    recovered = ow.run_checks(equity_remote(wallet=110.0), NOW, {"items": lower}, [c for c in ow.CHECKS if c.id == "a1-crypto-equity"])
+    assert recovered["a1-crypto-equity"]["state"] == ow.WAITING and recovered["a1-crypto-equity"]["notified_key"] is None
+    low_again = ow.run_checks(equity_remote(wallet=75.0), NOW, {"items": recovered}, [c for c in ow.CHECKS if c.id == "a1-crypto-equity"])
+    assert ow.notify(low_again, lambda text: sent.append(text) or True) == ["a1-crypto-equity"]   # tells again after a recovery
+    assert len(sent) == 3
+
+
+@pytest.mark.parametrize("remote", [
+    equity_remote(fetched=hours_ago(3)),                       # a stale read is not "all fine"
+    equity_remote(mode="DEMO"), equity_remote(environment="testnet"),   # not the live mainnet account
+    equity_remote(balance={}), equity_remote(balance={"wallet_balance": "n/a", "unrealized_pnl": 0.0}),
+    equity_remote(balance={"wallet_balance": float("nan"), "unrealized_pnl": 0.0}),
+], ids=["stale", "demo", "testnet", "no-balance", "not-a-number", "nan"])
+def test_equity_check_raises_instead_of_passing_when_it_cannot_tell(remote):
+    with pytest.raises(ow.RemoteError):
+        ow.check_crypto_equity(ctx(remote))
+
+
+def test_equity_check_that_cannot_tell_becomes_an_error_that_is_told_after_three_runs():
+    only = [c for c in ow.CHECKS if c.id == "a1-crypto-equity"]
+    items = {}
+    for n in (1, 2, 3):
+        items = ow.run_checks(equity_remote(fetched=hours_ago(3)), NOW, {"items": items}, only)
+        assert items["a1-crypto-equity"]["state"] == ow.ERROR and items["a1-crypto-equity"]["consecutive_errors"] == n
+    assert ow.notice_for(items["a1-crypto-equity"]) is not None
+
+
+def test_equity_check_is_registered_for_f55_and_reads_only_the_whitelisted_file():
+    check = next(c for c in ow.CHECKS if c.id == "a1-crypto-equity")
+    assert check.covers == ("f-55",) and ow.EQUITY_REMINDER_USDT == 90.0
+    assert ow.audit("mycrypto", "exchange_state.json") in ow.ALLOWED_PATHS
+
+
 # --- sheet tab names (f-26) -----------------------------------------------------------------------------------------
 
 def trade(hours, kind="trade_close", **extra):

@@ -57,6 +57,15 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項�
 
 - 狀態檔在取得檔案鎖「之後」才讀（`run` 與 `ack` 都是）：排在另一輪後面的那一輪，依前一輪存下的結果決定要不要通知，不會用鎖之前讀到的舊狀態重複發送。`ack` 會等鎖（等到前一輪結束），`run` 遇到鎖仍是略過這一輪。
 
+## A1 加密權益提醒（`a1-crypto-equity`，f-55）
+2026-10-19 使用者決定接受「最小下單量讓風險超過 5%」的現況，只要權益低於提醒線就通知他決定（補錢或接受）。
+
+- **看什麼**：A1 加密的 `audit/exchange_state.json`（已在白名單，沒有新增可讀路徑）：權益 ＝ `wallet_balance` ＋ `unrealized_pnl`。
+- **提醒線**：`EQUITY_REMINDER_USDT = 90`。最小單 0.001 BTC 約 82 USDT 名目（隨 BTC 價格變），權益低於約 82 時單筆停損會虧超過權益的 5%；90 是預留的緩衝。
+- **狀態**：權益 ≥ 90 為 `waiting`（報告裡直接寫現在的數字）；< 90 為 `observed` ＋ `needs_human`，發**一則** Telegram。每個 10 USDT 的區間（80、70、60…）各通知一次，回到 90 以上再跌破會再通知。
+- **不確定就是錯誤，不是沒事**：讀數超過 45 分鐘、讀到的不是真倉主網（`execution_mode` 不是 `LIVE` 或 `environment` 不是 `mainnet`）、沒有 `wallet_balance`／`unrealized_pnl` 或不是有限數字，一律當 `error`（連續 3 次才通知），不會顯示成「權益正常」。
+- 這個檢查只提醒，不碰下單量、不改任何設定；下單量的規則（`RISK_PER_TRADE_PCT` 與最小單）是使用者決定維持現狀。
+
 ## 開發機加密策略的 x5b 測試網檢查（`dev-crypto-x5b`，phase-x5b）
 x5b 剩下三件事要等開發機加密策略**自己**出訊號才驗得到（乾淨接手、停損真的觸發、移動停損撤舊再掛）。這個檢查只負責「看到」，不結案：
 
