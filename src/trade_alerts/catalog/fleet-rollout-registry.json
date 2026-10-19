@@ -2182,7 +2182,7 @@
           "state": "done",
           "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection；src/seykota_bot/google_ledger_provenance.py:141／:144 更正鏈用上一次更正的完整投影摘要當下一次的 corrects_payload_digest；拒收與停放在共用庫：google_ledger_client 的 correction_base_mismatch 屬終態拒收（記 REJECTED、不重試），接收端比對在 Apps Script google_ledger_receiver.gs（錯誤清單 ERR-068）。",
           "verified_at": "2026-10-19",
-          "limit": "A1 沒有真的遇到過：A1 趨勢仍是 v0.30.8，這個後果要等 v0.30.11 部署上 A1 才會生效；第二次更正被拒收後的手動處理步驟尚未實際演練。"
+          "limit": "A1 沒有真的遇到過：A1 趨勢仍是 v0.30.8，這個後果要等 v0.30.11 部署上 A1 才會生效；第二次更正被拒收後的手動處理步驟尚未實際演練，而且手動改儲存格不會更新接收端稽核摘要，之後對同一筆再更正仍會被拒收。"
         }
       },
       "emits_event": {
