@@ -39,12 +39,12 @@
     "momentum": {
       "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "b92a10b13bea301d8285a2ffc17ce1044d2f731e"
+      "commit": "3031e9c04d8b1c8e629440377deef864cf8ca8d5"
     },
     "seykota": {
       "repo": "AI-for-column/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "ef0d809b7b6093cb3639005cf80f889d8c051f94"
+      "commit": "560aec073667283c3022b7341a0aaad1d70322b1"
     },
     "mycrypto": {
       "repo": "AI-for-column/my-crypto-bot",
@@ -2182,7 +2182,7 @@
           "state": "done",
           "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection；src/seykota_bot/google_ledger_provenance.py:141／:144 更正鏈用上一次更正的完整投影摘要當下一次的 corrects_payload_digest；拒收與停放在共用庫：google_ledger_client 的 correction_base_mismatch 屬終態拒收（記 REJECTED、不重試），接收端比對在 Apps Script google_ledger_receiver.gs（錯誤清單 ERR-068）。",
           "verified_at": "2026-10-19",
-          "limit": "A1 沒有真的遇到過：A1 趨勢仍是 v0.30.8，這個後果要等 v0.30.11 部署上 A1 才會生效；第二次更正被拒收後的手動處理步驟尚未實際演練，而且手動改儲存格不會更新接收端稽核摘要，之後對同一筆再更正仍會被拒收。"
+          "limit": "A1 沒有真的遇到過：A1 趨勢共用庫已於 2026-10-19 台北 18:56 部署 v0.30.11，這個後果已生效，但目前沒有人對那兩筆再做第二次更正；第二次更正被拒收後的手動處理步驟尚未實際演練，而且手動改儲存格不會更新接收端稽核摘要，之後對同一筆再更正仍會被拒收。"
         }
       },
       "emits_event": {
@@ -2198,9 +2198,9 @@
     {
       "kind": "rule",
       "id": "SEY.CORRECTION_BASE_MISMATCH",
-      "type": "added",
+      "type": "updated",
       "project": "seykota",
-      "note": "新增列（ERR-068）：趨勢兩筆 2026-09 舊單改釘共用庫 v0.30.11 後，再做第二次帳本更正會被接收端拒收（備註文字改了，更正鏈摘要對不上）；行為做了、事件日誌還沒接（f-57）。"
+      "note": "限制句改成已生效：A1 趨勢共用庫 2026-10-19 台北 18:56 已部署 v0.30.11（原寫 A1 仍是 v0.30.8、要等部署）；同時 sources 換到該次部署的 A1 現行版（趨勢 ef0d809→560aec0、動能 b92a10b→3031e9c，src 沒動、引用行號與文字全量比對 0 失配）。"
     }
   ]
 }
