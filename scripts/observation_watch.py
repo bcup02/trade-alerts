@@ -303,6 +303,65 @@ def check_crypto_flat(ctx: Context) -> Result:
                   needs_human=True, key=str(last.get("event_id") or "flat"))
 
 
+#: f-55 (2026-10-19, decided by the user): the exchange's minimum order is 0.001 BTC (about 82 USDT of notional at today's price),
+#: so once the A1 crypto account's equity falls below roughly that figure a stop-out costs MORE than the 5% of equity the sizing
+#: formula promises.  The user accepted the current rule and asked to be reminded below this line to decide (top up or accept).
+EQUITY_REMINDER_USDT = 90.0
+
+
+def _finite(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number == number and number not in (float("inf"), float("-inf")) else None
+
+
+def check_crypto_equity(ctx: Context) -> Result:
+    """f-55: the live A1 crypto account's equity is above the reminder line.
+
+    Equity = ``balance.wallet_balance`` + the sum of every open position's ``unrealized_pnl`` (Binance ``unRealizedProfit``,
+    which counts both cross and isolated positions).  The balance block's own ``unrealized_pnl`` is NOT used: the fetch fills it
+    from ``crossUnPnl``, which leaves an isolated position's loss out -- and A1's crypto position is isolated (2026-10-19 review of
+    #246).  Only the strategy's own symbol is queried, so a position on another symbol would not be counted.
+
+    Below the line the user is told once per 10-USDT band ([80,90), [70,80) ...), and again after it recovered above the line.  A stale
+    read, a read of something that is not the live account, an incomplete fetch or a missing/non-finite figure is an ``error`` --
+    never a quiet "all fine"."""
+    state = load_json(ctx.remote, "a1", audit("mycrypto", "exchange_state.json"))
+    fetched = parse_time(state.get("fetched_at"))
+    if not _fresh(fetched, ctx.now, 45):
+        raise RemoteError(f"加密策略的交易所讀數太舊，判斷不了權益（fetched_at={state.get('fetched_at')}）")
+    if state.get("execution_mode") != "LIVE" or state.get("environment") != "mainnet":
+        raise RemoteError(f"加密策略的讀數不是真倉主網（execution_mode={state.get('execution_mode')}、environment={state.get('environment')}）")
+    if (state.get("fetch_status") or {}).get("complete") is not True:
+        raise RemoteError("加密策略這次的交易所讀數不完整（fetch_status.complete 不是 true），持倉或餘額可能漏了")
+    balance = state.get("balance") if isinstance(state.get("balance"), Mapping) else {}
+    wallet = _finite(balance.get("wallet_balance"))
+    if wallet is None:
+        raise RemoteError(f"加密策略的讀數沒有可用的 wallet_balance（balance keys={sorted(balance)[:8]}）")
+    positions = state.get("positions")
+    if not isinstance(positions, list):
+        raise RemoteError("加密策略的讀數沒有持倉清單（positions 不是清單）")
+    unrealized = 0.0
+    for position in positions:
+        loss = _finite(position.get("unrealized_pnl")) if isinstance(position, Mapping) else None
+        if loss is None:
+            raise RemoteError(f"加密策略有一筆持倉沒有可用的 unrealized_pnl（{json.dumps(position, ensure_ascii=False)[:120]}）")
+        unrealized += loss
+    equity = _finite(wallet + unrealized)      # two finite numbers can still overflow to inf
+    if equity is None:
+        raise RemoteError(f"加密策略的權益算不出有限數字（wallet_balance={wallet}、持倉未實現損益合計={unrealized}）")
+    evidence = [f"錢包餘額 {wallet:.2f}、{len(positions)} 筆持倉的未實現損益合計 {unrealized:+.2f}（讀數 {taipei(fetched)} 台北）"]
+    if equity >= EQUITY_REMINDER_USDT:
+        return Result(WAITING, f"A1 加密權益 {equity:.2f} USDT，高於 {EQUITY_REMINDER_USDT:.0f} USDT 提醒線。", evidence)
+    low = int(equity // 10) * 10
+    return Result(OBSERVED, f"A1 加密權益 {equity:.2f} USDT，已低於 {EQUITY_REMINDER_USDT:.0f} USDT 提醒線。",
+                  evidence + ["最小下單量 0.001 BTC（約 82 USDT 名目，隨 BTC 價格變）：權益低於約 82 USDT 時，單筆停損會虧超過權益的 5%（f-55）。",
+                              "要補錢還是接受目前的風險比例，由你決定。"],
+                  needs_human=True, key=f"band-{low}-{low + 10}")
+
+
 _F26_BASELINE = datetime(2026, 10, 9, 9, 30, tzinfo=timezone.utc)   # 2026-10-09 台北 17:30: tab names switched to Chinese
 _TRADE_TYPES = ("trade_open", "trade_close", "spot_fill")
 
@@ -782,6 +841,7 @@ def check_registry_drift(ctx: Context) -> Result:
 
 CHECKS: tuple[Check, ...] = (
     Check("crypto-flat", "加密策略空手（開工 x1 的訊號）", ("phase-x1",), check_crypto_flat),
+    Check("a1-crypto-equity", "A1 加密權益低於提醒線（最小手數風險）", ("f-55",), check_crypto_equity),
     Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
     Check("trend-addon", "A1 趨勢策略加碼交易", ("e-5",), check_trend_addon),
