@@ -324,3 +324,10 @@ def test_note_rounding_matches_the_shared_cases_that_the_receiver_test_also_chec
         value = None if text in ("None",) else text
         assert _money(value) == money, (text, _money(value), money)
         assert _quantity(value) == quantity, (text, _quantity(value), quantity)
+
+
+def test_correction_note_never_raises_on_huge_finite_numbers():
+    event = _correction_event()
+    event["previous"] = {**event["previous"], "net_pnl": 1e30, "exit_volume": -1e21}
+    event["corrected"] = {**event["corrected"], "net_pnl": 1e15, "exit_volume": 5}
+    assert correction_note(event).endswith("淨損益 未知 → 未知 USDT；數量 未知 → 5。")

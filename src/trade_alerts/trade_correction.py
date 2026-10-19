@@ -210,6 +210,13 @@ def apply_trade_corrections(events: list[Mapping[str, Any]]) -> list[dict[str, A
     return out
 
 
+#: A note shows "未知" for a number this large (money in USDT or a quantity): it is not a real trade figure, and past about
+#: 1e15 a float no longer holds 2 or 8 decimals anyway.  JavaScript's ``toFixed`` switches to exponent form from 1e21 and
+#: ``Decimal.quantize`` raises past its precision, so both sides apply the same bound instead.  Keep equal to
+#: NOTE_NUMBER_LIMIT in apps_script/google_ledger_receiver.gs.
+NOTE_NUMBER_LIMIT = 1e15
+
+
 def _fixed(number: float, places: int) -> str:
     """``number`` to ``places`` decimals, ties rounded away from zero (on the exact binary value) -- the rule JavaScript's
     ``toFixed`` follows, so the Apps Script receiver renders an old note exactly as this does a new one.  Python's own
@@ -221,12 +228,12 @@ def _fixed(number: float, places: int) -> str:
 
 def _money(value: Any) -> str:
     number = _num(value)
-    return "未知" if number is None else _fixed(number, 2)
+    return "未知" if number is None or abs(number) >= NOTE_NUMBER_LIMIT else _fixed(number, 2)
 
 
 def _quantity(value: Any) -> str:
     number = _num(value)
-    if number is None:
+    if number is None or abs(number) >= NOTE_NUMBER_LIMIT:
         return "未知"
     text = _fixed(number, 8).rstrip("0").rstrip(".")
     return "0" if text in ("", "-0") else text

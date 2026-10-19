@@ -602,7 +602,9 @@ function correctionNoteLabel(value) {
   const match = OLD_CORRECTION_NOTE.exec(value);
   if (!match || !Object.prototype.hasOwnProperty.call(CORRECTION_REASON_ZH, match[1])) return value;
   // Same rule as trade-alerts _money/_quantity: ties away from zero (toFixed does that), no exponent, no trailing zeros.
-  const finite = text => text !== '' && text !== 'None' && isFinite(Number(text));
+  // A number of 1e15 or more is shown as 未知 (equal to NOTE_NUMBER_LIMIT in trade_correction.py): toFixed turns exponent at 1e21.
+  const NOTE_NUMBER_LIMIT = 1e15;
+  const finite = text => text !== '' && text !== 'None' && isFinite(Number(text)) && Math.abs(Number(text)) < NOTE_NUMBER_LIMIT;
   const money = text => finite(text) ? (Number(text) === 0 ? 0 : Number(text)).toFixed(2) : '未知';
   const quantity = text => {
     if (!finite(text)) return '未知';
