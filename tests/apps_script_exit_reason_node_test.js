@@ -89,6 +89,12 @@ assert.equal(context.correctionNoteLabel('帳本更正 SOMETHING_NEW：x（淨�
 assert.equal(context.correctionNoteLabel('手動備註'), '手動備註');
 assert.equal(context.correctionNoteLabel(5), 5);
 
+// the same rounding table the Python test checks (tests/fixtures/note_rounding_cases.json): old notes render exactly as new ones
+JSON.parse(fs.readFileSync('tests/fixtures/note_rounding_cases.json', 'utf8')).forEach(([text, money, quantity]) => {
+  const out = context.correctionNoteLabel(`帳本更正 UNRECORDED_FILL：x（淨損益 ${text} → ${text}，數量 ${text} → ${text}）`);
+  assert.equal(out, `已更正（成交帳本沒記）：x。淨損益 ${money} → ${money} USDT；數量 ${quantity} → ${quantity}。`, text);
+});
+
 const noteHeader = Array(21).fill(''); noteHeader[20] = '備註';
 const noteRow = text => { const r = Array(21).fill(''); r[0] = 't'; r[20] = text; return r; };
 const notes = makeSheet('notes', noteHeader, [noteRow(oldNote), noteRow('手動備註'), noteRow('帳本更正 UNRECORDED_FILL：y（淨損益 1 → 2，數量 3 → 4）')]);

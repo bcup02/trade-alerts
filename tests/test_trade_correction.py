@@ -312,3 +312,15 @@ def test_reason_labels_equal_the_glossary_category():
     expected = {code: e["zh"] for e in glossary["entries"] if e["category"] == "帳本更正原因代碼" for code in e["en"]}
     assert REASON_LABELS_ZH == expected
     assert set(REASON_LABELS_ZH) == set(REASON_CODES)
+
+
+def test_note_rounding_matches_the_shared_cases_that_the_receiver_test_also_checks():
+    """The same table is checked by tests/apps_script_exit_reason_node_test.js against the Apps Script converter."""
+    import json
+    from trade_alerts.trade_correction import _money, _quantity
+
+    cases = json.loads((Path(__file__).resolve().parent / "fixtures" / "note_rounding_cases.json").read_text("utf-8"))
+    for text, money, quantity in cases:
+        value = None if text in ("None",) else text
+        assert _money(value) == money, (text, _money(value), money)
+        assert _quantity(value) == quantity, (text, _quantity(value), quantity)

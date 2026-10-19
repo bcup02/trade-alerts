@@ -29,6 +29,7 @@ fields with its own ledger writer (which adds ``event_id`` / ``event_time``).
 from __future__ import annotations
 
 import math
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Iterable, Mapping
 
 TRADE_CORRECTION_EVENT = "trade_correction"
@@ -209,14 +210,26 @@ def apply_trade_corrections(events: list[Mapping[str, Any]]) -> list[dict[str, A
     return out
 
 
+def _fixed(number: float, places: int) -> str:
+    """``number`` to ``places`` decimals, ties rounded away from zero (on the exact binary value) -- the rule JavaScript's
+    ``toFixed`` follows, so the Apps Script receiver renders an old note exactly as this does a new one.  Python's own
+    ``:.2f`` rounds an exact tie to even (1.125 -> 1.12), JavaScript to 1.13."""
+    if number == 0:
+        number = 0.0                                   # -0.0 prints as 0.00 in JavaScript
+    return format(Decimal(number).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP), "f")
+
+
 def _money(value: Any) -> str:
     number = _num(value)
-    return "未知" if number is None else f"{number:.2f}"
+    return "未知" if number is None else _fixed(number, 2)
 
 
 def _quantity(value: Any) -> str:
     number = _num(value)
-    return "未知" if number is None else f"{number:.8f}".rstrip("0").rstrip(".")
+    if number is None:
+        return "未知"
+    text = _fixed(number, 8).rstrip("0").rstrip(".")
+    return "0" if text in ("", "-0") else text
 
 
 def correction_note(event: Mapping[str, Any]) -> str:

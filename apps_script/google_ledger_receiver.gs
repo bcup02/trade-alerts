@@ -601,8 +601,14 @@ function correctionNoteLabel(value) {
   if (typeof value !== 'string') return value;
   const match = OLD_CORRECTION_NOTE.exec(value);
   if (!match || !Object.prototype.hasOwnProperty.call(CORRECTION_REASON_ZH, match[1])) return value;
-  const money = text => { const n = Number(text); return isFinite(n) && text !== '' && text !== 'None' ? n.toFixed(2) : '未知'; };
-  const quantity = text => { const n = Number(text); return isFinite(n) && text !== '' && text !== 'None' ? String(Number(n.toFixed(8))) : '未知'; };
+  // Same rule as trade-alerts _money/_quantity: ties away from zero (toFixed does that), no exponent, no trailing zeros.
+  const finite = text => text !== '' && text !== 'None' && isFinite(Number(text));
+  const money = text => finite(text) ? (Number(text) === 0 ? 0 : Number(text)).toFixed(2) : '未知';
+  const quantity = text => {
+    if (!finite(text)) return '未知';
+    const fixed = (Number(text) === 0 ? 0 : Number(text)).toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
+    return fixed === '' || fixed === '-0' ? '0' : fixed;
+  };
   const reason = match[2].trim().replace(/[。.；;]+$/, '');
   return '已更正（' + CORRECTION_REASON_ZH[match[1]] + '）：' + reason + '。淨損益 ' + money(match[3]) + ' → ' + money(match[4]) +
     ' USDT；數量 ' + quantity(match[5]) + ' → ' + quantity(match[6]) + '。';
