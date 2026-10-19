@@ -136,12 +136,21 @@ def test_crypto_stale_exchange_read_or_unreconciled_ledger_does_not_count_as_fla
 
 # --- crypto equity reminder (f-55) --------------------------------------------------------------------------------
 
-def equity_remote(*, wallet=119.99, unrealized=0.0, fetched=None, mode="LIVE", environment="mainnet", balance=None):
+def equity_remote(*, wallet=119.99, unrealized=0.0, fetched=None, mode="LIVE", environment="mainnet", balance=None,
+                  positions=None, complete=True, balance_unrealized=0.0):
+    """``unrealized`` is the (single) open position's unRealizedProfit; ``balance_unrealized`` is the balance block's crossUnPnl --
+    which stays 0 for an isolated position, exactly like A1's real reading (2026-10-19: balance 0.0, position -0.53)."""
     r = FakeRemote()
+    if positions is None:
+        positions = [{"symbol": "BTC_USDT", "side": "short", "quantity": 0.001, "margin_type": "isolated", "unrealized_pnl": unrealized}]
     put(r, "a1", "mycrypto", "exchange_state.json",
         {"fetched_at": fetched or iso(NOW - timedelta(minutes=5)), "execution_mode": mode, "environment": environment,
-         "balance": balance if balance is not None else {"wallet_balance": wallet, "unrealized_pnl": unrealized}})
+         "fetch_status": {"complete": complete, "errors": [] if complete else ["positions"]}, "positions": positions,
+         "balance": balance if balance is not None else {"wallet_balance": wallet, "unrealized_pnl": balance_unrealized}})
     return r
+
+
+ONLY_EQUITY = lambda: [c for c in ow.CHECKS if c.id == "a1-crypto-equity"]   # noqa: E731
 
 
 def test_equity_above_the_reminder_line_keeps_waiting_and_shows_the_number():
@@ -150,53 +159,84 @@ def test_equity_above_the_reminder_line_keeps_waiting_and_shows_the_number():
     assert "119.46" in result.summary and "90" in result.summary
 
 
+def test_equity_counts_an_isolated_positions_loss_that_the_balance_blocks_cross_figure_leaves_out():
+    """#246 review B1: wallet 95, isolated position -20, balance.unrealized_pnl (crossUnPnl) 0 -> real equity 75, not 95."""
+    result = ow.check_crypto_equity(ctx(equity_remote(wallet=95.0, unrealized=-20.0, balance_unrealized=0.0)))
+    assert result.state == ow.OBSERVED and result.needs_human and "75.00" in result.summary and result.key == "band-70-80"
+
+
+def test_equity_ignores_the_balance_blocks_own_unrealized_figure():
+    # a made-up crossUnPnl of -50 must not matter; only the positions' figures count
+    result = ow.check_crypto_equity(ctx(equity_remote(wallet=119.0, unrealized=-1.0, balance_unrealized=-50.0)))
+    assert result.state == ow.WAITING and "118.00" in result.summary
+
+
+def test_equity_sums_every_open_position_and_a_flat_account_is_just_the_wallet():
+    two = [{"unrealized_pnl": -10.0}, {"unrealized_pnl": 4.0}]
+    assert "94.00" in ow.check_crypto_equity(ctx(equity_remote(wallet=100.0, positions=two))).summary
+    flat = ow.check_crypto_equity(ctx(equity_remote(wallet=100.0, positions=[])))
+    assert flat.state == ow.WAITING and "100.00" in flat.summary
+
+
 def test_equity_exactly_on_the_line_is_still_waiting_and_just_below_is_observed():
     assert ow.check_crypto_equity(ctx(equity_remote(wallet=90.0))).state == ow.WAITING
     result = ow.check_crypto_equity(ctx(equity_remote(wallet=89.99)))
-    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and result.key == "below-80"
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and result.key == "band-80-90"
     assert "89.99" in result.summary and any("82" in line for line in result.evidence)
 
 
-def test_equity_unrealized_loss_counts_and_each_ten_usdt_band_is_its_own_notice():
+def test_equity_each_ten_usdt_band_is_its_own_notice():
     below = ow.check_crypto_equity(ctx(equity_remote(wallet=95.0, unrealized=-8.0)))        # equity 87.0
-    assert below.state == ow.OBSERVED and below.key == "below-80"
+    assert below.state == ow.OBSERVED and below.key == "band-80-90"
     lower = ow.check_crypto_equity(ctx(equity_remote(wallet=71.0)))
-    assert lower.state == ow.OBSERVED and lower.key == "below-70"
+    assert lower.state == ow.OBSERVED and lower.key == "band-70-80"
 
 
 def test_equity_notice_is_sent_once_per_band_and_again_after_it_recovered():
     sent = []
-    first = ow.run_checks(equity_remote(wallet=85.0), NOW, {}, [c for c in ow.CHECKS if c.id == "a1-crypto-equity"])
-    assert ow.notify(first, lambda text: sent.append(text) or True) == ["a1-crypto-equity"] and "85.00" in sent[0]
-    again = ow.run_checks(equity_remote(wallet=84.0), NOW, {"items": first}, [c for c in ow.CHECKS if c.id == "a1-crypto-equity"])
-    assert ow.notify(again, lambda text: sent.append(text) or True) == []                  # same band: no second message
-    lower = ow.run_checks(equity_remote(wallet=75.0), NOW, {"items": again}, [c for c in ow.CHECKS if c.id == "a1-crypto-equity"])
-    assert ow.notify(lower, lambda text: sent.append(text) or True) == ["a1-crypto-equity"]  # a lower band
-    recovered = ow.run_checks(equity_remote(wallet=110.0), NOW, {"items": lower}, [c for c in ow.CHECKS if c.id == "a1-crypto-equity"])
+
+    def send(text):
+        sent.append(text)
+        return True
+
+    first = ow.run_checks(equity_remote(wallet=85.0), NOW, {}, ONLY_EQUITY())
+    assert ow.notify(first, send) == ["a1-crypto-equity"] and "85.00" in sent[0]
+    again = ow.run_checks(equity_remote(wallet=84.0), NOW, {"items": first}, ONLY_EQUITY())
+    assert ow.notify(again, send) == []                                                    # same band: no second message
+    lower = ow.run_checks(equity_remote(wallet=75.0), NOW, {"items": again}, ONLY_EQUITY())
+    assert ow.notify(lower, send) == ["a1-crypto-equity"]                                  # a lower band
+    recovered = ow.run_checks(equity_remote(wallet=110.0), NOW, {"items": lower}, ONLY_EQUITY())
     assert recovered["a1-crypto-equity"]["state"] == ow.WAITING and recovered["a1-crypto-equity"]["notified_key"] is None
-    low_again = ow.run_checks(equity_remote(wallet=75.0), NOW, {"items": recovered}, [c for c in ow.CHECKS if c.id == "a1-crypto-equity"])
-    assert ow.notify(low_again, lambda text: sent.append(text) or True) == ["a1-crypto-equity"]   # tells again after a recovery
+    low_again = ow.run_checks(equity_remote(wallet=75.0), NOW, {"items": recovered}, ONLY_EQUITY())
+    assert ow.notify(low_again, send) == ["a1-crypto-equity"]                              # tells again after a recovery
     assert len(sent) == 3
 
 
 @pytest.mark.parametrize("remote", [
-    equity_remote(fetched=hours_ago(3)),                       # a stale read is not "all fine"
-    equity_remote(mode="DEMO"), equity_remote(environment="testnet"),   # not the live mainnet account
-    equity_remote(balance={}), equity_remote(balance={"wallet_balance": "n/a", "unrealized_pnl": 0.0}),
-    equity_remote(balance={"wallet_balance": float("nan"), "unrealized_pnl": 0.0}),
-], ids=["stale", "demo", "testnet", "no-balance", "not-a-number", "nan"])
+    equity_remote(fetched=hours_ago(3)),                                    # a stale read is not "all fine"
+    equity_remote(fetched="not-a-time"),
+    equity_remote(mode="DEMO"), equity_remote(environment="testnet"),       # not the live mainnet account
+    equity_remote(complete=False),                                          # an incomplete fetch may have lost the positions
+    equity_remote(balance={}), equity_remote(balance={"wallet_balance": "n/a"}),
+    equity_remote(balance={"wallet_balance": float("nan")}), equity_remote(balance={"wallet_balance": float("inf")}),
+    equity_remote(positions=[{"symbol": "BTC_USDT"}]),                      # a position without a figure
+    equity_remote(positions=[{"unrealized_pnl": None}]), equity_remote(positions=[{"unrealized_pnl": float("nan")}]),
+    equity_remote(positions="none"),
+    equity_remote(wallet=1e308, positions=[{"unrealized_pnl": 1e308}]),     # two finite numbers that overflow to inf (review B2)
+    equity_remote(wallet=-1e308, positions=[{"unrealized_pnl": -1e308}]),
+], ids=["stale", "bad-time", "demo", "testnet", "incomplete", "no-balance", "not-a-number", "nan", "inf", "position-without-pnl",
+        "position-pnl-none", "position-pnl-nan", "positions-not-a-list", "overflow-up", "overflow-down"])
 def test_equity_check_raises_instead_of_passing_when_it_cannot_tell(remote):
     with pytest.raises(ow.RemoteError):
         ow.check_crypto_equity(ctx(remote))
 
 
 def test_equity_check_that_cannot_tell_becomes_an_error_that_is_told_after_three_runs():
-    only = [c for c in ow.CHECKS if c.id == "a1-crypto-equity"]
     items = {}
     for n in (1, 2, 3):
-        items = ow.run_checks(equity_remote(fetched=hours_ago(3)), NOW, {"items": items}, only)
+        items = ow.run_checks(equity_remote(fetched=hours_ago(3)), NOW, {"items": items}, ONLY_EQUITY())
         assert items["a1-crypto-equity"]["state"] == ow.ERROR and items["a1-crypto-equity"]["consecutive_errors"] == n
-    assert ow.notice_for(items["a1-crypto-equity"]) is not None
+        assert (ow.notice_for(items["a1-crypto-equity"]) is not None) == (n == 3)
 
 
 def test_equity_check_is_registered_for_f55_and_reads_only_the_whitelisted_file():
