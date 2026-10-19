@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 67,
+  "error_ids_issued": 68,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -2150,6 +2150,40 @@
           "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
         ],
         "ai_prompt": "請在 my-crypto-bot 追查一次重啟後接管部位：讀 audit/trading_ledger.jsonl 裡該 trade_id 的 order_attempt／position_recovered／trade_open，以及 journalctl 在那個時間點前後 my-crypto-bot.service 的 graceful_stop／接管紀錄，判斷是進場途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。"
+      }
+    },
+    {
+      "error_id": "ERR-068",
+      "code": "SEY.CORRECTION_BASE_MISMATCH",
+      "title": "趨勢兩筆舊單的第二次帳本更正會被 Google 表接收端拒收",
+      "project": "seykota",
+      "sources": [
+        "src/seykota_bot/google_ledger_provenance.py:141",
+        "src/seykota_bot/google_ledger_provenance.py:144",
+        "src/trade_alerts/google_ledger_client.py:36",
+        "src/trade_alerts/trade_correction.py:270"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "MECHANICAL",
+      "risk_tier": "R1",
+      "auto_action": "帳本更正投到 Google 表時，要帶「我取代的是哪一版」的摘要（上一次更正的投影摘要，內容含備註文字）。共用庫 v0.30.11 起備註改成一句中文，所以趨勢兩筆在 v0.30.11 之前做過第一次更正的舊單（BTCUSDT-1139592365588、BTCUSDT-1142206675339，Google 表第 3、4 列），改釘後重建出的第一次更正摘要，跟接收端 2026-09-24 記下的不一樣。之後如果對這兩筆做第二次更正，接收端回 correction_base_mismatch，這筆投影記成 REJECTED 停放（終態、不重試），排在它後面的紀錄照常送出；帳本照常追加第二次更正，Google 表不會被寫錯，只是停在第一次更正的數字。已 CONFIRMED 的第一次更正不會被重送，其他交易的第一次與第二次更正兩邊用同一套新格式，不受影響。不動帳本、不暫停。",
+      "human_action": "無需立刻處理，目前也沒有任何一筆在等。真的發生時，帳本是標準答案：不要用 requeue_rejected_projection_intents 重新排入（同樣的摘要會再被拒收）。想讓 Google 表追上，就依帳本最新一筆 trade_correction 的 corrected 數字，手動改那一列被更正的欄位（淨損益、數量、備註）；對帳持續標出差異（ERR-044）時，把該交易列入 audit/google-reconcile-ignore.json。這套手動步驟尚未實際演練過。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-19 f-57 改釘共用庫 v0.30.11（備註改中文）時，用 A1 趨勢帳本的唯讀副本重建這兩筆舊更正：舊庫 v0.30.8 的摘要與送出佇列記錄完全吻合（3892bf5e12ff7cea、837a206dc7f474e9），新庫不同（cea030adda0b458e、bb51454eb8144ce6），原因只有備註文字，因為更正鏈的 in_force 摘要（google_ledger_provenance.py:144）把第一次更正的整個投影連備註都算進去。影響被限制在這兩筆 2026-09 已平倉的舊單，再更正的機率很低；接收端是拒收（fail-closed），不會寫錯資料；停放沒有第二個選項，所以是 R1。使用者 2026-10-19 決定接受這個後果並登記，不在共用庫另補舊格式相容。這條在 A1 目前還不會發生：A1 趨勢仍是 v0.30.8，改釘 PR（ed-seykota #129）只合併到 development，部署 A1 之後才會生效。",
+      "operator_message": {
+        "what": "趨勢有兩筆 2026-09 的舊單（Google 表第 3、4 列，交易編號 BTCUSDT-1139592365588、BTCUSDT-1142206675339）已經做過一次帳本更正。如果又對其中一筆做第二次更正，Google 表接收端會拒收，那筆更正會被停放，表上那列停在第一次更正的數字。",
+        "direction": "不需要做決定：帳本是標準答案，第二次更正已經在帳本裡。想讓 Google 表也一致，才需要手動處理。",
+        "steps": [
+          "不需要任何動作。",
+          "不要用重新排入（requeue）：同樣的內容會再被拒收。",
+          "想讓 Google 表追上：打開帳本最新一筆 trade_correction 看 corrected 的淨損益與數量，到 Google 表趨勢分頁找到該交易編號那一列，手動改淨損益、數量與備註。",
+          "對帳持續標出差異（ERR-044）：確認那一列已改好，仍標出時把該交易列入 audit/google-reconcile-ignore.json。"
+        ]
       }
     }
   ],

@@ -207,6 +207,9 @@
     },
     "cap:reconcile.funding_fee_sync|mycrypto": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-18 台北）：operations 096b9e8；/opt/my-crypto-bot 的 sync_funding_fees_entry.py（blob 9153baee）與 timer（cddfd7c7）和 096b9e8 同檔相同（A1 hash-object 與 git rev-parse 逐檔比對）；venv 的 binance-trading-toolkit 0.4.1；timer enabled；exchange.env 是 binance；2026-10-17 台北 19:02 起每四小時一輪都 exit 0、日誌 funding_sync_done exchange=binance mode=LIVE symbol=BTCUSDT，其中 2026-10-18 台北 03:03（A1 日誌 JST 04:03）與 19:02（JST 20:02）各新增 1 筆、Google 總表加密策略列寫入成功；帳本 funding_fee 列來源 binance_income 共 3 筆。"
+    },
+    "rule:SEY.CORRECTION_BASE_MISMATCH:behaviour|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-19 台北）：/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/google_projection_worker.py（blob c0fb2df）與 src/seykota_bot/google_ledger_provenance.py（blob afb46d1）與 operations ef0d809 同檔相同；venv 的 trade-alerts 0.30.8，其 projection_outbox 模組檔（blob 400c681）、google_ledger_client 模組檔（77d7e08）、trade_correction 模組檔（1cecf6d）都與 tag v0.30.8 同檔；seykota-google-projection.timer active、0 個失敗單元。趨勢帳本唯讀副本重建：2 筆 trade_correction 都是 CONFIRMED（receiver_row 3、4），舊庫重建摘要與佇列記錄吻合、v0.30.11 重建不同。"
     }
   }
 }
