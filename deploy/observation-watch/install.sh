@@ -4,9 +4,10 @@
 #   sudo bash deploy/observation-watch/install.sh            # WATCH_USER defaults to ai001
 #
 # - /opt/observation-watch/observation_watch.py : a copy of scripts/observation_watch.py (root-owned)
-# - /etc/observation-watch/watch.env            : TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID only, copied from
-#                                                 /etc/ops-notify/ops-notify.env the first time (root 0600); the token is
-#                                                 never printed
+# - /etc/observation-watch/watch.env            : LINE_CHANNEL_ACCESS_TOKEN / LINE_RECIPIENT_ID (the primary channel) and
+#                                                 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (the fallback), each copied from
+#                                                 /etc/ops-notify/ops-notify.env when it is not in the file yet (root 0600);
+#                                                 no value is ever printed
 # - observation-watch.service / .timer          : every 30 minutes, runs as WATCH_USER (needs its ssh key to A1 and sudo)
 set -euo pipefail
 
@@ -24,13 +25,11 @@ install -d -m 755 /opt/observation-watch
 install -o root -g root -m 755 "$SRC/scripts/observation_watch.py" /opt/observation-watch/observation_watch.py
 install -d -m 700 /etc/observation-watch
 
-if [[ ! -f /etc/observation-watch/watch.env ]]; then
-  [[ -r /etc/ops-notify/ops-notify.env ]] || die "no /etc/ops-notify/ops-notify.env to copy the Telegram settings from"
-  ( umask 077; grep -E '^(TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID)=' /etc/ops-notify/ops-notify.env > /etc/observation-watch/watch.env ) \
-    || die "ops-notify.env has no TELEGRAM_* settings"
-  chown root:root /etc/observation-watch/watch.env; chmod 600 /etc/observation-watch/watch.env
-  echo "Created /etc/observation-watch/watch.env ($(wc -l < /etc/observation-watch/watch.env) lines; contents not shown)."
-fi
+WATCH_ENV=/etc/observation-watch/watch.env
+# shellcheck source=deploy/observation-watch/watch_env.sh
+source "$SRC/deploy/observation-watch/watch_env.sh"
+ensure_watch_env /etc/ops-notify/ops-notify.env "$WATCH_ENV" || exit 1
+chown root:root "$WATCH_ENV"; chmod 600 "$WATCH_ENV"
 
 install -d -o "$WATCH_USER" -g "$WATCH_USER" -m 755 "$HOME_DIR/.local/state/observation-watch"
 for unit in observation-watch.service observation-watch.timer; do

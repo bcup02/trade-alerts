@@ -10,8 +10,10 @@ status alert, the next real trade, the crypto strategy going flat ...).  Each *c
   * whether a mechanical pass is enough to close the item (``closable``) or the operator must still look at a phone
     (``needs_human``).
 
-A run writes ``state.json`` (the result of every check) and sends ONE Telegram message when a check changes into
-``observed`` or ``failed`` (never again for the same thing; see ``notified_key``).  The progress-page items are closed
+A run writes ``state.json`` (the result of every check) and sends ONE message when a check changes into
+``observed`` or ``failed`` (never again for the same thing; see ``notified_key``).  The message goes to LINE (the
+channel the operator watches first); only after LINE has failed for ``LINE_FAILED_RUNS_BEFORE_TELEGRAM`` runs in a row for
+that same message is it sent once to Telegram instead, saying so.  The progress-page items are closed
 or reopened by Claude when it reads ``state.json`` at the start / end of a session -- this tool decides nothing about the
 page, and a script cannot judge what it cannot measure.
 
@@ -45,6 +47,8 @@ DEFAULT_STATE = Path.home() / ".local" / "state" / "observation-watch" / "state.
 
 OBSERVED, WAITING, FAILED, ERROR = "observed", "waiting", "failed", "error"
 ERRORS_BEFORE_NOTICE = 3
+LINE_FAILED_RUNS_BEFORE_TELEGRAM = 2     # runs are 30 minutes apart: about an hour of LINE not working
+LINE_TEXT_LIMIT = 4900                   # LINE's text message limit is 5000 characters
 
 # --- strategies ---------------------------------------------------------------------------------------------------
 
@@ -927,7 +931,8 @@ def run_checks(remote: Remote, now: datetime, previous: Mapping[str, Any], check
                  "closable": result.closable, "key": result.key, "checked_at": now.isoformat(timespec="seconds"),
                  "consecutive_errors": errors, "extra": result.extra,
                  "since": old.get("since") if old.get("state") == result.state and old.get("since") else now.isoformat(timespec="seconds"),
-                 "notified_key": old.get("notified_key"), "acked_key": old.get("acked_key")}
+                 "notified_key": old.get("notified_key"), "acked_key": old.get("acked_key"),
+                 "send_failures": old.get("send_failures")}
         if result.state == WAITING:
             entry["notified_key"] = None        # the next time it is observed, tell again
         items[check.id] = entry
@@ -955,6 +960,22 @@ def notice_for(entry: Mapping[str, Any]) -> str | None:
     return "\n".join(lines)
 
 
+def send_line(text: str, env: Mapping[str, str] = os.environ) -> bool:
+    """Push one text message to the operator on LINE (standard library only).  False on any failure, a missing variable
+    included; the token never reaches a log or an exception text."""
+    token, to = env.get("LINE_CHANNEL_ACCESS_TOKEN"), env.get("LINE_RECIPIENT_ID")
+    if not token or not to:
+        return False
+    body = json.dumps({"to": to, "messages": [{"type": "text", "text": text[:LINE_TEXT_LIMIT]}]}).encode("utf-8")
+    request = urllib.request.Request("https://api.line.me/v2/bot/message/push", data=body,
+                                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(request, timeout=20) as reply:
+            return 200 <= reply.status < 300
+    except Exception:  # noqa: BLE001 -- a quota refusal (429), a bad token or no network: retried next run
+        return False
+
+
 def send_telegram(text: str, env: Mapping[str, str] = os.environ) -> bool:
     token, chat = env.get("TELEGRAM_BOT_TOKEN"), env.get("TELEGRAM_CHAT_ID")
     if not token or not chat:
@@ -967,12 +988,47 @@ def send_telegram(text: str, env: Mapping[str, str] = os.environ) -> bool:
         return False
 
 
-def notify(items: dict[str, dict[str, Any]], send: Callable[[str], bool]) -> list[str]:
+def _delivered(send: Callable[[str], bool], text: str) -> bool:
+    """One send attempt; a sender that raises counts as a failed attempt and never stops the round (the other messages)."""
+    try:
+        return send(text) is True
+    except Exception:  # noqa: BLE001 -- the text may carry nothing secret, the exception might: report nothing
+        return False
+
+
+def _failed_runs(stored: Any, key: str) -> int:
+    """How many runs in a row failed to deliver THIS message, from the stored counter.  Anything but a well-formed counter
+    for the same message (a damaged file, another message, a wrong type) counts as no failures yet."""
+    if not isinstance(stored, dict) or stored.get("key") != key:
+        return 0
+    n = stored.get("n")
+    return n if isinstance(n, int) and not isinstance(n, bool) and 0 <= n <= 1000 else 0
+
+
+def notify(items: dict[str, dict[str, Any]], send: Callable[[str], bool],
+           fallback: Callable[[str], bool] | None = None) -> list[str]:
+    """Send each entry's one message through ``send`` (LINE).  When ``send`` has failed for
+    ``LINE_FAILED_RUNS_BEFORE_TELEGRAM`` runs in a row for the SAME message, send it once through ``fallback``
+    (Telegram) with a first line saying why.  A message nobody received is not marked as sent: the next run tries again."""
     sent = []
     for entry in items.values():
         text = notice_for(entry)
-        if text and send(text):
-            entry["notified_key"] = f"{entry['state']}:{entry.get('key', '')}"
+        if not text:
+            entry["send_failures"] = None
+            continue
+        key = f"{entry['state']}:{entry.get('key', '')}"
+        delivered = _delivered(send, text)
+        if delivered:
+            entry["send_failures"] = None
+        else:
+            failed = _failed_runs(entry.get("send_failures"), key) + 1
+            entry["send_failures"] = {"key": key, "n": failed}
+            if fallback is not None and failed >= LINE_FAILED_RUNS_BEFORE_TELEGRAM:
+                delivered = _delivered(fallback, "（LINE 送不出去，改用 Telegram 發這一則）\n" + text)
+                if delivered:
+                    entry["send_failures"] = None
+        if delivered:
+            entry["notified_key"] = key
             sent.append(entry["id"])
     return sent
 
@@ -1044,7 +1100,7 @@ def main(argv: list[str] | None = None, remote: Remote | None = None, send: Call
         if args.only:   # keep the other checks' stored results
             state["items"] = {**(previous.get("items") or {}), **state["items"]}
         if not args.dry_run:
-            notify(state["items"], send or send_telegram)
+            notify(state["items"], send or send_line, None if send else send_telegram)
             try:
                 save_state(args.state, state)
             except OSError as exc:
