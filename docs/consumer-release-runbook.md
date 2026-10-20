@@ -478,7 +478,7 @@ trade-alerts：v0.17.0（Phase 6a）
 ```text
 trade-alerts：v0.17.1（Phase 6b 配套）
 變更摘要：1. 錯誤目錄補登 momentum 修復 bot 的三條條件（sources 指向
-          AI-for-column/mexc-4h-momentum-trailing-stop PR #88 的
+          AI-for-column5/mexc-4h-momentum-trailing-stop PR #88 的
           scripts/repair_bot.py）：
           - MOM.VERIFIED_CLOSE_AUTO_REPAIRED — MECHANICAL／R2／P6：開關開啟
             且判準全部成立才自動寫帳本，事後稽核通知。

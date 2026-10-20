@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-19",
+  "updated_at": "2026-10-20",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -37,22 +37,22 @@
   },
   "sources": {
     "momentum": {
-      "repo": "AI-for-column/mexc-4h-momentum-trailing-stop",
+      "repo": "AI-for-column5/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
       "commit": "3031e9c04d8b1c8e629440377deef864cf8ca8d5"
     },
     "seykota": {
-      "repo": "AI-for-column/ed-seykota-systematic-trend-following",
+      "repo": "AI-for-column5/ed-seykota-systematic-trend-following",
       "branch": "operations",
       "commit": "560aec073667283c3022b7341a0aaad1d70322b1"
     },
     "mycrypto": {
-      "repo": "AI-for-column/my-crypto-bot",
+      "repo": "AI-for-column5/my-crypto-bot",
       "branch": "operations",
       "commit": "a60e94f6649f4c5dd2cb17ad503af0e7b2f863ce"
     },
     "btc-competition": {
-      "repo": "AI-for-column/btc-bull-market-competition",
+      "repo": "AI-for-column5/btc-bull-market-competition",
       "branch": "operations",
       "commit": "a8a1ba1ac8871be6866bf6659c73af26905fef8c"
     }
@@ -481,19 +481,19 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "AI-for-column/mexc-4h-momentum-trailing-stop#94（2026-09-19 squash 合併 cf4df67，外部審閱 PASS）：docs/branch-governance.md、docs/operations-modes.md、docs/protective-pause-contract.md 等 7 份 docs 加 README、src/notifications.py／src/investor.py 的通知與 close_reason 顯示文字、src/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。刻意不動已封存的 archive/reports（比照趨勢策略 n2 先例）。"
+          "evidence": "AI-for-column5/mexc-4h-momentum-trailing-stop#94（2026-09-19 squash 合併 cf4df67，外部審閱 PASS）：docs/branch-governance.md、docs/operations-modes.md、docs/protective-pause-contract.md 等 7 份 docs 加 README、src/notifications.py／src/investor.py 的通知與 close_reason 顯示文字、src/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。刻意不動已封存的 archive/reports（比照趨勢策略 n2 先例）。"
         },
         "seykota": {
           "state": "done",
-          "evidence": "AI-for-column/ed-seykota-systematic-trend-following#61（2026-09-19 squash 合併 993c07f，外部審閱 PASS）：docs/branch-governance.md、docs/kill_switch_runbook.md、docs/operations-modes.md 等 6 份 docs 加 CLAUDE.md、SAFE_HALT 訊息字串（src/seykota_bot/bot.py）、修復機器人顯示名全部改用對照表統一叫法。刻意不動已封存的 archive/reports 與跨專案契約文件（比照 C4/C5 先例）。"
+          "evidence": "AI-for-column5/ed-seykota-systematic-trend-following#61（2026-09-19 squash 合併 993c07f，外部審閱 PASS）：docs/branch-governance.md、docs/kill_switch_runbook.md、docs/operations-modes.md 等 6 份 docs 加 CLAUDE.md、SAFE_HALT 訊息字串（src/seykota_bot/bot.py）、修復機器人顯示名全部改用對照表統一叫法。刻意不動已封存的 archive/reports 與跨專案契約文件（比照 C4/C5 先例）。"
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "AI-for-column/my-crypto-bot#47（2026-09-19 squash 合併 1c2c039，外部審閱 PASS）：README、docs/branch-governance.md、docs/operations-modes.md 加 mexc_futures_bot.py／portfolio_snapshot_adapter.py 的程式註解全部改用對照表統一叫法；README 描述對帳容忍值不會自動停止交易的那句話，原文誤用了保留給未來單日虧損上限的舊詞，已修正成安全暫停（這支 bot 本身無 SAFE_HALT latch，2026-09-12 使用者定案不加）。"
+          "evidence": "AI-for-column5/my-crypto-bot#47（2026-09-19 squash 合併 1c2c039，外部審閱 PASS）：README、docs/branch-governance.md、docs/operations-modes.md 加 mexc_futures_bot.py／portfolio_snapshot_adapter.py 的程式註解全部改用對照表統一叫法；README 描述對帳容忍值不會自動停止交易的那句話，原文誤用了保留給未來單日虧損上限的舊詞，已修正成安全暫停（這支 bot 本身無 SAFE_HALT latch，2026-09-12 使用者定案不加）。"
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "AI-for-column/btc-bull-market-competition#33（2026-09-19 squash 合併 a878166，外部審閱 PASS）：README、docs/branch-governance.md、docs/btc-competition-onboarding-plan.md、docs/execution-flow.md、docs/recon-strategy4.md 加 src/btc_competition/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。過程中排除了兩處剛好包含子字串、但語意其實是買賣盤報價、跟交易模式無關的詞，也刻意不動 tests/test_portfolio_snapshot_adapter.py 的跨 repo digest 一致性 fixture（要跟 portfolio-query 同步才能改，留給 n6）。"
+          "evidence": "AI-for-column5/btc-bull-market-competition#33（2026-09-19 squash 合併 a878166，外部審閱 PASS）：README、docs/branch-governance.md、docs/btc-competition-onboarding-plan.md、docs/execution-flow.md、docs/recon-strategy4.md 加 src/btc_competition/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。過程中排除了兩處剛好包含子字串、但語意其實是買賣盤報價、跟交易模式無關的詞，也刻意不動 tests/test_portfolio_snapshot_adapter.py 的跨 repo digest 一致性 fixture（要跟 portfolio-query 同步才能改，留給 n6）。"
         }
       }
     },
@@ -2200,68 +2200,31 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "reconcile.adopted_fills",
-      "type": "completed",
-      "project": "mycrypto",
-      "note": "接手成交配對（帳本對交易所守門測試 #100）隨 A1 operations a60e94f 上線；A1 沒有接手案例，開發機 x5b 乾淨端到端尚未做。"
+      "id": "docs.glossary_adopted",
+      "type": "updated",
+      "project": "momentum",
+      "note": "證據裡的倉庫位置改成 AI-for-column5（四支策略 2026-10-20 台北轉移，PR 編號與提交不變，舊網址自動轉址）；格子狀態沒變。"
     },
     {
       "kind": "cap",
-      "id": "reconcile.unrecorded_fill_handling",
-      "type": "completed",
-      "project": "mycrypto",
-      "note": "少記成交自動更正（g1-6，#102）已在 A1 跑；A1 沒發生過，只有測試與開發機測試網實測。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.UNRECORDED_FILL_CORRECTED",
-      "type": "completed",
-      "project": "mycrypto",
-      "aspect": "behaviour",
-      "note": "ERR-067 行為格改已做（A1 2026-10-19 台北 19:25 起，沒觸發過）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.UNRECORDED_FILL_CORRECTED",
-      "type": "completed",
-      "project": "mycrypto",
-      "aspect": "emits_event",
-      "note": "ERR-067 事件日誌格改已做（共用處理程式寫事件日誌與匯出檔；A1 沒觸發過、手機端沒實機跑過）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.UNRECORDED_FILL_UNRESOLVED",
+      "id": "docs.glossary_adopted",
       "type": "updated",
-      "project": "mycrypto",
-      "note": "引用改成 A1 現行 Binance 轉接器（client_ids=True）；說法改為『不能確定是自己重複送單才只通知』。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_PLACEMENT_REJECTED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "f-54 已上 A1：-2021 改 reduce-only 市價平倉；限制句改為 A1 沒有真的觸發過。"
-    },
-    {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_REPLACE_FAILED",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "f-54 已上 A1：移動停損遇 -2021 改市價平倉；限制句保留 A1 沒觸發過、現有停損單是舊編號。"
+      "project": "seykota",
+      "note": "證據裡的倉庫位置改成 AI-for-column5（四支策略 2026-10-20 台北轉移，PR 編號與提交不變，舊網址自動轉址）；格子狀態沒變。"
     },
     {
       "kind": "cap",
-      "id": "orders.single_send",
+      "id": "docs.glossary_adopted",
       "type": "updated",
       "project": "mycrypto",
-      "note": "單號改 mc-o-／mc-c-（g1-6），並說明 f-54 市價平倉最多兩張 reduce-only 單。"
+      "note": "證據裡的倉庫位置改成 AI-for-column5（四支策略 2026-10-20 台北轉移，PR 編號與提交不變，舊網址自動轉址）；格子狀態沒變。"
     },
     {
-      "kind": "rule",
-      "id": "MYC.PROTECTION_PLACEMENT_ERROR",
+      "kind": "cap",
+      "id": "docs.glossary_adopted",
       "type": "updated",
-      "project": "mycrypto",
-      "note": "sources 換 a60e94f 後引用行號跟著搬（行為沒變）。"
+      "project": "btc-competition",
+      "note": "證據裡的倉庫位置改成 AI-for-column5（四支策略 2026-10-20 台北轉移，PR 編號與提交不變，舊網址自動轉址）；格子狀態沒變。"
     }
   ]
 }
