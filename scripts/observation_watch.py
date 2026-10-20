@@ -988,6 +988,23 @@ def send_telegram(text: str, env: Mapping[str, str] = os.environ) -> bool:
         return False
 
 
+def _delivered(send: Callable[[str], bool], text: str) -> bool:
+    """One send attempt; a sender that raises counts as a failed attempt and never stops the round (the other messages)."""
+    try:
+        return send(text) is True
+    except Exception:  # noqa: BLE001 -- the text may carry nothing secret, the exception might: report nothing
+        return False
+
+
+def _failed_runs(stored: Any, key: str) -> int:
+    """How many runs in a row failed to deliver THIS message, from the stored counter.  Anything but a well-formed counter
+    for the same message (a damaged file, another message, a wrong type) counts as no failures yet."""
+    if not isinstance(stored, dict) or stored.get("key") != key:
+        return 0
+    n = stored.get("n")
+    return n if isinstance(n, int) and not isinstance(n, bool) and 0 <= n <= 1000 else 0
+
+
 def notify(items: dict[str, dict[str, Any]], send: Callable[[str], bool],
            fallback: Callable[[str], bool] | None = None) -> list[str]:
     """Send each entry's one message through ``send`` (LINE).  When ``send`` has failed for
@@ -1000,15 +1017,14 @@ def notify(items: dict[str, dict[str, Any]], send: Callable[[str], bool],
             entry["send_failures"] = None
             continue
         key = f"{entry['state']}:{entry.get('key', '')}"
-        delivered = send(text)
+        delivered = _delivered(send, text)
         if delivered:
             entry["send_failures"] = None
         else:
-            previous = entry.get("send_failures") if isinstance(entry.get("send_failures"), dict) else {}
-            failed = (int(previous.get("n", 0)) if previous.get("key") == key else 0) + 1
+            failed = _failed_runs(entry.get("send_failures"), key) + 1
             entry["send_failures"] = {"key": key, "n": failed}
             if fallback is not None and failed >= LINE_FAILED_RUNS_BEFORE_TELEGRAM:
-                delivered = fallback("（LINE 送不出去，改用 Telegram 發這一則）\n" + text)
+                delivered = _delivered(fallback, "（LINE 送不出去，改用 Telegram 發這一則）\n" + text)
                 if delivered:
                     entry["send_failures"] = None
         if delivered:

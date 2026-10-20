@@ -26,23 +26,10 @@ install -o root -g root -m 755 "$SRC/scripts/observation_watch.py" /opt/observat
 install -d -m 700 /etc/observation-watch
 
 WATCH_ENV=/etc/observation-watch/watch.env
-( umask 077; touch "$WATCH_ENV" )
-for var in LINE_CHANNEL_ACCESS_TOKEN LINE_RECIPIENT_ID TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID; do
-  if ! grep -q "^${var}=" "$WATCH_ENV"; then
-    [[ -r /etc/ops-notify/ops-notify.env ]] || die "no /etc/ops-notify/ops-notify.env to copy the $var setting from"
-    line=$(grep -E "^${var}=" /etc/ops-notify/ops-notify.env || true)
-    if [[ -n $line ]]; then
-      ( umask 077; printf '%s\n' "$line" >> "$WATCH_ENV" )
-      echo "Copied $var into $WATCH_ENV (value not shown)."
-    fi
-  fi
-done
+# shellcheck source=deploy/observation-watch/watch_env.sh
+source "$SRC/deploy/observation-watch/watch_env.sh"
+ensure_watch_env /etc/ops-notify/ops-notify.env "$WATCH_ENV" || exit 1
 chown root:root "$WATCH_ENV"; chmod 600 "$WATCH_ENV"
-grep -q "^LINE_CHANNEL_ACCESS_TOKEN=" "$WATCH_ENV" && grep -q "^LINE_RECIPIENT_ID=" "$WATCH_ENV" \
-  || die "no LINE settings for the watcher: LINE is its primary channel (put LINE_CHANNEL_ACCESS_TOKEN and LINE_RECIPIENT_ID in ops-notify.env or $WATCH_ENV)"
-grep -q "^TELEGRAM_BOT_TOKEN=" "$WATCH_ENV" && grep -q "^TELEGRAM_CHAT_ID=" "$WATCH_ENV" \
-  || echo "WARNING: no Telegram settings: a LINE failure will not be sent anywhere else." >&2
-echo "$WATCH_ENV has $(wc -l < "$WATCH_ENV") lines; contents not shown."
 
 install -d -o "$WATCH_USER" -g "$WATCH_USER" -m 755 "$HOME_DIR/.local/state/observation-watch"
 for unit in observation-watch.service observation-watch.timer; do

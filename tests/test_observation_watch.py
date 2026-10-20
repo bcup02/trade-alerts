@@ -562,12 +562,15 @@ def test_the_service_has_no_secret_and_the_installer_never_prints_one():
     assert "NoNewPrivileges=true" not in service          # sudo needs it; the reason is written next to the unit
     assert "OnCalendar=*:0/30" in timer
     # the token is copied by grep into a root-only file; no echo/cat of its value anywhere
-    assert "umask 077" in installer and 'chmod 600 "$WATCH_ENV"' in installer and "WATCH_ENV=/etc/observation-watch/watch.env" in installer
-    assert not any(w in installer for w in ("echo $TELEGRAM", 'echo "$TELEGRAM', "cat /etc/ops-notify", "echo $line", 'echo "$line"', "echo $LINE", 'echo "$LINE'))
+    env_fill = (_ROOT / "deploy" / "observation-watch" / "watch_env.sh").read_text(encoding="utf-8")
+    assert "umask 077" in env_fill and 'chmod 600 "$WATCH_ENV"' in installer and "WATCH_ENV=/etc/observation-watch/watch.env" in installer
+    assert 'source "$SRC/deploy/observation-watch/watch_env.sh"' in installer and "ensure_watch_env /etc/ops-notify/ops-notify.env" in installer
+    for text in (installer, env_fill):
+        assert not any(w in text for w in ("echo $TELEGRAM", 'echo "$TELEGRAM', "cat /etc/ops-notify", "echo $line", 'echo "$line"', "echo $LINE", 'echo "$LINE'))
     # LINE is the primary channel and Telegram the fallback: both pairs are copied, LINE is required
     for var in ("LINE_CHANNEL_ACCESS_TOKEN", "LINE_RECIPIENT_ID", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
-        assert var in installer
-    assert "no LINE settings for the watcher" in installer and "LINE" not in service
+        assert var in env_fill
+    assert "no LINE settings for the watcher" in env_fill and "LINE" not in service
 
 
 # --- the reconcile must come AFTER the trade's grace period (review of #183, BLOCK-01/02) -------------------------------
@@ -1403,3 +1406,104 @@ def test_main_sends_to_line_by_default_and_falls_back_to_telegram(monkeypatch, t
     for _ in range(2):
         ow.main(["run", "--state", str(state2), "--only", "crypto-flat"], remote=r)
     assert len(lines) == 2 and len(telegrams) == 1 and telegrams[0].startswith("（LINE 送不出去")
+
+
+# --- review of #254: a damaged counter or a sender that raises never stops the round --------------------------------------
+
+@pytest.mark.parametrize("stored", ["invalid", -3, None, True, 1.5, 10**9, [], {"key": "observed:k"}, {"n": 1}, {"key": "observed:k", "n": "2"}, "text", 7])
+def test_a_damaged_failure_counter_counts_as_no_failures_and_the_round_goes_on(stored):
+    check = one_check(lambda n: ow.Result(ow.OBSERVED, "到了", needs_human=True, key="k"))
+    other = ow.Check("other", "另一個", ("f-o",), lambda c: ow.Result(ow.FAILED, "不符", key="o"))
+    items = ow.run_checks(ow.Remote("k"), NOW, {}, [check, other])
+    items["demo"]["send_failures"] = stored if not isinstance(stored, dict) else {**stored}
+    telegrams = []
+    sent = ow.notify(items, lambda t: False, lambda t: telegrams.append(t) or True)
+    assert items["demo"]["send_failures"] == {"key": "observed:k", "n": 1} and items["other"]["send_failures"] == {"key": "failed:o", "n": 1}
+    assert sent == [] and telegrams == []                                              # one failure each, no Telegram yet; nothing raised
+
+
+def test_a_well_formed_counter_still_reaches_the_fallback():
+    check = one_check(lambda n: ow.Result(ow.OBSERVED, "到了", needs_human=True, key="k"))
+    items = ow.run_checks(ow.Remote("k"), NOW, {}, [check])
+    items["demo"]["send_failures"] = {"key": "observed:k", "n": 1}
+    telegrams = []
+    assert ow.notify(items, lambda t: False, lambda t: telegrams.append(t) or True) == ["demo"] and len(telegrams) == 1
+
+
+def test_a_sender_that_raises_is_a_failed_attempt_and_the_other_messages_still_go_out():
+    first = one_check(lambda n: ow.Result(ow.OBSERVED, "到了", needs_human=True, key="k"))
+    second = ow.Check("second", "第二個", ("f-s",), lambda c: ow.Result(ow.FAILED, "不符", key="s"))
+    items = ow.run_checks(ow.Remote("k"), NOW, {}, [first, second])
+    seen = []
+
+    def line(text):
+        seen.append(text)
+        if "到了" in text:
+            raise RuntimeError("token-secret-in-an-exception")
+        return True
+
+    assert ow.notify(items, line) == ["second"] and len(seen) == 2
+    assert items["demo"]["send_failures"] == {"key": "observed:k", "n": 1} and not items["demo"]["notified_key"]
+    items["demo"]["send_failures"] = {"key": "observed:k", "n": 1}
+    assert ow.notify(items, line, lambda t: (_ for _ in ()).throw(OSError("boom"))) == []          # a raising fallback is a failure too
+    assert items["demo"]["send_failures"] == {"key": "observed:k", "n": 2}
+
+
+# --- the installer's env fill (deploy/observation-watch/watch_env.sh), run against temp files, no systemd ------------------
+
+def _fill(tmp_path, *, ops=None, watch=None):
+    ops_file, watch_file = tmp_path / "ops-notify.env", tmp_path / "watch.env"
+    if ops is not None:
+        ops_file.write_text("\n".join(ops) + "\n", encoding="utf-8")
+    if watch is not None:
+        watch_file.write_text("\n".join(watch) + "\n", encoding="utf-8")
+    script = f'source "{_ROOT}/deploy/observation-watch/watch_env.sh"; ensure_watch_env "{ops_file}" "{watch_file}"'
+    run = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+    return run, watch_file
+
+
+LINE = ["LINE_CHANNEL_ACCESS_TOKEN=line-secret-value", "LINE_RECIPIENT_ID=U-recipient-secret"]
+TELEGRAM = ["TELEGRAM_BOT_TOKEN=telegram-secret-value", "TELEGRAM_CHAT_ID=123456"]
+
+
+def _no_secret(run):
+    assert not any(v in run.stdout + run.stderr for v in ("line-secret-value", "U-recipient-secret", "telegram-secret-value", "123456"))
+
+
+def test_env_fill_line_complete_and_the_ops_file_missing_installs_with_only_a_warning(tmp_path):
+    run, watch = _fill(tmp_path, ops=None, watch=LINE)                          # review B1: LINE there, no Telegram, source unreadable
+    assert run.returncode == 0 and "WARNING: no Telegram settings" in run.stderr
+    assert watch.read_text(encoding="utf-8").splitlines() == LINE
+    _no_secret(run)
+
+
+def test_env_fill_without_any_line_setting_fails(tmp_path):
+    run, _ = _fill(tmp_path, ops=None, watch=[])
+    assert run.returncode == 1 and "INSTALL_FAILED" in run.stderr
+    run, _ = _fill(tmp_path, ops=TELEGRAM, watch=[])                           # the source exists but has no LINE
+    assert run.returncode == 1 and "no LINE settings for the watcher" in run.stderr
+    _no_secret(run)
+
+
+def test_env_fill_copies_missing_values_from_the_ops_file_without_showing_them(tmp_path):
+    run, watch = _fill(tmp_path, ops=[*LINE, *TELEGRAM, "OTHER=x"], watch=None)
+    assert run.returncode == 0 and "WARNING" not in run.stderr
+    assert watch.read_text(encoding="utf-8").splitlines() == [*LINE, *TELEGRAM]
+    assert oct(watch.stat().st_mode & 0o777) == "0o600"
+    assert "Copied LINE_CHANNEL_ACCESS_TOKEN" in run.stdout
+    _no_secret(run)
+
+
+def test_env_fill_is_idempotent_and_never_overwrites_an_existing_value(tmp_path):
+    run, watch = _fill(tmp_path, ops=[*LINE, *TELEGRAM], watch=["LINE_CHANNEL_ACCESS_TOKEN=already-here", "LINE_RECIPIENT_ID=U-already"])
+    assert run.returncode == 0
+    first = watch.read_text(encoding="utf-8").splitlines()
+    assert first[:2] == ["LINE_CHANNEL_ACCESS_TOKEN=already-here", "LINE_RECIPIENT_ID=U-already"] and first[2:] == TELEGRAM
+    again, _ = _fill(tmp_path, ops=[*LINE, *TELEGRAM])
+    assert again.returncode == 0 and watch.read_text(encoding="utf-8").splitlines() == first
+
+
+def test_env_fill_copies_what_exists_when_the_source_lacks_only_telegram(tmp_path):
+    run, watch = _fill(tmp_path, ops=LINE, watch=None)
+    assert run.returncode == 0 and "WARNING: no Telegram settings" in run.stderr
+    assert watch.read_text(encoding="utf-8").splitlines() == LINE
