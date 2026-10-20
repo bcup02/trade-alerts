@@ -1,0 +1,192 @@
+diff --git a/deploy/observation-watch/install.sh b/deploy/observation-watch/install.sh
+index 7ccddce..5398cf7 100755
+--- a/deploy/observation-watch/install.sh
++++ b/deploy/observation-watch/install.sh
+@@ -1,13 +1,14 @@
+ #!/usr/bin/env bash
+-# Install the observation watcher (f-43) on the dev host.  Idempotent.
++# Install the observation watcher (f-43) on the dev host (trading-dev, or fleet-standby-1 with WATCH_USER=ubuntu).  Idempotent.
+ #
+-#   sudo bash deploy/observation-watch/install.sh            # WATCH_USER defaults to ai001
++#   sudo bash deploy/observation-watch/install.sh            # WATCH_USER defaults to ai001; on fleet-standby-1: sudo WATCH_USER=ubuntu bash ...
+ #
+ # - /opt/observation-watch/observation_watch.py : a copy of scripts/observation_watch.py (root-owned)
+ # - /etc/observation-watch/watch.env            : LINE_CHANNEL_ACCESS_TOKEN / LINE_RECIPIENT_ID (the primary channel) and
+ #                                                 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (the fallback), each copied from
+ #                                                 /etc/ops-notify/ops-notify.env when it is not in the file yet (root 0600);
+ #                                                 no value is ever printed
++# - warn-only preflight (watch_preflight.sh): the five clones, A1 in known_hosts, ssh key mode; install goes on regardless
+ # - observation-watch.service / .timer          : every 30 minutes, runs as WATCH_USER (needs its ssh key to A1 and sudo)
+ set -euo pipefail
+ 
+@@ -21,6 +22,10 @@ id "$WATCH_USER" >/dev/null 2>&1 || die "no such user $WATCH_USER"
+ HOME_DIR=$(getent passwd "$WATCH_USER" | cut -d: -f6)
+ [[ -f $HOME_DIR/.ssh/oci_a1_key ]] || die "$WATCH_USER has no ~/.ssh/oci_a1_key (read access to A1)"
+ 
++# shellcheck source=deploy/observation-watch/watch_preflight.sh
++source "$SRC/deploy/observation-watch/watch_preflight.sh"
++watch_preflight "$HOME_DIR" 161.33.186.220 oci_a1_key
++
+ install -d -m 755 /opt/observation-watch
+ install -o root -g root -m 755 "$SRC/scripts/observation_watch.py" /opt/observation-watch/observation_watch.py
+ install -d -m 700 /etc/observation-watch
+diff --git a/deploy/observation-watch/watch_preflight.sh b/deploy/observation-watch/watch_preflight.sh
+new file mode 100644
+index 0000000..e1715cf
+--- /dev/null
++++ b/deploy/observation-watch/watch_preflight.sh
+@@ -0,0 +1,41 @@
++#!/usr/bin/env bash
++# Warn-only checks for a NEW host before the observation watcher's first run (sourced by install.sh; tested on its own).
++#
++#   watch_preflight <home-dir> <a1-host> <ssh-key-name>
++#
++# Prints a WARNING line for each thing the watcher needs that is missing; never fails, never prints a secret:
++#   - the five clones it reads (registry clone + four strategy clones under <home-dir>); the unit skips missing ones,
++#     so the registry checks would report errors instead of results;
++#   - A1's host key in known_hosts (the watcher ssh's with StrictHostKeyChecking=yes, so an unknown host fails);
++#   - the ssh key's permissions (must not be group/world readable).
++# Returns the number of warnings in WATCH_PREFLIGHT_WARNINGS.
++
++watch_preflight() {
++  local home=$1 a1=$2 keyname=$3 repo kh found=no mode
++  WATCH_PREFLIGHT_WARNINGS=0
++  for repo in trade-alerts ed-seykota-systematic-trend-following mexc-4h-momentum-trailing-stop my-crypto-bot btc-bull-market-competition; do
++    if [[ ! -d $home/$repo/.git ]]; then
++      echo "WARNING: no clone $home/$repo (the watcher's registry/strategy checks will report errors until it exists)." >&2
++      WATCH_PREFLIGHT_WARNINGS=$((WATCH_PREFLIGHT_WARNINGS + 1))
++    fi
++  done
++  for kh in "$home/.ssh/known_hosts" /etc/ssh/ssh_known_hosts; do
++    if [[ -r $kh ]] && ssh-keygen -F "$a1" -f "$kh" >/dev/null 2>&1; then found=yes; fi
++  done
++  if [[ $found == no ]]; then
++    echo "WARNING: $a1 is not in known_hosts (the watcher uses StrictHostKeyChecking=yes, so every A1 read fails until the host key is added)." >&2
++    WATCH_PREFLIGHT_WARNINGS=$((WATCH_PREFLIGHT_WARNINGS + 1))
++  fi
++  if [[ -f $home/.ssh/$keyname ]]; then
++    # install.sh runs with set -e: a failing stat must become a warning, never end the install.
++    if ! mode=$(stat -c '%a' "$home/.ssh/$keyname" 2>/dev/null) || [[ ! $mode =~ ^[0-7]{3,4}$ ]]; then
++      echo "WARNING: cannot read the mode of $home/.ssh/$keyname (is it readable? ssh needs mode 600)." >&2
++      WATCH_PREFLIGHT_WARNINGS=$((WATCH_PREFLIGHT_WARNINGS + 1))
++    elif (( 8#$mode & 8#077 )); then
++      echo "WARNING: $home/.ssh/$keyname has mode $mode (ssh refuses keys readable by group/others; use 600)." >&2
++      WATCH_PREFLIGHT_WARNINGS=$((WATCH_PREFLIGHT_WARNINGS + 1))
++    fi
++  fi
++  echo "Preflight: $WATCH_PREFLIGHT_WARNINGS warning(s)."
++  return 0
++}
+diff --git a/docs/observation-watch.md b/docs/observation-watch.md
+index 1075ffe..7c0c9f2 100644
+--- a/docs/observation-watch.md
++++ b/docs/observation-watch.md
+@@ -74,3 +74,15 @@ x5b 剩下三件事要等開發機加密策略**自己**出訊號才驗得到（
+ - **停損觸發**：自己進場的交易，出現 `source` 以 `native_stop` 開頭的 `trade_close`。
+ - 進場後過了寬限，Google 表對帳仍 `DIVERGED` 時回報失敗。
+ - 三項都看到時仍是 `observed` ＋ `needs_human`，不會是 `closable`：帳本、Google 表、出場單編號（`mc-t-`）要人（Claude 加使用者授權）逐項查證。
++
++## 裝在新主機（fleet-standby-1，階段 3 切換；P3）
++安裝腳本本來就用 `WATCH_USER` 參數化（單元是 `@WATCH_USER@` 範本），新機用 `ubuntu` 即可，不用建 `ai001`：
++
++1. 先裝好三支策略與 ops-notify（腳本要從 `/etc/ops-notify/ops-notify.env` 複製 LINE／Telegram 設定，沒有就失敗）。
++2. 在 ubuntu 家目錄放 5 個 clone：`trade-alerts`、`ed-seykota-systematic-trend-following`、`mexc-4h-momentum-trailing-stop`、`my-crypto-bot`、`btc-bull-market-competition`（私有 repo，取碼方式見切換手冊 P1；沒有 clone 時單元會略過，登記冊類檢查會回報錯誤）。
++3. `~/.ssh/oci_a1_key`（權限 600；從開發機用 ssh 串流複製，不落地不印出）與 A1 的 known_hosts（`ssh-keyscan -t ed25519 161.33.186.220 >> ~/.ssh/known_hosts` 之後，**與開發機 known_hosts 的指紋核對一致**才算數；程式用 `StrictHostKeyChecking=yes`）。
++4. `sudo WATCH_USER=ubuntu bash deploy/observation-watch/install.sh`：開頭的警告式預檢（`watch_preflight.sh`）會列出缺的 clone、known_hosts、金鑰權限，只警告不中止。
++5. 搬 `state.json`（保留已 ack／已通知的紀錄，否則第一輪會重複通知）：開發機 `~/.local/state/observation-watch/state.json` → 新機同路徑（擁有者 ubuntu）。
++6. `sudo systemctl start observation-watch.service` → `python3 /opt/observation-watch/observation_watch.py report` 看 `檢查時間` 新鮮、`systemctl --failed` 為空。
++
++開發機那一側的檢查讀「本機」檔案（`sudo -n cat`，ubuntu 在新機 sudo 免密即可），所以必須與三支策略同機。
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index 0bd0c69..b27f15f 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -694,6 +694,7 @@ def test_a_run_that_waited_behind_another_decides_from_what_that_one_saved(tmp_p
+ 
+ # --- registry cells waiting for a deployment (phase-sync1) ---------------------------------------------------------
+ 
++import os
+ import subprocess
+ 
+ 
+@@ -1507,3 +1508,80 @@ def test_env_fill_copies_what_exists_when_the_source_lacks_only_telegram(tmp_pat
+     run, watch = _fill(tmp_path, ops=LINE, watch=None)
+     assert run.returncode == 0 and "WARNING: no Telegram settings" in run.stderr
+     assert watch.read_text(encoding="utf-8").splitlines() == LINE
++
++
++# --- P3: installing on a new host (fleet-standby-1, WATCH_USER=ubuntu) -------------------------------------------------
++
++def _preflight(home, a1="161.33.186.220", path_prefix=None):
++    # same shell options as install.sh: a failure inside the preflight would end the script before CONTINUES
++    script = (f'set -euo pipefail; source "{_ROOT}/deploy/observation-watch/watch_preflight.sh"; '
++              f'watch_preflight "{home}" {a1} oci_a1_key; echo "N=$WATCH_PREFLIGHT_WARNINGS"; echo INSTALL_CONTINUES')
++    return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "PATH": f"{path_prefix}:{os.environ['PATH']}"} if path_prefix else None)
++
++
++def test_preflight_on_an_empty_home_warns_about_every_missing_piece_and_still_succeeds(tmp_path):
++    run = _preflight(tmp_path)
++    assert run.returncode == 0 and "N=6" in run.stdout                    # 5 clones + known_hosts (no key file: nothing to check)
++    assert run.stderr.count("WARNING: no clone") == 5 and "not in known_hosts" in run.stderr
++
++
++def test_preflight_clean_home_has_no_warnings(tmp_path):
++    for repo in ("trade-alerts", "ed-seykota-systematic-trend-following", "mexc-4h-momentum-trailing-stop", "my-crypto-bot", "btc-bull-market-competition"):
++        (tmp_path / repo / ".git").mkdir(parents=True)
++    ssh = tmp_path / ".ssh"
++    ssh.mkdir()
++    key = ssh / "oci_a1_key"
++    key.write_text("not a real key\n", encoding="utf-8")
++    key.chmod(0o600)
++    (ssh / "known_hosts").write_text("161.33.186.220 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeFakeFakeFakeFakeFakeFakeFakeFakeFakeFake\n", encoding="utf-8")
++    run = _preflight(tmp_path)
++    assert run.returncode == 0 and "N=0" in run.stdout and run.stderr == ""
++
++
++def test_preflight_flags_a_key_readable_by_others_and_never_prints_the_key(tmp_path):
++    ssh = tmp_path / ".ssh"
++    ssh.mkdir()
++    key = ssh / "oci_a1_key"
++    key.write_text("SECRET-KEY-BODY\n", encoding="utf-8")
++    key.chmod(0o644)
++    run = _preflight(tmp_path)
++    assert "has mode 644" in run.stderr and "SECRET-KEY-BODY" not in run.stdout + run.stderr
++
++
++def test_installer_runs_the_preflight_with_the_target_users_home_and_does_not_stop_on_warnings():
++    installer = (_ROOT / "deploy" / "observation-watch" / "install.sh").read_text(encoding="utf-8")
++    assert 'source "$SRC/deploy/observation-watch/watch_preflight.sh"' in installer
++    assert 'watch_preflight "$HOME_DIR" 161.33.186.220 oci_a1_key' in installer
++    assert "A1_SSH_TARGET" not in installer and "161.33.186.220" in (_ROOT / "scripts" / "observation_watch.py").read_text(encoding="utf-8")
++
++
++def test_unit_template_has_no_hard_coded_account_so_any_watch_user_works():
++    unit = (_ROOT / "deploy" / "observation-watch" / "observation-watch.service").read_text(encoding="utf-8")
++    assert "ai001" not in unit and unit.count("@WATCH_USER@") >= 7
++    for user in ("ubuntu", "ai001"):
++        rendered = unit.replace("@WATCH_USER@", user)
++        assert f"User={user}" in rendered.splitlines() and f"ReadWritePaths=/home/{user}/.local/state/observation-watch" in rendered.splitlines()
++        assert "@" not in rendered.replace("/home/", "")
++
++
++@pytest.mark.parametrize("stat_body", ["exit 1", "echo garbage", "echo"])
++def test_preflight_survives_a_failing_or_garbage_stat_under_set_e(tmp_path, stat_body):
++    """Review #256 BLOCK-256-01: stat failing must be a warning; the install must still reach its next step."""
++    stubs = tmp_path / "stubs"
++    stubs.mkdir()
++    (stubs / "stat").write_text(f"#!/bin/sh\n{stat_body}\n", encoding="utf-8")
++    (stubs / "stat").chmod(0o755)
++    home = tmp_path / "home"
++    (home / ".ssh").mkdir(parents=True)
++    key = home / ".ssh" / "oci_a1_key"
++    key.write_text("SECRET-KEY-BODY\n", encoding="utf-8")
++    run = _preflight(home, path_prefix=str(stubs))
++    assert run.returncode == 0 and "INSTALL_CONTINUES" in run.stdout and "cannot read the mode" in run.stderr
++    assert "N=7" in run.stdout                                  # 5 clones + known_hosts + unreadable mode
++    assert "SECRET-KEY-BODY" not in run.stdout + run.stderr
++
++
++def test_the_preflight_is_called_from_the_installer_before_any_install_step_and_under_set_e():
++    installer = (_ROOT / "deploy" / "observation-watch" / "install.sh").read_text(encoding="utf-8")
++    assert "set -euo pipefail" in installer
++    assert installer.index("watch_preflight \"$HOME_DIR\"") < installer.index("install -d -m 755 /opt/observation-watch")
