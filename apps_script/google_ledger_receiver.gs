@@ -26,6 +26,20 @@
  * A cell value that is a purely-numeric string of 16+ digits (order ids) is
  * forced to text format so Sheets does not lose precision.
  *
+ * --- put_health_v1 contract (f-45; reference only until deployed) ---
+ * The A1 ops-notify publisher writes the latest health table into one cell for the rule-register page:
+ *   {"schema_version":"google-ledger-projection-v2","action":"put_health_v1","source_id":"fleet-health-a1",
+ *    "project_id":"fleet-health","sheet_name":"維運健康","request_id":<uuid>,"issued_at":<ISO, within 5 min>,
+ *    "health":{"b64":"<gzip+base64 of the table JSON, at most 9000 characters>","generated_at":<ISO, within 5 min>},
+ *    "signature":<hmac-sha256 hex over the canonical JSON of everything else, with the source's own secret>}
+ * Writes A1 of the tab 維運健康 as text "HEALTHv1|<b64>|HEALTHEND" and answers {ok, cell_chars, written_at}.
+ * Registration (Script Property GOOGLE_LEDGER_V2_SOURCES, one more key; the secret is generated on the host and
+ * never written here): "fleet-health-a1": {"hmac_secret":"...","project_id":"fleet-health","sheet_name":"維運健康",
+ * "allowed_actions":["put_health_v1"]}.  The tab 維運健康 is created by hand; this script never creates it.  A
+ * source without allowed_actions (all earlier ones) cannot call it; a source with allowed_actions can call only
+ * those.  Errors: action_not_allowed, health_sheet_not_allowed, health_payload_invalid, health_too_large,
+ * sheet_not_found, plus the usual source_not_allowed / signature_invalid / request_not_fresh.
+ *
  * --- Redeploy (manual, whole-endpoint) ---
  * Paste this whole file into the spreadsheet's Apps Script editor (Extensions ->
  * Apps Script) -> Manage deployments -> edit -> new version. The Web App URL is
@@ -58,6 +72,16 @@
 
 const V2_SCHEMA = 'google-ledger-projection-v2';
 const V2_AUDIT_SHEET = 'Google_Provenance_Audit';
+// put_health_v1 (f-45): the A1 ops-notify publisher writes the latest health table (5 targets x checks, gzip + base64)
+// into ONE cell for the rule-register page to read through the Drive connector.  Its own source (own secret, own
+// project_id, allowed_actions ['put_health_v1']) and its own tab; it cannot touch a trading tab or the audit sheet.
+// 9000 base64 characters is the most the Drive connector is known to return whole from a single cell (a 9 KB cell
+// came back complete on 2026-10-20; two big cells on one tab were each cut to ~900 characters), so more is refused.
+const HEALTH_ACTION = 'put_health_v1';
+const HEALTH_SHEET_NAME = '維運健康';
+const HEALTH_PREFIX = 'HEALTHv1|';
+const HEALTH_SUFFIX = '|HEALTHEND';
+const HEALTH_MAX_B64_CHARS = 9000;
 const OPEN_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time', 'entry_price', 'volume', 'leverage', 'entry_fee', 'entry_order_id'];
 const OPEN_REQUIRED_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time', 'entry_price', 'volume', 'leverage', 'entry_fee'];
 const CLOSE_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source', 'exit_order_id', 'stop_plan_order_id', 'exit_anomaly', 'exit_price_is_confirmed'];
@@ -290,13 +314,16 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
 // ---- V2 handler: ledger-backed, source-scoped, and fail-closed. ----
 
 function handleV2(data) {
-  if (!['append_open_v2', 'append_fill_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
+  if (!['append_open_v2', 'append_fill_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2', HEALTH_ACTION].includes(data.action)) return {ok: false, error: 'unsupported_action'};
   const source = sourceRegistration(data.source_id);
   if (!source || data.project_id !== source.project_id || data.sheet_name !== source.sheet_name) return {ok: false, error: 'source_not_allowed'};
   if (!verifySignature(data, source.hmac_secret)) return {ok: false, error: 'signature_invalid'};
   if (!isRecentIso(data.issued_at) || !isUuid(data.request_id)) return {ok: false, error: 'request_not_fresh'};
+  if (!actionAllowedForSource(source, data.action)) return {ok: false, error: 'action_not_allowed'};
+  if (data.action === HEALTH_ACTION && source.sheet_name !== HEALTH_SHEET_NAME) return {ok: false, error: 'health_sheet_not_allowed'};
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(source.sheet_name);
   if (!sheet) return {ok: false, error: 'sheet_not_found'};
+  if (data.action === HEALTH_ACTION) return putHealth(sheet, data);
   if (data.action === 'read_reconciliation_v2') return readReconciliationInventory(sheet, data);
   if (!validProvenance(data.provenance, data)) return {ok: false, error: 'provenance_invalid'};
   const projection = data.projection || {};
@@ -306,6 +333,32 @@ function handleV2(data) {
   if (data.action === 'correct_close_v2') return correctClose(sheet, data, projection);
   if (data.action === 'read_audit_v2') return readAudit(data);
   return quarantineOnlyWithExplicitDeploymentFlag(data);
+}
+
+// A source registered with an allowed_actions list may call exactly those actions.  One WITHOUT the field (every source
+// registered before put_health_v1) keeps all the ledger actions and never gets the health write.  A field that is
+// present but not an array (a string, null, an object, a number) is a registration mistake and allows nothing: the
+// older, wider rule is only for a field that is really absent (review of #250).
+function actionAllowedForSource(source, action) {
+  if (Object.prototype.hasOwnProperty.call(source, 'allowed_actions')) {
+    return Array.isArray(source.allowed_actions) && source.allowed_actions.includes(action);
+  }
+  return action !== HEALTH_ACTION;
+}
+
+// Writes the one health cell: A1 of the health tab, as text, in the fixed HEALTHv1|<base64>|HEALTHEND shape.
+function putHealth(sheet, data) {
+  const health = data.health;
+  if (!health || typeof health !== 'object' || Array.isArray(health)) return {ok: false, error: 'health_payload_invalid'};
+  if (Object.keys(health).sort().join(',') !== 'b64,generated_at') return {ok: false, error: 'health_payload_invalid'};
+  if (typeof health.b64 !== 'string' || !/^[A-Za-z0-9+\/]+={0,2}$/.test(health.b64)) return {ok: false, error: 'health_payload_invalid'};
+  if (!isRecentIso(health.generated_at)) return {ok: false, error: 'health_payload_invalid'};
+  if (health.b64.length > HEALTH_MAX_B64_CHARS) return {ok: false, error: 'health_too_large'};
+  const text = HEALTH_PREFIX + health.b64 + HEALTH_SUFFIX;
+  const cell = sheet.getRange(1, 1);
+  cell.setNumberFormat('@');                       // text first, or a long digit run could be re-read as a number
+  cell.setValue(text);
+  return {ok: true, cell_chars: text.length, written_at: new Date().toISOString()};
 }
 
 function sourceRegistration(sourceId) {
