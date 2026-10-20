@@ -529,34 +529,65 @@ def _own_dev_crypto_trades(events: Iterable[dict[str, Any]]) -> tuple[list[dict[
     return entries, stops
 
 
+def _number(value: Any) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _side(value: Any) -> str | None:
+    text = str(value or "").lower()
+    return "short" if text in ("short", "sell") else "long" if text in ("long", "buy") else None
+
+
 def check_dev_crypto_x5b(ctx: Context) -> Result:
     """x5b: what the dev host's crypto strategy has to do by itself before the last testnet checks can run --
     open a position on a signal, move its stop (cancel the old order, place a new one), and get stopped out.
 
     Nothing here closes the item: the clean take-over test and the checks of ledger, sheet and ids need a person (and the
     user's per-item authorisation).  A move is seen as a changed ``stop_plan_order_id`` of the same trade between two runs
-    (the move is not ledgered), so a move and the close between two 30-minute runs can be missed."""
+    (the move is not ledgered) together with a stop price that tightened (down for a short, up for a long); a changed id with an
+    equal or looser price is somebody else's order and only resets the baseline.  A move and the close between two 30-minute
+    runs can be missed, and so can a stranger's order that happens to tighten the stop."""
     events = list(jsonl(ctx.remote.read("dev", audit("mycrypto", "trading_ledger.jsonl"))))
     entries, stops = _own_dev_crypto_trades(events)
     seen: dict[str, list[str]] = {k: list(v) for k, v in dict(ctx.previous.get("stops") or {}).items()}
+    prices: dict[str, float] = {k: float(v) for k, v in dict(ctx.previous.get("prices") or {}).items()}
+    last_ids: dict[str, str] = {k: str(v) for k, v in dict(ctx.previous.get("last_ids") or {}).items()}
     if not entries:
-        return Result(WAITING, "開發機加密策略還沒有因進場訊號而下的測試網單。", extra={"stops": seen})
+        return Result(WAITING, "開發機加密策略還沒有因進場訊號而下的測試網單。", extra={"stops": seen, "prices": prices, "last_ids": last_ids})
     try:
         state = load_json(ctx.remote, "dev", f"/opt/{REPOS['mycrypto']}/state/state.json")
     except RemoteFileMissing:
         state = {}                                    # flat: the strategy has no state file; nothing to learn about a stop
-    if state.get("trade_id") and state.get("stop_plan_order_id") is not None:
-        ids = seen.setdefault(str(state["trade_id"]), [])
-        if str(state["stop_plan_order_id"]) not in ids:
-            ids.append(str(state["stop_plan_order_id"]))
+    trade, order = state.get("trade_id"), state.get("stop_plan_order_id")
+    if trade and order is not None:
+        trade, order = str(trade), str(order)
+        ids = seen.setdefault(trade, [])
+        if order != last_ids.get(trade):
+            price = _number(state.get("active_stop_price"))
+            side = next((_side(e.get("side")) for e in reversed(entries) if str(e.get("trade_id")) == trade), None)
+            # A new order id alone is not a move: only the strategy tightening its stop is (a short's stop goes down, a long's
+            # up).  An id that changed with the same or a looser price -- somebody else's order replaced and restored, like the
+            # 10/20 dry-run accident -- becomes the new baseline but is never counted.
+            tightened = (price is not None and trade in prices and side is not None
+                         and (price < prices[trade] if side == "short" else price > prices[trade]))
+            if order not in ids and (not ids or tightened):
+                ids.append(order)
+            last_ids[trade] = order
+            if price is not None:
+                prices[trade] = price
     own_trades = {e.get("trade_id") for e in entries}
     seen = {t: ids for t, ids in seen.items() if t in own_trades}      # nothing else is ever looked at, so nothing else is kept
+    prices = {t: v for t, v in prices.items() if t in own_trades}
+    last_ids = {t: v for t, v in last_ids.items() if t in own_trades}
     moved = sorted(t for t, ids in seen.items() if len(ids) >= 2)
     last = max(parse_time(e["event_time"]) for e in entries)
     status = load_json(ctx.remote, "dev", audit("mycrypto", "google_reconcile_status.json"))
     if reconcile_covers(status, last, ctx.now) == "diverged":
         return Result(FAILED, "開發機加密策略有依訊號的進場，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"],
-                      extra={"stops": seen})
+                      extra={"stops": seen, "prices": prices, "last_ids": last_ids})
     stages = ["entry"] + (["move"] if moved else []) + (["stop"] if stops else [])
     done = len(stages) == 3
     summary = ("開發機加密策略依訊號進場、移動停損撤舊再掛、停損也觸發過了：x5b 的三項都觀察到，可以逐項查證。" if done else
@@ -566,7 +597,7 @@ def check_dev_crypto_x5b(ctx: Context) -> Result:
                 f"停損單號變動：{', '.join(f'{t}={len(seen[t])} 個' for t in moved) or '尚無'}",
                 f"停損觸發的平倉：{', '.join(str(e.get('trade_id'))[:8] for e in stops) or '尚無'}"]
     return Result(OBSERVED, summary, evidence, needs_human=True,
-                  key="|".join([*stages, *sorted(str(e.get("trade_id")) for e in entries)]), extra={"stops": seen})
+                  key="|".join([*stages, *sorted(str(e.get("trade_id")) for e in entries)]), extra={"stops": seen, "prices": prices, "last_ids": last_ids})
 
 
 _NOTICE_LINE = re.compile(r"notices=(\d+) attempted=(\d+) sent=(\d+) consecutive_send_failures=(\d+)")
