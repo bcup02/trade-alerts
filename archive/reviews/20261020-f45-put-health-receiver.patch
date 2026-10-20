@@ -1,0 +1,270 @@
+diff --git a/apps_script/google_ledger_receiver.gs b/apps_script/google_ledger_receiver.gs
+index 9f0ec24..42d6f91 100644
+--- a/apps_script/google_ledger_receiver.gs
++++ b/apps_script/google_ledger_receiver.gs
+@@ -26,6 +26,20 @@
+  * A cell value that is a purely-numeric string of 16+ digits (order ids) is
+  * forced to text format so Sheets does not lose precision.
+  *
++ * --- put_health_v1 contract (f-45; reference only until deployed) ---
++ * The A1 ops-notify publisher writes the latest health table into one cell for the rule-register page:
++ *   {"schema_version":"google-ledger-projection-v2","action":"put_health_v1","source_id":"fleet-health-a1",
++ *    "project_id":"fleet-health","sheet_name":"維運健康","request_id":<uuid>,"issued_at":<ISO, within 5 min>,
++ *    "health":{"b64":"<gzip+base64 of the table JSON, at most 9000 characters>","generated_at":<ISO, within 5 min>},
++ *    "signature":<hmac-sha256 hex over the canonical JSON of everything else, with the source's own secret>}
++ * Writes A1 of the tab 維運健康 as text "HEALTHv1|<b64>|HEALTHEND" and answers {ok, cell_chars, written_at}.
++ * Registration (Script Property GOOGLE_LEDGER_V2_SOURCES, one more key; the secret is generated on the host and
++ * never written here): "fleet-health-a1": {"hmac_secret":"...","project_id":"fleet-health","sheet_name":"維運健康",
++ * "allowed_actions":["put_health_v1"]}.  The tab 維運健康 is created by hand; this script never creates it.  A
++ * source without allowed_actions (all earlier ones) cannot call it; a source with allowed_actions can call only
++ * those.  Errors: action_not_allowed, health_sheet_not_allowed, health_payload_invalid, health_too_large,
++ * sheet_not_found, plus the usual source_not_allowed / signature_invalid / request_not_fresh.
++ *
+  * --- Redeploy (manual, whole-endpoint) ---
+  * Paste this whole file into the spreadsheet's Apps Script editor (Extensions ->
+  * Apps Script) -> Manage deployments -> edit -> new version. The Web App URL is
+@@ -58,6 +72,16 @@
+ 
+ const V2_SCHEMA = 'google-ledger-projection-v2';
+ const V2_AUDIT_SHEET = 'Google_Provenance_Audit';
++// put_health_v1 (f-45): the A1 ops-notify publisher writes the latest health table (5 targets x checks, gzip + base64)
++// into ONE cell for the rule-register page to read through the Drive connector.  Its own source (own secret, own
++// project_id, allowed_actions ['put_health_v1']) and its own tab; it cannot touch a trading tab or the audit sheet.
++// 9000 base64 characters is the most the Drive connector is known to return whole from a single cell (a 9 KB cell
++// came back complete on 2026-10-20; two big cells on one tab were each cut to ~900 characters), so more is refused.
++const HEALTH_ACTION = 'put_health_v1';
++const HEALTH_SHEET_NAME = '維運健康';
++const HEALTH_PREFIX = 'HEALTHv1|';
++const HEALTH_SUFFIX = '|HEALTHEND';
++const HEALTH_MAX_B64_CHARS = 9000;
+ const OPEN_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time', 'entry_price', 'volume', 'leverage', 'entry_fee', 'entry_order_id'];
+ const OPEN_REQUIRED_FIELDS = ['trade_id', 'execution_mode', 'symbol', 'side', 'entry_time', 'entry_price', 'volume', 'leverage', 'entry_fee'];
+ const CLOSE_FIELDS = ['trade_id', 'exit_time', 'entry_price', 'exit_price', 'entry_volume', 'exit_volume', 'leverage', 'entry_fee', 'exit_fee', 'gross_pnl', 'net_pnl', 'return_on_margin', 'source', 'exit_order_id', 'stop_plan_order_id', 'exit_anomaly', 'exit_price_is_confirmed'];
+@@ -290,13 +314,16 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
+ // ---- V2 handler: ledger-backed, source-scoped, and fail-closed. ----
+ 
+ function handleV2(data) {
+-  if (!['append_open_v2', 'append_fill_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2'].includes(data.action)) return {ok: false, error: 'unsupported_action'};
++  if (!['append_open_v2', 'append_fill_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2', HEALTH_ACTION].includes(data.action)) return {ok: false, error: 'unsupported_action'};
+   const source = sourceRegistration(data.source_id);
+   if (!source || data.project_id !== source.project_id || data.sheet_name !== source.sheet_name) return {ok: false, error: 'source_not_allowed'};
+   if (!verifySignature(data, source.hmac_secret)) return {ok: false, error: 'signature_invalid'};
+   if (!isRecentIso(data.issued_at) || !isUuid(data.request_id)) return {ok: false, error: 'request_not_fresh'};
++  if (!actionAllowedForSource(source, data.action)) return {ok: false, error: 'action_not_allowed'};
++  if (data.action === HEALTH_ACTION && source.sheet_name !== HEALTH_SHEET_NAME) return {ok: false, error: 'health_sheet_not_allowed'};
+   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(source.sheet_name);
+   if (!sheet) return {ok: false, error: 'sheet_not_found'};
++  if (data.action === HEALTH_ACTION) return putHealth(sheet, data);
+   if (data.action === 'read_reconciliation_v2') return readReconciliationInventory(sheet, data);
+   if (!validProvenance(data.provenance, data)) return {ok: false, error: 'provenance_invalid'};
+   const projection = data.projection || {};
+@@ -308,6 +335,32 @@ function handleV2(data) {
+   return quarantineOnlyWithExplicitDeploymentFlag(data);
+ }
+ 
++// A source registered with an allowed_actions list may call exactly those actions.  One WITHOUT the field (every source
++// registered before put_health_v1) keeps all the ledger actions and never gets the health write.  A field that is
++// present but not an array (a string, null, an object, a number) is a registration mistake and allows nothing: the
++// older, wider rule is only for a field that is really absent (review of #250).
++function actionAllowedForSource(source, action) {
++  if (Object.prototype.hasOwnProperty.call(source, 'allowed_actions')) {
++    return Array.isArray(source.allowed_actions) && source.allowed_actions.includes(action);
++  }
++  return action !== HEALTH_ACTION;
++}
++
++// Writes the one health cell: A1 of the health tab, as text, in the fixed HEALTHv1|<base64>|HEALTHEND shape.
++function putHealth(sheet, data) {
++  const health = data.health;
++  if (!health || typeof health !== 'object' || Array.isArray(health)) return {ok: false, error: 'health_payload_invalid'};
++  if (Object.keys(health).sort().join(',') !== 'b64,generated_at') return {ok: false, error: 'health_payload_invalid'};
++  if (typeof health.b64 !== 'string' || !/^[A-Za-z0-9+\/]+={0,2}$/.test(health.b64)) return {ok: false, error: 'health_payload_invalid'};
++  if (!isRecentIso(health.generated_at)) return {ok: false, error: 'health_payload_invalid'};
++  if (health.b64.length > HEALTH_MAX_B64_CHARS) return {ok: false, error: 'health_too_large'};
++  const text = HEALTH_PREFIX + health.b64 + HEALTH_SUFFIX;
++  const cell = sheet.getRange(1, 1);
++  cell.setNumberFormat('@');                       // text first, or a long digit run could be re-read as a number
++  cell.setValue(text);
++  return {ok: true, cell_chars: text.length, written_at: new Date().toISOString()};
++}
++
+ function sourceRegistration(sourceId) {
+   if (typeof sourceId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(sourceId)) return null;
+   const raw = PropertiesService.getScriptProperties().getProperty('GOOGLE_LEDGER_V2_SOURCES');
+diff --git a/tests/apps_script_put_health_node_test.js b/tests/apps_script_put_health_node_test.js
+new file mode 100644
+index 0000000..ed0a326
+--- /dev/null
++++ b/tests/apps_script_put_health_node_test.js
+@@ -0,0 +1,171 @@
++// f-45: put_health_v1 -- the A1 publisher writes the health table into ONE cell of its own tab.
++const assert = require('assert');
++const crypto = require('crypto');
++const fs = require('fs');
++const vm = require('vm');
++
++const healthSecret = 'health-test-secret';
++const ledgerSecret = 'ledger-test-secret';
++const healthSource = {hmac_secret: healthSecret, project_id: 'fleet-health', sheet_name: '維運健康', allowed_actions: ['put_health_v1']};
++const ledgerSource = {hmac_secret: ledgerSecret, project_id: 'mexc-4h-momentum', sheet_name: 'trading-tab'};   // registered before put_health_v1: no allowed_actions
++const misplacedHealthSource = {hmac_secret: 'misplaced-secret', project_id: 'fleet-health', sheet_name: 'trading-tab', allowed_actions: ['put_health_v1']};
++const missingTabSource = {hmac_secret: 'missing-secret', project_id: 'fleet-health', sheet_name: '維運健康-不存在', allowed_actions: ['put_health_v1']};
++const brokenSource = allowed => ({hmac_secret: 'broken-secret', project_id: 'fleet-health', sheet_name: '維運健康', allowed_actions: allowed});
++const bothSource = {hmac_secret: 'both-secret', project_id: 'fleet-health', sheet_name: '維運健康', allowed_actions: ['put_health_v1', 'read_reconciliation_v2']};
++const sources = {'health-a1': healthSource, 'ledger-a1': ledgerSource, 'misplaced': misplacedHealthSource, 'missing-tab': missingTabSource,
++  'broken-empty': brokenSource([]), 'broken-string': brokenSource('put_health_v1'), 'broken-null': brokenSource(null),
++  'broken-object': brokenSource({put_health_v1: true}), 'broken-number': brokenSource(1), 'both': bothSource};
++const sheets = new Map();
++const calls = [];
++
++function canonicalJson(value) {
++  if (value === null || typeof value !== 'object') return JSON.stringify(value);
++  if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']';
++  return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonicalJson(value[key])).join(',') + '}';
++}
++function bytesFromDigest(algorithm, text, key) {
++  const output = key ? crypto.createHmac(algorithm, key).update(text, 'utf8').digest() : crypto.createHash(algorithm).update(text, 'utf8').digest();
++  return Array.from(output).map(number => number > 127 ? number - 256 : number);
++}
++function createSheet(name, rows) {
++  const sheet = {name, rows, getLastRow() { return this.rows.length; },
++    getRange(row, column) {
++      const target = this;
++      return {
++        setNumberFormat(format) { calls.push({sheet: name, op: 'setNumberFormat', row, column, format}); },
++        setValue(value) {
++          calls.push({sheet: name, op: 'setValue', row, column});
++          while (target.rows.length < row) target.rows.push([]);
++          while (target.rows[row - 1].length < column) target.rows[row - 1].push('');
++          target.rows[row - 1][column - 1] = value;
++        },
++        getValues() { return [[(target.rows[row - 1] || [])[column - 1] || '']]; },
++      };
++    },
++    appendRow(values) { calls.push({sheet: name, op: 'appendRow'}); this.rows.push(values); }};
++  sheets.set(name, sheet);
++  return sheet;
++}
++const healthTab = createSheet('維運健康', [['']]);
++const tradingTab = createSheet('trading-tab', [['trade_id', 'symbol'], ['t-1', 'BTCUSDT']]);
++
++const context = {console, Date, JSON, Math, Object, String, Array, Number, Set, isNaN, isFinite,
++  PropertiesService: {getScriptProperties: () => ({getProperty: key => key === 'GOOGLE_LEDGER_V2_SOURCES' ? JSON.stringify(sources) : null})},
++  Utilities: {Charset: {UTF_8: 'UTF_8'}, DigestAlgorithm: {SHA_256: 'SHA_256'},
++    computeHmacSha256Signature: (text, key) => bytesFromDigest('sha256', text, key),
++    computeDigest: (algorithm, text) => bytesFromDigest('sha256', text)},
++  SpreadsheetApp: {getActiveSpreadsheet: () => ({getSheetByName: name => sheets.get(name) || null, insertSheet: name => { calls.push({op: 'insertSheet', name}); return createSheet(name, []); }})},
++  ContentService: {MimeType: {JSON: 'application/json'}, createTextOutput: text => ({text, setMimeType() { return this; }})}};
++vm.createContext(context);
++vm.runInContext(fs.readFileSync('apps_script/google_ledger_receiver.gs', 'utf8'), context, {filename: 'google_ledger_receiver.gs'});
++
++const route = payload => JSON.parse(JSON.stringify(context.routeRequest(payload)));
++let seq = 0;
++const nextId = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`;
++
++function signed(body, secret) {
++  return {...body, signature: crypto.createHmac('sha256', secret).update(canonicalJson(body), 'utf8').digest('hex')};
++}
++function healthRequest({sourceId = 'health-a1', secret = healthSecret, project = 'fleet-health', sheet = '維運健康', action = 'put_health_v1',
++                        b64 = 'H4sIAAAAAAAAA6tWSs5IzcnJV6oFAEvJF0kPAAAA', generatedAt = new Date().toISOString(), issuedAt = new Date().toISOString(), health} = {}) {
++  return signed({schema_version: 'google-ledger-projection-v2', action, source_id: sourceId, project_id: project, sheet_name: sheet,
++    request_id: nextId(), issued_at: issuedAt, health: health === undefined ? {b64, generated_at: generatedAt} : health}, secret);
++}
++function untouched() {
++  assert.deepEqual(tradingTab.rows, [['trade_id', 'symbol'], ['t-1', 'BTCUSDT']]);
++  assert.equal(calls.filter(c => c.op === 'appendRow' || c.op === 'insertSheet').length, 0);
++}
++
++// a good write: A1 of the health tab only, text format first, the fixed marker shape, nothing else touched
++const good = route(healthRequest());
++assert.equal(good.ok, true);
++assert.equal(good.cell_chars, 'HEALTHv1|H4sIAAAAAAAAA6tWSs5IzcnJV6oFAEvJF0kPAAAA|HEALTHEND'.length);
++assert.equal(healthTab.rows[0][0], 'HEALTHv1|H4sIAAAAAAAAA6tWSs5IzcnJV6oFAEvJF0kPAAAA|HEALTHEND');
++assert.deepEqual(calls.map(c => [c.sheet, c.op, c.row, c.column]), [['維運健康', 'setNumberFormat', 1, 1], ['維運健康', 'setValue', 1, 1]]);
++assert.equal(calls[0].format, '@');
++assert.equal(healthTab.rows.length, 1);
++untouched();
++
++// the next run overwrites the same cell (one latest table, not a log)
++assert.equal(route(healthRequest({b64: 'AAAA'})).ok, true);
++assert.equal(healthTab.rows[0][0], 'HEALTHv1|AAAA|HEALTHEND');
++assert.equal(healthTab.rows.length, 1);
++
++// the size cap: exactly the cap is written, one more character is refused and the previous table stays
++const cap = vm.runInContext('HEALTH_MAX_B64_CHARS', context);     // top-level const: not a property of the context object
++assert.equal(cap, 9000);
++const atCap = 'A'.repeat(cap);
++assert.equal(route(healthRequest({b64: atCap})).ok, true);
++assert.equal(healthTab.rows[0][0].length, 'HEALTHv1|'.length + 9000 + '|HEALTHEND'.length);
++assert.deepEqual(route(healthRequest({b64: atCap + 'A'})), {ok: false, error: 'health_too_large'});
++assert.equal(healthTab.rows[0][0].length, 'HEALTHv1|'.length + 9000 + '|HEALTHEND'.length);
++
++// payload shape: base64 characters only, exactly the two members, a recent generated_at
++const before = healthTab.rows[0][0];
++for (const bad of [
++  {b64: ''}, {b64: 'has space'}, {b64: 'pipe|inside'}, {b64: 'new\nline'}, {b64: 'AAAA=A'}, {b64: 123},
++  {generatedAt: 'not a date'}, {generatedAt: new Date(Date.now() - 3600 * 1000).toISOString()},
++  {health: null}, {health: []}, {health: {b64: 'AAAA'}}, {health: {generated_at: new Date().toISOString()}},
++  {health: {b64: 'AAAA', generated_at: new Date().toISOString(), extra: 'x'}},
++]) {
++  assert.deepEqual(route(healthRequest(bad)), {ok: false, error: 'health_payload_invalid'}, JSON.stringify(bad));
++}
++assert.equal(healthTab.rows[0][0], before);
++
++// authentication: the same gates as every v2 action
++const wrongSecret = healthRequest({secret: 'not-the-secret'});
++assert.deepEqual(route(wrongSecret), {ok: false, error: 'signature_invalid'});
++assert.deepEqual(route(healthRequest({issuedAt: new Date(Date.now() - 3600 * 1000).toISOString()})), {ok: false, error: 'request_not_fresh'});
++assert.deepEqual(route(healthRequest({project: 'mexc-4h-momentum'})), {ok: false, error: 'source_not_allowed'});
++assert.deepEqual(route(healthRequest({sheet: 'trading-tab'})), {ok: false, error: 'source_not_allowed'});
++assert.deepEqual(route(healthRequest({sourceId: 'unknown-source'})), {ok: false, error: 'source_not_allowed'});
++const tampered = healthRequest();
++tampered.health.b64 = 'BBBB';
++assert.deepEqual(route(tampered), {ok: false, error: 'signature_invalid'});
++assert.equal(healthTab.rows[0][0], before);
++
++// the health source may call put_health_v1 and nothing else
++const asOpen = signed({schema_version: 'google-ledger-projection-v2', action: 'append_open_v2', source_id: 'health-a1', project_id: 'fleet-health', sheet_name: '維運健康',
++  request_id: nextId(), issued_at: new Date().toISOString(), projection: {trade_id: 'x'}}, healthSecret);
++assert.deepEqual(route(asOpen), {ok: false, error: 'action_not_allowed'});
++const asRead = signed({schema_version: 'google-ledger-projection-v2', action: 'read_reconciliation_v2', source_id: 'health-a1', project_id: 'fleet-health', sheet_name: '維運健康',
++  request_id: nextId(), issued_at: new Date().toISOString(), query: {kind: 'source_projection_inventory_v1'}}, healthSecret);
++assert.deepEqual(route(asRead), {ok: false, error: 'action_not_allowed'});
++assert.equal(healthTab.rows[0][0], before);
++
++// a source registered before put_health_v1 (no allowed_actions) can never write the health cell, on any tab
++assert.deepEqual(route(healthRequest({sourceId: 'ledger-a1', secret: ledgerSecret, project: 'mexc-4h-momentum', sheet: 'trading-tab'})), {ok: false, error: 'action_not_allowed'});
++untouched();
++
++// a mis-registered health source pointing at a trading tab cannot overwrite that tab's A1
++assert.deepEqual(route(healthRequest({sourceId: 'misplaced', secret: 'misplaced-secret', sheet: 'trading-tab'})), {ok: false, error: 'health_sheet_not_allowed'});
++untouched();
++
++// the receiver never creates the tab: the operator makes it
++assert.deepEqual(route(healthRequest({sourceId: 'missing-tab', secret: 'missing-secret', sheet: '維運健康-不存在'})), {ok: false, error: 'health_sheet_not_allowed'});
++sources['missing-tab'].sheet_name = '維運健康';
++sheets.delete('維運健康');
++assert.deepEqual(route(healthRequest({sourceId: 'missing-tab', secret: 'missing-secret'})), {ok: false, error: 'sheet_not_found'});
++assert.equal(calls.filter(c => c.op === 'insertSheet').length, 0);
++
++// review of #250 (B1): allowed_actions present but not an array allows NOTHING -- it never falls back to the wide rule
++const rawSecret = {'broken-empty': 'broken-secret', 'broken-string': 'broken-secret', 'broken-null': 'broken-secret', 'broken-object': 'broken-secret', 'broken-number': 'broken-secret'};
++for (const [sourceId, secret] of Object.entries(rawSecret)) {
++  const src = sources[sourceId];
++  assert.equal(context.actionAllowedForSource(src, 'append_open_v2'), false, sourceId);
++  assert.equal(context.actionAllowedForSource(src, 'put_health_v1'), false, sourceId);
++  assert.deepEqual(route(healthRequest({sourceId, secret})), {ok: false, error: 'action_not_allowed'}, sourceId);
++  const openAttempt = signed({schema_version: 'google-ledger-projection-v2', action: 'append_open_v2', source_id: sourceId, project_id: 'fleet-health', sheet_name: '維運健康',
++    request_id: nextId(), issued_at: new Date().toISOString(), projection: {trade_id: 'x'}}, secret);
++  assert.deepEqual(route(openAttempt), {ok: false, error: 'action_not_allowed'}, sourceId);
++}
++// a source with both actions listed gets exactly those two
++sheets.set('維運健康', healthTab);
++assert.equal(route(healthRequest({sourceId: 'both', secret: 'both-secret'})).ok, true);
++assert.equal(context.actionAllowedForSource(sources.both, 'read_reconciliation_v2'), true);
++assert.equal(context.actionAllowedForSource(sources.both, 'append_open_v2'), false);
++// and a source with no allowed_actions at all is the old wide rule minus the health write
++assert.equal(context.actionAllowedForSource(ledgerSource, 'append_open_v2'), true);
++assert.equal(context.actionAllowedForSource(ledgerSource, 'put_health_v1'), false);
++
++console.log('apps_script_put_health_node_test: passed');
