@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Install the observation watcher (f-43) on the dev host.  Idempotent.
+# Install the observation watcher (f-43) on the dev host (trading-dev, or fleet-standby-1 with WATCH_USER=ubuntu).  Idempotent.
 #
-#   sudo bash deploy/observation-watch/install.sh            # WATCH_USER defaults to ai001
+#   sudo bash deploy/observation-watch/install.sh            # WATCH_USER defaults to ai001; on fleet-standby-1: sudo WATCH_USER=ubuntu bash ...
 #
 # - /opt/observation-watch/observation_watch.py : a copy of scripts/observation_watch.py (root-owned)
 # - /etc/observation-watch/watch.env            : LINE_CHANNEL_ACCESS_TOKEN / LINE_RECIPIENT_ID (the primary channel) and
 #                                                 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (the fallback), each copied from
 #                                                 /etc/ops-notify/ops-notify.env when it is not in the file yet (root 0600);
 #                                                 no value is ever printed
+# - warn-only preflight (watch_preflight.sh): the five clones, A1 in known_hosts, ssh key mode; install goes on regardless
 # - observation-watch.service / .timer          : every 30 minutes, runs as WATCH_USER (needs its ssh key to A1 and sudo)
 set -euo pipefail
 
@@ -20,6 +21,10 @@ id "$WATCH_USER" >/dev/null 2>&1 || die "no such user $WATCH_USER"
 [[ -f $SRC/scripts/observation_watch.py ]] || die "missing $SRC/scripts/observation_watch.py"
 HOME_DIR=$(getent passwd "$WATCH_USER" | cut -d: -f6)
 [[ -f $HOME_DIR/.ssh/oci_a1_key ]] || die "$WATCH_USER has no ~/.ssh/oci_a1_key (read access to A1)"
+
+# shellcheck source=deploy/observation-watch/watch_preflight.sh
+source "$SRC/deploy/observation-watch/watch_preflight.sh"
+watch_preflight "$HOME_DIR" 161.33.186.220 oci_a1_key
 
 install -d -m 755 /opt/observation-watch
 install -o root -g root -m 755 "$SRC/scripts/observation_watch.py" /opt/observation-watch/observation_watch.py

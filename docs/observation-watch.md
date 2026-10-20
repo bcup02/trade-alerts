@@ -74,3 +74,15 @@ x5b 剩下三件事要等開發機加密策略**自己**出訊號才驗得到（
 - **停損觸發**：自己進場的交易，出現 `source` 以 `native_stop` 開頭的 `trade_close`。
 - 進場後過了寬限，Google 表對帳仍 `DIVERGED` 時回報失敗。
 - 三項都看到時仍是 `observed` ＋ `needs_human`，不會是 `closable`：帳本、Google 表、出場單編號（`mc-t-`）要人（Claude 加使用者授權）逐項查證。
+
+## 裝在新主機（fleet-standby-1，階段 3 切換；P3）
+安裝腳本本來就用 `WATCH_USER` 參數化（單元是 `@WATCH_USER@` 範本），新機用 `ubuntu` 即可，不用建 `ai001`：
+
+1. 先裝好三支策略與 ops-notify（腳本要從 `/etc/ops-notify/ops-notify.env` 複製 LINE／Telegram 設定，沒有就失敗）。
+2. 在 ubuntu 家目錄放 5 個 clone：`trade-alerts`、`ed-seykota-systematic-trend-following`、`mexc-4h-momentum-trailing-stop`、`my-crypto-bot`、`btc-bull-market-competition`（私有 repo，取碼方式見切換手冊 P1；沒有 clone 時單元會略過，登記冊類檢查會回報錯誤）。
+3. `~/.ssh/oci_a1_key`（權限 600；從開發機用 ssh 串流複製，不落地不印出）與 A1 的 known_hosts（`ssh-keyscan -t ed25519 161.33.186.220 >> ~/.ssh/known_hosts` 之後，**與開發機 known_hosts 的指紋核對一致**才算數；程式用 `StrictHostKeyChecking=yes`）。
+4. `sudo WATCH_USER=ubuntu bash deploy/observation-watch/install.sh`：開頭的警告式預檢（`watch_preflight.sh`）會列出缺的 clone、known_hosts、金鑰權限，只警告不中止。
+5. 搬 `state.json`（保留已 ack／已通知的紀錄，否則第一輪會重複通知）：開發機 `~/.local/state/observation-watch/state.json` → 新機同路徑（擁有者 ubuntu）。
+6. `sudo systemctl start observation-watch.service` → `python3 /opt/observation-watch/observation_watch.py report` 看 `檢查時間` 新鮮、`systemctl --failed` 為空。
+
+開發機那一側的檢查讀「本機」檔案（`sudo -n cat`，ubuntu 在新機 sudo 免密即可），所以必須與三支策略同機。

@@ -694,6 +694,7 @@ def test_a_run_that_waited_behind_another_decides_from_what_that_one_saved(tmp_p
 
 # --- registry cells waiting for a deployment (phase-sync1) ---------------------------------------------------------
 
+import os
 import subprocess
 
 
@@ -1507,3 +1508,80 @@ def test_env_fill_copies_what_exists_when_the_source_lacks_only_telegram(tmp_pat
     run, watch = _fill(tmp_path, ops=LINE, watch=None)
     assert run.returncode == 0 and "WARNING: no Telegram settings" in run.stderr
     assert watch.read_text(encoding="utf-8").splitlines() == LINE
+
+
+# --- P3: installing on a new host (fleet-standby-1, WATCH_USER=ubuntu) -------------------------------------------------
+
+def _preflight(home, a1="161.33.186.220", path_prefix=None):
+    # same shell options as install.sh: a failure inside the preflight would end the script before CONTINUES
+    script = (f'set -euo pipefail; source "{_ROOT}/deploy/observation-watch/watch_preflight.sh"; '
+              f'watch_preflight "{home}" {a1} oci_a1_key; echo "N=$WATCH_PREFLIGHT_WARNINGS"; echo INSTALL_CONTINUES')
+    return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "PATH": f"{path_prefix}:{os.environ['PATH']}"} if path_prefix else None)
+
+
+def test_preflight_on_an_empty_home_warns_about_every_missing_piece_and_still_succeeds(tmp_path):
+    run = _preflight(tmp_path)
+    assert run.returncode == 0 and "N=6" in run.stdout                    # 5 clones + known_hosts (no key file: nothing to check)
+    assert run.stderr.count("WARNING: no clone") == 5 and "not in known_hosts" in run.stderr
+
+
+def test_preflight_clean_home_has_no_warnings(tmp_path):
+    for repo in ("trade-alerts", "ed-seykota-systematic-trend-following", "mexc-4h-momentum-trailing-stop", "my-crypto-bot", "btc-bull-market-competition"):
+        (tmp_path / repo / ".git").mkdir(parents=True)
+    ssh = tmp_path / ".ssh"
+    ssh.mkdir()
+    key = ssh / "oci_a1_key"
+    key.write_text("not a real key\n", encoding="utf-8")
+    key.chmod(0o600)
+    (ssh / "known_hosts").write_text("161.33.186.220 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeFakeFakeFakeFakeFakeFakeFakeFakeFakeFake\n", encoding="utf-8")
+    run = _preflight(tmp_path)
+    assert run.returncode == 0 and "N=0" in run.stdout and run.stderr == ""
+
+
+def test_preflight_flags_a_key_readable_by_others_and_never_prints_the_key(tmp_path):
+    ssh = tmp_path / ".ssh"
+    ssh.mkdir()
+    key = ssh / "oci_a1_key"
+    key.write_text("SECRET-KEY-BODY\n", encoding="utf-8")
+    key.chmod(0o644)
+    run = _preflight(tmp_path)
+    assert "has mode 644" in run.stderr and "SECRET-KEY-BODY" not in run.stdout + run.stderr
+
+
+def test_installer_runs_the_preflight_with_the_target_users_home_and_does_not_stop_on_warnings():
+    installer = (_ROOT / "deploy" / "observation-watch" / "install.sh").read_text(encoding="utf-8")
+    assert 'source "$SRC/deploy/observation-watch/watch_preflight.sh"' in installer
+    assert 'watch_preflight "$HOME_DIR" 161.33.186.220 oci_a1_key' in installer
+    assert "A1_SSH_TARGET" not in installer and "161.33.186.220" in (_ROOT / "scripts" / "observation_watch.py").read_text(encoding="utf-8")
+
+
+def test_unit_template_has_no_hard_coded_account_so_any_watch_user_works():
+    unit = (_ROOT / "deploy" / "observation-watch" / "observation-watch.service").read_text(encoding="utf-8")
+    assert "ai001" not in unit and unit.count("@WATCH_USER@") >= 7
+    for user in ("ubuntu", "ai001"):
+        rendered = unit.replace("@WATCH_USER@", user)
+        assert f"User={user}" in rendered.splitlines() and f"ReadWritePaths=/home/{user}/.local/state/observation-watch" in rendered.splitlines()
+        assert "@" not in rendered.replace("/home/", "")
+
+
+@pytest.mark.parametrize("stat_body", ["exit 1", "echo garbage", "echo"])
+def test_preflight_survives_a_failing_or_garbage_stat_under_set_e(tmp_path, stat_body):
+    """Review #256 BLOCK-256-01: stat failing must be a warning; the install must still reach its next step."""
+    stubs = tmp_path / "stubs"
+    stubs.mkdir()
+    (stubs / "stat").write_text(f"#!/bin/sh\n{stat_body}\n", encoding="utf-8")
+    (stubs / "stat").chmod(0o755)
+    home = tmp_path / "home"
+    (home / ".ssh").mkdir(parents=True)
+    key = home / ".ssh" / "oci_a1_key"
+    key.write_text("SECRET-KEY-BODY\n", encoding="utf-8")
+    run = _preflight(home, path_prefix=str(stubs))
+    assert run.returncode == 0 and "INSTALL_CONTINUES" in run.stdout and "cannot read the mode" in run.stderr
+    assert "N=7" in run.stdout                                  # 5 clones + known_hosts + unreadable mode
+    assert "SECRET-KEY-BODY" not in run.stdout + run.stderr
+
+
+def test_the_preflight_is_called_from_the_installer_before_any_install_step_and_under_set_e():
+    installer = (_ROOT / "deploy" / "observation-watch" / "install.sh").read_text(encoding="utf-8")
+    assert "set -euo pipefail" in installer
+    assert installer.index("watch_preflight \"$HOME_DIR\"") < installer.index("install -d -m 755 /opt/observation-watch")
