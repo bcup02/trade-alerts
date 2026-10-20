@@ -1135,6 +1135,24 @@ def test_x5b_a_replaced_and_restored_stop_is_not_a_move():
     assert "停損已移動過" in after.summary
 
 
+def test_x5b_the_price_baseline_follows_an_unchanged_order_id():
+    """BLOCK-260-01: same id, the price changed in between, then the id changes to a price that is looser than that."""
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1", side="short")]
+    r1 = x5b_run(events, 111, 86190.9)
+    r2 = x5b_run(events, 111, 82943.09, r1.extra)
+    assert r2.extra["prices"] == {"T1": 82943.09}
+    r3 = x5b_run(events, 222, 85000.0, r2.extra)                      # looser than the last price seen: not a move
+    assert "還沒看到停損移動" in r3.summary and r3.extra["stops"] == {"T1": ["111"]}
+
+
+@pytest.mark.parametrize("bad", ["nan", "inf", "-inf", None, "x"])
+def test_x5b_a_non_finite_or_missing_price_is_ignored(bad):
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1", side="short")]
+    r1 = x5b_run(events, 111, 86190.9)
+    r2 = x5b_run(events, 222, bad, r1.extra)
+    assert "還沒看到停損移動" in r2.summary and r2.extra["prices"] == {"T1": 86190.9}
+
+
 def test_x5b_old_memory_without_prices_never_counts_the_next_id_change_as_a_move():
     events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1", side="short")]
     result = x5b_run(events, 222, 80000.0, {"stops": {"T1": ["111"]}})   # the memory written before prices were kept

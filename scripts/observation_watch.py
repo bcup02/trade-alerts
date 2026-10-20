@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import math
 import os
 import re
 import shlex
@@ -531,9 +532,10 @@ def _own_dev_crypto_trades(events: Iterable[dict[str, Any]]) -> tuple[list[dict[
 
 def _number(value: Any) -> float | None:
     try:
-        return float(value) if value is not None else None
+        number = float(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+    return number if number is not None and math.isfinite(number) else None
 
 
 def _side(value: Any) -> str | None:
@@ -565,19 +567,19 @@ def check_dev_crypto_x5b(ctx: Context) -> Result:
     if trade and order is not None:
         trade, order = str(trade), str(order)
         ids = seen.setdefault(trade, [])
+        price = _number(state.get("active_stop_price"))
         if order != last_ids.get(trade):
-            price = _number(state.get("active_stop_price"))
             side = next((_side(e.get("side")) for e in reversed(entries) if str(e.get("trade_id")) == trade), None)
             # A new order id alone is not a move: only the strategy tightening its stop is (a short's stop goes down, a long's
-            # up).  An id that changed with the same or a looser price -- somebody else's order replaced and restored, like the
-            # 10/20 dry-run accident -- becomes the new baseline but is never counted.
+            # up), measured against the price seen on the previous run.  An id that changed with the same or a looser price --
+            # somebody else's order replaced and restored, like the 10/20 dry-run accident -- is never counted.
             tightened = (price is not None and trade in prices and side is not None
                          and (price < prices[trade] if side == "short" else price > prices[trade]))
             if order not in ids and (not ids or tightened):
                 ids.append(order)
             last_ids[trade] = order
-            if price is not None:
-                prices[trade] = price
+        if price is not None:
+            prices[trade] = price                     # every run, so an unchanged id with a new price moves the baseline too
     own_trades = {e.get("trade_id") for e in entries}
     seen = {t: ids for t, ids in seen.items() if t in own_trades}      # nothing else is ever looked at, so nothing else is kept
     prices = {t: v for t, v in prices.items() if t in own_trades}
