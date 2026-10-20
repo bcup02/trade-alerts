@@ -1507,3 +1507,55 @@ def test_env_fill_copies_what_exists_when_the_source_lacks_only_telegram(tmp_pat
     run, watch = _fill(tmp_path, ops=LINE, watch=None)
     assert run.returncode == 0 and "WARNING: no Telegram settings" in run.stderr
     assert watch.read_text(encoding="utf-8").splitlines() == LINE
+
+
+# --- P3: installing on a new host (fleet-standby-1, WATCH_USER=ubuntu) -------------------------------------------------
+
+def _preflight(home, a1="161.33.186.220"):
+    script = f'source "{_ROOT}/deploy/observation-watch/watch_preflight.sh"; watch_preflight "{home}" {a1} oci_a1_key; echo "N=$WATCH_PREFLIGHT_WARNINGS"'
+    return subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+
+
+def test_preflight_on_an_empty_home_warns_about_every_missing_piece_and_still_succeeds(tmp_path):
+    run = _preflight(tmp_path)
+    assert run.returncode == 0 and "N=6" in run.stdout                    # 5 clones + known_hosts (no key file: nothing to check)
+    assert run.stderr.count("WARNING: no clone") == 5 and "not in known_hosts" in run.stderr
+
+
+def test_preflight_clean_home_has_no_warnings(tmp_path):
+    for repo in ("trade-alerts", "ed-seykota-systematic-trend-following", "mexc-4h-momentum-trailing-stop", "my-crypto-bot", "btc-bull-market-competition"):
+        (tmp_path / repo / ".git").mkdir(parents=True)
+    ssh = tmp_path / ".ssh"
+    ssh.mkdir()
+    key = ssh / "oci_a1_key"
+    key.write_text("not a real key\n", encoding="utf-8")
+    key.chmod(0o600)
+    (ssh / "known_hosts").write_text("161.33.186.220 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeFakeFakeFakeFakeFakeFakeFakeFakeFakeFake\n", encoding="utf-8")
+    run = _preflight(tmp_path)
+    assert run.returncode == 0 and "N=0" in run.stdout and run.stderr == ""
+
+
+def test_preflight_flags_a_key_readable_by_others_and_never_prints_the_key(tmp_path):
+    ssh = tmp_path / ".ssh"
+    ssh.mkdir()
+    key = ssh / "oci_a1_key"
+    key.write_text("SECRET-KEY-BODY\n", encoding="utf-8")
+    key.chmod(0o644)
+    run = _preflight(tmp_path)
+    assert "has mode 644" in run.stderr and "SECRET-KEY-BODY" not in run.stdout + run.stderr
+
+
+def test_installer_runs_the_preflight_with_the_target_users_home_and_does_not_stop_on_warnings():
+    installer = (_ROOT / "deploy" / "observation-watch" / "install.sh").read_text(encoding="utf-8")
+    assert 'source "$SRC/deploy/observation-watch/watch_preflight.sh"' in installer
+    assert 'watch_preflight "$HOME_DIR" 161.33.186.220 oci_a1_key' in installer
+    assert "A1_SSH_TARGET" not in installer and "161.33.186.220" in (_ROOT / "scripts" / "observation_watch.py").read_text(encoding="utf-8")
+
+
+def test_unit_template_has_no_hard_coded_account_so_any_watch_user_works():
+    unit = (_ROOT / "deploy" / "observation-watch" / "observation-watch.service").read_text(encoding="utf-8")
+    assert "ai001" not in unit and unit.count("@WATCH_USER@") >= 7
+    for user in ("ubuntu", "ai001"):
+        rendered = unit.replace("@WATCH_USER@", user)
+        assert f"User={user}" in rendered.splitlines() and f"ReadWritePaths=/home/{user}/.local/state/observation-watch" in rendered.splitlines()
+        assert "@" not in rendered.replace("/home/", "")
