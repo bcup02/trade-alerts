@@ -375,9 +375,37 @@ def _trades_after(events: Iterable[dict[str, Any]], after: datetime, types: Iter
     return out
 
 
+# A strategy that WAS freshly confirmed stays listed as confirmed for at most this long while the Google check cannot say
+# anything new about it (a read that timed out, or a new trade still inside its 60-minute grace).  Past it, or when the
+# reconcile itself has stopped, it goes back to waiting.
+F26_CARRY_HOURS = 3
+
+
+def reconcile_pending_reason(status: Mapping[str, Any], last_trade: datetime, now: datetime) -> str:
+    """Why ``reconcile_covers`` said ``pending``: ``unknown`` (the check ran lately but could not read Google), ``grace`` (it
+    ran lately, but the newest trade is still inside its grace period) or ``stale`` (it has not run lately / has no time /
+    gave some other answer)."""
+    checked = parse_time(status.get("checked_at"))
+    if checked is None or not _fresh(checked, now, 90):
+        return "stale"
+    if str(status.get("value")) == "UNKNOWN":
+        return "unknown"
+    if checked < last_trade + RECONCILE_GRACE:
+        return "grace"
+    return "stale"
+
+
 def check_sheet_tab_names(ctx: Context) -> Result:
-    """f-26: each strategy's next real trade goes through the Chinese tab name and the ledger-vs-sheet check agrees."""
-    ok, waiting, bad, evidence = [], [], [], []
+    """f-26: each strategy's next real trade goes through the Chinese tab name and the ledger-vs-sheet check agrees.
+
+    A strategy confirmed in an earlier run is not dropped back to "waiting" for a moment in which the check cannot say
+    anything new about it -- the Google read of this round failed (UNKNOWN) or a newer trade is still inside its grace.  It
+    stays listed as confirmed, with the reason and the time of the confirmation it rests on, for up to ``F26_CARRY_HOURS``.
+    That carried line is display only: it never counts toward closing (every strategy must be freshly covered for that),
+    and a DIVERGED answer after the grace, a wrong tab name or a stale reconcile still change the result at once."""
+    ok, carried, waiting, bad, evidence = [], [], [], [], []
+    remembered = dict((ctx.previous or {}).get("covered") or {})
+    covered_now: dict[str, dict[str, str]] = {}
     for key in REPOS:
         status = load_json(ctx.remote, "a1", audit(key, "google_reconcile_status.json"))
         trades = _trades_after(jsonl(ctx.remote.read("a1", audit(key, "trading_ledger.jsonl"))), _F26_BASELINE)
@@ -393,18 +421,33 @@ def check_sheet_tab_names(ctx: Context) -> Result:
         verdict = reconcile_covers(status, last, ctx.now)
         if verdict == "covered":
             ok.append(name)
+            covered_now[key] = {"at": ctx.now.isoformat(timespec="seconds"), "last_trade": last.isoformat(timespec="seconds")}
             evidence.append(f"{name}：{len(trades)} 筆新交易（最近 {taipei(last)} 台北），之後的 Google 表對帳（{taipei(parse_time(status['checked_at']))}）一致")
         elif verdict == "diverged":
             bad.append(name)
             evidence.append(f"{name}：最近一筆新交易已過 60 分鐘寬限，之後的 Google 表對帳仍是 DIVERGED")
         else:
-            waiting.append(name)
+            earlier = remembered.get(key) or {}
+            since = parse_time(earlier.get("at"))
+            reason = reconcile_pending_reason(status, last, ctx.now)
+            if since is not None and ctx.now - since <= timedelta(hours=F26_CARRY_HOURS) and reason in ("unknown", "grace"):
+                carried.append((name, reason, since))
+                covered_now[key] = dict(earlier)                      # keep the ORIGINAL confirmation time: the bound never slides
+                why = ("這一輪對帳讀不到 Google 表（UNKNOWN），下一輪會再試" if reason == "unknown"
+                       else f"最近一筆新交易（{taipei(last)} 台北）還在 60 分鐘對帳寬限內，這筆還不算已確認")
+                evidence.append(f"{name}：{why}；沿用 {taipei(since)} 台北的確認，最久 {F26_CARRY_HOURS} 小時")
+            else:
+                waiting.append(name)
     if bad:
-        return Result(FAILED, "新分頁名有策略不符合預期：" + "、".join(bad), evidence, key="bad:" + ",".join(bad))
-    if not waiting:
-        return Result(OBSERVED, "四支策略的新交易都走新分頁名，帳本對 Google 表一致。", evidence, closable=True, key="all")
-    summary = ("已確認：" + "、".join(ok) + "；" if ok else "") + "還在等新交易：" + "、".join(waiting)
-    return Result(WAITING, summary, evidence)
+        return Result(FAILED, "新分頁名有策略不符合預期：" + "、".join(bad), evidence, key="bad:" + ",".join(bad), extra={"covered": covered_now})
+    if not waiting and not carried:
+        return Result(OBSERVED, "四支策略的新交易都走新分頁名，帳本對 Google 表一致。", evidence, closable=True, key="all",
+                      extra={"covered": covered_now})
+    confirmed = [*ok, *(f"{name}（{'本輪讀不到 Google 表' if reason == 'unknown' else '新交易在對帳寬限內'}，沿用 {taipei(since)} 的確認）"
+                        for name, reason, since in carried)]
+    summary = ("已確認：" + "、".join(confirmed) + "；" if confirmed else "")
+    summary += ("還在等新交易：" + "、".join(waiting)) if waiting else "沿用的確認要等下一輪對帳重新確認後才能結案"
+    return Result(WAITING, summary, evidence, extra={"covered": covered_now})
 
 
 def check_competition_fill(ctx: Context) -> Result:
