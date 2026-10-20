@@ -291,9 +291,9 @@ def record_projection_park_event(
     dispatch, intent = result.dispatch, result.intent
     if dispatch is None or intent is None or dispatch.status != "REJECTED":
         return False
-    if dispatch.error_code == ORPHAN_CLOSE_PARKED_CODE:
+    if dispatch.error_code in (ORPHAN_CLOSE_PARKED_CODE, CORRECTION_PARKED_CODE):    # both are ERR-056
         project, code = "fleet", ORPHAN_CLOSE_PARKED_EVENT
-        summary = "平倉送到 Google 表接收端連續找不到開倉列，已停放"
+        summary = "平倉（或它的帳本更正）送到 Google 表接收端連續被退回，已停放"
     elif (dispatch.error_code == CORRECTION_BASE_MISMATCH_ERROR and intent.action == "correct_close_v2"
           and strategy_project == "seykota"):          # the catalog entry (ERR-068) exists for the trend strategy only
         project, code = strategy_project, CORRECTION_BASE_MISMATCH_EVENT

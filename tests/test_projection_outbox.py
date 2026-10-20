@@ -537,3 +537,14 @@ def test_an_event_that_cannot_be_written_never_stops_the_queue(tmp_path: Path, m
     result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer("correction_base_mismatch", "REJECTED"),
                                       fleet_event_log=tmp_path / "log.jsonl", strategy_project="seykota")
     assert result.dispatch.status == "REJECTED" and outstanding_projection_intents(path) == ()
+
+
+def test_parking_a_correction_that_cannot_be_confirmed_records_the_same_r1_event(tmp_path: Path, monkeypatch) -> None:
+    _ticking_clock(monkeypatch)
+    path, log = tmp_path / "projection-outbox.jsonl", tmp_path / "fleet_event_log.jsonl"
+    enqueue_projection_intent(path, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
+    for _ in range(CORRECTION_UNCONFIRMED_PARK_AFTER):
+        dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer(CORRECTION_UNCONFIRMED_ERROR),
+                                 fleet_event_log=log, strategy_project="seykota")
+    [event] = _events(log)
+    assert (event["project"], event["code"], event["details"]["error_code"]) == ("fleet", "PROJECTION_ORPHAN_CLOSE_PARKED", CORRECTION_PARKED_CODE)
