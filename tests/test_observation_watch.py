@@ -1099,13 +1099,74 @@ def test_x5b_reports_the_first_own_entry_once_and_needs_a_person():
     assert result.extra["stops"] == {"T1": ["111"]}
 
 
-def test_x5b_sees_a_moved_stop_as_a_new_order_id_of_the_same_trade_between_runs():
-    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1")]
+def x5b_state(order, price):
+    return {"trade_id": "T1", "stop_plan_order_id": order, "active_stop_price": price}
+
+
+def x5b_run(events, order, price, previous=None):
+    return ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events, state=x5b_state(order, price)), previous))
+
+
+def test_x5b_sees_a_moved_stop_as_a_new_order_id_with_a_tighter_price_between_runs():
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1", side="short")]
+    first = x5b_run(events, 111, 86190.9)
+    second = x5b_run(events, 222, 85000.0, first.extra)              # a short's stop moved down
+    assert "停損已移動過" in second.summary and second.key != first.key
+    again = x5b_run(events, 222, 85000.0, second.extra)
+    assert again.key == second.key                       # the same observation is announced once (notify keys on it)
+
+
+def test_x5b_a_long_moves_its_stop_up():
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1", side="long")]
+    first = x5b_run(events, 111, 70000.0)
+    assert "停損已移動過" in x5b_run(events, 222, 71000.0, first.extra).summary
+    assert "還沒看到停損移動" in x5b_run(events, 222, 69000.0, first.extra).summary
+
+
+def test_x5b_a_replaced_and_restored_stop_is_not_a_move():
+    """10/20: a dry-run replaced the short's stop (86190.9 -> 82943.09) and restored it under a new id (86190.9)."""
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1", side="short")]
+    first = x5b_run(events, 111, 86190.9)
+    restored = x5b_run(events, 222, 86190.9, first.extra)            # a new id at the same price
+    assert "還沒看到停損移動" in restored.summary and restored.key == first.key
+    looser = x5b_run(events, 333, 90000.0, restored.extra)           # a new id at a looser price
+    assert "還沒看到停損移動" in looser.summary
+    after = x5b_run(events, 444, 88000.0, looser.extra)              # tightening again counts from the new baseline
+    assert "停損已移動過" in after.summary
+
+
+def test_x5b_the_price_baseline_follows_an_unchanged_order_id():
+    """BLOCK-260-01: same id, the price changed in between, then the id changes to a price that is looser than that."""
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1", side="short")]
+    r1 = x5b_run(events, 111, 86190.9)
+    r2 = x5b_run(events, 111, 82943.09, r1.extra)
+    assert r2.extra["prices"] == {"T1": 82943.09}
+    r3 = x5b_run(events, 222, 85000.0, r2.extra)                      # looser than the last price seen: not a move
+    assert "還沒看到停損移動" in r3.summary and r3.extra["stops"] == {"T1": ["111"]}
+
+
+@pytest.mark.parametrize("bad", ["nan", "inf", "-inf", None, "x"])
+def test_x5b_a_non_finite_or_missing_price_is_ignored(bad):
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1", side="short")]
+    r1 = x5b_run(events, 111, 86190.9)
+    r2 = x5b_run(events, 222, bad, r1.extra)
+    assert "還沒看到停損移動" in r2.summary and r2.extra["prices"] == {"T1": 86190.9}
+
+
+def test_x5b_old_memory_without_prices_never_counts_the_next_id_change_as_a_move():
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1", side="short")]
+    result = x5b_run(events, 222, 80000.0, {"stops": {"T1": ["111"]}})   # the memory written before prices were kept
+    assert "還沒看到停損移動" in result.summary and result.extra["prices"] == {"T1": 80000.0}
+
+
+def test_x5b_a_move_needs_a_known_side_and_price():
+    no_side = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1")]
+    first = x5b_run(no_side, 111, 86190.9)
+    assert "還沒看到停損移動" in x5b_run(no_side, 222, 85000.0, first.extra).summary
+    events = [x5b_ev(2, "trade_open", source="entry_signal", trade_id="T1", side="short")]
     first = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events, state={"trade_id": "T1", "stop_plan_order_id": 111})))
     second = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events, state={"trade_id": "T1", "stop_plan_order_id": 222}), first.extra))
-    assert "停損已移動過" in second.summary and second.key != first.key
-    again = ow.check_dev_crypto_x5b(x5b_ctx(x5b_remote(events, state={"trade_id": "T1", "stop_plan_order_id": 222}), second.extra))
-    assert again.key == second.key                       # the same observation is announced once (notify keys on it)
+    assert "還沒看到停損移動" in second.summary
 
 
 def test_x5b_an_unmoved_stop_or_another_trades_stop_is_not_a_move():
@@ -1121,7 +1182,7 @@ def test_x5b_all_three_observed_is_still_not_closable_by_the_machine():
     events = [x5b_ev(3, "trade_open", source="entry_signal", trade_id="T1"),
               x5b_ev(1, "trade_close", source="native_stop_reconciled", trade_id="T1")]
     r = x5b_remote(events, state={"trade_id": "T1", "stop_plan_order_id": 222})
-    result = ow.check_dev_crypto_x5b(x5b_ctx(r, {"stops": {"T1": ["111"]}}))
+    result = ow.check_dev_crypto_x5b(x5b_ctx(r, {"stops": {"T1": ["111", "222"]}, "last_ids": {"T1": "222"}}))
     assert result.state == ow.OBSERVED and result.needs_human and not result.closable
     assert "三項都觀察到" in result.summary and result.key.startswith("entry|move|stop|")
 
