@@ -548,3 +548,39 @@ def test_parking_a_correction_that_cannot_be_confirmed_records_the_same_r1_event
                                  fleet_event_log=log, strategy_project="seykota")
     [event] = _events(log)
     assert (event["project"], event["code"], event["details"]["error_code"]) == ("fleet", "PROJECTION_ORPHAN_CLOSE_PARKED", CORRECTION_PARKED_CODE)
+
+
+def test_a_busy_event_log_cannot_hold_the_dispatch_up(tmp_path: Path, monkeypatch) -> None:
+    import fcntl
+    import time
+
+    import trade_alerts.projection_outbox as outbox
+
+    monkeypatch.setattr(outbox, "PARK_EVENT_LOCK_TIMEOUT_SECONDS", 0.2)
+    path, log = tmp_path / "projection-outbox.jsonl", tmp_path / "fleet_event_log.jsonl"
+    enqueue_projection_intent(path, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
+    with log.open("a+", encoding="utf-8") as holder:              # another process holds the log's lock
+        fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
+        started = time.monotonic()
+        result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer("correction_base_mismatch", "REJECTED"),
+                                          fleet_event_log=log, strategy_project="seykota")
+        waited = time.monotonic() - started
+    assert waited < 5                                               # gave up after ~0.2 s instead of waiting for ever
+    assert result.dispatch.status == "REJECTED" and outstanding_projection_intents(path) == ()   # the dispatch itself is on disk
+    assert _events(log) == []                                       # the audit line was the only thing dropped
+
+
+def test_the_event_log_lock_wait_is_unbounded_unless_a_timeout_is_given(tmp_path: Path) -> None:
+    import fcntl
+
+    import pytest
+
+    from trade_alerts import FleetEventLogError, append_fleet_event
+
+    log = tmp_path / "fleet_event_log.jsonl"
+    with log.open("a+", encoding="utf-8") as holder:
+        fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
+        with pytest.raises(FleetEventLogError):
+            append_fleet_event(log, project="seykota", code="X", lock_timeout=0.1)
+    append_fleet_event(log, project="seykota", code="X", lock_timeout=0.1)   # free again: written
+    assert len(_events(log)) == 1

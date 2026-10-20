@@ -53,6 +53,9 @@ CORRECTION_BASE_MISMATCH_ERROR = "correction_base_mismatch"
 #: Fleet event log names (8b).  A parked orphan close is the fleet-wide ERR-056 (``FLEET.`` code, so the event
 #: is recorded under project ``fleet``); a base mismatch is the trend strategy's ERR-068 (``SEY.`` code).
 #: Both are R1: the line is the audit trail, nobody is notified.
+#: Longest the audit line may wait for the event log's lock.  The dispatch is already on disk by then, so the
+#: line is given up (and a warning logged) rather than keeping the caller -- the strategy's projection worker -- waiting.
+PARK_EVENT_LOCK_TIMEOUT_SECONDS = 2.0
 ORPHAN_CLOSE_PARKED_EVENT = "PROJECTION_ORPHAN_CLOSE_PARKED"
 CORRECTION_BASE_MISMATCH_EVENT = "CORRECTION_BASE_MISMATCH"
 
@@ -305,6 +308,7 @@ def record_projection_park_event(
             fleet_event_log, project=project, code=code, risk_tier="R1", summary=summary,
             evidence={"trade_id": intent.trade_id, "intent_id": intent.intent_id, "action": intent.action},
             details={"strategy": strategy_project, "error_code": dispatch.error_code, "event_type": intent.event_type},
+            lock_timeout=PARK_EVENT_LOCK_TIMEOUT_SECONDS,
         )
         return True
     except Exception:  # noqa: BLE001 -- an audit line must never stop the projection queue

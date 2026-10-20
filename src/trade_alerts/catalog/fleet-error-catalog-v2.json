@@ -1811,9 +1811,9 @@
       "project": "fleet",
       "sources": [
         "src/trade_alerts/projection_outbox.py:39",
-        "src/trade_alerts/projection_outbox.py:304",
-        "src/trade_alerts/projection_outbox.py:344",
-        "src/trade_alerts/projection_outbox.py:347"
+        "src/trade_alerts/projection_outbox.py:307",
+        "src/trade_alerts/projection_outbox.py:348",
+        "src/trade_alerts/projection_outbox.py:351"
       ],
       "current": {
         "latch": null,
@@ -2162,7 +2162,7 @@
         "src/seykota_bot/google_ledger_provenance.py:141",
         "src/seykota_bot/google_ledger_provenance.py:144",
         "src/trade_alerts/google_ledger_client.py:36",
-        "src/trade_alerts/projection_outbox.py:304",
+        "src/trade_alerts/projection_outbox.py:307",
         "src/trade_alerts/trade_correction.py:270"
       ],
       "current": {

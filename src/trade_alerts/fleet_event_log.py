@@ -20,6 +20,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from importlib import resources
@@ -128,13 +129,32 @@ def exclusive_log_lock(path: str | Path) -> Iterator[None]:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def append_jsonl(path: str | Path, record: Mapping[str, Any]) -> None:
-    """Append one canonical JSON line under an exclusive lock, then fsync."""
+def _lock_exclusive(handle: Any, timeout: float | None) -> None:
+    """Take the exclusive ``flock``.  ``timeout=None`` blocks as long as it takes (every existing caller);
+    a number polls without blocking and raises ``FleetEventLogError`` once it has waited that many seconds."""
+    if timeout is None:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        return
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                raise FleetEventLogError(f"could not lock the event log within {timeout:g}s") from None
+            time.sleep(0.02)
+
+
+def append_jsonl(path: str | Path, record: Mapping[str, Any], *, lock_timeout: float | None = None) -> None:
+    """Append one canonical JSON line under an exclusive lock, then fsync.
+
+    ``lock_timeout`` (seconds) bounds the wait for the lock; the default waits indefinitely, as before."""
     encoded = _canonical_line(record) + "\n"
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("a+", encoding="utf-8") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        _lock_exclusive(handle, lock_timeout)
         try:
             handle.write(encoded)
             handle.flush()
@@ -184,8 +204,12 @@ def append_fleet_event(
     measurements: Mapping[str, Any] | None = None,
     recorded_at: str | None = None,
     event_id: str | None = None,
+    lock_timeout: float | None = None,
 ) -> dict[str, Any]:
     """Record one detection and return the exact stored object.
+
+    ``lock_timeout`` bounds the wait for the log's lock (``FleetEventLogError`` when it runs out); the
+    default waits indefinitely.
 
     ``evidence`` is the stable set of facts that identify *this* occurrence --
     the same split as ``safe_halt_model.build_safe_halt``, and what a request
@@ -210,7 +234,7 @@ def append_fleet_event(
         "details": _require_mapping(details, "details"),
         "measurements": _require_mapping(measurements, "measurements"),
     }
-    append_jsonl(path, record)
+    append_jsonl(path, record, lock_timeout=lock_timeout)
     return record
 
 
