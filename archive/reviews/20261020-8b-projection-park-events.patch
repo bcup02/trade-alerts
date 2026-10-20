@@ -1,0 +1,391 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index ace97f2..a33e335 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.14"
++version = "0.30.15"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 5de36b8..94f9300 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -10,6 +10,7 @@ from .projection_outbox import (
+     ProjectionIntent,
+     RebuiltProjection,
+     dispatch_next_projection,
++    record_projection_park_event,
+     enqueue_projection_intent,
+     outstanding_projection_intents,
+     record_projection_dispatch,
+@@ -206,6 +207,7 @@ __all__ = [
+     "ProjectionIntent",
+     "RebuiltProjection",
+     "dispatch_next_projection",
++    "record_projection_park_event",
+     "enqueue_projection_intent",
+     "outstanding_projection_intents",
+     "requeue_rejected_projection_intents",
+@@ -345,4 +347,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.14"
++__version__ = "0.30.15"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index c603854..d6f1176 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -1810,9 +1810,10 @@
+       "title": "Google 表同步佇列停放了一筆找不到開倉列的平倉",
+       "project": "fleet",
+       "sources": [
+-        "src/trade_alerts/projection_outbox.py:33",
+-        "src/trade_alerts/projection_outbox.py:275",
+-        "src/trade_alerts/projection_outbox.py:278"
++        "src/trade_alerts/projection_outbox.py:39",
++        "src/trade_alerts/projection_outbox.py:307",
++        "src/trade_alerts/projection_outbox.py:348",
++        "src/trade_alerts/projection_outbox.py:351"
+       ],
+       "current": {
+         "latch": null,
+@@ -1821,7 +1822,7 @@
+       },
+       "verdict": "MECHANICAL",
+       "risk_tier": "R1",
+-      "auto_action": "某筆平倉（或帳本更正）送給 Google 表接收端，連續 12 次都回「找不到這筆交易的開倉列」，就把它記成 REJECTED（原因 orphan_close_no_open_row）停放，排在它後面的紀錄照常送出。同一筆交易的帳本更正如果連續 12 次都回「平倉未確認」（前面的平倉被停放、接收端沒有已確認的平倉可更正），也同樣記成 REJECTED（原因 correction_close_not_confirmed）停放。被停放的紀錄可以用共用庫的 requeue_rejected_projection_intents 依原順序重新排入（先平倉、再更正）。不動帳本、不暫停。帳本跟 Google 表的差異仍由對帳照樣標出（ERR-044）。",
++      "auto_action": "某筆平倉（或帳本更正）送給 Google 表接收端，連續 12 次都回「找不到這筆交易的開倉列」，就把它記成 REJECTED（原因 orphan_close_no_open_row）停放，排在它後面的紀錄照常送出。同一筆交易的帳本更正如果連續 12 次都回「平倉未確認」（前面的平倉被停放、接收端沒有已確認的平倉可更正），也同樣記成 REJECTED（原因 correction_close_not_confirmed）停放。被停放的紀錄可以用共用庫的 requeue_rejected_projection_intents 依原順序重新排入（先平倉、再更正）。停放時策略會在自己的事件日誌記一筆 R1 事件（只留稽核紀錄，不通知；8b）。不動帳本、不暫停。帳本跟 Google 表的差異仍由對帳照樣標出（ERR-044）。",
+       "human_action": "無需立刻處理。想讓對帳恢復一致，才需要處理這筆差異：先確認該筆交易確實存在，再二選一——補上開倉列，或把它列入忽略清單 audit/google-reconcile-ignore.json（只影響對帳的比較，會逐筆列在讀數的 ignored 欄）。",
+       "resume": "n/a",
+       "lands_in_phase": 8,
+@@ -2161,6 +2162,7 @@
+         "src/seykota_bot/google_ledger_provenance.py:141",
+         "src/seykota_bot/google_ledger_provenance.py:144",
+         "src/trade_alerts/google_ledger_client.py:36",
++        "src/trade_alerts/projection_outbox.py:307",
+         "src/trade_alerts/trade_correction.py:270"
+       ],
+       "current": {
+@@ -2170,7 +2172,7 @@
+       },
+       "verdict": "MECHANICAL",
+       "risk_tier": "R1",
+-      "auto_action": "帳本更正投到 Google 表時，要帶「我取代的是哪一版」的摘要（上一次更正的投影摘要，內容含備註文字）。共用庫 v0.30.11 起備註改成一句中文，所以趨勢兩筆在 v0.30.11 之前做過第一次更正的舊單（BTCUSDT-1139592365588、BTCUSDT-1142206675339，Google 表第 3、4 列），改釘後重建出的第一次更正摘要，跟接收端 2026-09-24 記下的不一樣。之後如果對這兩筆做第二次更正，接收端回 correction_base_mismatch，這筆投影記成 REJECTED 停放（終態、不重試），排在它後面的紀錄照常送出；帳本照常追加第二次更正，Google 表不會被寫錯，只是停在第一次更正的數字。已 CONFIRMED 的第一次更正不會被重送；沒有「v0.30.11 之前就更正過一次」這種跨版本更正鏈的交易，第一次與第二次更正兩邊都用同一套新格式，不受這條影響。不動帳本、不暫停。",
++      "auto_action": "帳本更正投到 Google 表時，要帶「我取代的是哪一版」的摘要（上一次更正的投影摘要，內容含備註文字）。共用庫 v0.30.11 起備註改成一句中文，所以趨勢兩筆在 v0.30.11 之前做過第一次更正的舊單（BTCUSDT-1139592365588、BTCUSDT-1142206675339，Google 表第 3、4 列），改釘後重建出的第一次更正摘要，跟接收端 2026-09-24 記下的不一樣。之後如果對這兩筆做第二次更正，接收端回 correction_base_mismatch，這筆投影記成 REJECTED 停放（終態、不重試），排在它後面的紀錄照常送出，並在趨勢的事件日誌記一筆 R1 事件（只留稽核紀錄，不通知；8b）；帳本照常追加第二次更正，Google 表不會被寫錯，只是停在第一次更正的數字。已 CONFIRMED 的第一次更正不會被重送；沒有「v0.30.11 之前就更正過一次」這種跨版本更正鏈的交易，第一次與第二次更正兩邊都用同一套新格式，不受這條影響。不動帳本、不暫停。",
+       "human_action": "無需立刻處理，目前也沒有任何一筆在等。真的發生時，帳本是標準答案，Google 表不能自動追上：不要用 requeue_rejected_projection_intents 重新排入（同樣的摘要會再被拒收）。想讓 Google 表看起來一致，只能手動改那一列，而且要涵蓋整筆更正會寫的欄位——進場價、出場價、進場數量、進場手續費、出場手續費、毛損益、淨損益、報酬率、出場訂單編號與備註——逐欄對照帳本最新一筆 trade_correction 的 corrected，不是只改淨損益與數量。手動改儲存格不會更新接收端記的稽核摘要，所以不能當成恢復自動更正的方式：之後對同一筆交易再做更正，仍然會被拒收。audit/google-reconcile-ignore.json 只影響對帳的比較（讓對帳不再標出這筆差異），不修正任何資料，不能代替手動修正。這套手動步驟尚未實際演練過。",
+       "resume": "n/a",
+       "lands_in_phase": 8,
+diff --git a/src/trade_alerts/fleet_event_log.py b/src/trade_alerts/fleet_event_log.py
+index 890e7d7..316c3d2 100644
+--- a/src/trade_alerts/fleet_event_log.py
++++ b/src/trade_alerts/fleet_event_log.py
+@@ -20,6 +20,7 @@ from __future__ import annotations
+ import fcntl
+ import json
+ import os
++import time
+ from contextlib import contextmanager
+ from datetime import datetime, timezone
+ from importlib import resources
+@@ -128,13 +129,32 @@ def exclusive_log_lock(path: str | Path) -> Iterator[None]:
+             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+ 
+ 
+-def append_jsonl(path: str | Path, record: Mapping[str, Any]) -> None:
+-    """Append one canonical JSON line under an exclusive lock, then fsync."""
++def _lock_exclusive(handle: Any, timeout: float | None) -> None:
++    """Take the exclusive ``flock``.  ``timeout=None`` blocks as long as it takes (every existing caller);
++    a number polls without blocking and raises ``FleetEventLogError`` once it has waited that many seconds."""
++    if timeout is None:
++        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
++        return
++    deadline = time.monotonic() + timeout
++    while True:
++        try:
++            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
++            return
++        except BlockingIOError:
++            if time.monotonic() >= deadline:
++                raise FleetEventLogError(f"could not lock the event log within {timeout:g}s") from None
++            time.sleep(0.02)
++
++
++def append_jsonl(path: str | Path, record: Mapping[str, Any], *, lock_timeout: float | None = None) -> None:
++    """Append one canonical JSON line under an exclusive lock, then fsync.
++
++    ``lock_timeout`` (seconds) bounds the wait for the lock; the default waits indefinitely, as before."""
+     encoded = _canonical_line(record) + "\n"
+     target = Path(path)
+     target.parent.mkdir(parents=True, exist_ok=True)
+     with target.open("a+", encoding="utf-8") as handle:
+-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
++        _lock_exclusive(handle, lock_timeout)
+         try:
+             handle.write(encoded)
+             handle.flush()
+@@ -184,9 +204,13 @@ def append_fleet_event(
+     measurements: Mapping[str, Any] | None = None,
+     recorded_at: str | None = None,
+     event_id: str | None = None,
++    lock_timeout: float | None = None,
+ ) -> dict[str, Any]:
+     """Record one detection and return the exact stored object.
+ 
++    ``lock_timeout`` bounds the wait for the log's lock (``FleetEventLogError`` when it runs out); the
++    default waits indefinitely.
++
+     ``evidence`` is the stable set of facts that identify *this* occurrence --
+     the same split as ``safe_halt_model.build_safe_halt``, and what a request
+     fingerprint is derived from.  ``details`` is diagnostic context, and
+@@ -210,7 +234,7 @@ def append_fleet_event(
+         "details": _require_mapping(details, "details"),
+         "measurements": _require_mapping(measurements, "measurements"),
+     }
+-    append_jsonl(path, record)
++    append_jsonl(path, record, lock_timeout=lock_timeout)
+     return record
+ 
+ 
+diff --git a/src/trade_alerts/projection_outbox.py b/src/trade_alerts/projection_outbox.py
+index 400c681..834c991 100644
+--- a/src/trade_alerts/projection_outbox.py
++++ b/src/trade_alerts/projection_outbox.py
+@@ -9,6 +9,7 @@ from __future__ import annotations
+ 
+ import fcntl
+ import json
++import logging
+ import os
+ from contextlib import contextmanager
+ from dataclasses import asdict, dataclass, replace
+@@ -17,8 +18,11 @@ from pathlib import Path
+ from typing import Any, Callable, Literal, Mapping
+ from uuid import uuid4
+ 
++from .fleet_event_log import append_fleet_event
+ from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance, LedgerUnreadableError
+ 
++_log = logging.getLogger(__name__)
++
+ ProjectionAction = Literal["append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2"]
+ ProjectionOutcomeStatus = Literal["CONFIRMED", "REJECTED", "TRANSPORT_FAILED"]
+ _ALLOWED_ACTIONS = frozenset({"append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2"})
+@@ -42,6 +46,18 @@ _CLOSE_ACTIONS = frozenset({"update_close_v2", "correct_close_v2"})
+ CORRECTION_UNCONFIRMED_ERROR = "close_not_confirmed"
+ CORRECTION_UNCONFIRMED_PARK_AFTER = 12
+ CORRECTION_PARKED_CODE = "correction_close_not_confirmed"
++#: The receiver's terminal answer to a correction whose "which version do I replace" digest does not match
++#: the confirmed row (ERR-068).  ``google_ledger_client`` makes it a terminal REJECTED on the first answer.
++CORRECTION_BASE_MISMATCH_ERROR = "correction_base_mismatch"
++
++#: Fleet event log names (8b).  A parked orphan close is the fleet-wide ERR-056 (``FLEET.`` code, so the event
++#: is recorded under project ``fleet``); a base mismatch is the trend strategy's ERR-068 (``SEY.`` code).
++#: Both are R1: the line is the audit trail, nobody is notified.
++#: Longest the audit line may wait for the event log's lock.  The dispatch is already on disk by then, so the
++#: line is given up (and a warning logged) rather than keeping the caller -- the strategy's projection worker -- waiting.
++PARK_EVENT_LOCK_TIMEOUT_SECONDS = 2.0
++ORPHAN_CLOSE_PARKED_EVENT = "PROJECTION_ORPHAN_CLOSE_PARKED"
++CORRECTION_BASE_MISMATCH_EVENT = "CORRECTION_BASE_MISMATCH"
+ 
+ 
+ @dataclass(frozen=True)
+@@ -240,15 +256,72 @@ def dispatch_next_projection(
+     *,
+     rebuild: Callable[[ProjectionIntent], RebuiltProjection],
+     submit: Callable[[Mapping[str, Any], LedgerProvenance], Any],
++    fleet_event_log: str | Path | None = None,
++    strategy_project: str | None = None,
+ ) -> ProjectionDispatchResult:
+     """Attempt only the oldest outstanding intent once.
+ 
++    ``fleet_event_log`` (the strategy's ``audit/fleet_event_log.jsonl``) and ``strategy_project`` (its
++    ``PROJECT_CODE_PREFIXES`` key) make this record an R1 fleet event when the dispatch parks an orphan
++    close or the receiver refuses a correction's base digest (see ``record_projection_park_event``).
++    Both are optional so a caller that has no event log behaves as before.
++
+     ``rebuild`` must read the strategy's authoritative ledger and construct a
+     fresh request id/timestamp/signature. A ``LedgerUnreadableError`` from it
+     pauses the intent (nothing is recorded) rather than rejecting it. ``submit`` is transport only. Neither
+     callback receives a secret from this module, and this dispatcher never loops
+     or falls back to legacy synchronization.
+     """
++    result = _dispatch_next_locked(path, rebuild=rebuild, submit=submit)
++    if fleet_event_log is not None and strategy_project is not None:
++        # Outside the outbox lock, after the dispatch is on disk: the event is best-effort audit and
++        # must never undo or delay the dispatch (a crash right here loses only the audit line).
++        record_projection_park_event(result, fleet_event_log=fleet_event_log, strategy_project=strategy_project)
++    return result
++
++
++def record_projection_park_event(
++    result: ProjectionDispatchResult,
++    *,
++    fleet_event_log: str | Path,
++    strategy_project: str,
++) -> bool:
++    """Append the R1 fleet event for a dispatch that just parked a close or hit a base mismatch.
++
++    Returns whether a line was written.  Never raises.  A parked or refused intent is terminal, so a
++    later pass never dispatches it again and the event is written once per intent.
++    """
++    dispatch, intent = result.dispatch, result.intent
++    if dispatch is None or intent is None or dispatch.status != "REJECTED":
++        return False
++    if dispatch.error_code in (ORPHAN_CLOSE_PARKED_CODE, CORRECTION_PARKED_CODE):    # both are ERR-056
++        project, code = "fleet", ORPHAN_CLOSE_PARKED_EVENT
++        summary = "平倉（或它的帳本更正）送到 Google 表接收端連續被退回，已停放"
++    elif (dispatch.error_code == CORRECTION_BASE_MISMATCH_ERROR and intent.action == "correct_close_v2"
++          and strategy_project == "seykota"):          # the catalog entry (ERR-068) exists for the trend strategy only
++        project, code = strategy_project, CORRECTION_BASE_MISMATCH_EVENT
++        summary = "帳本更正帶的『取代哪一版』摘要與接收端已確認的列不符，被拒收"
++    else:
++        return False
++    try:
++        append_fleet_event(
++            fleet_event_log, project=project, code=code, risk_tier="R1", summary=summary,
++            evidence={"trade_id": intent.trade_id, "intent_id": intent.intent_id, "action": intent.action},
++            details={"strategy": strategy_project, "error_code": dispatch.error_code, "event_type": intent.event_type},
++            lock_timeout=PARK_EVENT_LOCK_TIMEOUT_SECONDS,
++        )
++        return True
++    except Exception:  # noqa: BLE001 -- an audit line must never stop the projection queue
++        _log.warning("projection_park_event_not_recorded code=%s trade_id=%s", code, intent.trade_id, exc_info=True)
++        return False
++
++
++def _dispatch_next_locked(
++    path: str | Path,
++    *,
++    rebuild: Callable[[ProjectionIntent], RebuiltProjection],
++    submit: Callable[[Mapping[str, Any], LedgerProvenance], Any],
++) -> ProjectionDispatchResult:
+     with _exclusive_outbox_lock(path):
+         intents = outstanding_projection_intents(path)
+         if not intents:
+diff --git a/tests/test_projection_outbox.py b/tests/test_projection_outbox.py
+index 12c5266..2018aa2 100644
+--- a/tests/test_projection_outbox.py
++++ b/tests/test_projection_outbox.py
+@@ -471,3 +471,116 @@ def test_an_invalid_fill_is_rejected_and_the_next_projection_still_goes_out(tmp_
+     assert [i.intent_id for i in outstanding_projection_intents(path)] == [nxt.intent_id]
+     delivered = dispatch_next_projection(path, rebuild=_rebuild_like, submit=submit_with({"ok": True, "row": 2}))
+     assert delivered.dispatch.status == "CONFIRMED"
++
++
++# --------------------------------------------------------------------------- #
++# 8b: a parked orphan close / a refused correction base leaves an R1 fleet event
++# --------------------------------------------------------------------------- #
++def _events(path: Path) -> list[dict]:
++    from trade_alerts import read_fleet_events
++
++    return read_fleet_events(path) if path.exists() else []
++
++
++def test_parking_an_orphan_close_records_one_r1_fleet_event(tmp_path: Path, monkeypatch) -> None:
++    _ticking_clock(monkeypatch)
++    path, log = tmp_path / "projection-outbox.jsonl", tmp_path / "fleet_event_log.jsonl"
++    intent = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
++    not_found = lambda *_a: Submission("TRANSPORT_FAILED", error_code="trade_id_not_found")  # noqa: E731
++
++    for _ in range(ORPHAN_CLOSE_PARK_AFTER - 1):
++        dispatch_next_projection(path, rebuild=rebuilt, submit=not_found, fleet_event_log=log, strategy_project="momentum")
++    assert _events(log) == []                                    # still retrying: nothing recorded yet
++
++    dispatch_next_projection(path, rebuild=rebuilt, submit=not_found, fleet_event_log=log, strategy_project="momentum")
++    [event] = _events(log)
++    assert (event["project"], event["code"], event["risk_tier"]) == ("fleet", "PROJECTION_ORPHAN_CLOSE_PARKED", "R1")
++    assert event["evidence"]["trade_id"] == "trade-001" and event["evidence"]["intent_id"] == intent.intent_id
++    assert event["details"]["strategy"] == "momentum"
++
++    assert dispatch_next_projection(path, rebuild=rebuilt, submit=not_found, fleet_event_log=log, strategy_project="momentum").intent is None
++    assert len(_events(log)) == 1                                # the parked intent is terminal: written once
++
++
++def test_a_refused_correction_base_records_an_r1_event_for_the_trend_strategy_only(tmp_path: Path) -> None:
++    for strategy, expected in (("seykota", 1), ("mycrypto", 0)):
++        path, log = tmp_path / f"{strategy}-outbox.jsonl", tmp_path / f"{strategy}-events.jsonl"
++        enqueue_projection_intent(path, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
++        result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer("correction_base_mismatch", "REJECTED"),
++                                          fleet_event_log=log, strategy_project=strategy)
++        assert result.dispatch.status == "REJECTED"
++        events = _events(log)
++        assert len(events) == expected
++        if expected:
++            assert (events[0]["project"], events[0]["code"], events[0]["risk_tier"]) == ("seykota", "CORRECTION_BASE_MISMATCH", "R1")
++
++
++def test_other_rejections_and_a_missing_event_log_record_nothing(tmp_path: Path) -> None:
++    path, log = tmp_path / "projection-outbox.jsonl", tmp_path / "fleet_event_log.jsonl"
++    enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
++    dispatch_next_projection(path, rebuild=rebuilt, submit=_answer("close_projection_invalid", "REJECTED"),
++                             fleet_event_log=log, strategy_project="seykota")
++    assert _events(log) == []
++
++    path2 = tmp_path / "second-outbox.jsonl"
++    enqueue_projection_intent(path2, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
++    dispatch_next_projection(path2, rebuild=_rebuild_like, submit=_answer("correction_base_mismatch", "REJECTED"))   # no log given: as before
++    assert not (tmp_path / "second-events.jsonl").exists()
++
++
++def test_an_event_that_cannot_be_written_never_stops_the_queue(tmp_path: Path, monkeypatch) -> None:
++    import trade_alerts.projection_outbox as outbox
++
++    monkeypatch.setattr(outbox, "append_fleet_event", lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
++    path = tmp_path / "projection-outbox.jsonl"
++    enqueue_projection_intent(path, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
++    result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer("correction_base_mismatch", "REJECTED"),
++                                      fleet_event_log=tmp_path / "log.jsonl", strategy_project="seykota")
++    assert result.dispatch.status == "REJECTED" and outstanding_projection_intents(path) == ()
++
++
++def test_parking_a_correction_that_cannot_be_confirmed_records_the_same_r1_event(tmp_path: Path, monkeypatch) -> None:
++    _ticking_clock(monkeypatch)
++    path, log = tmp_path / "projection-outbox.jsonl", tmp_path / "fleet_event_log.jsonl"
++    enqueue_projection_intent(path, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
++    for _ in range(CORRECTION_UNCONFIRMED_PARK_AFTER):
++        dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer(CORRECTION_UNCONFIRMED_ERROR),
++                                 fleet_event_log=log, strategy_project="seykota")
++    [event] = _events(log)
++    assert (event["project"], event["code"], event["details"]["error_code"]) == ("fleet", "PROJECTION_ORPHAN_CLOSE_PARKED", CORRECTION_PARKED_CODE)
++
++
++def test_a_busy_event_log_cannot_hold_the_dispatch_up(tmp_path: Path, monkeypatch) -> None:
++    import fcntl
++    import time
++
++    import trade_alerts.projection_outbox as outbox
++
++    monkeypatch.setattr(outbox, "PARK_EVENT_LOCK_TIMEOUT_SECONDS", 0.2)
++    path, log = tmp_path / "projection-outbox.jsonl", tmp_path / "fleet_event_log.jsonl"
++    enqueue_projection_intent(path, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
++    with log.open("a+", encoding="utf-8") as holder:              # another process holds the log's lock
++        fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
++        started = time.monotonic()
++        result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer("correction_base_mismatch", "REJECTED"),
++                                          fleet_event_log=log, strategy_project="seykota")
++        waited = time.monotonic() - started
++    assert waited < 5                                               # gave up after ~0.2 s instead of waiting for ever
++    assert result.dispatch.status == "REJECTED" and outstanding_projection_intents(path) == ()   # the dispatch itself is on disk
++    assert _events(log) == []                                       # the audit line was the only thing dropped
++
++
++def test_the_event_log_lock_wait_is_unbounded_unless_a_timeout_is_given(tmp_path: Path) -> None:
++    import fcntl
++
++    import pytest
++
++    from trade_alerts import FleetEventLogError, append_fleet_event
++
++    log = tmp_path / "fleet_event_log.jsonl"
++    with log.open("a+", encoding="utf-8") as holder:
++        fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
++        with pytest.raises(FleetEventLogError):
++            append_fleet_event(log, project="seykota", code="X", lock_timeout=0.1)
++    append_fleet_event(log, project="seykota", code="X", lock_timeout=0.1)   # free again: written
++    assert len(_events(log)) == 1
