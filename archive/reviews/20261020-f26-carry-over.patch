@@ -1,0 +1,213 @@
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index 26db4ec..d22c9b5 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -375,9 +375,39 @@ def _trades_after(events: Iterable[dict[str, Any]], after: datetime, types: Iter
+     return out
+ 
+ 
++# A strategy that WAS freshly confirmed stays listed as confirmed for at most this long while the Google check cannot say
++# anything new about it (a read that timed out, or a new trade still inside its 60-minute grace).  Past it, or when the
++# reconcile itself has stopped, it goes back to waiting.
++F26_CARRY_HOURS = 3
++
++
++def reconcile_pending_reason(status: Mapping[str, Any], last_trade: datetime, now: datetime) -> str:
++    """Why ``reconcile_covers`` said ``pending``: ``unknown`` (the check ran lately but could not read Google), ``grace`` (it
++    ran lately, but the newest trade is still inside its grace period) or ``stale`` (it has not run lately / has no time /
++    gave an answer other than RECONCILED, DIVERGED or UNKNOWN)."""
++    checked = parse_time(status.get("checked_at"))
++    if checked is None or not _fresh(checked, now, 90):
++        return "stale"
++    value = str(status.get("value"))
++    if value == "UNKNOWN":
++        return "unknown"
++    if value in ("RECONCILED", "DIVERGED") and checked < last_trade + RECONCILE_GRACE:
++        return "grace"                                  # only an answer the check knows how to read can be "still inside the grace"
++    return "stale"
++
++
+ def check_sheet_tab_names(ctx: Context) -> Result:
+-    """f-26: each strategy's next real trade goes through the Chinese tab name and the ledger-vs-sheet check agrees."""
+-    ok, waiting, bad, evidence = [], [], [], []
++    """f-26: each strategy's next real trade goes through the Chinese tab name and the ledger-vs-sheet check agrees.
++
++    A strategy confirmed in an earlier run is not dropped back to "waiting" for a moment in which the check cannot say
++    anything new about it -- the Google read of this round failed (UNKNOWN) or a newer trade is still inside its grace.  It
++    stays listed as confirmed, with the reason and the time of the confirmation it rests on, for up to ``F26_CARRY_HOURS``.
++    That carried line is display only: it never counts toward closing (every strategy must be freshly covered for that),
++    and a DIVERGED answer after the grace, a wrong tab name or a stale reconcile still change the result at once."""
++    ok, carried, waiting, bad, evidence = [], [], [], [], []
++    remembered = (ctx.previous or {}).get("covered")
++    remembered = remembered if isinstance(remembered, dict) else {}             # a damaged memory is no memory
++    covered_now: dict[str, dict[str, str]] = {}
+     for key in REPOS:
+         status = load_json(ctx.remote, "a1", audit(key, "google_reconcile_status.json"))
+         trades = _trades_after(jsonl(ctx.remote.read("a1", audit(key, "trading_ledger.jsonl"))), _F26_BASELINE)
+@@ -393,18 +423,37 @@ def check_sheet_tab_names(ctx: Context) -> Result:
+         verdict = reconcile_covers(status, last, ctx.now)
+         if verdict == "covered":
+             ok.append(name)
++            covered_now[key] = {"at": ctx.now.isoformat(timespec="seconds"), "last_trade": last.isoformat(timespec="seconds")}
+             evidence.append(f"{name}：{len(trades)} 筆新交易（最近 {taipei(last)} 台北），之後的 Google 表對帳（{taipei(parse_time(status['checked_at']))}）一致")
+         elif verdict == "diverged":
+             bad.append(name)
+             evidence.append(f"{name}：最近一筆新交易已過 60 分鐘寬限，之後的 Google 表對帳仍是 DIVERGED")
+         else:
+-            waiting.append(name)
++            earlier = remembered.get(key)
++            earlier = earlier if isinstance(earlier, dict) else {}
++            since = parse_time(earlier.get("at"))
++            reason = reconcile_pending_reason(status, last, ctx.now)
++            # the confirmation must lie in the PAST and be at most F26_CARRY_HOURS old: a time in the future (a clock
++            # fault, a damaged file) never extends the carry (review of #252)
++            if (since is not None and timedelta(0) <= ctx.now - since <= timedelta(hours=F26_CARRY_HOURS)
++                    and reason in ("unknown", "grace")):
++                carried.append((name, reason, since))
++                covered_now[key] = dict(earlier)                      # keep the ORIGINAL confirmation time: the bound never slides
++                why = ("這一輪對帳讀不到 Google 表（UNKNOWN），下一輪會再試" if reason == "unknown"
++                       else f"最近一筆新交易（{taipei(last)} 台北）還在 60 分鐘對帳寬限內，這筆還不算已確認")
++                evidence.append(f"{name}：{why}；沿用 {taipei(since)} 台北的確認，最久 {F26_CARRY_HOURS} 小時")
++            else:
++                waiting.append(name)
+     if bad:
+-        return Result(FAILED, "新分頁名有策略不符合預期：" + "、".join(bad), evidence, key="bad:" + ",".join(bad))
+-    if not waiting:
+-        return Result(OBSERVED, "四支策略的新交易都走新分頁名，帳本對 Google 表一致。", evidence, closable=True, key="all")
+-    summary = ("已確認：" + "、".join(ok) + "；" if ok else "") + "還在等新交易：" + "、".join(waiting)
+-    return Result(WAITING, summary, evidence)
++        return Result(FAILED, "新分頁名有策略不符合預期：" + "、".join(bad), evidence, key="bad:" + ",".join(bad), extra={"covered": covered_now})
++    if not waiting and not carried:
++        return Result(OBSERVED, "四支策略的新交易都走新分頁名，帳本對 Google 表一致。", evidence, closable=True, key="all",
++                      extra={"covered": covered_now})
++    confirmed = [*ok, *(f"{name}（{'本輪讀不到 Google 表' if reason == 'unknown' else '新交易在對帳寬限內'}，沿用 {taipei(since)} 的確認）"
++                        for name, reason, since in carried)]
++    summary = ("已確認：" + "、".join(confirmed) + "；" if confirmed else "")
++    summary += ("還在等新交易：" + "、".join(waiting)) if waiting else "沿用的確認要等下一輪對帳重新確認後才能結案"
++    return Result(WAITING, summary, evidence, extra={"covered": covered_now})
+ 
+ 
+ def check_competition_fill(ctx: Context) -> Result:
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index 00942b5..098c984 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -1179,3 +1179,118 @@ def test_only_a_cat_that_says_the_file_is_missing_counts_as_missing(monkeypatch,
+     with pytest.raises(ow.RemoteError) as caught:
+         ow.Remote("k")._run("dev", ["cat", STATE_PATH])
+     assert type(caught.value) is expected
++
++
++# --- f-26: a strategy confirmed earlier is not dropped for a moment the check cannot speak (carry-over) ---------------------
++
++def _covered_before(key="momentum", hours_ago_=1, last_trade_hours_ago=5):
++    return {"covered": {key: {"at": iso(NOW - timedelta(hours=hours_ago_)), "last_trade": iso(NOW - timedelta(hours=last_trade_hours_ago))}}}
++
++
++def _tabs_with_momentum(*, status, trade_ago_minutes=300):
++    st = {"momentum": status, "seykota": _status(30, name="趨勢策略"), "mycrypto": _status(30, name="加密策略"), "btc-competition": _status(30, name="競賽策略")}
++    trades = {"momentum": [{"event_type": "trade_close", "event_time": iso(NOW - timedelta(minutes=trade_ago_minutes))}],
++              "mycrypto": [trade(5)], "btc-competition": [trade(5)]}
++    return tabs_remote(trades=trades, status=st)
++
++
++def test_tabs_a_google_read_that_failed_keeps_a_confirmed_strategy_listed_with_the_reason():
++    r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
++    out = ow.check_sheet_tab_names(ctx(r, _covered_before()))
++    assert out.state == ow.WAITING and not out.closable
++    assert "動能策略（本輪讀不到 Google 表，沿用" in out.summary and "還在等新交易：趨勢策略" in out.summary
++    assert any(line.startswith("動能策略：這一輪對帳讀不到 Google 表（UNKNOWN）") for line in out.evidence)
++    assert out.extra["covered"]["momentum"]["at"] == iso(NOW - timedelta(hours=1))                    # the bound does not slide
++
++
++def test_tabs_a_new_trade_inside_its_grace_does_not_count_as_confirmed_but_the_earlier_confirmation_stays():
++    # the 10/14 review example: the old RECONCILED must not count for the NEW trade -- it is listed as carried, never as covered
++    r = _tabs_with_momentum(status=_status(5), trade_ago_minutes=30)
++    out = ow.check_sheet_tab_names(ctx(r, _covered_before()))
++    assert out.state == ow.WAITING and not out.closable
++    assert "動能策略（新交易在對帳寬限內，沿用" in out.summary
++    assert any("還不算已確認" in line for line in out.evidence if line.startswith("動能策略"))
++    assert not any("筆新交易（最近" in line and line.startswith("動能策略") for line in out.evidence)   # no 'covered' line for it
++
++
++def test_tabs_the_carry_expires_after_three_hours():
++    r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
++    out = ow.check_sheet_tab_names(ctx(r, _covered_before(hours_ago_=ow.F26_CARRY_HOURS + 1)))
++    assert "已確認：動能策略" not in out.summary and "動能策略" in out.summary.split("還在等新交易：")[1]
++    assert "momentum" not in out.extra["covered"]
++
++
++def test_tabs_nothing_is_carried_for_a_strategy_that_was_never_confirmed_or_whose_reconcile_stopped():
++    r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
++    assert "動能策略" in ow.check_sheet_tab_names(ctx(r, {})).summary.split("還在等新交易：")[1]            # no memory
++    stale = _tabs_with_momentum(status=_status(300))                                                    # the check itself stopped
++    out = ow.check_sheet_tab_names(ctx(stale, _covered_before()))
++    assert "動能策略" in out.summary.split("還在等新交易：")[1] and "momentum" not in out.extra["covered"]
++
++
++def test_tabs_a_diverged_answer_after_the_grace_or_a_wrong_tab_still_fails_at_once_even_if_confirmed_before():
++    div = {"sheet_name": "動能策略", "value": "DIVERGED", "checked_at": iso(NOW - timedelta(minutes=5)), "note": "x"}
++    assert ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=div), _covered_before())).state == ow.FAILED
++    wrong = {"sheet_name": "mexc", "value": "RECONCILED", "checked_at": iso(NOW - timedelta(minutes=5))}
++    assert ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=wrong), _covered_before())).state == ow.FAILED
++
++
++def test_tabs_a_carried_strategy_never_lets_the_item_close_and_a_fresh_cover_restarts_the_clock():
++    allfour = {k: [trade(5)] for k in ow.REPOS}
++    good = {"momentum": _status(5, "UNKNOWN"), "seykota": _status(30, name="趨勢策略"), "mycrypto": _status(30, name="加密策略"), "btc-competition": _status(30, name="競賽策略")}
++    carried = ow.check_sheet_tab_names(ctx(tabs_remote(trades=allfour, status=good), _covered_before()))
++    assert carried.state == ow.WAITING and not carried.closable and "沿用的確認要等下一輪對帳重新確認後才能結案" in carried.summary
++    fresh = {**good, "momentum": _status(30)}
++    closed = ow.check_sheet_tab_names(ctx(tabs_remote(trades=allfour, status=fresh), _covered_before()))
++    assert closed.state == ow.OBSERVED and closed.closable
++    assert closed.extra["covered"]["momentum"]["at"] == iso(NOW)
++
++
++def test_tabs_the_memory_survives_through_run_checks():
++    only = [c for c in ow.CHECKS if c.id == "sheet-tab-names"]
++    first = ow.run_checks(_tabs_with_momentum(status=_status(30)), NOW - timedelta(hours=1), {}, only)
++    assert "momentum" in first["sheet-tab-names"]["extra"]["covered"]
++    second = ow.run_checks(_tabs_with_momentum(status=_status(5, "UNKNOWN")), NOW, {"items": first}, only)
++    assert "動能策略（本輪讀不到 Google 表" in second["sheet-tab-names"]["summary"]
++
++
++def test_tabs_pending_reason_names_why_the_check_cannot_speak():
++    t = NOW - timedelta(hours=3)
++    assert ow.reconcile_pending_reason(_status(30, "UNKNOWN"), t, NOW) == "unknown"
++    assert ow.reconcile_pending_reason(_status(30), NOW - timedelta(minutes=40), NOW) == "grace"
++    assert ow.reconcile_pending_reason(_status(300), t, NOW) == "stale"
++    assert ow.reconcile_pending_reason({"value": "RECONCILED"}, t, NOW) == "stale"
++
++
++# review of #252: the carry needs a confirmation in the PAST, and only an answer the check can read counts as "in the grace"
++
++def test_tabs_a_confirmation_dated_in_the_future_is_never_carried():
++    future = {"covered": {"momentum": {"at": iso(NOW + timedelta(hours=48)), "last_trade": iso(NOW - timedelta(hours=1))}}}
++    r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
++    out = ow.check_sheet_tab_names(ctx(r, future))
++    assert "動能策略" in out.summary.split("還在等新交易：")[1] and "momentum" not in out.extra["covered"]
++    just_ahead = {"covered": {"momentum": {"at": iso(NOW + timedelta(seconds=1)), "last_trade": iso(NOW)}}}
++    assert "momentum" not in ow.check_sheet_tab_names(ctx(r, just_ahead)).extra["covered"]
++
++
++@pytest.mark.parametrize("answer", [{"value": "ERROR"}, {"value": "something-new"}, {"value": None}, {}])
++def test_tabs_an_unreadable_answer_inside_the_grace_is_stale_not_grace(answer):
++    status = {**_status(5), **answer}
++    if not answer:
++        status.pop("value")
++    assert ow.reconcile_pending_reason(status, NOW - timedelta(minutes=30), NOW) == "stale"
++    out = ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=status, trade_ago_minutes=30), _covered_before()))
++    assert "動能策略" in out.summary.split("還在等新交易：")[1] and "momentum" not in out.extra["covered"]
++
++
++def test_tabs_known_answers_inside_the_grace_still_count_as_grace():
++    for value in ("RECONCILED", "DIVERGED"):
++        assert ow.reconcile_pending_reason(_status(5, value), NOW - timedelta(minutes=30), NOW) == "grace"
++
++
++@pytest.mark.parametrize("memory", [None, "text", ["a"], 7, {"covered": "x"}, {"covered": ["a"]}, {"covered": {"momentum": "x"}}, {"covered": {"momentum": {"at": "not a time"}}},
++                                    {"covered": {"momentum": {"at": 12345}}}, {"covered": {"momentum": None}}])
++def test_tabs_a_damaged_memory_is_no_memory_and_never_an_error(memory):
++    previous = memory if isinstance(memory, dict) else {"covered": memory}
++    out = ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=_status(5, "UNKNOWN")), previous))
++    assert out.state == ow.WAITING and "動能策略" in out.summary.split("還在等新交易：")[1]
