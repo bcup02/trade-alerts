@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import fcntl
 import json
+import logging
 import os
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
@@ -17,7 +18,10 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Mapping
 from uuid import uuid4
 
+from .fleet_event_log import append_fleet_event
 from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerProvenance, LedgerUnreadableError
+
+_log = logging.getLogger(__name__)
 
 ProjectionAction = Literal["append_open_v2", "append_fill_v2", "update_close_v2", "correct_close_v2"]
 ProjectionOutcomeStatus = Literal["CONFIRMED", "REJECTED", "TRANSPORT_FAILED"]
@@ -42,6 +46,15 @@ _CLOSE_ACTIONS = frozenset({"update_close_v2", "correct_close_v2"})
 CORRECTION_UNCONFIRMED_ERROR = "close_not_confirmed"
 CORRECTION_UNCONFIRMED_PARK_AFTER = 12
 CORRECTION_PARKED_CODE = "correction_close_not_confirmed"
+#: The receiver's terminal answer to a correction whose "which version do I replace" digest does not match
+#: the confirmed row (ERR-068).  ``google_ledger_client`` makes it a terminal REJECTED on the first answer.
+CORRECTION_BASE_MISMATCH_ERROR = "correction_base_mismatch"
+
+#: Fleet event log names (8b).  A parked orphan close is the fleet-wide ERR-056 (``FLEET.`` code, so the event
+#: is recorded under project ``fleet``); a base mismatch is the trend strategy's ERR-068 (``SEY.`` code).
+#: Both are R1: the line is the audit trail, nobody is notified.
+ORPHAN_CLOSE_PARKED_EVENT = "PROJECTION_ORPHAN_CLOSE_PARKED"
+CORRECTION_BASE_MISMATCH_EVENT = "CORRECTION_BASE_MISMATCH"
 
 
 @dataclass(frozen=True)
@@ -240,8 +253,15 @@ def dispatch_next_projection(
     *,
     rebuild: Callable[[ProjectionIntent], RebuiltProjection],
     submit: Callable[[Mapping[str, Any], LedgerProvenance], Any],
+    fleet_event_log: str | Path | None = None,
+    strategy_project: str | None = None,
 ) -> ProjectionDispatchResult:
     """Attempt only the oldest outstanding intent once.
+
+    ``fleet_event_log`` (the strategy's ``audit/fleet_event_log.jsonl``) and ``strategy_project`` (its
+    ``PROJECT_CODE_PREFIXES`` key) make this record an R1 fleet event when the dispatch parks an orphan
+    close or the receiver refuses a correction's base digest (see ``record_projection_park_event``).
+    Both are optional so a caller that has no event log behaves as before.
 
     ``rebuild`` must read the strategy's authoritative ledger and construct a
     fresh request id/timestamp/signature. A ``LedgerUnreadableError`` from it
@@ -249,6 +269,55 @@ def dispatch_next_projection(
     callback receives a secret from this module, and this dispatcher never loops
     or falls back to legacy synchronization.
     """
+    result = _dispatch_next_locked(path, rebuild=rebuild, submit=submit)
+    if fleet_event_log is not None and strategy_project is not None:
+        # Outside the outbox lock, after the dispatch is on disk: the event is best-effort audit and
+        # must never undo or delay the dispatch (a crash right here loses only the audit line).
+        record_projection_park_event(result, fleet_event_log=fleet_event_log, strategy_project=strategy_project)
+    return result
+
+
+def record_projection_park_event(
+    result: ProjectionDispatchResult,
+    *,
+    fleet_event_log: str | Path,
+    strategy_project: str,
+) -> bool:
+    """Append the R1 fleet event for a dispatch that just parked a close or hit a base mismatch.
+
+    Returns whether a line was written.  Never raises.  A parked or refused intent is terminal, so a
+    later pass never dispatches it again and the event is written once per intent.
+    """
+    dispatch, intent = result.dispatch, result.intent
+    if dispatch is None or intent is None or dispatch.status != "REJECTED":
+        return False
+    if dispatch.error_code == ORPHAN_CLOSE_PARKED_CODE:
+        project, code = "fleet", ORPHAN_CLOSE_PARKED_EVENT
+        summary = "平倉送到 Google 表接收端連續找不到開倉列，已停放"
+    elif (dispatch.error_code == CORRECTION_BASE_MISMATCH_ERROR and intent.action == "correct_close_v2"
+          and strategy_project == "seykota"):          # the catalog entry (ERR-068) exists for the trend strategy only
+        project, code = strategy_project, CORRECTION_BASE_MISMATCH_EVENT
+        summary = "帳本更正帶的『取代哪一版』摘要與接收端已確認的列不符，被拒收"
+    else:
+        return False
+    try:
+        append_fleet_event(
+            fleet_event_log, project=project, code=code, risk_tier="R1", summary=summary,
+            evidence={"trade_id": intent.trade_id, "intent_id": intent.intent_id, "action": intent.action},
+            details={"strategy": strategy_project, "error_code": dispatch.error_code, "event_type": intent.event_type},
+        )
+        return True
+    except Exception:  # noqa: BLE001 -- an audit line must never stop the projection queue
+        _log.warning("projection_park_event_not_recorded code=%s trade_id=%s", code, intent.trade_id, exc_info=True)
+        return False
+
+
+def _dispatch_next_locked(
+    path: str | Path,
+    *,
+    rebuild: Callable[[ProjectionIntent], RebuiltProjection],
+    submit: Callable[[Mapping[str, Any], LedgerProvenance], Any],
+) -> ProjectionDispatchResult:
     with _exclusive_outbox_lock(path):
         intents = outstanding_projection_intents(path)
         if not intents:

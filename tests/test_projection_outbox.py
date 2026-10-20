@@ -471,3 +471,69 @@ def test_an_invalid_fill_is_rejected_and_the_next_projection_still_goes_out(tmp_
     assert [i.intent_id for i in outstanding_projection_intents(path)] == [nxt.intent_id]
     delivered = dispatch_next_projection(path, rebuild=_rebuild_like, submit=submit_with({"ok": True, "row": 2}))
     assert delivered.dispatch.status == "CONFIRMED"
+
+
+# --------------------------------------------------------------------------- #
+# 8b: a parked orphan close / a refused correction base leaves an R1 fleet event
+# --------------------------------------------------------------------------- #
+def _events(path: Path) -> list[dict]:
+    from trade_alerts import read_fleet_events
+
+    return read_fleet_events(path) if path.exists() else []
+
+
+def test_parking_an_orphan_close_records_one_r1_fleet_event(tmp_path: Path, monkeypatch) -> None:
+    _ticking_clock(monkeypatch)
+    path, log = tmp_path / "projection-outbox.jsonl", tmp_path / "fleet_event_log.jsonl"
+    intent = enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    not_found = lambda *_a: Submission("TRANSPORT_FAILED", error_code="trade_id_not_found")  # noqa: E731
+
+    for _ in range(ORPHAN_CLOSE_PARK_AFTER - 1):
+        dispatch_next_projection(path, rebuild=rebuilt, submit=not_found, fleet_event_log=log, strategy_project="momentum")
+    assert _events(log) == []                                    # still retrying: nothing recorded yet
+
+    dispatch_next_projection(path, rebuild=rebuilt, submit=not_found, fleet_event_log=log, strategy_project="momentum")
+    [event] = _events(log)
+    assert (event["project"], event["code"], event["risk_tier"]) == ("fleet", "PROJECTION_ORPHAN_CLOSE_PARKED", "R1")
+    assert event["evidence"]["trade_id"] == "trade-001" and event["evidence"]["intent_id"] == intent.intent_id
+    assert event["details"]["strategy"] == "momentum"
+
+    assert dispatch_next_projection(path, rebuild=rebuilt, submit=not_found, fleet_event_log=log, strategy_project="momentum").intent is None
+    assert len(_events(log)) == 1                                # the parked intent is terminal: written once
+
+
+def test_a_refused_correction_base_records_an_r1_event_for_the_trend_strategy_only(tmp_path: Path) -> None:
+    for strategy, expected in (("seykota", 1), ("mycrypto", 0)):
+        path, log = tmp_path / f"{strategy}-outbox.jsonl", tmp_path / f"{strategy}-events.jsonl"
+        enqueue_projection_intent(path, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
+        result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer("correction_base_mismatch", "REJECTED"),
+                                          fleet_event_log=log, strategy_project=strategy)
+        assert result.dispatch.status == "REJECTED"
+        events = _events(log)
+        assert len(events) == expected
+        if expected:
+            assert (events[0]["project"], events[0]["code"], events[0]["risk_tier"]) == ("seykota", "CORRECTION_BASE_MISMATCH", "R1")
+
+
+def test_other_rejections_and_a_missing_event_log_record_nothing(tmp_path: Path) -> None:
+    path, log = tmp_path / "projection-outbox.jsonl", tmp_path / "fleet_event_log.jsonl"
+    enqueue_projection_intent(path, action="update_close_v2", provenance=provenance())
+    dispatch_next_projection(path, rebuild=rebuilt, submit=_answer("close_projection_invalid", "REJECTED"),
+                             fleet_event_log=log, strategy_project="seykota")
+    assert _events(log) == []
+
+    path2 = tmp_path / "second-outbox.jsonl"
+    enqueue_projection_intent(path2, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
+    dispatch_next_projection(path2, rebuild=_rebuild_like, submit=_answer("correction_base_mismatch", "REJECTED"))   # no log given: as before
+    assert not (tmp_path / "second-events.jsonl").exists()
+
+
+def test_an_event_that_cannot_be_written_never_stops_the_queue(tmp_path: Path, monkeypatch) -> None:
+    import trade_alerts.projection_outbox as outbox
+
+    monkeypatch.setattr(outbox, "append_fleet_event", lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
+    path = tmp_path / "projection-outbox.jsonl"
+    enqueue_projection_intent(path, action="correct_close_v2", provenance=_prov("trade_correction", "c" * 64))
+    result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer("correction_base_mismatch", "REJECTED"),
+                                      fleet_event_log=tmp_path / "log.jsonl", strategy_project="seykota")
+    assert result.dispatch.status == "REJECTED" and outstanding_projection_intents(path) == ()
