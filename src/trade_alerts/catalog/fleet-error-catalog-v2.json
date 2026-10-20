@@ -1810,9 +1810,10 @@
       "title": "Google 表同步佇列停放了一筆找不到開倉列的平倉",
       "project": "fleet",
       "sources": [
-        "src/trade_alerts/projection_outbox.py:33",
-        "src/trade_alerts/projection_outbox.py:275",
-        "src/trade_alerts/projection_outbox.py:278"
+        "src/trade_alerts/projection_outbox.py:39",
+        "src/trade_alerts/projection_outbox.py:307",
+        "src/trade_alerts/projection_outbox.py:348",
+        "src/trade_alerts/projection_outbox.py:351"
       ],
       "current": {
         "latch": null,
@@ -1821,7 +1822,7 @@
       },
       "verdict": "MECHANICAL",
       "risk_tier": "R1",
-      "auto_action": "某筆平倉（或帳本更正）送給 Google 表接收端，連續 12 次都回「找不到這筆交易的開倉列」，就把它記成 REJECTED（原因 orphan_close_no_open_row）停放，排在它後面的紀錄照常送出。同一筆交易的帳本更正如果連續 12 次都回「平倉未確認」（前面的平倉被停放、接收端沒有已確認的平倉可更正），也同樣記成 REJECTED（原因 correction_close_not_confirmed）停放。被停放的紀錄可以用共用庫的 requeue_rejected_projection_intents 依原順序重新排入（先平倉、再更正）。不動帳本、不暫停。帳本跟 Google 表的差異仍由對帳照樣標出（ERR-044）。",
+      "auto_action": "某筆平倉（或帳本更正）送給 Google 表接收端，連續 12 次都回「找不到這筆交易的開倉列」，就把它記成 REJECTED（原因 orphan_close_no_open_row）停放，排在它後面的紀錄照常送出。同一筆交易的帳本更正如果連續 12 次都回「平倉未確認」（前面的平倉被停放、接收端沒有已確認的平倉可更正），也同樣記成 REJECTED（原因 correction_close_not_confirmed）停放。被停放的紀錄可以用共用庫的 requeue_rejected_projection_intents 依原順序重新排入（先平倉、再更正）。停放時策略會在自己的事件日誌記一筆 R1 事件（只留稽核紀錄，不通知；8b）。不動帳本、不暫停。帳本跟 Google 表的差異仍由對帳照樣標出（ERR-044）。",
       "human_action": "無需立刻處理。想讓對帳恢復一致，才需要處理這筆差異：先確認該筆交易確實存在，再二選一——補上開倉列，或把它列入忽略清單 audit/google-reconcile-ignore.json（只影響對帳的比較，會逐筆列在讀數的 ignored 欄）。",
       "resume": "n/a",
       "lands_in_phase": 8,
@@ -2161,6 +2162,7 @@
         "src/seykota_bot/google_ledger_provenance.py:141",
         "src/seykota_bot/google_ledger_provenance.py:144",
         "src/trade_alerts/google_ledger_client.py:36",
+        "src/trade_alerts/projection_outbox.py:307",
         "src/trade_alerts/trade_correction.py:270"
       ],
       "current": {
@@ -2170,7 +2172,7 @@
       },
       "verdict": "MECHANICAL",
       "risk_tier": "R1",
-      "auto_action": "帳本更正投到 Google 表時，要帶「我取代的是哪一版」的摘要（上一次更正的投影摘要，內容含備註文字）。共用庫 v0.30.11 起備註改成一句中文，所以趨勢兩筆在 v0.30.11 之前做過第一次更正的舊單（BTCUSDT-1139592365588、BTCUSDT-1142206675339，Google 表第 3、4 列），改釘後重建出的第一次更正摘要，跟接收端 2026-09-24 記下的不一樣。之後如果對這兩筆做第二次更正，接收端回 correction_base_mismatch，這筆投影記成 REJECTED 停放（終態、不重試），排在它後面的紀錄照常送出；帳本照常追加第二次更正，Google 表不會被寫錯，只是停在第一次更正的數字。已 CONFIRMED 的第一次更正不會被重送；沒有「v0.30.11 之前就更正過一次」這種跨版本更正鏈的交易，第一次與第二次更正兩邊都用同一套新格式，不受這條影響。不動帳本、不暫停。",
+      "auto_action": "帳本更正投到 Google 表時，要帶「我取代的是哪一版」的摘要（上一次更正的投影摘要，內容含備註文字）。共用庫 v0.30.11 起備註改成一句中文，所以趨勢兩筆在 v0.30.11 之前做過第一次更正的舊單（BTCUSDT-1139592365588、BTCUSDT-1142206675339，Google 表第 3、4 列），改釘後重建出的第一次更正摘要，跟接收端 2026-09-24 記下的不一樣。之後如果對這兩筆做第二次更正，接收端回 correction_base_mismatch，這筆投影記成 REJECTED 停放（終態、不重試），排在它後面的紀錄照常送出，並在趨勢的事件日誌記一筆 R1 事件（只留稽核紀錄，不通知；8b）；帳本照常追加第二次更正，Google 表不會被寫錯，只是停在第一次更正的數字。已 CONFIRMED 的第一次更正不會被重送；沒有「v0.30.11 之前就更正過一次」這種跨版本更正鏈的交易，第一次與第二次更正兩邊都用同一套新格式，不受這條影響。不動帳本、不暫停。",
       "human_action": "無需立刻處理，目前也沒有任何一筆在等。真的發生時，帳本是標準答案，Google 表不能自動追上：不要用 requeue_rejected_projection_intents 重新排入（同樣的摘要會再被拒收）。想讓 Google 表看起來一致，只能手動改那一列，而且要涵蓋整筆更正會寫的欄位——進場價、出場價、進場數量、進場手續費、出場手續費、毛損益、淨損益、報酬率、出場訂單編號與備註——逐欄對照帳本最新一筆 trade_correction 的 corrected，不是只改淨損益與數量。手動改儲存格不會更新接收端記的稽核摘要，所以不能當成恢復自動更正的方式：之後對同一筆交易再做更正，仍然會被拒收。audit/google-reconcile-ignore.json 只影響對帳的比較（讓對帳不再標出這筆差異），不修正任何資料，不能代替手動修正。這套手動步驟尚未實際演練過。",
       "resume": "n/a",
       "lands_in_phase": 8,

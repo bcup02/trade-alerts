@@ -10,6 +10,7 @@ from .projection_outbox import (
     ProjectionIntent,
     RebuiltProjection,
     dispatch_next_projection,
+    record_projection_park_event,
     enqueue_projection_intent,
     outstanding_projection_intents,
     record_projection_dispatch,
@@ -206,6 +207,7 @@ __all__ = [
     "ProjectionIntent",
     "RebuiltProjection",
     "dispatch_next_projection",
+    "record_projection_park_event",
     "enqueue_projection_intent",
     "outstanding_projection_intents",
     "requeue_rejected_projection_intents",
@@ -345,4 +347,4 @@ __all__ = [
     "utc_now_iso",
 ]
 
-__version__ = "0.30.14"
+__version__ = "0.30.15"
