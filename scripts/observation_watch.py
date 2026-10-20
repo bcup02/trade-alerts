@@ -384,14 +384,15 @@ F26_CARRY_HOURS = 3
 def reconcile_pending_reason(status: Mapping[str, Any], last_trade: datetime, now: datetime) -> str:
     """Why ``reconcile_covers`` said ``pending``: ``unknown`` (the check ran lately but could not read Google), ``grace`` (it
     ran lately, but the newest trade is still inside its grace period) or ``stale`` (it has not run lately / has no time /
-    gave some other answer)."""
+    gave an answer other than RECONCILED, DIVERGED or UNKNOWN)."""
     checked = parse_time(status.get("checked_at"))
     if checked is None or not _fresh(checked, now, 90):
         return "stale"
-    if str(status.get("value")) == "UNKNOWN":
+    value = str(status.get("value"))
+    if value == "UNKNOWN":
         return "unknown"
-    if checked < last_trade + RECONCILE_GRACE:
-        return "grace"
+    if value in ("RECONCILED", "DIVERGED") and checked < last_trade + RECONCILE_GRACE:
+        return "grace"                                  # only an answer the check knows how to read can be "still inside the grace"
     return "stale"
 
 
@@ -404,7 +405,8 @@ def check_sheet_tab_names(ctx: Context) -> Result:
     That carried line is display only: it never counts toward closing (every strategy must be freshly covered for that),
     and a DIVERGED answer after the grace, a wrong tab name or a stale reconcile still change the result at once."""
     ok, carried, waiting, bad, evidence = [], [], [], [], []
-    remembered = dict((ctx.previous or {}).get("covered") or {})
+    remembered = (ctx.previous or {}).get("covered")
+    remembered = remembered if isinstance(remembered, dict) else {}             # a damaged memory is no memory
     covered_now: dict[str, dict[str, str]] = {}
     for key in REPOS:
         status = load_json(ctx.remote, "a1", audit(key, "google_reconcile_status.json"))
@@ -427,10 +429,14 @@ def check_sheet_tab_names(ctx: Context) -> Result:
             bad.append(name)
             evidence.append(f"{name}：最近一筆新交易已過 60 分鐘寬限，之後的 Google 表對帳仍是 DIVERGED")
         else:
-            earlier = remembered.get(key) or {}
+            earlier = remembered.get(key)
+            earlier = earlier if isinstance(earlier, dict) else {}
             since = parse_time(earlier.get("at"))
             reason = reconcile_pending_reason(status, last, ctx.now)
-            if since is not None and ctx.now - since <= timedelta(hours=F26_CARRY_HOURS) and reason in ("unknown", "grace"):
+            # the confirmation must lie in the PAST and be at most F26_CARRY_HOURS old: a time in the future (a clock
+            # fault, a damaged file) never extends the carry (review of #252)
+            if (since is not None and timedelta(0) <= ctx.now - since <= timedelta(hours=F26_CARRY_HOURS)
+                    and reason in ("unknown", "grace")):
                 carried.append((name, reason, since))
                 covered_now[key] = dict(earlier)                      # keep the ORIGINAL confirmation time: the bound never slides
                 why = ("這一輪對帳讀不到 Google 表（UNKNOWN），下一輪會再試" if reason == "unknown"

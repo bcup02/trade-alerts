@@ -1260,3 +1260,37 @@ def test_tabs_pending_reason_names_why_the_check_cannot_speak():
     assert ow.reconcile_pending_reason(_status(30), NOW - timedelta(minutes=40), NOW) == "grace"
     assert ow.reconcile_pending_reason(_status(300), t, NOW) == "stale"
     assert ow.reconcile_pending_reason({"value": "RECONCILED"}, t, NOW) == "stale"
+
+
+# review of #252: the carry needs a confirmation in the PAST, and only an answer the check can read counts as "in the grace"
+
+def test_tabs_a_confirmation_dated_in_the_future_is_never_carried():
+    future = {"covered": {"momentum": {"at": iso(NOW + timedelta(hours=48)), "last_trade": iso(NOW - timedelta(hours=1))}}}
+    r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
+    out = ow.check_sheet_tab_names(ctx(r, future))
+    assert "動能策略" in out.summary.split("還在等新交易：")[1] and "momentum" not in out.extra["covered"]
+    just_ahead = {"covered": {"momentum": {"at": iso(NOW + timedelta(seconds=1)), "last_trade": iso(NOW)}}}
+    assert "momentum" not in ow.check_sheet_tab_names(ctx(r, just_ahead)).extra["covered"]
+
+
+@pytest.mark.parametrize("answer", [{"value": "ERROR"}, {"value": "something-new"}, {"value": None}, {}])
+def test_tabs_an_unreadable_answer_inside_the_grace_is_stale_not_grace(answer):
+    status = {**_status(5), **answer}
+    if not answer:
+        status.pop("value")
+    assert ow.reconcile_pending_reason(status, NOW - timedelta(minutes=30), NOW) == "stale"
+    out = ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=status, trade_ago_minutes=30), _covered_before()))
+    assert "動能策略" in out.summary.split("還在等新交易：")[1] and "momentum" not in out.extra["covered"]
+
+
+def test_tabs_known_answers_inside_the_grace_still_count_as_grace():
+    for value in ("RECONCILED", "DIVERGED"):
+        assert ow.reconcile_pending_reason(_status(5, value), NOW - timedelta(minutes=30), NOW) == "grace"
+
+
+@pytest.mark.parametrize("memory", [None, "text", ["a"], 7, {"covered": "x"}, {"covered": ["a"]}, {"covered": {"momentum": "x"}}, {"covered": {"momentum": {"at": "not a time"}}},
+                                    {"covered": {"momentum": {"at": 12345}}}, {"covered": {"momentum": None}}])
+def test_tabs_a_damaged_memory_is_no_memory_and_never_an_error(memory):
+    previous = memory if isinstance(memory, dict) else {"covered": memory}
+    out = ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=_status(5, "UNKNOWN")), previous))
+    assert out.state == ow.WAITING and "動能策略" in out.summary.split("還在等新交易：")[1]
