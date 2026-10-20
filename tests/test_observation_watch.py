@@ -694,6 +694,7 @@ def test_a_run_that_waited_behind_another_decides_from_what_that_one_saved(tmp_p
 
 # --- registry cells waiting for a deployment (phase-sync1) ---------------------------------------------------------
 
+import os
 import subprocess
 
 
@@ -1511,9 +1512,11 @@ def test_env_fill_copies_what_exists_when_the_source_lacks_only_telegram(tmp_pat
 
 # --- P3: installing on a new host (fleet-standby-1, WATCH_USER=ubuntu) -------------------------------------------------
 
-def _preflight(home, a1="161.33.186.220"):
-    script = f'source "{_ROOT}/deploy/observation-watch/watch_preflight.sh"; watch_preflight "{home}" {a1} oci_a1_key; echo "N=$WATCH_PREFLIGHT_WARNINGS"'
-    return subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+def _preflight(home, a1="161.33.186.220", path_prefix=None):
+    # same shell options as install.sh: a failure inside the preflight would end the script before CONTINUES
+    script = (f'set -euo pipefail; source "{_ROOT}/deploy/observation-watch/watch_preflight.sh"; '
+              f'watch_preflight "{home}" {a1} oci_a1_key; echo "N=$WATCH_PREFLIGHT_WARNINGS"; echo INSTALL_CONTINUES')
+    return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={**os.environ, "PATH": f"{path_prefix}:{os.environ['PATH']}"} if path_prefix else None)
 
 
 def test_preflight_on_an_empty_home_warns_about_every_missing_piece_and_still_succeeds(tmp_path):
@@ -1559,3 +1562,26 @@ def test_unit_template_has_no_hard_coded_account_so_any_watch_user_works():
         rendered = unit.replace("@WATCH_USER@", user)
         assert f"User={user}" in rendered.splitlines() and f"ReadWritePaths=/home/{user}/.local/state/observation-watch" in rendered.splitlines()
         assert "@" not in rendered.replace("/home/", "")
+
+
+@pytest.mark.parametrize("stat_body", ["exit 1", "echo garbage", "echo"])
+def test_preflight_survives_a_failing_or_garbage_stat_under_set_e(tmp_path, stat_body):
+    """Review #256 BLOCK-256-01: stat failing must be a warning; the install must still reach its next step."""
+    stubs = tmp_path / "stubs"
+    stubs.mkdir()
+    (stubs / "stat").write_text(f"#!/bin/sh\n{stat_body}\n", encoding="utf-8")
+    (stubs / "stat").chmod(0o755)
+    home = tmp_path / "home"
+    (home / ".ssh").mkdir(parents=True)
+    key = home / ".ssh" / "oci_a1_key"
+    key.write_text("SECRET-KEY-BODY\n", encoding="utf-8")
+    run = _preflight(home, path_prefix=str(stubs))
+    assert run.returncode == 0 and "INSTALL_CONTINUES" in run.stdout and "cannot read the mode" in run.stderr
+    assert "N=7" in run.stdout                                  # 5 clones + known_hosts + unreadable mode
+    assert "SECRET-KEY-BODY" not in run.stdout + run.stderr
+
+
+def test_the_preflight_is_called_from_the_installer_before_any_install_step_and_under_set_e():
+    installer = (_ROOT / "deploy" / "observation-watch" / "install.sh").read_text(encoding="utf-8")
+    assert "set -euo pipefail" in installer
+    assert installer.index("watch_preflight \"$HOME_DIR\"") < installer.index("install -d -m 755 /opt/observation-watch")

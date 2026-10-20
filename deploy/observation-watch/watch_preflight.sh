@@ -27,8 +27,11 @@ watch_preflight() {
     WATCH_PREFLIGHT_WARNINGS=$((WATCH_PREFLIGHT_WARNINGS + 1))
   fi
   if [[ -f $home/.ssh/$keyname ]]; then
-    mode=$(stat -c '%a' "$home/.ssh/$keyname")
-    if (( 8#$mode & 8#077 )); then
+    # install.sh runs with set -e: a failing stat must become a warning, never end the install.
+    if ! mode=$(stat -c '%a' "$home/.ssh/$keyname" 2>/dev/null) || [[ ! $mode =~ ^[0-7]{3,4}$ ]]; then
+      echo "WARNING: cannot read the mode of $home/.ssh/$keyname (is it readable? ssh needs mode 600)." >&2
+      WATCH_PREFLIGHT_WARNINGS=$((WATCH_PREFLIGHT_WARNINGS + 1))
+    elif (( 8#$mode & 8#077 )); then
       echo "WARNING: $home/.ssh/$keyname has mode $mode (ssh refuses keys readable by group/others; use 600)." >&2
       WATCH_PREFLIGHT_WARNINGS=$((WATCH_PREFLIGHT_WARNINGS + 1))
     fi
