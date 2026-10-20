@@ -335,10 +335,14 @@ function handleV2(data) {
   return quarantineOnlyWithExplicitDeploymentFlag(data);
 }
 
-// A source registered with an allowed_actions list may call exactly those actions.  One without it (every source
-// registered before put_health_v1) keeps all the ledger actions and never gets the health write.
+// A source registered with an allowed_actions list may call exactly those actions.  One WITHOUT the field (every source
+// registered before put_health_v1) keeps all the ledger actions and never gets the health write.  A field that is
+// present but not an array (a string, null, an object, a number) is a registration mistake and allows nothing: the
+// older, wider rule is only for a field that is really absent (review of #250).
 function actionAllowedForSource(source, action) {
-  if (Array.isArray(source.allowed_actions)) return source.allowed_actions.includes(action);
+  if (Object.prototype.hasOwnProperty.call(source, 'allowed_actions')) {
+    return Array.isArray(source.allowed_actions) && source.allowed_actions.includes(action);
+  }
   return action !== HEALTH_ACTION;
 }
 

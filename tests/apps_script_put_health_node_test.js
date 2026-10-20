@@ -10,7 +10,11 @@ const healthSource = {hmac_secret: healthSecret, project_id: 'fleet-health', she
 const ledgerSource = {hmac_secret: ledgerSecret, project_id: 'mexc-4h-momentum', sheet_name: 'trading-tab'};   // registered before put_health_v1: no allowed_actions
 const misplacedHealthSource = {hmac_secret: 'misplaced-secret', project_id: 'fleet-health', sheet_name: 'trading-tab', allowed_actions: ['put_health_v1']};
 const missingTabSource = {hmac_secret: 'missing-secret', project_id: 'fleet-health', sheet_name: '維運健康-不存在', allowed_actions: ['put_health_v1']};
-const sources = {'health-a1': healthSource, 'ledger-a1': ledgerSource, 'misplaced': misplacedHealthSource, 'missing-tab': missingTabSource};
+const brokenSource = allowed => ({hmac_secret: 'broken-secret', project_id: 'fleet-health', sheet_name: '維運健康', allowed_actions: allowed});
+const bothSource = {hmac_secret: 'both-secret', project_id: 'fleet-health', sheet_name: '維運健康', allowed_actions: ['put_health_v1', 'read_reconciliation_v2']};
+const sources = {'health-a1': healthSource, 'ledger-a1': ledgerSource, 'misplaced': misplacedHealthSource, 'missing-tab': missingTabSource,
+  'broken-empty': brokenSource([]), 'broken-string': brokenSource('put_health_v1'), 'broken-null': brokenSource(null),
+  'broken-object': brokenSource({put_health_v1: true}), 'broken-number': brokenSource(1), 'both': bothSource};
 const sheets = new Map();
 const calls = [];
 
@@ -143,5 +147,25 @@ sources['missing-tab'].sheet_name = '維運健康';
 sheets.delete('維運健康');
 assert.deepEqual(route(healthRequest({sourceId: 'missing-tab', secret: 'missing-secret'})), {ok: false, error: 'sheet_not_found'});
 assert.equal(calls.filter(c => c.op === 'insertSheet').length, 0);
+
+// review of #250 (B1): allowed_actions present but not an array allows NOTHING -- it never falls back to the wide rule
+const rawSecret = {'broken-empty': 'broken-secret', 'broken-string': 'broken-secret', 'broken-null': 'broken-secret', 'broken-object': 'broken-secret', 'broken-number': 'broken-secret'};
+for (const [sourceId, secret] of Object.entries(rawSecret)) {
+  const src = sources[sourceId];
+  assert.equal(context.actionAllowedForSource(src, 'append_open_v2'), false, sourceId);
+  assert.equal(context.actionAllowedForSource(src, 'put_health_v1'), false, sourceId);
+  assert.deepEqual(route(healthRequest({sourceId, secret})), {ok: false, error: 'action_not_allowed'}, sourceId);
+  const openAttempt = signed({schema_version: 'google-ledger-projection-v2', action: 'append_open_v2', source_id: sourceId, project_id: 'fleet-health', sheet_name: '維運健康',
+    request_id: nextId(), issued_at: new Date().toISOString(), projection: {trade_id: 'x'}}, secret);
+  assert.deepEqual(route(openAttempt), {ok: false, error: 'action_not_allowed'}, sourceId);
+}
+// a source with both actions listed gets exactly those two
+sheets.set('維運健康', healthTab);
+assert.equal(route(healthRequest({sourceId: 'both', secret: 'both-secret'})).ok, true);
+assert.equal(context.actionAllowedForSource(sources.both, 'read_reconciliation_v2'), true);
+assert.equal(context.actionAllowedForSource(sources.both, 'append_open_v2'), false);
+// and a source with no allowed_actions at all is the old wide rule minus the health write
+assert.equal(context.actionAllowedForSource(ledgerSource, 'append_open_v2'), true);
+assert.equal(context.actionAllowedForSource(ledgerSource, 'put_health_v1'), false);
 
 console.log('apps_script_put_health_node_test: passed');
