@@ -1179,3 +1179,118 @@ def test_only_a_cat_that_says_the_file_is_missing_counts_as_missing(monkeypatch,
     with pytest.raises(ow.RemoteError) as caught:
         ow.Remote("k")._run("dev", ["cat", STATE_PATH])
     assert type(caught.value) is expected
+
+
+# --- f-26: a strategy confirmed earlier is not dropped for a moment the check cannot speak (carry-over) ---------------------
+
+def _covered_before(key="momentum", hours_ago_=1, last_trade_hours_ago=5):
+    return {"covered": {key: {"at": iso(NOW - timedelta(hours=hours_ago_)), "last_trade": iso(NOW - timedelta(hours=last_trade_hours_ago))}}}
+
+
+def _tabs_with_momentum(*, status, trade_ago_minutes=300):
+    st = {"momentum": status, "seykota": _status(30, name="趨勢策略"), "mycrypto": _status(30, name="加密策略"), "btc-competition": _status(30, name="競賽策略")}
+    trades = {"momentum": [{"event_type": "trade_close", "event_time": iso(NOW - timedelta(minutes=trade_ago_minutes))}],
+              "mycrypto": [trade(5)], "btc-competition": [trade(5)]}
+    return tabs_remote(trades=trades, status=st)
+
+
+def test_tabs_a_google_read_that_failed_keeps_a_confirmed_strategy_listed_with_the_reason():
+    r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
+    out = ow.check_sheet_tab_names(ctx(r, _covered_before()))
+    assert out.state == ow.WAITING and not out.closable
+    assert "動能策略（本輪讀不到 Google 表，沿用" in out.summary and "還在等新交易：趨勢策略" in out.summary
+    assert any(line.startswith("動能策略：這一輪對帳讀不到 Google 表（UNKNOWN）") for line in out.evidence)
+    assert out.extra["covered"]["momentum"]["at"] == iso(NOW - timedelta(hours=1))                    # the bound does not slide
+
+
+def test_tabs_a_new_trade_inside_its_grace_does_not_count_as_confirmed_but_the_earlier_confirmation_stays():
+    # the 10/14 review example: the old RECONCILED must not count for the NEW trade -- it is listed as carried, never as covered
+    r = _tabs_with_momentum(status=_status(5), trade_ago_minutes=30)
+    out = ow.check_sheet_tab_names(ctx(r, _covered_before()))
+    assert out.state == ow.WAITING and not out.closable
+    assert "動能策略（新交易在對帳寬限內，沿用" in out.summary
+    assert any("還不算已確認" in line for line in out.evidence if line.startswith("動能策略"))
+    assert not any("筆新交易（最近" in line and line.startswith("動能策略") for line in out.evidence)   # no 'covered' line for it
+
+
+def test_tabs_the_carry_expires_after_three_hours():
+    r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
+    out = ow.check_sheet_tab_names(ctx(r, _covered_before(hours_ago_=ow.F26_CARRY_HOURS + 1)))
+    assert "已確認：動能策略" not in out.summary and "動能策略" in out.summary.split("還在等新交易：")[1]
+    assert "momentum" not in out.extra["covered"]
+
+
+def test_tabs_nothing_is_carried_for_a_strategy_that_was_never_confirmed_or_whose_reconcile_stopped():
+    r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
+    assert "動能策略" in ow.check_sheet_tab_names(ctx(r, {})).summary.split("還在等新交易：")[1]            # no memory
+    stale = _tabs_with_momentum(status=_status(300))                                                    # the check itself stopped
+    out = ow.check_sheet_tab_names(ctx(stale, _covered_before()))
+    assert "動能策略" in out.summary.split("還在等新交易：")[1] and "momentum" not in out.extra["covered"]
+
+
+def test_tabs_a_diverged_answer_after_the_grace_or_a_wrong_tab_still_fails_at_once_even_if_confirmed_before():
+    div = {"sheet_name": "動能策略", "value": "DIVERGED", "checked_at": iso(NOW - timedelta(minutes=5)), "note": "x"}
+    assert ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=div), _covered_before())).state == ow.FAILED
+    wrong = {"sheet_name": "mexc", "value": "RECONCILED", "checked_at": iso(NOW - timedelta(minutes=5))}
+    assert ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=wrong), _covered_before())).state == ow.FAILED
+
+
+def test_tabs_a_carried_strategy_never_lets_the_item_close_and_a_fresh_cover_restarts_the_clock():
+    allfour = {k: [trade(5)] for k in ow.REPOS}
+    good = {"momentum": _status(5, "UNKNOWN"), "seykota": _status(30, name="趨勢策略"), "mycrypto": _status(30, name="加密策略"), "btc-competition": _status(30, name="競賽策略")}
+    carried = ow.check_sheet_tab_names(ctx(tabs_remote(trades=allfour, status=good), _covered_before()))
+    assert carried.state == ow.WAITING and not carried.closable and "沿用的確認要等下一輪對帳重新確認後才能結案" in carried.summary
+    fresh = {**good, "momentum": _status(30)}
+    closed = ow.check_sheet_tab_names(ctx(tabs_remote(trades=allfour, status=fresh), _covered_before()))
+    assert closed.state == ow.OBSERVED and closed.closable
+    assert closed.extra["covered"]["momentum"]["at"] == iso(NOW)
+
+
+def test_tabs_the_memory_survives_through_run_checks():
+    only = [c for c in ow.CHECKS if c.id == "sheet-tab-names"]
+    first = ow.run_checks(_tabs_with_momentum(status=_status(30)), NOW - timedelta(hours=1), {}, only)
+    assert "momentum" in first["sheet-tab-names"]["extra"]["covered"]
+    second = ow.run_checks(_tabs_with_momentum(status=_status(5, "UNKNOWN")), NOW, {"items": first}, only)
+    assert "動能策略（本輪讀不到 Google 表" in second["sheet-tab-names"]["summary"]
+
+
+def test_tabs_pending_reason_names_why_the_check_cannot_speak():
+    t = NOW - timedelta(hours=3)
+    assert ow.reconcile_pending_reason(_status(30, "UNKNOWN"), t, NOW) == "unknown"
+    assert ow.reconcile_pending_reason(_status(30), NOW - timedelta(minutes=40), NOW) == "grace"
+    assert ow.reconcile_pending_reason(_status(300), t, NOW) == "stale"
+    assert ow.reconcile_pending_reason({"value": "RECONCILED"}, t, NOW) == "stale"
+
+
+# review of #252: the carry needs a confirmation in the PAST, and only an answer the check can read counts as "in the grace"
+
+def test_tabs_a_confirmation_dated_in_the_future_is_never_carried():
+    future = {"covered": {"momentum": {"at": iso(NOW + timedelta(hours=48)), "last_trade": iso(NOW - timedelta(hours=1))}}}
+    r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
+    out = ow.check_sheet_tab_names(ctx(r, future))
+    assert "動能策略" in out.summary.split("還在等新交易：")[1] and "momentum" not in out.extra["covered"]
+    just_ahead = {"covered": {"momentum": {"at": iso(NOW + timedelta(seconds=1)), "last_trade": iso(NOW)}}}
+    assert "momentum" not in ow.check_sheet_tab_names(ctx(r, just_ahead)).extra["covered"]
+
+
+@pytest.mark.parametrize("answer", [{"value": "ERROR"}, {"value": "something-new"}, {"value": None}, {}])
+def test_tabs_an_unreadable_answer_inside_the_grace_is_stale_not_grace(answer):
+    status = {**_status(5), **answer}
+    if not answer:
+        status.pop("value")
+    assert ow.reconcile_pending_reason(status, NOW - timedelta(minutes=30), NOW) == "stale"
+    out = ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=status, trade_ago_minutes=30), _covered_before()))
+    assert "動能策略" in out.summary.split("還在等新交易：")[1] and "momentum" not in out.extra["covered"]
+
+
+def test_tabs_known_answers_inside_the_grace_still_count_as_grace():
+    for value in ("RECONCILED", "DIVERGED"):
+        assert ow.reconcile_pending_reason(_status(5, value), NOW - timedelta(minutes=30), NOW) == "grace"
+
+
+@pytest.mark.parametrize("memory", [None, "text", ["a"], 7, {"covered": "x"}, {"covered": ["a"]}, {"covered": {"momentum": "x"}}, {"covered": {"momentum": {"at": "not a time"}}},
+                                    {"covered": {"momentum": {"at": 12345}}}, {"covered": {"momentum": None}}])
+def test_tabs_a_damaged_memory_is_no_memory_and_never_an_error(memory):
+    previous = memory if isinstance(memory, dict) else {"covered": memory}
+    out = ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=_status(5, "UNKNOWN")), previous))
+    assert out.state == ow.WAITING and "動能策略" in out.summary.split("還在等新交易：")[1]
