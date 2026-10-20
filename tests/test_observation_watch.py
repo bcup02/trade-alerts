@@ -562,8 +562,12 @@ def test_the_service_has_no_secret_and_the_installer_never_prints_one():
     assert "NoNewPrivileges=true" not in service          # sudo needs it; the reason is written next to the unit
     assert "OnCalendar=*:0/30" in timer
     # the token is copied by grep into a root-only file; no echo/cat of its value anywhere
-    assert "umask 077" in installer and "chmod 600 /etc/observation-watch/watch.env" in installer
-    assert not any(w in installer for w in ("echo $TELEGRAM", 'echo "$TELEGRAM', "cat /etc/ops-notify"))
+    assert "umask 077" in installer and 'chmod 600 "$WATCH_ENV"' in installer and "WATCH_ENV=/etc/observation-watch/watch.env" in installer
+    assert not any(w in installer for w in ("echo $TELEGRAM", 'echo "$TELEGRAM', "cat /etc/ops-notify", "echo $line", 'echo "$line"', "echo $LINE", 'echo "$LINE'))
+    # LINE is the primary channel and Telegram the fallback: both pairs are copied, LINE is required
+    for var in ("LINE_CHANNEL_ACCESS_TOKEN", "LINE_RECIPIENT_ID", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
+        assert var in installer
+    assert "no LINE settings for the watcher" in installer and "LINE" not in service
 
 
 # --- the reconcile must come AFTER the trade's grace period (review of #183, BLOCK-01/02) -------------------------------
@@ -1294,3 +1298,108 @@ def test_tabs_a_damaged_memory_is_no_memory_and_never_an_error(memory):
     previous = memory if isinstance(memory, dict) else {"covered": memory}
     out = ow.check_sheet_tab_names(ctx(_tabs_with_momentum(status=_status(5, "UNKNOWN")), previous))
     assert out.state == ow.WAITING and "動能策略" in out.summary.split("還在等新交易：")[1]
+
+
+# --- messages go to LINE first; Telegram only after LINE failed for two runs in a row --------------------------------------
+
+class _Reply:
+    def __init__(self, status):
+        self.status = status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_send_line_needs_both_variables_and_pushes_a_text_message_with_the_bearer_token(monkeypatch):
+    assert ow.send_line("x", {}) is False and ow.send_line("x", {"LINE_CHANNEL_ACCESS_TOKEN": "t"}) is False
+    assert ow.send_line("x", {"LINE_RECIPIENT_ID": "U1"}) is False
+    seen = {}
+
+    def fake_urlopen(request, timeout):
+        seen["url"], seen["auth"], seen["body"], seen["timeout"] = request.full_url, request.get_header("Authorization"), json.loads(request.data), timeout
+        return _Reply(200)
+
+    monkeypatch.setattr(ow.urllib.request, "urlopen", fake_urlopen)
+    env = {"LINE_CHANNEL_ACCESS_TOKEN": "secret-token", "LINE_RECIPIENT_ID": "U123"}
+    assert ow.send_line("哈囉" + "x" * 6000, env) is True
+    assert seen["url"] == "https://api.line.me/v2/bot/message/push" and seen["auth"] == "Bearer secret-token"
+    assert seen["body"]["to"] == "U123" and seen["body"]["messages"][0]["type"] == "text"
+    assert len(seen["body"]["messages"][0]["text"]) == ow.LINE_TEXT_LIMIT and seen["timeout"] == 20
+
+
+def test_send_line_failures_are_false_and_never_raise_or_leak_the_token(monkeypatch):
+    env = {"LINE_CHANNEL_ACCESS_TOKEN": "secret-token", "LINE_RECIPIENT_ID": "U123"}
+
+    def quota(request, timeout):
+        raise ow.urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {}, None)
+
+    monkeypatch.setattr(ow.urllib.request, "urlopen", quota)
+    assert ow.send_line("x", env) is False
+    monkeypatch.setattr(ow.urllib.request, "urlopen", lambda request, timeout: _Reply(500))
+    assert ow.send_line("x", env) is False
+    monkeypatch.setattr(ow.urllib.request, "urlopen", lambda request, timeout: (_ for _ in ()).throw(OSError("no network " + "secret-token")))
+    assert ow.send_line("x", env) is False
+
+
+def _failing_run(state, send, fallback):
+    check = one_check(lambda n: ow.Result(ow.OBSERVED, "到了", needs_human=True, key="k"))
+    state = {"items": ow.run_checks(ow.Remote("k"), NOW, state, [check])}
+    return state, ow.notify(state["items"], send, fallback)
+
+
+def test_a_message_that_reaches_line_never_touches_telegram():
+    lines, telegrams = [], []
+    state, sent = _failing_run({}, lambda t: lines.append(t) or True, lambda t: telegrams.append(t) or True)
+    assert sent == ["demo"] and len(lines) == 1 and telegrams == []
+    assert state["items"]["demo"]["send_failures"] is None and state["items"]["demo"]["notified_key"]
+
+
+def test_telegram_is_used_only_after_line_failed_two_runs_in_a_row_and_says_why():
+    telegrams, state = [], {}
+    state, sent = _failing_run(state, lambda t: False, lambda t: telegrams.append(t) or True)
+    assert sent == [] and telegrams == [] and state["items"]["demo"]["send_failures"]["n"] == 1      # one failure: LINE is tried again
+    state, sent = _failing_run(state, lambda t: False, lambda t: telegrams.append(t) or True)
+    assert sent == ["demo"] and len(telegrams) == 1
+    assert telegrams[0].startswith("（LINE 送不出去，改用 Telegram 發這一則）") and "需要你確認" in telegrams[0]
+    assert state["items"]["demo"]["notified_key"] and state["items"]["demo"]["send_failures"] is None
+    state, sent = _failing_run(state, lambda t: False, lambda t: telegrams.append(t) or True)
+    assert sent == [] and len(telegrams) == 1                                                       # told once, not again
+
+
+def test_when_both_channels_fail_the_message_is_not_marked_sent_and_tries_again():
+    state = {}
+    for run in (1, 2, 3):
+        state, sent = _failing_run(state, lambda t: False, lambda t: False)
+        assert sent == [] and not state["items"]["demo"]["notified_key"]
+        assert state["items"]["demo"]["send_failures"]["n"] == run
+    state, sent = _failing_run(state, lambda t: True, lambda t: False)
+    assert sent == ["demo"]
+
+
+def test_the_failure_count_belongs_to_one_message_and_restarts_for_a_different_one():
+    state, telegrams = {}, []
+    state, _ = _failing_run(state, lambda t: False, lambda t: telegrams.append(t) or True)
+    changed = one_check(lambda n: ow.Result(ow.OBSERVED, "另一件事", needs_human=True, key="other"))
+    state = {"items": ow.run_checks(ow.Remote("k"), NOW, state, [changed])}
+    ow.notify(state["items"], lambda t: False, lambda t: telegrams.append(t) or True)
+    assert telegrams == [] and state["items"]["demo"]["send_failures"] == {"key": "observed:other", "n": 1}
+
+
+def test_main_sends_to_line_by_default_and_falls_back_to_telegram(monkeypatch, tmp_path):
+    lines, telegrams = [], []
+    monkeypatch.setattr(ow, "send_line", lambda t: lines.append(t) or True)
+    monkeypatch.setattr(ow, "send_telegram", lambda t: telegrams.append(t) or True)
+    r = crypto_remote(fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))
+    state = tmp_path / "state.json"
+    assert ow.main(["run", "--state", str(state), "--only", "crypto-flat"], remote=r) == 0
+    assert len(lines) == 1 and "需要你確認" in lines[0] and telegrams == []
+    # a failing LINE for two runs sends the Telegram copy
+    lines.clear()
+    monkeypatch.setattr(ow, "send_line", lambda t: lines.append(t) and False)
+    state2 = tmp_path / "state2.json"
+    for _ in range(2):
+        ow.main(["run", "--state", str(state2), "--only", "crypto-flat"], remote=r)
+    assert len(lines) == 2 and len(telegrams) == 1 and telegrams[0].startswith("（LINE 送不出去")
