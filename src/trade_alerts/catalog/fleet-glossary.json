@@ -1,6 +1,6 @@
 {
   "glossary_version": "fleet-glossary/v1",
-  "updated_at": "2026-10-19",
+  "updated_at": "2026-10-21",
   "note": "機隊全專案中文用詞對照表。給人看的文字一律用 zh；retired 是不要再用的舊叫法，tests/test_fleet_glossary.py 會掃描 trade-alerts 內給人看的文字，出現就擋。英文代號只如實列出，不在這裡改。",
   "entries": [
     {
@@ -81,7 +81,7 @@
       "en": [
         "trading-main"
       ],
-      "definition": "跑正式交易的主機這個角色，部署來源是正式機分支（operations）。搬家期間同時有兩台：A1 正式機（新）與 trading-main 正式機（舊）。",
+      "definition": "跑正式交易的主機這個角色，部署來源是正式機分支（operations）。2026-10-04 起實際的正式機是 A1 正式機（新）；trading-main 正式機（舊）已於 2026-10-20 關機，硬碟保留到 2026-12-06 前。",
       "retired": [
         "策略主機",
         "seykota 主機",
@@ -91,7 +91,7 @@
         "正式環境",
         "真倉（operations）"
       ],
-      "note": "「真倉」只拿來說交易模式（用真錢），不拿來指這台主機。2026-09-29 起到 trading-main 除役前，指某一台主機時一律寫「A1 正式機（新）」或「trading-main 正式機（舊）」，不單寫「正式機」；單寫「正式機」只用在角色或正式機分支（例如「推正式機分支」）。登記冊的「已做」在切換完成前指 trading-main 正式機（舊）上在跑。"
+      "note": "「真倉」只拿來說交易模式（用真錢），不拿來指這台主機。trading-main 關機後，單寫「正式機」就是 A1（fleet-prod-tokyo）；要區分新舊時才寫「A1 正式機（新）」或「trading-main 正式機（舊）」。登記冊的「已做」指 A1 正式機上在跑。trading-main 除役後，刪掉「trading-main 正式機（舊）」這一條並把「A1 正式機（新）」改回「正式機」。"
     },
     {
       "id": "host.main.a1",
@@ -101,9 +101,9 @@
         "fleet-prod-tokyo",
         "161.33.186.220"
       ],
-      "definition": "Oracle 東京 A1（ARM，2 核心／12GB）上的新正式機，搬家完成後接手正式交易。",
+      "definition": "Oracle 東京 A1（ARM，2 核心／12GB）上的正式機，2026-10-04 起接手全部真倉交易，也是現在唯一在跑正式交易的主機。",
       "retired": [],
-      "note": "2026-09-29 起使用。切換完成、trading-main 除役後，改回單稱「正式機」並更新這一條。"
+      "note": "2026-09-29 起使用。trading-main 除役後，改回單稱「正式機」並更新這一條。"
     },
     {
       "id": "host.main.gcp",
@@ -112,7 +112,7 @@
       "en": [
         "trading-main"
       ],
-      "definition": "GCP 上目前還在跑正式交易的舊正式機，搬家切換完成後凍結、保留到 2026-12-06 前再除役。",
+      "definition": "GCP 上的舊正式機，2026-10-04 起凍結不再交易，2026-10-20 台北關機，硬碟保留到 2026-12-06 前再除役。",
       "retired": [],
       "note": "2026-09-29 起使用；除役後刪除這一條。"
     },
@@ -121,15 +121,48 @@
       "category": "主機",
       "zh": "開發機",
       "en": [
-        "trading-dev"
+        "fleet-standby-1",
+        "168.110.15.84"
       ],
-      "definition": "GCP 上給開發測試用的那台主機，部署來源是開發機分支（testing）。",
+      "definition": "給開發測試用的那台主機，部署來源是開發機分支（testing）。2026-10-21 台北起是 Oracle 東京的 A1-dev（E2.1.Micro，1 OCPU／954MB，跑三支策略的測試網模擬倉、競賽、維運通知、查詢與隧道、自動監看）。",
       "retired": [
         "測試機",
         "WSL 開發機隊",
         "development／測試機"
       ],
-      "note": "舊文件叫 WSL 開發機隊，那台機器現在已是 GCP 上的 trading-dev。"
+      "note": "舊文件叫 WSL 開發機隊，之後是 GCP 上的 trading-dev；兩者都已換成 A1-dev。指舊的 GCP 那台時寫「trading-dev 開發機（舊）」。"
+    },
+    {
+      "id": "host.dev.gcp",
+      "category": "主機",
+      "zh": "trading-dev 開發機（舊）",
+      "en": [
+        "trading-dev"
+      ],
+      "definition": "GCP 上原本的開發機。2026-10-21 台北 10:41 凍結（機隊單元全停並停用），機隊已搬到 A1-dev；因 GCP 額度用完，11 月 3 日前除役。",
+      "retired": [],
+      "note": "2026-10-21 起使用；除役後刪除這一條。"
+    },
+    {
+      "id": "host.dev.dev2",
+      "category": "主機",
+      "zh": "A1-dev2",
+      "en": [
+        "fleet-standby-2",
+        "161.33.222.54"
+      ],
+      "definition": "Oracle 東京的第二台 E2.1.Micro 小機器，是 A1-dev 的熱備援（目前沒裝機隊，只有 2GB 備用空間）。",
+      "retired": [],
+      "note": "2026-10-20 建立。"
+    },
+    {
+      "id": "host.workstation",
+      "category": "主機",
+      "zh": "工作機",
+      "en": [],
+      "definition": "使用者自己的電腦（Windows，裡面跑 WSL2 Ubuntu），用來跑 Claude 對話、開 PR 與審閱；不跑任何交易程式，也不是開發機。",
+      "retired": [],
+      "note": "2026-10-21 定：開發機（舊 GCP 的 trading-dev）除役後，Claude 的工作環境改在這裡。"
     },
     {
       "id": "mode.live",
