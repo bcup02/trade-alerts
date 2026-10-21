@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-20",
+  "updated_at": "2026-10-21",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -2197,34 +2197,5 @@
       }
     }
   ],
-  "recent_changes": [
-    {
-      "kind": "cap",
-      "id": "docs.glossary_adopted",
-      "type": "updated",
-      "project": "momentum",
-      "note": "證據裡的倉庫位置改成 AI-for-column5（四支策略 2026-10-20 台北轉移，PR 編號與提交不變，舊網址自動轉址）；格子狀態沒變。"
-    },
-    {
-      "kind": "cap",
-      "id": "docs.glossary_adopted",
-      "type": "updated",
-      "project": "seykota",
-      "note": "證據裡的倉庫位置改成 AI-for-column5（四支策略 2026-10-20 台北轉移，PR 編號與提交不變，舊網址自動轉址）；格子狀態沒變。"
-    },
-    {
-      "kind": "cap",
-      "id": "docs.glossary_adopted",
-      "type": "updated",
-      "project": "mycrypto",
-      "note": "證據裡的倉庫位置改成 AI-for-column5（四支策略 2026-10-20 台北轉移，PR 編號與提交不變，舊網址自動轉址）；格子狀態沒變。"
-    },
-    {
-      "kind": "cap",
-      "id": "docs.glossary_adopted",
-      "type": "updated",
-      "project": "btc-competition",
-      "note": "證據裡的倉庫位置改成 AI-for-column5（四支策略 2026-10-20 台北轉移，PR 編號與提交不變，舊網址自動轉址）；格子狀態沒變。"
-    }
-  ]
+  "recent_changes": []
 }
