@@ -98,42 +98,6 @@ def test_the_ssh_command_is_quoted_and_read_only(monkeypatch):
     assert "-o" in calls[0] and "BatchMode=yes" in calls[0]
 
 
-# --- crypto flat (x1) ---------------------------------------------------------------------------------------------
-
-def crypto_remote(*, snapshot_flat=True, positions=(), fetched=None, recon="RECONCILED"):
-    r = FakeRemote()
-    r.files[("a1", "/var/lib/portfolio-query/my-crypto-bot/current.json")] = json.dumps(
-        {"position": {"status": "FLAT"} if snapshot_flat else {"status": "LONG"}})
-    put(r, "a1", "mycrypto", "exchange_state.json", {"positions": list(positions), "fetch_status": {"complete": True, "errors": []},
-                                                      "fetched_at": fetched or iso(NOW - timedelta(minutes=5)),
-                                                      "balance": {"equity": 9.5}})
-    put(r, "a1", "mycrypto", "ledger_status.json", {"value": recon})
-    put(r, "a1", "mycrypto", "trading_ledger.jsonl",
-        [{"event_type": "trade_close", "event_time": hours_ago(3), "event_id": "close-1"}], jsonl=True)
-    return r
-
-
-def test_crypto_flat_is_observed_when_every_source_agrees():
-    result = ow.check_crypto_flat(ctx(crypto_remote()))
-    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and result.key == "close-1"
-    assert "x1" in result.summary
-
-
-def test_crypto_with_a_position_keeps_waiting():
-    r = crypto_remote(snapshot_flat=False, positions=[{"symbol": "BTC_USDT"}])
-    assert ow.check_crypto_flat(ctx(r)).state == ow.WAITING
-
-
-def test_crypto_snapshot_and_exchange_disagreeing_is_a_failure_not_a_pass():
-    result = ow.check_crypto_flat(ctx(crypto_remote(snapshot_flat=True, positions=[{"symbol": "BTC_USDT"}])))
-    assert result.state == ow.FAILED
-
-
-def test_crypto_stale_exchange_read_or_unreconciled_ledger_does_not_count_as_flat():
-    assert ow.check_crypto_flat(ctx(crypto_remote(fetched=hours_ago(3)))).state == ow.WAITING
-    assert ow.check_crypto_flat(ctx(crypto_remote(recon="DIVERGED"))).state == ow.WAITING
-
-
 # --- crypto equity reminder (f-55) --------------------------------------------------------------------------------
 
 def equity_remote(*, wallet=119.99, unrealized=0.0, fetched=None, mode="LIVE", environment="mainnet", balance=None,
@@ -511,6 +475,14 @@ def test_one_broken_check_does_not_stop_the_others():
     assert items["broken"]["state"] == ow.ERROR and items["fine"]["state"] == ow.WAITING
 
 
+def test_a_check_removed_from_the_registry_leaves_no_orphan_state():
+    # a check retired from CHECKS (e.g. crypto-flat/x1, 2026-10-22) must not keep showing up in state.json forever
+    fine = ow.Check("fine", "好的", ("f-f",), lambda c: ow.Result(ow.WAITING, "等"))
+    state = {"items": {"retired": {"id": "retired", "state": ow.OBSERVED, "key": "k", "acked_key": "observed:k"}}}
+    items = ow.run_checks(ow.Remote("k"), NOW, state, [fine])
+    assert "retired" not in items and items.keys() == {"fine"}
+
+
 def test_the_telegram_token_is_never_sent_without_both_variables():
     assert ow.send_telegram("x", {}) is False and ow.send_telegram("x", {"TELEGRAM_BOT_TOKEN": "t"}) is False
 
@@ -518,18 +490,18 @@ def test_the_telegram_token_is_never_sent_without_both_variables():
 # --- command line -----------------------------------------------------------------------------------------------------
 
 def test_run_report_and_ack_round_trip(tmp_path, capsys):
-    r = crypto_remote(fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))     # main() uses the real clock
+    r = equity_remote(wallet=85.0, fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))     # main() uses the real clock
     state, sent = tmp_path / "state.json", []
-    only = ["--state", str(state), "--only", "crypto-flat"]
+    only = ["--state", str(state), "--only", "a1-crypto-equity"]
     assert ow.main(["run", *only], remote=r, send=lambda t: sent.append(t) or True) == 0
     assert len(sent) == 1 and "需要你確認" in sent[0]
     saved = json.loads(state.read_text(encoding="utf-8"))
-    assert saved["items"]["crypto-flat"]["state"] == ow.OBSERVED and saved["items"]["crypto-flat"]["notified_key"]
+    assert saved["items"]["a1-crypto-equity"]["state"] == ow.OBSERVED and saved["items"]["a1-crypto-equity"]["notified_key"]
     assert ow.main(["run", *only], remote=r, send=lambda t: sent.append(t) or True) == 0 and len(sent) == 1
     capsys.readouterr()
     assert ow.main(["report", "--state", str(state)]) == 0
     assert "需要你確認" in capsys.readouterr().out
-    assert ow.main(["ack", "crypto-flat", "--state", str(state)]) == 0
+    assert ow.main(["ack", "a1-crypto-equity", "--state", str(state)]) == 0
     capsys.readouterr()
     ow.main(["report", "--state", str(state)])
     assert "已處理" in capsys.readouterr().out
@@ -538,8 +510,8 @@ def test_run_report_and_ack_round_trip(tmp_path, capsys):
 
 def test_dry_run_neither_sends_nor_saves(tmp_path):
     state, sent = tmp_path / "state.json", []
-    ow.main(["run", "--dry-run", "--state", str(state), "--only", "crypto-flat"],
-            remote=crypto_remote(fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5))), send=lambda t: sent.append(t) or True)
+    ow.main(["run", "--dry-run", "--state", str(state), "--only", "a1-crypto-equity"],
+            remote=equity_remote(wallet=85.0, fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5))), send=lambda t: sent.append(t) or True)
     assert sent == [] and not state.exists()
 
 
@@ -548,7 +520,7 @@ def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
     assert len(ids) == len(set(ids))
     assert all(c.covers and c.title for c in ow.CHECKS)
     covered = {i for c in ow.CHECKS for i in c.covers}
-    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x1", "phase-x5b"} <= covered
+    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x5b"} <= covered
 
 
 # --- deployment files ----------------------------------------------------------------------------------------------
@@ -637,25 +609,25 @@ def test_a_second_run_while_one_is_running_does_nothing(tmp_path, capsys):
     with open(state.with_suffix(".lock"), "w") as held:
         fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
         sent = []
-        assert ow.main(["run", "--state", str(state), "--only", "crypto-flat"], remote=crypto_remote(), send=lambda t: sent.append(t) or True) == 0
+        assert ow.main(["run", "--state", str(state), "--only", "a1-crypto-equity"], remote=FakeRemote(), send=lambda t: sent.append(t) or True) == 0
     assert sent == [] and not state.exists() and "另一個偵測正在跑" in capsys.readouterr().out
 
 
 def test_a_state_file_that_cannot_be_saved_is_reported_and_the_repeat_is_documented(tmp_path, monkeypatch, capsys):
     state, sent = tmp_path / "state.json", []
-    r = crypto_remote(fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))
+    r = equity_remote(wallet=85.0, fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))
     monkeypatch.setattr(ow, "save_state", lambda *a: (_ for _ in ()).throw(OSError("disk full")))
-    code = ow.main(["run", "--state", str(state), "--only", "crypto-flat"], remote=r, send=lambda t: sent.append(t) or True)
+    code = ow.main(["run", "--state", str(state), "--only", "a1-crypto-equity"], remote=r, send=lambda t: sent.append(t) or True)
     assert code == 1 and len(sent) == 1 and "下一輪可能重複發送" in capsys.readouterr().err
 
 
 # --- the state is read only after the lock is held (review of #183 round 3) ----------------------------------------------
 
-@pytest.mark.parametrize("argv", [["run", "--only", "crypto-flat"], ["ack", "crypto-flat"]])
+@pytest.mark.parametrize("argv", [["run", "--only", "a1-crypto-equity"], ["ack", "a1-crypto-equity"]])
 def test_the_state_is_loaded_while_the_lock_is_held(tmp_path, monkeypatch, argv):
     import fcntl
     state = tmp_path / "state.json"
-    ow.save_state(state, {"items": {"crypto-flat": {"state": ow.WAITING, "key": "k"}}})
+    ow.save_state(state, {"items": {"a1-crypto-equity": {"state": ow.WAITING, "key": "k"}}})
     seen = []
     real_load = ow.load_state
 
@@ -670,7 +642,7 @@ def test_the_state_is_loaded_while_the_lock_is_held(tmp_path, monkeypatch, argv)
         return real_load(path)
 
     monkeypatch.setattr(ow, "load_state", probe)
-    ow.main([*argv, "--state", str(state)], remote=crypto_remote(), send=lambda t: True)
+    ow.main([*argv, "--state", str(state)], remote=FakeRemote(), send=lambda t: True)
     assert seen == ["lock held"]
 
 
@@ -1457,16 +1429,16 @@ def test_main_sends_to_line_by_default_and_falls_back_to_telegram(monkeypatch, t
     lines, telegrams = [], []
     monkeypatch.setattr(ow, "send_line", lambda t: lines.append(t) or True)
     monkeypatch.setattr(ow, "send_telegram", lambda t: telegrams.append(t) or True)
-    r = crypto_remote(fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))
+    r = equity_remote(wallet=85.0, fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))
     state = tmp_path / "state.json"
-    assert ow.main(["run", "--state", str(state), "--only", "crypto-flat"], remote=r) == 0
+    assert ow.main(["run", "--state", str(state), "--only", "a1-crypto-equity"], remote=r) == 0
     assert len(lines) == 1 and "需要你確認" in lines[0] and telegrams == []
     # a failing LINE for two runs sends the Telegram copy
     lines.clear()
     monkeypatch.setattr(ow, "send_line", lambda t: lines.append(t) and False)
     state2 = tmp_path / "state2.json"
     for _ in range(2):
-        ow.main(["run", "--state", str(state2), "--only", "crypto-flat"], remote=r)
+        ow.main(["run", "--state", str(state2), "--only", "a1-crypto-equity"], remote=r)
     assert len(lines) == 2 and len(telegrams) == 1 and telegrams[0].startswith("（LINE 送不出去")
 
 

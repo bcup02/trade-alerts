@@ -2,7 +2,7 @@
 """Observation-area watcher (f-43): watches, read-only, for the events the progress page's 「觀察區」 is waiting for.
 
 The observation area lists things that can only be verified when something happens in production (the next real
-status alert, the next real trade, the crypto strategy going flat ...).  Each *check* here knows
+status alert, the next real trade ...).  Each *check* here knows
 
   * how to see that the event happened (read-only: files under /opt/<repo>/audit, /var/lib/..., the ops-notify journal,
     the commit a strategy clone on A1 is at, the blobs of cited files in those clones),
@@ -276,36 +276,6 @@ def reconcile_covers(status: Mapping[str, Any], last_trade: datetime, now: datet
     if checked is None or checked < last_trade + RECONCILE_GRACE or not _fresh(checked, now, 90):
         return "pending"
     return {"RECONCILED": "covered", "DIVERGED": "diverged"}.get(str(status.get("value")), "pending")
-
-
-def check_crypto_flat(ctx: Context) -> Result:
-    """x1: the crypto strategy is flat -- the signal to start the Binance move (the user asked to be told)."""
-    snap = load_json(ctx.remote, "a1", "/var/lib/portfolio-query/my-crypto-bot/current.json")
-    state = load_json(ctx.remote, "a1", audit("mycrypto", "exchange_state.json"))
-    recon = load_json(ctx.remote, "a1", audit("mycrypto", "ledger_status.json"))
-    snap_flat = (snap.get("position") or {}).get("status") == "FLAT"
-    positions = state.get("positions")
-    if not isinstance(positions, list):
-        return Result(WAITING, "加密策略的交易所讀數沒有持倉欄位，沒辦法判斷是否空手。", [f"keys={sorted(state)[:8]}"])
-    exchange_flat = positions == [] and (state.get("fetch_status") or {}).get("complete") is True
-    fetched = parse_time(state.get("fetched_at"))
-    if not _fresh(fetched, ctx.now, 45):
-        return Result(WAITING, "加密策略的交易所讀數太舊，沒辦法判斷是否空手。", [f"fetched_at={state.get('fetched_at')}"])
-    if snap_flat != exchange_flat:
-        return Result(FAILED, "加密策略的快照與交易所讀數對不上（一個說空手、一個說有持倉）。",
-                      [f"快照 position={snap.get('position')}", f"交易所 positions={json.dumps(positions)[:160]}"])
-    if not exchange_flat:
-        return Result(WAITING, "加密策略還有持倉。", [f"交易所 positions={json.dumps(positions, ensure_ascii=False)[:160]}"])
-    if recon.get("value") != "RECONCILED":
-        return Result(WAITING, "加密策略空手，但帳本對交易所還不是 RECONCILED。", [f"對帳={recon.get('value')}"])
-    ledger = list(jsonl(ctx.remote.read("a1", audit("mycrypto", "trading_ledger.jsonl"))))
-    closes = [e for e in ledger if e.get("event_type") == "trade_close"]
-    last = closes[-1] if closes else {}
-    since = parse_time(last.get("event_time"))
-    return Result(OBSERVED, "加密策略現在空手：可以開始 x1（換 Binance）。注意它可能在下一個訊號又進場，要開工請盡快決定。",
-                  [f"最近一筆平倉：{taipei(since) if since else '?'}（台北）；帳本、交易所、快照三方都顯示空手，對帳一致。",
-                   f"交易所權益 {((state.get('balance') or {}).get('equity'))} USDT"],
-                  needs_human=True, key=str(last.get("event_id") or "flat"))
 
 
 #: f-55 (2026-10-19, decided by the user): the exchange's minimum order is 0.001 BTC (about 82 USDT of notional at today's price),
@@ -926,7 +896,6 @@ def check_registry_drift(ctx: Context) -> Result:
 
 
 CHECKS: tuple[Check, ...] = (
-    Check("crypto-flat", "加密策略空手（開工 x1 的訊號）", ("phase-x1",), check_crypto_flat),
     Check("a1-crypto-equity", "A1 加密權益低於提醒線（最小手數風險）", ("f-55",), check_crypto_equity),
     Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
@@ -947,7 +916,11 @@ CHECKS: tuple[Check, ...] = (
 
 def run_checks(remote: Remote, now: datetime, previous: Mapping[str, Any], checks: Iterable[Check] = CHECKS,
                only: str | None = None) -> dict[str, dict[str, Any]]:
-    items = dict(previous.get("items") or {})
+    checks = tuple(checks)
+    known_ids = {check.id for check in checks}
+    # drop a stored entry for a check that no longer exists (e.g. removed from CHECKS): otherwise it is carried
+    # forward forever, since nothing below ever touches an id that is not in ``checks``.
+    items = {id_: entry for id_, entry in (previous.get("items") or {}).items() if id_ in known_ids}
     for check in checks:
         if only and check.id != only:
             continue
