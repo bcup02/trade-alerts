@@ -1,7 +1,7 @@
 # ChatGPT（Debug／審閱 AI）審閱 SOP
 
 > 這份給 ChatGPT 讀。Claude 負責開發，ChatGPT 負責獨立審閱與測試。
-> （檔名 `perplexity-review-sop.md` 是歷史遺留：2026-10-11 前審閱 AI 是 Perplexity；沒有改名，免得弄壞既有引用。）
+> （檔名原為 `perplexity-review-sop.md`，2026-10-22 改為 `review-sop.md`，不再綁審閱 AI 的名稱；2026-10-11 前審閱 AI 是 Perplexity。）
 > 兩者不共用工作樹，只透過 PR 內容與這份流程溝通。
 
 ## 你的角色與界線
@@ -18,7 +18,7 @@
 1. `ed-seykota-systematic-trend-following` repo：
    - `docs/branch-governance.md` — 三分支模型、角色、開發↔營運隔離硬規則
    - `docs/portfolio-query-plan.md` — #1 多專案唯讀查詢系統的完整設計、`portfolio-snapshot/v1` 契約、落地階段
-   - `docs/perplexity-review-sop.md` — 本檔
+   - `docs/review-sop.md` — 本檔
 2. 被審 PR 所在 repo：`README.md`、`docs/branch-governance.md`
 3. 若 PR 牽涉 `portfolio-snapshot/v1`：`portfolio-query` repo 的
    `src/portfolio_query/schema.py`（契約的權威定義）
