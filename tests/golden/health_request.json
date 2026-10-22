@@ -1,0 +1,38 @@
+{
+ "request": {
+  "action": "put_health_v1",
+  "health": {
+   "b64": "H4sIAAAAAAACA6WNQQuCQBCF/8ucFVaJAq/mIYiC6FREDPpaxdWFdZVE/O+Nl25C0G3mvW/mmygvkdconuwpoVjF2zBSYRxf1SZRKlG7GwWk0cKxX6UitVAOXFSt7ii5T8TvSgbS1moDKX/RdBjgKj8KYWvZPTuNhW9sg9b3jWQDmx4SXbL0fEoPx2xPc/DVGRQa7l9dh7G2nldsD7mU9w1L/jKAD0uw8WU4RDR/AC8rZudQAQAA",
+   "generated_at": "2026-10-22T04:00:10Z"
+  },
+  "issued_at": "2026-10-22T04:00:10Z",
+  "project_id": "fleet-health",
+  "request_id": "00000000-0000-4000-8000-000000000001",
+  "schema_version": "google-ledger-projection-v2",
+  "sheet_name": "維運健康",
+  "signature": "81099e69dc50e49f5c0307a6dc648b15f47397c1a4c713f245090e80d0b79775",
+  "source_id": "fleet-health-a1"
+ },
+ "secret": "golden-test-secret",
+ "table": {
+  "checked_at": "2026-10-22T04:00:07Z",
+  "generated_at": "2026-10-22T04:00:10Z",
+  "readings": [
+   {
+    "axis": "google",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "severity": "ok",
+    "target": "momentum",
+    "value": "RECONCILED"
+   },
+   {
+    "axis": "ledger",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "severity": "ok",
+    "target": "seykota",
+    "value": "RECONCILED"
+   }
+  ],
+  "schema": "fleet-health-v1"
+ }
+}
