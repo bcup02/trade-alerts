@@ -86,6 +86,26 @@ def _post_json(*, endpoint: str, payload: Mapping[str, Any], post: Callable[...,
     return result
 
 
+def post_receiver_json(
+    *,
+    endpoint: str | None,
+    payload: Mapping[str, Any],
+    post: Callable[..., Any] = requests.post,
+    get: Callable[..., Any] = requests.get,
+) -> dict[str, Any]:
+    """POST one signed payload to the receiver and return its JSON answer (``{"ok": ..., ...}``).
+
+    The public face of the receiver transport for callers outside the ledger projection (f-45's health publisher):
+    https only, a redirect is followed only to the same host or Apps Script's ``script.googleusercontent.com``, a
+    non-2xx status or a non-object answer raises.  It does not retry and does not interpret ``ok`` -- the caller decides
+    which receiver errors are worth another attempt.  Raises ``ValueError`` for a missing or non-https endpoint and for a
+    redirect that is not allowed; transport errors from ``requests`` propagate.
+    """
+    if not isinstance(endpoint, str) or not endpoint.startswith("https://"):
+        raise ValueError("endpoint_not_configured")
+    return _post_json(endpoint=endpoint, payload=payload, post=post, get=get)
+
+
 def read_projection_audit_v2(
     *,
     endpoint: str | None,
