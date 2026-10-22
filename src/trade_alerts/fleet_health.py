@@ -38,6 +38,11 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 _B64_RE = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 _READING_FIELDS = ("target", "axis", "value", "severity", "checked_at")
 _TABLE_FIELDS = frozenset({"schema", "generated_at", "checked_at", "readings"})
+# The page (scripts/health_panel_core.js validateTable) refuses a table past these, so the publisher must not pack one:
+# tests/golden/health_contract_vectors.json is read by both this module's tests and tests/health_contract_vectors_node_test.js.
+MAX_READINGS = 100
+MAX_TEXT_UTF16_UNITS = 200          # JavaScript's String.length counts UTF-16 code units, not code points
+_CONTROL_RE = re.compile("[\u0000-\u001f\u007f-\u009f\u2028\u2029]")
 # The receiver (isRecentIso) refuses a request whose issued_at or generated_at is more than 5 minutes from its clock.
 FRESH_WINDOW = timedelta(minutes=5)
 # Strict ISO 8601 with an explicit zone: JavaScript's Date accepts looser spellings, so the publisher is narrower than the receiver.
@@ -49,7 +54,13 @@ class HealthTableError(LedgerIntegrityError):
 
 
 def _parse_iso(name: str, value: Any) -> datetime:
+    """Strict ISO 8601 with a zone; the page's ``parseIso`` applies the same rules (tests/golden/health_contract_vectors.json).
+
+    Year 1-9999, a real calendar day, hour 0-23, minute and second 0-59 (no leap second, no ``T24``), offset hours 0-23 and
+    offset minutes 0-59: ``datetime.fromisoformat`` alone accepts an offset such as ``+08:60`` that the page refuses."""
     if not isinstance(value, str) or not _ISO_RE.fullmatch(value):
+        raise HealthTableError(f"invalid {name}")
+    if value[-1] != "Z" and int(value[-2:]) > 59:
         raise HealthTableError(f"invalid {name}")
     try:
         parsed = datetime.fromisoformat(value)
@@ -60,8 +71,20 @@ def _parse_iso(name: str, value: Any) -> datetime:
     return parsed
 
 
+def _clean_text(value: Any) -> bool:
+    """Same rule as the page's ``cleanText``: a non-empty string of at most 200 UTF-16 units with no control characters."""
+    return (isinstance(value, str) and bool(value) and len(value.encode("utf-16-le", "surrogatepass")) // 2 <= MAX_TEXT_UTF16_UNITS
+            and not _CONTROL_RE.search(value))
+
+
 def validate_health_table(table: Any) -> None:
-    """Exact shape: the four members, two ISO times, at least one reading, every reading with exactly the five non-empty strings.
+    """Exact shape: the four members, two ISO times, at least one reading, every reading with exactly the five fields.
+
+    Four of a reading's fields are clean text (non-empty, at most 200 UTF-16 units, no control characters) and there are at
+    most 100 readings -- the same limits the page enforces, so a table that packs is a table the page can show;
+    ``checked_at`` is an ISO time or ``None`` (f-62: the axis could not be
+    read at all, so there is no time to give -- the page shows "no reading time" and never dresses it up as fresh).  The key
+    itself is still required, and any other bad value (``""``, a number, a loose date) is refused.
 
     Used on both sides (before packing and after unpacking), so a table that decodes is a table the page can render.
     """
@@ -72,12 +95,15 @@ def validate_health_table(table: Any) -> None:
     readings = table["readings"]
     if not isinstance(readings, list) or not readings:
         raise HealthTableError("health table has no readings")
+    if len(readings) > MAX_READINGS:
+        raise HealthTableError(f"health table has {len(readings)} readings, over the page's {MAX_READINGS}")
     for row in readings:
         if not isinstance(row, Mapping) or set(row) != set(_READING_FIELDS):
             raise HealthTableError("reading does not have exactly the required fields")
-        if any(not isinstance(row[field], str) or not row[field] for field in _READING_FIELDS):
-            raise HealthTableError("reading has an empty or non-text field")
-        _parse_iso("reading checked_at", row["checked_at"])
+        if not all(_clean_text(row[field]) for field in _READING_FIELDS if field != "checked_at"):
+            raise HealthTableError("reading has an empty, over-long, control-character or non-text field")
+        if row["checked_at"] is not None:
+            _parse_iso("reading checked_at", row["checked_at"])
 
 
 def build_health_table(readings: Iterable[Mapping[str, Any]], *, generated_at: str, checked_at: str) -> dict[str, Any]:

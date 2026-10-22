@@ -57,7 +57,8 @@ def test_pack_round_trip_and_determinism():
 
 def test_cap_is_the_receivers_cap_and_is_enforced():
     assert HEALTH_MAX_B64_CHARS == 9000
-    noisy = [dict(_reading(f"t{i}", f"a{j}"), value=hashlib.sha256(f"{i}{j}".encode()).hexdigest() * 3) for i in range(20) for j in range(20)]
+    # 100 readings of 192 characters each: inside the page's limits (100 readings, 200 characters), so only the cell cap can refuse it
+    noisy = [dict(_reading(f"t{i}", f"a{j}"), value="".join(hashlib.sha256(f"{i}{j}{k}".encode()).hexdigest() for k in "abc")) for i in range(10) for j in range(10)]
     with pytest.raises(HealthTableError, match="cap"):
         encode_health_table(_table(noisy))
 
@@ -148,6 +149,64 @@ def _good() -> dict:
     return _table()
 
 
+# --- f-62: a reading that could not be read has no time (checked_at is null) ---------------------------------------------
+
+def _with_null_time() -> dict:
+    return _table([_reading("momentum", "ledger"), dict(_reading("host", "units", "UNAVAILABLE", "warn"), checked_at=None)])
+
+
+def test_a_reading_may_have_a_null_time_and_it_survives_pack_and_unpack():
+    table = _with_null_time()
+    null_row = next(r for r in table["readings"] if r["axis"] == "units")
+    assert null_row["checked_at"] is None
+    packed = encode_health_table(table)
+    assert decode_health_table(packed) == table
+    assert parse_health_cell(health_cell_text(packed)) == table
+    assert next(r for r in decode_health_table(packed)["readings"] if r["axis"] == "units")["checked_at"] is None
+
+
+def test_every_reading_may_be_null_but_the_table_times_may_not():
+    table = _table([dict(_reading(), checked_at=None)])
+    validate_health_table(table)
+    for member in ("generated_at", "checked_at"):
+        broken = _with_null_time()
+        broken[member] = None
+        with pytest.raises(HealthTableError):
+            validate_health_table(broken)
+
+
+@pytest.mark.parametrize("bad", ["", 0, 1761105607, "yesterday", "2026-10-22T04:00:07", False, [], {}])
+def test_a_null_time_is_the_only_thing_besides_an_iso_time_the_reading_time_accepts(bad):
+    table = _with_null_time()
+    table["readings"][0]["checked_at"] = bad
+    with pytest.raises(HealthTableError):
+        validate_health_table(table)
+
+
+def test_the_reading_time_key_is_still_required_even_when_it_may_be_null():
+    table = _with_null_time()
+    table["readings"][0].pop("checked_at")
+    with pytest.raises(HealthTableError):
+        validate_health_table(table)
+    with pytest.raises(HealthTableError):
+        _table([{k: v for k, v in _reading().items() if k != "checked_at"}])
+
+
+@pytest.mark.parametrize("field", ["target", "axis", "value", "severity"])
+def test_null_is_refused_for_every_other_reading_field(field):
+    table = _with_null_time()
+    table["readings"][0][field] = None
+    with pytest.raises(HealthTableError):
+        validate_health_table(table)
+
+
+def test_the_golden_cell_with_a_null_time_unpacks_in_python_as_it_does_on_the_page():
+    golden = json.loads((Path(__file__).parent / "golden" / "health_cell_real.json").read_text(encoding="utf-8"))
+    table = parse_health_cell(golden["with_null_time"]["cell"])
+    assert any(r["checked_at"] is None for r in table["readings"])
+    assert not any(r["checked_at"] is None for r in parse_health_cell(golden["real"]["cell"])["readings"])
+
+
 @pytest.mark.parametrize("mutate", [
     lambda t: t.pop("generated_at"),
     lambda t: t.pop("checked_at"),
@@ -183,3 +242,30 @@ def test_reviewers_two_reproductions_are_refused():
         encode_health_table({"schema": "fleet-health-v1", "readings": []})
     with pytest.raises(HealthTableError):
         encode_health_table({"schema": "fleet-health-v1", "generated_at": "x", "checked_at": "x", "readings": [{"target": "a"}]})
+
+
+# --- the page and the publisher must accept exactly the same tables (f-62) ----------------------------------------------
+
+_VECTOR_FILE = json.loads((Path(__file__).parent / "golden" / "health_contract_vectors.json").read_text(encoding="utf-8"))
+_VECTORS = _VECTOR_FILE["cases"]
+_TIMES = _VECTOR_FILE["times"]
+
+
+@pytest.mark.parametrize("case", _VECTORS, ids=[c["name"] for c in _VECTORS])
+def test_python_accepts_and_refuses_the_same_tables_as_the_page(case):
+    if case["valid"]:
+        validate_health_table(case["table"])
+        assert decode_health_table(encode_health_table(case["table"])) == case["table"]
+    else:
+        with pytest.raises(HealthTableError):
+            validate_health_table(case["table"])
+
+
+@pytest.mark.parametrize("case", _TIMES, ids=[repr(c["value"]) for c in _TIMES])
+def test_python_reads_a_time_the_way_the_page_does(case):
+    from trade_alerts.fleet_health import _parse_iso
+    if case["valid"]:
+        _parse_iso("checked_at", case["value"])
+    else:
+        with pytest.raises(HealthTableError):
+            _parse_iso("checked_at", case["value"])

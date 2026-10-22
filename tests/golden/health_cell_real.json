@@ -1,6 +1,6 @@
 {
  "generated_at": "2026-10-22T07:51:00Z",
- "note": "Generated from the development host's real ops-notify health.json of 2026-10-22 (ops-notify tests/fixtures/health_real_20261022.json). 'real': what the v0.30.17 publisher writes. 'with_null_time': one axis that read nothing (f-62 shape, not yet writable by the publisher).",
+ "note": "Generated from the development host's real ops-notify health.json of 2026-10-22 (ops-notify tests/fixtures/health_real_20261022.json). 'real': what the v0.30.17 publisher writes. 'with_null_time': one axis that read nothing (f-62 shape: the shared contract allows it since v0.30.18).",
  "poll_checked_at": "2026-10-22T07:50:05Z",
  "real": {
   "cell": "HEALTHv1|H4sIAAAAAAACA7WVXWuDMBSG/0uuK0RX1zV3o5W1rKxQymAbY2T2TMWPlHgsldL/vriLsU1r0k7vDOeYx5P3kRyIH4Ifw+aNI2HEoc61ZVPLcdZ0xFzKqPtMBiSADCTHE102o7TqksA3URbkhL0cCN9H6oHAfiskqmIL5spldFRtkMMOZISl6hCxWiOXAVT97+hbvki3gBFGIlOlHU8KUJXlPTkOvmmBEEEC7bShyxz6h8YT+PpIA+B0/uit7rzpT2wCmwCkFmvfXDjkypssHybzxW+qLDKMUs20VYSXnu3Mu12sZ08/mUUWYa4nup2k6SfCj/Uw2goLRY4nCSZ26udJRQoZFmnnWmoxzWKY6jjsBmfkoeLR8bm8vgTUBmbixXDMqN2OKX1ZblH07UUd8z8v3G5wpl7YZ59igxfd3DM5lLFA3nNgdUq3edVuszqw6RYzzss5c7q+fuPmtF7VG2rblKv1RwKAVgg8wdDa2eT4CarAA/rvCAAA|HEALTHEND",

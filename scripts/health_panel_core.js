@@ -30,7 +30,8 @@ var HealthPanel = (function () {
     futureSkewMs: 5 * MIN            // the receiver's own freshness window
   };
 
-  var ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+  // Capture groups: year, month, day, hour, minute, second, offset hour, offset minute (both undefined for "Z").
+  var ISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-](\d{2}):(\d{2}))$/;
   var B64 = /^[A-Za-z0-9+\/]+={0,2}$/;
   var CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
   var FILE_ID = /^[A-Za-z0-9_-]{20,100}$/;
@@ -75,13 +76,24 @@ var HealthPanel = (function () {
 
   // ---- validating the table ----------------------------------------------------------------------------------
 
+  // The calendar rules are written out (not left to Date.parse, which rolls Feb 30 into March, takes T24:00:00 as the next day
+  // and skips every check when the offset is not Z): the same rules as trade_alerts.fleet_health._parse_iso, and
+  // tests/golden/health_contract_vectors.json pins both sides to them.
+  function daysInMonth(year, month) {
+    if (month === 2) return (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 29 : 28;
+    return (month === 4 || month === 6 || month === 9 || month === 11) ? 30 : 31;
+  }
+
   function parseIso(value) {
-    if (typeof value !== "string" || !ISO.test(value)) return NaN;
+    if (typeof value !== "string") return NaN;
+    var m = ISO.exec(value);
+    if (!m) return NaN;
+    var year = +m[1], month = +m[2], day = +m[3], hour = +m[4], minute = +m[5], second = +m[6];
+    if (year < 1 || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) return NaN;
+    if (hour > 23 || minute > 59 || second > 59) return NaN;
+    if (m[7] !== undefined && (+m[7] > 23 || +m[8] > 59)) return NaN;
     var ms = Date.parse(value);
-    if (isNaN(ms)) return NaN;
-    // Date.parse is lenient about impossible days (Feb 30 -> Mar 2): the calendar date must survive a round trip.
-    if (/(Z|\+00:00|-00:00)$/.test(value) && new Date(ms).toISOString().slice(0, 10) !== value.slice(0, 10)) return NaN;
-    return ms;
+    return isNaN(ms) ? NaN : ms;
   }
 
   function cleanText(v) {
