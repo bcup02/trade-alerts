@@ -1,0 +1,483 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index a33e335..0015667 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.15"
++version = "0.30.16"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 94f9300..9691c0f 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -347,4 +347,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.15"
++__version__ = "0.30.16"
+diff --git a/src/trade_alerts/fleet_health.py b/src/trade_alerts/fleet_health.py
+new file mode 100644
+index 0000000..411277a
+--- /dev/null
++++ b/src/trade_alerts/fleet_health.py
+@@ -0,0 +1,179 @@
++"""Pure contract for the fleet health table that rides in one Google cell (f-45).
++
++The A1 ops-notify publisher builds the latest health table (every target x axis
++reading), packs it as gzip + base64 and signs a ``put_health_v1`` request; the
++receiver writes it to A1 of its own tab as ``HEALTHv1|<b64>|HEALTHEND``; the
++rule-register page reads that one cell through the Drive connector and unpacks
++it.  This module holds the shared, secret-free parts: packing, unpacking, the
++cell text and the signed request.  No HTTP, no filesystem, no clock reads --
++the caller passes every time and id in, so the output is deterministic.
++
++The numbers mirror ``apps_script/google_ledger_receiver.gs`` (``HEALTH_*``);
++``tests/test_fleet_health.py`` and ``tests/apps_script_put_health_node_test.js``
++pin both sides to the same golden request.
++"""
++from __future__ import annotations
++
++import base64
++import binascii
++import gzip
++import hashlib
++import hmac
++import json
++import re
++from datetime import datetime, timedelta, timezone
++from typing import Any, Iterable, Mapping
++
++from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerIntegrityError, _require_request_id, canonical_json
++
++HEALTH_ACTION = "put_health_v1"
++HEALTH_SHEET_NAME = "維運健康"
++HEALTH_TABLE_SCHEMA = "fleet-health-v1"
++HEALTH_CELL_PREFIX = "HEALTHv1|"
++HEALTH_CELL_SUFFIX = "|HEALTHEND"
++# Same cap as the receiver: the Drive connector returned a single 9 KB cell whole on 2026-10-20.
++HEALTH_MAX_B64_CHARS = 9000
++
++_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
++_B64_RE = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
++_READING_FIELDS = ("target", "axis", "value", "severity", "checked_at")
++_TABLE_FIELDS = frozenset({"schema", "generated_at", "checked_at", "readings"})
++# The receiver (isRecentIso) refuses a request whose issued_at or generated_at is more than 5 minutes from its clock.
++FRESH_WINDOW = timedelta(minutes=5)
++# Strict ISO 8601 with an explicit zone: JavaScript's Date accepts looser spellings, so the publisher is narrower than the receiver.
++_ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$")
++
++
++class HealthTableError(LedgerIntegrityError):
++    """The health table or request cannot be built or read as specified."""
++
++
++def _parse_iso(name: str, value: Any) -> datetime:
++    if not isinstance(value, str) or not _ISO_RE.fullmatch(value):
++        raise HealthTableError(f"invalid {name}")
++    try:
++        parsed = datetime.fromisoformat(value)
++    except ValueError as exc:
++        raise HealthTableError(f"invalid {name}") from exc
++    if parsed.tzinfo is None:
++        raise HealthTableError(f"invalid {name}")
++    return parsed
++
++
++def validate_health_table(table: Any) -> None:
++    """Exact shape: the four members, two ISO times, at least one reading, every reading with exactly the five non-empty strings.
++
++    Used on both sides (before packing and after unpacking), so a table that decodes is a table the page can render.
++    """
++    if not isinstance(table, Mapping) or set(table) != _TABLE_FIELDS or table.get("schema") != HEALTH_TABLE_SCHEMA:
++        raise HealthTableError("unknown health table")
++    _parse_iso("generated_at", table["generated_at"])
++    _parse_iso("checked_at", table["checked_at"])
++    readings = table["readings"]
++    if not isinstance(readings, list) or not readings:
++        raise HealthTableError("health table has no readings")
++    for row in readings:
++        if not isinstance(row, Mapping) or set(row) != set(_READING_FIELDS):
++            raise HealthTableError("reading does not have exactly the required fields")
++        if any(not isinstance(row[field], str) or not row[field] for field in _READING_FIELDS):
++            raise HealthTableError("reading has an empty or non-text field")
++        _parse_iso("reading checked_at", row["checked_at"])
++
++
++def build_health_table(readings: Iterable[Mapping[str, Any]], *, generated_at: str, checked_at: str) -> dict[str, Any]:
++    """One latest-state table: ``checked_at`` is the poll's own time, ``generated_at`` the moment it was packed.
++
++    Each reading keeps only the five fields the page shows, in a stable order, so the same poll always packs to the
++    same bytes.  A reading missing a field is refused rather than padded: a half-empty row would read as healthy.
++    """
++    rows: list[dict[str, Any]] = []
++    for reading in readings:
++        if not isinstance(reading, Mapping) or any(field not in reading for field in _READING_FIELDS):
++            raise HealthTableError("reading is missing a required field")
++        rows.append({field: reading[field] for field in _READING_FIELDS})
++    rows.sort(key=lambda row: (str(row["target"]), str(row["axis"])))
++    table = {"schema": HEALTH_TABLE_SCHEMA, "generated_at": generated_at, "checked_at": checked_at, "readings": rows}
++    validate_health_table(table)
++    return table
++
++
++def encode_health_table(table: Mapping[str, Any]) -> str:
++    """gzip (mtime 0, so deterministic) + standard base64 of the canonical table JSON; refuses past the cell cap."""
++    validate_health_table(table)
++    raw = canonical_json(table).encode("utf-8")
++    packed = base64.b64encode(gzip.compress(raw, compresslevel=9, mtime=0)).decode("ascii")
++    if len(packed) > HEALTH_MAX_B64_CHARS:
++        raise HealthTableError(f"health table is {len(packed)} base64 characters, over the {HEALTH_MAX_B64_CHARS} cap")
++    return packed
++
++
++def decode_health_table(b64: str) -> dict[str, Any]:
++    """Inverse of :func:`encode_health_table`; any damage (base64, gzip, JSON, schema) raises ``HealthTableError``."""
++    if not isinstance(b64, str) or not _B64_RE.fullmatch(b64):
++        raise HealthTableError("health cell is not base64")
++    try:
++        table = json.loads(gzip.decompress(base64.b64decode(b64, validate=True)).decode("utf-8"))
++    except (binascii.Error, OSError, EOFError, ValueError) as exc:
++        raise HealthTableError("health cell is not a gzip JSON table") from exc
++    validate_health_table(table)
++    return table
++
++
++def health_cell_text(b64: str) -> str:
++    """The exact text the receiver writes to A1."""
++    return f"{HEALTH_CELL_PREFIX}{b64}{HEALTH_CELL_SUFFIX}"
++
++
++def parse_health_cell(text: str) -> dict[str, Any]:
++    """Unpack a cell as the page reads it: markers first, then the table.  A cut-off cell fails on the end marker."""
++    if not isinstance(text, str) or not text.startswith(HEALTH_CELL_PREFIX) or not text.endswith(HEALTH_CELL_SUFFIX):
++        raise HealthTableError("health cell markers are missing (cell cut off or not written by the publisher)")
++    return decode_health_table(text[len(HEALTH_CELL_PREFIX):-len(HEALTH_CELL_SUFFIX)])
++
++
++def signed_health_request(
++    *,
++    source_id: str,
++    project_id: str,
++    request_id: str,
++    issued_at: str,
++    b64: str,
++    generated_at: str,
++    source_hmac_secret: str,
++    now: datetime | None = None,
++) -> dict[str, Any]:
++    """Build the signed ``put_health_v1`` payload; the secret is used in memory only and never returned.
++
++    The tab is always ``維運健康`` (the receiver refuses any other).  ``issued_at`` and ``generated_at`` must be strict ISO
++    times with a zone; pass ``now`` (the publisher does) to also refuse a time more than 5 minutes from it, which is
++    what the receiver would answer ``request_not_fresh`` / ``health_payload_invalid`` to.
++    """
++    for name, value in (("source_id", source_id), ("project_id", project_id)):
++        if not isinstance(value, str) or not _IDENTIFIER_RE.fullmatch(value):
++            raise HealthTableError(f"invalid {name}")
++    if not isinstance(source_hmac_secret, str) or not source_hmac_secret:
++        raise HealthTableError("missing source signing credential")
++    if not isinstance(b64, str) or not _B64_RE.fullmatch(b64) or len(b64) > HEALTH_MAX_B64_CHARS:
++        raise HealthTableError("invalid health payload")
++    try:
++        _require_request_id(request_id)
++    except LedgerIntegrityError as exc:
++        raise HealthTableError("invalid request_id") from exc
++    if now is not None and now.tzinfo is None:
++        raise HealthTableError("now must carry a time zone")
++    for name, value in (("issued_at", issued_at), ("generated_at", generated_at)):
++        parsed = _parse_iso(name, value)
++        if now is not None and abs(now - parsed) > FRESH_WINDOW:
++            raise HealthTableError(f"{name} is not within {int(FRESH_WINDOW.total_seconds())} seconds of now")
++    body: dict[str, Any] = {
++        "schema_version": LEDGER_PROJECTION_SCHEMA_VERSION,
++        "action": HEALTH_ACTION,
++        "source_id": source_id,
++        "project_id": project_id,
++        "sheet_name": HEALTH_SHEET_NAME,
++        "request_id": request_id,
++        "issued_at": issued_at,
++        "health": {"b64": b64, "generated_at": generated_at},
++    }
++    signature = hmac.new(source_hmac_secret.encode("utf-8"), canonical_json(body).encode("utf-8"), hashlib.sha256).hexdigest()
++    return {**body, "signature": signature}
+diff --git a/tests/apps_script_health_golden_node_test.js b/tests/apps_script_health_golden_node_test.js
+new file mode 100644
+index 0000000..7d018fa
+--- /dev/null
++++ b/tests/apps_script_health_golden_node_test.js
+@@ -0,0 +1,33 @@
++// f-45: the Python publisher (trade_alerts.fleet_health) and the Apps Script receiver agree on one golden put_health_v1 request.
++// The request's issued_at is fixed in the past, so freshness is not tested here (apps_script_put_health_node_test.js does that);
++// this pins the parts that must match byte for byte across runtimes: canonical JSON, the HMAC and the gzip + base64 payload.
++const assert = require('assert');
++const crypto = require('crypto');
++const fs = require('fs');
++const vm = require('vm');
++const zlib = require('zlib');
++
++const golden = JSON.parse(fs.readFileSync('tests/golden/health_request.json', 'utf8'));
++function bytesFromDigest(algorithm, text, key) {
++  const output = key ? crypto.createHmac(algorithm, key).update(text, 'utf8').digest() : crypto.createHash(algorithm).update(text, 'utf8').digest();
++  return Array.from(output).map(number => number > 127 ? number - 256 : number);
++}
++const context = {console, Date, JSON, Math, Object, String, Array, Number, Set, isNaN, isFinite,
++  Utilities: {Charset: {UTF_8: 'UTF_8'}, DigestAlgorithm: {SHA_256: 'SHA_256'},
++    computeHmacSha256Signature: (text, key) => bytesFromDigest('sha256', text, key),
++    computeDigest: (algorithm, text) => bytesFromDigest('sha256', text)}};
++vm.createContext(context);
++vm.runInContext(fs.readFileSync('apps_script/google_ledger_receiver.gs', 'utf8'), context, {filename: 'google_ledger_receiver.gs'});
++
++// the receiver's own signature check accepts the Python-signed request, and rejects it with one character changed
++assert.equal(context.verifySignature(golden.request, golden.secret), true);
++const tampered = JSON.parse(JSON.stringify(golden.request));
++tampered.health.generated_at = '2026-10-22T04:00:11Z';
++assert.equal(context.verifySignature(tampered, golden.secret), false);
++assert.equal(context.verifySignature(golden.request, 'another-secret'), false);
++
++// the payload the receiver would store unpacks to exactly the golden table (gzip + base64, canonical JSON)
++const unpacked = JSON.parse(zlib.gunzipSync(Buffer.from(golden.request.health.b64, 'base64')).toString('utf8'));
++assert.deepEqual(unpacked, golden.table);
++assert.ok(golden.request.health.b64.length <= vm.runInContext('HEALTH_MAX_B64_CHARS', context));
++console.log('apps_script_health_golden_node_test ok');
+diff --git a/tests/golden/health_request.json b/tests/golden/health_request.json
+new file mode 100644
+index 0000000..f46b84a
+--- /dev/null
++++ b/tests/golden/health_request.json
+@@ -0,0 +1,38 @@
++{
++ "request": {
++  "action": "put_health_v1",
++  "health": {
++   "b64": "H4sIAAAAAAACA6WNQQuCQBCF/8ucFVaJAq/mIYiC6FREDPpaxdWFdZVE/O+Nl25C0G3mvW/mmygvkdconuwpoVjF2zBSYRxf1SZRKlG7GwWk0cKxX6UitVAOXFSt7ii5T8TvSgbS1moDKX/RdBjgKj8KYWvZPTuNhW9sg9b3jWQDmx4SXbL0fEoPx2xPc/DVGRQa7l9dh7G2nldsD7mU9w1L/jKAD0uw8WU4RDR/AC8rZudQAQAA",
++   "generated_at": "2026-10-22T04:00:10Z"
++  },
++  "issued_at": "2026-10-22T04:00:10Z",
++  "project_id": "fleet-health",
++  "request_id": "00000000-0000-4000-8000-000000000001",
++  "schema_version": "google-ledger-projection-v2",
++  "sheet_name": "維運健康",
++  "signature": "81099e69dc50e49f5c0307a6dc648b15f47397c1a4c713f245090e80d0b79775",
++  "source_id": "fleet-health-a1"
++ },
++ "secret": "golden-test-secret",
++ "table": {
++  "checked_at": "2026-10-22T04:00:07Z",
++  "generated_at": "2026-10-22T04:00:10Z",
++  "readings": [
++   {
++    "axis": "google",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "severity": "ok",
++    "target": "momentum",
++    "value": "RECONCILED"
++   },
++   {
++    "axis": "ledger",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "severity": "ok",
++    "target": "seykota",
++    "value": "RECONCILED"
++   }
++  ],
++  "schema": "fleet-health-v1"
++ }
++}
+\ No newline at end of file
+diff --git a/tests/test_fleet_health.py b/tests/test_fleet_health.py
+new file mode 100644
+index 0000000..4bc7bb7
+--- /dev/null
++++ b/tests/test_fleet_health.py
+@@ -0,0 +1,185 @@
++from __future__ import annotations
++
++import base64
++import gzip
++import hashlib
++import hmac
++import json
++from datetime import datetime, timedelta, timezone
++from pathlib import Path
++
++import pytest
++
++from trade_alerts.fleet_health import (
++    HEALTH_MAX_B64_CHARS,
++    HealthTableError,
++    build_health_table,
++    decode_health_table,
++    encode_health_table,
++    health_cell_text,
++    parse_health_cell,
++    signed_health_request,
++    validate_health_table,
++)
++from trade_alerts.ledger_integrity import canonical_json
++
++GOLDEN = Path(__file__).parent / "golden" / "health_request.json"
++REQUEST_ID = "00000000-0000-4000-8000-000000000001"
++
++
++def _reading(target: str = "seykota", axis: str = "ledger", value: str = "RECONCILED", severity: str = "ok") -> dict:
++    return {"target": target, "axis": axis, "value": value, "severity": severity, "checked_at": "2026-10-22T04:00:07Z"}
++
++
++def _table(readings=None) -> dict:
++    return build_health_table([_reading()] if readings is None else readings, generated_at="2026-10-22T04:00:10Z", checked_at="2026-10-22T04:00:07Z")
++
++
++def test_table_is_sorted_and_keeps_only_the_five_fields():
++    rows = [dict(_reading("seykota", "ledger"), extra="x"), _reading("momentum", "google"), _reading("momentum", "ledger")]
++    table = _table(rows)
++    assert [(r["target"], r["axis"]) for r in table["readings"]] == [("momentum", "google"), ("momentum", "ledger"), ("seykota", "ledger")]
++    assert all(set(r) == {"target", "axis", "value", "severity", "checked_at"} for r in table["readings"])
++
++
++@pytest.mark.parametrize("bad", [[], [{"target": "a", "axis": "b", "value": "c", "severity": "ok"}], ["not a mapping"]])
++def test_table_refuses_empty_or_incomplete_readings(bad):
++    with pytest.raises(HealthTableError):
++        _table(bad)
++
++
++def test_pack_round_trip_and_determinism():
++    table = _table([_reading("momentum", "google"), _reading("seykota", "ledger", "DIVERGED", "alert")])
++    first, second = encode_health_table(table), encode_health_table(table)
++    assert first == second
++    assert decode_health_table(first) == table
++
++
++def test_cap_is_the_receivers_cap_and_is_enforced():
++    assert HEALTH_MAX_B64_CHARS == 9000
++    noisy = [dict(_reading(f"t{i}", f"a{j}"), value=hashlib.sha256(f"{i}{j}".encode()).hexdigest() * 3) for i in range(20) for j in range(20)]
++    with pytest.raises(HealthTableError, match="cap"):
++        encode_health_table(_table(noisy))
++
++
++def test_cell_text_round_trip_and_cut_off_cell_is_refused():
++    table = _table()
++    text = health_cell_text(encode_health_table(table))
++    assert text.startswith("HEALTHv1|") and text.endswith("|HEALTHEND")
++    assert parse_health_cell(text) == table
++    for damaged in (text[:-20], text[len("HEALTHv1|"):], "HEALTHv1|" + "A" * 40 + "|HEALTHEND"):
++        with pytest.raises(HealthTableError):
++            parse_health_cell(damaged)
++
++
++def test_decode_refuses_wrong_schema_and_non_gzip():
++    other = base64.b64encode(gzip.compress(json.dumps({"schema": "x", "readings": []}).encode())).decode()
++    with pytest.raises(HealthTableError):
++        decode_health_table(other)
++    with pytest.raises(HealthTableError):
++        decode_health_table(base64.b64encode(b"plain").decode())
++
++
++def test_signed_request_shape_and_signature():
++    b64 = encode_health_table(_table())
++    request = signed_health_request(source_id="fleet-health-a1", project_id="fleet-health", request_id=REQUEST_ID,
++                                    issued_at="2026-10-22T04:00:10Z", b64=b64, generated_at="2026-10-22T04:00:10Z",
++                                    source_hmac_secret="s3cret")
++    assert request["action"] == "put_health_v1" and request["sheet_name"] == "維運健康"
++    assert set(request["health"]) == {"b64", "generated_at"}
++    unsigned = {k: v for k, v in request.items() if k != "signature"}
++    assert request["signature"] == hmac.new(b"s3cret", canonical_json(unsigned).encode("utf-8"), hashlib.sha256).hexdigest()
++    assert "s3cret" not in json.dumps(request)
++
++
++@pytest.mark.parametrize("override", [
++    {"source_id": "bad id"}, {"project_id": ""}, {"request_id": "not-a-uuid"}, {"b64": "has space"},
++    {"b64": "A" * (HEALTH_MAX_B64_CHARS + 1)}, {"source_hmac_secret": ""}, {"issued_at": ""}, {"generated_at": ""},
++])
++def test_signed_request_refuses_bad_inputs(override):
++    args = dict(source_id="fleet-health-a1", project_id="fleet-health", request_id=REQUEST_ID, issued_at="2026-10-22T04:00:10Z",
++                b64="AAAA", generated_at="2026-10-22T04:00:10Z", source_hmac_secret="s3cret")
++    args.update(override)
++    with pytest.raises(HealthTableError):
++        signed_health_request(**args)
++
++
++def test_golden_request_is_reproduced_byte_for_byte():
++    golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
++    table = golden["table"]
++    assert encode_health_table(table) == golden["request"]["health"]["b64"]
++    rebuilt = signed_health_request(source_id="fleet-health-a1", project_id="fleet-health", request_id=REQUEST_ID,
++                                    issued_at="2026-10-22T04:00:10Z", b64=encode_health_table(table),
++                                    generated_at="2026-10-22T04:00:10Z", source_hmac_secret=golden["secret"])
++    assert rebuilt == golden["request"]
++
++
++GOOD_ARGS = dict(source_id="fleet-health-a1", project_id="fleet-health", request_id=REQUEST_ID, issued_at="2026-10-22T04:00:10Z",
++                 b64="AAAA", generated_at="2026-10-22T04:00:10Z", source_hmac_secret="s3cret")
++
++
++@pytest.mark.parametrize("field", ["issued_at", "generated_at"])
++@pytest.mark.parametrize("bad", ["not-a-date", "2026-10-22", "2026-10-22T04:00:10", "2026-10-22 04:00:10Z", "Oct 22 2026 04:00 UTC", "2026-13-40T04:00:10Z"])
++def test_signed_request_refuses_times_the_receiver_would_refuse(field, bad):
++    with pytest.raises(HealthTableError):
++        signed_health_request(**{**GOOD_ARGS, field: bad})
++
++
++def test_signed_request_has_no_sheet_name_parameter_and_always_uses_the_health_tab():
++    with pytest.raises(TypeError):
++        signed_health_request(**GOOD_ARGS, sheet_name="trading-tab")  # type: ignore[call-arg]
++    assert signed_health_request(**GOOD_ARGS)["sheet_name"] == "維運健康"
++
++
++def test_signed_request_freshness_window_when_now_is_given():
++    issued = datetime(2026, 10, 22, 4, 0, 10, tzinfo=timezone.utc)
++    signed_health_request(**GOOD_ARGS, now=issued + timedelta(minutes=5))
++    signed_health_request(**GOOD_ARGS, now=issued - timedelta(minutes=5))
++    for off in (timedelta(minutes=5, seconds=1), -timedelta(minutes=5, seconds=1), timedelta(hours=1)):
++        with pytest.raises(HealthTableError):
++            signed_health_request(**GOOD_ARGS, now=issued + off)
++    with pytest.raises(HealthTableError):   # generated_at stale even though issued_at is fresh
++        signed_health_request(**{**GOOD_ARGS, "generated_at": "2026-10-22T03:00:00Z"}, now=issued)
++    with pytest.raises(HealthTableError):
++        signed_health_request(**GOOD_ARGS, now=datetime(2026, 10, 22, 4, 0, 10))
++
++
++def _good() -> dict:
++    return _table()
++
++
++@pytest.mark.parametrize("mutate", [
++    lambda t: t.pop("generated_at"),
++    lambda t: t.pop("checked_at"),
++    lambda t: t.update(readings=[]),
++    lambda t: t.update(readings="rows"),
++    lambda t: t.update(extra="x"),
++    lambda t: t.update(generated_at="x"),
++    lambda t: t.update(checked_at="2026-10-22T04:00:07"),
++    lambda t: t["readings"].append({"target": "a"}),
++    lambda t: t["readings"][0].pop("severity"),
++    lambda t: t["readings"][0].update(extra="x"),
++    lambda t: t["readings"][0].update(value=""),
++    lambda t: t["readings"][0].update(value=3),
++    lambda t: t["readings"][0].update(checked_at="yesterday"),
++])
++def test_encode_and_decode_refuse_a_damaged_table_that_keeps_the_schema_name(mutate):
++    table = _good()
++    mutate(table)
++    with pytest.raises(HealthTableError):
++        validate_health_table(table)
++    with pytest.raises(HealthTableError):
++        encode_health_table(table)
++    # a damaged table that reached the cell by another route is refused when it is read, too
++    packed = base64.b64encode(gzip.compress(canonical_json(table).encode("utf-8"), mtime=0)).decode()
++    with pytest.raises(HealthTableError):
++        decode_health_table(packed)
++    with pytest.raises(HealthTableError):
++        parse_health_cell(health_cell_text(packed))
++
++
++def test_reviewers_two_reproductions_are_refused():
++    with pytest.raises(HealthTableError):
++        encode_health_table({"schema": "fleet-health-v1", "readings": []})
++    with pytest.raises(HealthTableError):
++        encode_health_table({"schema": "fleet-health-v1", "generated_at": "x", "checked_at": "x", "readings": [{"target": "a"}]})
