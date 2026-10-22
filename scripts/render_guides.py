@@ -31,6 +31,8 @@ from trade_alerts.glossary import load_glossary  # noqa: E402
 from trade_alerts.rollout_registry import STRATEGY_PROJECTS, load_rollout_registry, owners  # noqa: E402
 
 GUIDES = ROOT / "docs" / "guides"
+HEALTH_CORE_JS = ROOT / "scripts" / "health_panel_core.js"
+HEALTH_SOURCES = ROOT / "src" / "trade_alerts" / "catalog" / "fleet-health-sources.json"
 RISK_PAGE = GUIDES / "fleet-risk-register.html"
 ROLLOUT_PAGE = GUIDES / "fleet-rollout-register.html"
 
@@ -41,6 +43,16 @@ TIERS = [
     {"id": "R0", "title": "只是記一筆", "sub": "不需要處理，不通知任何人"},
 ]
 BOT_LABEL_FLEET = "全機隊"
+
+#: The connector the rollout page needs, in the shape the Artifact tool's ``capabilities`` takes.  Publishing the page
+#: WITHOUT this leaves the health panel unable to read anything (and a page that declares it cannot be shared publicly).
+HEALTH_CAPABILITIES = {"mcp": {"servers": [{"server": "Google Drive", "tools": ["read_file_content"]}]}}
+
+#: ops-notify target keys in the order the health panel lists them -> the glossary term that names them.
+HEALTH_TARGETS = [("momentum", "strategy.momentum"), ("mycrypto", "strategy.mycrypto"), ("seykota", "strategy.seykota"),
+                  ("btc-competition", "strategy.btc-competition")]
+HEALTH_HOST_TARGET = ("host", "主機")
+_FILE_ID = re.compile(r"^[A-Za-z0-9_-]{20,100}$")
 
 #: What the ops-notify "axes" are (f-44, 2026-10-14: the user asked what 「軸」 means).  One row per axis the
 #: relay reads each round; ``codes`` are the FLEET.OPS_* catalog codes raised from that axis.  A test keeps every
@@ -54,6 +66,43 @@ OPS_NOTIFY_AXES = [
     ("匯出檔軸", "export", "策略把要通知的事轉成的匯出檔，讀得到、有在更新嗎", ["FLEET.OPS_EXPORT_UNAVAILABLE"]),
     ("時鐘軸", "clock", "主機的時鐘同步有沒有被關掉", ["FLEET.OPS_CLOCK_DEGRADED"]),
 ]
+
+
+def _glossary_zh(glossary: dict[str, Any], term_id: str) -> str:
+    for entry in glossary["entries"]:
+        if entry["id"] == term_id:
+            return entry["zh"]
+    raise ValueError(f"glossary has no term {term_id!r}")
+
+
+def health_panel_data(glossary: dict[str, Any], sources_doc: dict[str, Any] | None = None) -> dict[str, Any]:
+    """What the health panel needs from the repo: where to read, and the names it may use.
+
+    Every name comes from the glossary or from ``OPS_NOTIFY_AXES`` -- nothing is typed in twice.  A source's ``file_id`` is
+    ``None`` until its spreadsheet exists; a malformed one is refused here rather than reaching the page."""
+    doc = sources_doc if sources_doc is not None else json.loads(HEALTH_SOURCES.read_text(encoding="utf-8"))
+    sources, seen = [], set()
+    for src in doc["sources"]:
+        if set(src) != {"id", "host_term", "file_id"}:
+            raise ValueError(f"health source {src.get('id')!r}: members must be exactly id, host_term, file_id")
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,30}", src["id"]) or src["id"] in seen:
+            raise ValueError(f"health source id {src['id']!r} is invalid or repeated")
+        seen.add(src["id"])
+        file_id = src["file_id"]
+        if file_id is not None and not (isinstance(file_id, str) and _FILE_ID.fullmatch(file_id)):
+            raise ValueError(f"health source {src['id']!r}: file_id must be null or a Drive file id")
+        sources.append({"id": src["id"], "label": _glossary_zh(glossary, src["host_term"]), "file_id": file_id})
+    if not sources:
+        raise ValueError("no health source")
+    if doc["server"] != "Google Drive" or doc["tool"] != "read_file_content":
+        raise ValueError("the health panel is declared for Google Drive / read_file_content only (HEALTH_CAPABILITIES)")
+    if not isinstance(doc["refresh_ms"], int) or doc["refresh_ms"] < 30000:
+        raise ValueError("refresh_ms must be at least 30000 (the connector's polling floor)")
+    targets = [{"id": key, "label": _glossary_zh(glossary, term)} for key, term in HEALTH_TARGETS]
+    targets.append({"id": HEALTH_HOST_TARGET[0], "label": HEALTH_HOST_TARGET[1]})
+    axes = [{"id": key, "label": name} for name, key, _meaning, _codes in OPS_NOTIFY_AXES]
+    return {"server": doc["server"], "tool": doc["tool"], "refresh_ms": doc["refresh_ms"],
+            "sources": sources, "targets": targets, "axes": axes}
 
 
 def _axes_section(catalog: dict[str, Any]) -> str:
@@ -448,7 +497,154 @@ _ROLLOUT_CSS = """
   }
 """
 
-_ROLLOUT_JS = _JS_HELPERS + r"""
+_HEALTH_CSS = """
+  .health{margin:0 0 20px;}
+  .health h2{margin:0 0 6px;}
+  .health-sub{font-size:13.5px;color:var(--ink-soft);line-height:1.6;margin:0 0 10px;max-width:70ch;}
+  .hs{padding:14px 16px;}
+  .hs-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;margin-bottom:6px;}
+  .hs-head h3{margin:0;font-size:15.5px;}
+  .hs-level{font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;color:var(--c);background:var(--cb);}
+  .hs-ok{--c:var(--done);--cb:var(--done-bg);} .hs-warn{--c:var(--pending);--cb:var(--pending-bg);}
+  .hs-alert,.hs-bad{--c:var(--R3);--cb:var(--R3-bg);}
+  .hs-publish_stale,.hs-poll_stale,.hs-clock{--c:var(--pending);--cb:var(--pending-bg);}
+  .hs-banner{border-inline-start:4px solid var(--c);background:var(--cb);border-radius:3px;padding:8px 12px;margin:6px 0;}
+  .hs-banner p{margin:0 0 4px;font-size:13.5px;color:var(--ink);line-height:1.6;}
+  .hs-note{font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin:6px 0;}
+  .hs-times{font-size:12.5px;color:var(--ink-soft);margin:6px 0;font-family:"IBM Plex Mono","Noto Sans TC",monospace;}
+  .hs-btn{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--accent-line);background:var(--accent-bg);color:var(--accent);cursor:pointer;margin-top:4px;}
+  .hs-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .hm-wrap{overflow-x:auto;margin:8px 0;}
+  .hm{border-collapse:collapse;width:100%;font-size:12.5px;min-width:560px;}
+  .hm th,.hm td{border:1px solid var(--line);padding:6px 8px;text-align:start;vertical-align:top;}
+  .hm thead th{background:var(--paper);font-weight:700;color:var(--ink-soft);white-space:nowrap;}
+  .hm tbody th{white-space:nowrap;font-weight:700;color:var(--ink-soft);}
+  .hv{display:inline-block;font-family:"IBM Plex Mono","Noto Sans TC",monospace;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:3px;color:var(--c);background:var(--cb);overflow-wrap:anywhere;}
+  .hv-ok{--c:var(--done);--cb:var(--done-bg);} .hv-warn{--c:var(--pending);--cb:var(--pending-bg);}
+  .hv-alert{--c:var(--R3);--cb:var(--R3-bg);}
+  .hv-stale,.hv-notime{--c:var(--na);--cb:var(--na-bg);border:1px dashed var(--na);}
+  .hv-none{--c:var(--ink-faint);--cb:transparent;}
+  .hv-age{display:block;font-size:11px;color:var(--ink-faint);margin-top:2px;}
+"""
+
+
+_HEALTH_PANEL_JS = r"""
+(function(){
+  var H = DATA.health, P = HealthPanel, box = document.getElementById("healthSources");
+  if(!H || !box) return;
+  var DISPLAY = {ok:"正常", warn:"注意", alert:"異常", stale:"過期", notime:"無讀取時間"};
+  var mcp = null, mcpState = "pending";          // pending -> ready | none (no connector in this view)
+  var states = H.sources.map(function(src){
+    var s = {cfg:src, card:el("div","card hs"), table:null, readAt:null, error:null, problem:null, seq:0, busy:false, unsub:null};
+    box.appendChild(s.card); return s;
+  });
+  function note(text, cls){ return el("p", cls || "hs-note", text); }
+  function button(label, onClick){
+    var b = el("button","hs-btn",label); b.type = "button"; b.addEventListener("click", onClick); return b;
+  }
+  function when(ms){ return P.formatTaipei(ms) + "（" + P.formatAge(Date.now() - ms) + "）"; }
+  function cell(row){
+    var c = el("td","hc");
+    if(!row){ c.appendChild(el("span","hv hv-none","—")); c.title = "這個對象沒有這個軸"; return c; }
+    var chip = el("span","hv hv-" + row.display, row.value);
+    chip.title = "狀態 " + row.value + "｜嚴重度 " + row.severity + "｜" + (row.noTime ? "沒有讀取時間" : "讀取 " + P.formatTaipei(Date.parse(row.checkedAt)));
+    c.appendChild(chip);
+    var age = row.noTime ? "無讀取時間" : (row.display === "stale" ? "過期｜" : "") + P.formatAge(row.ageMs);
+    c.appendChild(el("span","hv-age", age));
+    return c;
+  }
+  function matrix(a){
+    var byKey = {}, targets = H.targets.slice(), axes = H.axes.slice();
+    a.rows.forEach(function(r){
+      byKey[r.target + "\u0000" + r.axis] = r;
+      if(!targets.some(function(t){return t.id === r.target;})) targets.push({id:r.target, label:r.target});
+      if(!axes.some(function(x){return x.id === r.axis;})) axes.push({id:r.axis, label:r.axis});
+    });
+    var wrap = el("div","hm-wrap"), t = el("table","hm"), head = el("tr");
+    head.appendChild(el("th",null,""));
+    axes.forEach(function(x){ var th = el("th",null,x.label); th.scope = "col"; head.appendChild(th); });
+    var thead = el("thead"); thead.appendChild(head); t.appendChild(thead);
+    var body = el("tbody");
+    targets.forEach(function(tg){
+      if(!a.rows.some(function(r){return r.target === tg.id;})) return;
+      var tr = el("tr"), th = el("th",null,tg.label); th.scope = "row"; tr.appendChild(th);
+      axes.forEach(function(x){ tr.appendChild(cell(byKey[tg.id + "\u0000" + x.id])); });
+      body.appendChild(tr);
+    });
+    t.appendChild(body); wrap.appendChild(t); return wrap;
+  }
+  function fail(s, err){ s.seq++; s.error = P.classifyError(err); if(s.error.retract) s.table = null; s.problem = null; draw(s); }
+  function ingest(s, res){
+    var mine = ++s.seq;
+    P.readResult(res).then(function(r){
+      if(mine !== s.seq) return;
+      s.error = null;
+      s.readAt = (res && res.cache && typeof res.cache.storedAt === "number") ? res.cache.storedAt : Date.now();
+      if(r.ok){ s.table = r.table; s.problem = null; } else { s.table = null; s.problem = P.describeFailure(r); }
+      draw(s);
+    });
+  }
+  function readNow(s){
+    if(!mcp || s.busy) return;
+    s.busy = true; draw(s);
+    mcp.callTool(H.server, H.tool, {fileId:s.cfg.file_id}, {cache:false}).then(function(res){ s.busy = false; ingest(s, res); })
+      .catch(function(err){ s.busy = false; fail(s, err); });
+  }
+  function draw(s){
+    var c = s.card; while(c.firstChild) c.removeChild(c.firstChild);
+    var head = el("div","hs-head"); head.appendChild(el("h3",null,s.cfg.label)); c.appendChild(head);
+    var plan = P.planSource(s.cfg, mcpState !== "none");
+    if(plan === "unconfigured"){ c.appendChild(note("還沒設定讀數來源：這台主機的維運讀數還沒開始發布。發布單元部署、讀數試算表建好後，這裡會顯示最新一輪。")); return; }
+    if(mcpState === "none"){ c.appendChild(note(P.classifyError({code:"capability_disabled"}).text, "hs-note hs-warn")); return; }
+    if(mcpState === "pending"){ c.appendChild(note("讀取中…")); return; }
+    if(s.error){
+      var e = el("div","hs-banner hs-bad"); e.appendChild(el("p",null,s.error.text));
+      if(s.error.button) e.appendChild(button(s.error.button, function(){ readNow(s); }));
+      c.appendChild(e);
+    }
+    if(s.problem){
+      var q = el("div","hs-banner hs-bad"); q.appendChild(el("p",null,s.problem.text));
+      if(s.problem.detail) q.appendChild(el("p","hs-note","（" + s.problem.detail + "）"));
+      q.appendChild(button("重新讀取", function(){ readNow(s); })); c.appendChild(q);
+    }
+    if(!s.table){ if(!s.error && !s.problem) c.appendChild(note("讀取中…")); return; }
+    var a = P.assess(s.table, Date.now()), d = P.describeLevel(a);
+    head.appendChild(el("span","hs-level hs-" + a.level, d.title));
+    var banner = el("div","hs-banner hs-" + a.level); banner.appendChild(el("p",null,d.detail)); c.appendChild(banner);
+    var times = el("p","hs-times");
+    times.textContent = "讀數產生 " + when(s.table.generatedAtMs) + "｜最後一次輪詢 " + when(s.table.checkedAtMs) + (s.readAt ? "｜這頁讀取於 " + P.formatTaipei(s.readAt) : "");
+    c.appendChild(times);
+    c.appendChild(matrix(a));
+    var legend = el("p","hs-note");
+    legend.textContent = "狀態標色：" + Object.keys(DISPLAY).map(function(k){ return DISPLAY[k]; }).join("、") +
+      "。過期規則：發布停 " + Math.round(P.DEFAULTS.publishStaleMs / 60000) + " 分鐘、輪詢停 " + Math.round(P.DEFAULTS.pollStaleMs / 60000) +
+      " 分鐘、單格 " + Math.round(P.DEFAULTS.rowStaleMs / 60000) + " 分鐘沒更新就標過期；過期的格子不會顯示成正常。";
+    c.appendChild(legend);
+    c.appendChild(button(s.busy ? "讀取中…" : "重新讀取", function(){ readNow(s); }));
+  }
+  function startWatches(){
+    states.forEach(function(s){
+      if(P.planSource(s.cfg, true) !== "load") return;
+      s.unsub = mcp.watchTool(H.server, H.tool, {fileId:s.cfg.file_id}, function(ev){
+        if(ev.type === "error") fail(s, ev.error); else ingest(s, ev.result);
+      }, {cache:{staleTime:30000, gcTime:300000}, refetchInterval:H.refresh_ms});
+    });
+  }
+  var anyConfigured = states.some(function(s){ return P.planSource(s.cfg, true) === "load"; });
+  states.forEach(draw);
+  if(anyConfigured){
+    if(typeof claude === "undefined" || !claude || typeof claude.use !== "function"){ mcpState = "none"; states.forEach(draw); }
+    else claude.use("mcp").then(function(m){
+      mcp = m; mcpState = m ? "ready" : "none";
+      if(m) startWatches();
+      states.forEach(draw);
+    }).catch(function(){ mcpState = "none"; states.forEach(draw); });
+    setInterval(function(){ states.forEach(function(s){ if(s.table && !s.busy) draw(s); }); }, 30000);
+  }
+})();
+"""
+
+_ROLLOUT_JS = HEALTH_CORE_JS.read_text(encoding="utf-8") + _JS_HELPERS + _HEALTH_PANEL_JS + r"""
 var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"跟這支無關","recent":"最新變動"};
 var KINDS=[["cap","機隊功能"],["rule","錯誤處理規則"]];
 function dots(item){
@@ -752,7 +948,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
     data = {
         "projects": projects, "project_order": list(STRATEGY_PROJECTS), "phases": phases,
         "phase_order": [k for k in phases if phase_counts[k]], "phase_counts": phase_counts, "totals": totals, "items": items,
-        "recent_summary": recent_summary, "glossary": _glossary_groups(glossary),
+        "recent_summary": recent_summary, "glossary": _glossary_groups(glossary), "health": health_panel_data(glossary),
     }
     sources = "；".join(
         f"{html.escape(registry['projects'][p])} <code>{html.escape(s['repo'])}@{html.escape(s['branch'])} {html.escape(s['commit'][:7])}</code>"
@@ -768,6 +964,14 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
     「未做」會寫預定在哪一關做，「不適用」會寫理由，漏寫 CI 會擋下來。
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
+  <section class="health" id="healthPanel" aria-labelledby="healthTitle">
+    <h2 id="healthTitle">維運讀數</h2>
+    <p class="health-sub">
+      維運通知每 10 分鐘對每個對象讀一輪狀態（每種讀法叫一個軸），發布單元把結果送到 Google 表，這裡用你的 Google Drive 連接器讀回來。
+      資料過期會標出來：過期的格子不會顯示成正常。
+    </p>
+    <div id="healthSources"></div>
+  </section>
   <div class="big">
     <a class="c-pending" href="#group-pending"><b>{n_pending}</b><span>項未完成——還有策略沒做到</span></a>
     <a class="c-done" href="#group-done"><b>{n_done}</b><span>項已完成——四支都到位，不用再動</span></a>
@@ -808,7 +1012,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
   </div>
 </div>
 <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>"""
-    return _page("機隊一致性登記冊", body, data, _ROLLOUT_JS, _ROLLOUT_CSS)
+    return _page("機隊一致性登記冊", body, data, _ROLLOUT_JS, _ROLLOUT_CSS + _HEALTH_CSS)
 
 
 def rendered_pages() -> dict[Path, str]:

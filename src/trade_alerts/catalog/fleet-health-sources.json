@@ -1,0 +1,9 @@
+{
+  "note": "Where the rule-register page reads the ops-notify health table from (f-45).  Each source is a Google spreadsheet that holds ONLY the tab 維運健康 with the table in A1 (written by that host's ops-notify publisher through its own Apps Script project).  file_id stays null until that spreadsheet exists; the page then says 'not set up yet' and calls no connector.  The label is looked up in the glossary by host_term, so the page can only use the glossary's name for a host.",
+  "server": "Google Drive",
+  "tool": "read_file_content",
+  "refresh_ms": 60000,
+  "sources": [
+    {"id": "a1", "host_term": "host.main.a1", "file_id": null}
+  ]
+}
