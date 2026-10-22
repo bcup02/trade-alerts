@@ -21,6 +21,7 @@ import hashlib
 import hmac
 import json
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping
 
 from .ledger_integrity import LEDGER_PROJECTION_SCHEMA_VERSION, LedgerIntegrityError, _require_request_id, canonical_json
@@ -36,10 +37,47 @@ HEALTH_MAX_B64_CHARS = 9000
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 _B64_RE = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 _READING_FIELDS = ("target", "axis", "value", "severity", "checked_at")
+_TABLE_FIELDS = frozenset({"schema", "generated_at", "checked_at", "readings"})
+# The receiver (isRecentIso) refuses a request whose issued_at or generated_at is more than 5 minutes from its clock.
+FRESH_WINDOW = timedelta(minutes=5)
+# Strict ISO 8601 with an explicit zone: JavaScript's Date accepts looser spellings, so the publisher is narrower than the receiver.
+_ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$")
 
 
 class HealthTableError(LedgerIntegrityError):
     """The health table or request cannot be built or read as specified."""
+
+
+def _parse_iso(name: str, value: Any) -> datetime:
+    if not isinstance(value, str) or not _ISO_RE.fullmatch(value):
+        raise HealthTableError(f"invalid {name}")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise HealthTableError(f"invalid {name}") from exc
+    if parsed.tzinfo is None:
+        raise HealthTableError(f"invalid {name}")
+    return parsed
+
+
+def validate_health_table(table: Any) -> None:
+    """Exact shape: the four members, two ISO times, at least one reading, every reading with exactly the five non-empty strings.
+
+    Used on both sides (before packing and after unpacking), so a table that decodes is a table the page can render.
+    """
+    if not isinstance(table, Mapping) or set(table) != _TABLE_FIELDS or table.get("schema") != HEALTH_TABLE_SCHEMA:
+        raise HealthTableError("unknown health table")
+    _parse_iso("generated_at", table["generated_at"])
+    _parse_iso("checked_at", table["checked_at"])
+    readings = table["readings"]
+    if not isinstance(readings, list) or not readings:
+        raise HealthTableError("health table has no readings")
+    for row in readings:
+        if not isinstance(row, Mapping) or set(row) != set(_READING_FIELDS):
+            raise HealthTableError("reading does not have exactly the required fields")
+        if any(not isinstance(row[field], str) or not row[field] for field in _READING_FIELDS):
+            raise HealthTableError("reading has an empty or non-text field")
+        _parse_iso("reading checked_at", row["checked_at"])
 
 
 def build_health_table(readings: Iterable[Mapping[str, Any]], *, generated_at: str, checked_at: str) -> dict[str, Any]:
@@ -53,19 +91,15 @@ def build_health_table(readings: Iterable[Mapping[str, Any]], *, generated_at: s
         if not isinstance(reading, Mapping) or any(field not in reading for field in _READING_FIELDS):
             raise HealthTableError("reading is missing a required field")
         rows.append({field: reading[field] for field in _READING_FIELDS})
-    if not rows:
-        raise HealthTableError("health table has no readings")
-    for name, value in (("generated_at", generated_at), ("checked_at", checked_at)):
-        if not isinstance(value, str) or not value:
-            raise HealthTableError(f"invalid {name}")
     rows.sort(key=lambda row: (str(row["target"]), str(row["axis"])))
-    return {"schema": HEALTH_TABLE_SCHEMA, "generated_at": generated_at, "checked_at": checked_at, "readings": rows}
+    table = {"schema": HEALTH_TABLE_SCHEMA, "generated_at": generated_at, "checked_at": checked_at, "readings": rows}
+    validate_health_table(table)
+    return table
 
 
 def encode_health_table(table: Mapping[str, Any]) -> str:
     """gzip (mtime 0, so deterministic) + standard base64 of the canonical table JSON; refuses past the cell cap."""
-    if table.get("schema") != HEALTH_TABLE_SCHEMA:
-        raise HealthTableError("unknown health table schema")
+    validate_health_table(table)
     raw = canonical_json(table).encode("utf-8")
     packed = base64.b64encode(gzip.compress(raw, compresslevel=9, mtime=0)).decode("ascii")
     if len(packed) > HEALTH_MAX_B64_CHARS:
@@ -81,8 +115,7 @@ def decode_health_table(b64: str) -> dict[str, Any]:
         table = json.loads(gzip.decompress(base64.b64decode(b64, validate=True)).decode("utf-8"))
     except (binascii.Error, OSError, EOFError, ValueError) as exc:
         raise HealthTableError("health cell is not a gzip JSON table") from exc
-    if not isinstance(table, dict) or table.get("schema") != HEALTH_TABLE_SCHEMA or not isinstance(table.get("readings"), list):
-        raise HealthTableError("health cell holds an unknown table")
+    validate_health_table(table)
     return table
 
 
@@ -107,9 +140,14 @@ def signed_health_request(
     b64: str,
     generated_at: str,
     source_hmac_secret: str,
-    sheet_name: str = HEALTH_SHEET_NAME,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Build the signed ``put_health_v1`` payload; the secret is used in memory only and never returned."""
+    """Build the signed ``put_health_v1`` payload; the secret is used in memory only and never returned.
+
+    The tab is always ``維運健康`` (the receiver refuses any other).  ``issued_at`` and ``generated_at`` must be strict ISO
+    times with a zone; pass ``now`` (the publisher does) to also refuse a time more than 5 minutes from it, which is
+    what the receiver would answer ``request_not_fresh`` / ``health_payload_invalid`` to.
+    """
     for name, value in (("source_id", source_id), ("project_id", project_id)):
         if not isinstance(value, str) or not _IDENTIFIER_RE.fullmatch(value):
             raise HealthTableError(f"invalid {name}")
@@ -121,15 +159,18 @@ def signed_health_request(
         _require_request_id(request_id)
     except LedgerIntegrityError as exc:
         raise HealthTableError("invalid request_id") from exc
+    if now is not None and now.tzinfo is None:
+        raise HealthTableError("now must carry a time zone")
     for name, value in (("issued_at", issued_at), ("generated_at", generated_at)):
-        if not isinstance(value, str) or not value:
-            raise HealthTableError(f"invalid {name}")
+        parsed = _parse_iso(name, value)
+        if now is not None and abs(now - parsed) > FRESH_WINDOW:
+            raise HealthTableError(f"{name} is not within {int(FRESH_WINDOW.total_seconds())} seconds of now")
     body: dict[str, Any] = {
         "schema_version": LEDGER_PROJECTION_SCHEMA_VERSION,
         "action": HEALTH_ACTION,
         "source_id": source_id,
         "project_id": project_id,
-        "sheet_name": sheet_name,
+        "sheet_name": HEALTH_SHEET_NAME,
         "request_id": request_id,
         "issued_at": issued_at,
         "health": {"b64": b64, "generated_at": generated_at},

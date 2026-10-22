@@ -5,6 +5,7 @@ import gzip
 import hashlib
 import hmac
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ from trade_alerts.fleet_health import (
     health_cell_text,
     parse_health_cell,
     signed_health_request,
+    validate_health_table,
 )
 from trade_alerts.ledger_integrity import canonical_json
 
@@ -110,3 +112,74 @@ def test_golden_request_is_reproduced_byte_for_byte():
                                     issued_at="2026-10-22T04:00:10Z", b64=encode_health_table(table),
                                     generated_at="2026-10-22T04:00:10Z", source_hmac_secret=golden["secret"])
     assert rebuilt == golden["request"]
+
+
+GOOD_ARGS = dict(source_id="fleet-health-a1", project_id="fleet-health", request_id=REQUEST_ID, issued_at="2026-10-22T04:00:10Z",
+                 b64="AAAA", generated_at="2026-10-22T04:00:10Z", source_hmac_secret="s3cret")
+
+
+@pytest.mark.parametrize("field", ["issued_at", "generated_at"])
+@pytest.mark.parametrize("bad", ["not-a-date", "2026-10-22", "2026-10-22T04:00:10", "2026-10-22 04:00:10Z", "Oct 22 2026 04:00 UTC", "2026-13-40T04:00:10Z"])
+def test_signed_request_refuses_times_the_receiver_would_refuse(field, bad):
+    with pytest.raises(HealthTableError):
+        signed_health_request(**{**GOOD_ARGS, field: bad})
+
+
+def test_signed_request_has_no_sheet_name_parameter_and_always_uses_the_health_tab():
+    with pytest.raises(TypeError):
+        signed_health_request(**GOOD_ARGS, sheet_name="trading-tab")  # type: ignore[call-arg]
+    assert signed_health_request(**GOOD_ARGS)["sheet_name"] == "維運健康"
+
+
+def test_signed_request_freshness_window_when_now_is_given():
+    issued = datetime(2026, 10, 22, 4, 0, 10, tzinfo=timezone.utc)
+    signed_health_request(**GOOD_ARGS, now=issued + timedelta(minutes=5))
+    signed_health_request(**GOOD_ARGS, now=issued - timedelta(minutes=5))
+    for off in (timedelta(minutes=5, seconds=1), -timedelta(minutes=5, seconds=1), timedelta(hours=1)):
+        with pytest.raises(HealthTableError):
+            signed_health_request(**GOOD_ARGS, now=issued + off)
+    with pytest.raises(HealthTableError):   # generated_at stale even though issued_at is fresh
+        signed_health_request(**{**GOOD_ARGS, "generated_at": "2026-10-22T03:00:00Z"}, now=issued)
+    with pytest.raises(HealthTableError):
+        signed_health_request(**GOOD_ARGS, now=datetime(2026, 10, 22, 4, 0, 10))
+
+
+def _good() -> dict:
+    return _table()
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda t: t.pop("generated_at"),
+    lambda t: t.pop("checked_at"),
+    lambda t: t.update(readings=[]),
+    lambda t: t.update(readings="rows"),
+    lambda t: t.update(extra="x"),
+    lambda t: t.update(generated_at="x"),
+    lambda t: t.update(checked_at="2026-10-22T04:00:07"),
+    lambda t: t["readings"].append({"target": "a"}),
+    lambda t: t["readings"][0].pop("severity"),
+    lambda t: t["readings"][0].update(extra="x"),
+    lambda t: t["readings"][0].update(value=""),
+    lambda t: t["readings"][0].update(value=3),
+    lambda t: t["readings"][0].update(checked_at="yesterday"),
+])
+def test_encode_and_decode_refuse_a_damaged_table_that_keeps_the_schema_name(mutate):
+    table = _good()
+    mutate(table)
+    with pytest.raises(HealthTableError):
+        validate_health_table(table)
+    with pytest.raises(HealthTableError):
+        encode_health_table(table)
+    # a damaged table that reached the cell by another route is refused when it is read, too
+    packed = base64.b64encode(gzip.compress(canonical_json(table).encode("utf-8"), mtime=0)).decode()
+    with pytest.raises(HealthTableError):
+        decode_health_table(packed)
+    with pytest.raises(HealthTableError):
+        parse_health_cell(health_cell_text(packed))
+
+
+def test_reviewers_two_reproductions_are_refused():
+    with pytest.raises(HealthTableError):
+        encode_health_table({"schema": "fleet-health-v1", "readings": []})
+    with pytest.raises(HealthTableError):
+        encode_health_table({"schema": "fleet-health-v1", "generated_at": "x", "checked_at": "x", "readings": [{"target": "a"}]})
