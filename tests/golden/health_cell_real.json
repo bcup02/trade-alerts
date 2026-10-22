@@ -1,0 +1,305 @@
+{
+ "generated_at": "2026-10-22T07:51:00Z",
+ "note": "Generated from the development host's real ops-notify health.json of 2026-10-22 (ops-notify tests/fixtures/health_real_20261022.json). 'real': what the v0.30.17 publisher writes. 'with_null_time': one axis that read nothing (f-62 shape, not yet writable by the publisher).",
+ "poll_checked_at": "2026-10-22T07:50:05Z",
+ "real": {
+  "cell": "HEALTHv1|H4sIAAAAAAACA7WVXWuDMBSG/0uuK0RX1zV3o5W1rKxQymAbY2T2TMWPlHgsldL/vriLsU1r0k7vDOeYx5P3kRyIH4Ifw+aNI2HEoc61ZVPLcdZ0xFzKqPtMBiSADCTHE102o7TqksA3URbkhL0cCN9H6oHAfiskqmIL5spldFRtkMMOZISl6hCxWiOXAVT97+hbvki3gBFGIlOlHU8KUJXlPTkOvmmBEEEC7bShyxz6h8YT+PpIA+B0/uit7rzpT2wCmwCkFmvfXDjkypssHybzxW+qLDKMUs20VYSXnu3Mu12sZ08/mUUWYa4nup2k6SfCj/Uw2goLRY4nCSZ26udJRQoZFmnnWmoxzWKY6jjsBmfkoeLR8bm8vgTUBmbixXDMqN2OKX1ZblH07UUd8z8v3G5wpl7YZ59igxfd3DM5lLFA3nNgdUq3edVuszqw6RYzzss5c7q+fuPmtF7VG2rblKv1RwKAVgg8wdDa2eT4CarAA/rvCAAA|HEALTHEND",
+  "table": {
+   "checked_at": "2026-10-22T07:50:05Z",
+   "generated_at": "2026-10-22T07:51:00Z",
+   "readings": [
+    {
+     "axis": "export",
+     "checked_at": "2026-10-22T07:35:07Z",
+     "severity": "ok",
+     "target": "btc-competition",
+     "value": "OK"
+    },
+    {
+     "axis": "google",
+     "checked_at": "2026-10-22T07:45:20Z",
+     "severity": "alert",
+     "target": "btc-competition",
+     "value": "DIVERGED"
+    },
+    {
+     "axis": "ledger",
+     "checked_at": "2026-10-22T07:45:18Z",
+     "severity": "ok",
+     "target": "btc-competition",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "runtime",
+     "checked_at": "2026-10-22T07:50:07Z",
+     "severity": "ok",
+     "target": "btc-competition",
+     "value": "HEALTHY"
+    },
+    {
+     "axis": "units",
+     "checked_at": "2026-10-22T07:50:05Z",
+     "severity": "ok",
+     "target": "btc-competition",
+     "value": "OK"
+    },
+    {
+     "axis": "clock",
+     "checked_at": "2026-10-22T07:50:00Z",
+     "severity": "ok",
+     "target": "host",
+     "value": "OK"
+    },
+    {
+     "axis": "export",
+     "checked_at": "2026-10-22T07:50:05Z",
+     "severity": "ok",
+     "target": "momentum",
+     "value": "OK"
+    },
+    {
+     "axis": "google",
+     "checked_at": "2026-10-22T07:45:20Z",
+     "severity": "ok",
+     "target": "momentum",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "ledger",
+     "checked_at": "2026-10-22T07:45:14Z",
+     "severity": "ok",
+     "target": "momentum",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "runtime",
+     "checked_at": "2026-10-22T07:45:09Z",
+     "severity": "ok",
+     "target": "momentum",
+     "value": "HEALTHY"
+    },
+    {
+     "axis": "units",
+     "checked_at": "2026-10-22T07:50:05Z",
+     "severity": "ok",
+     "target": "momentum",
+     "value": "OK"
+    },
+    {
+     "axis": "export",
+     "checked_at": "2026-10-22T07:49:01Z",
+     "severity": "ok",
+     "target": "mycrypto",
+     "value": "OK"
+    },
+    {
+     "axis": "google",
+     "checked_at": "2026-10-22T07:45:20Z",
+     "severity": "ok",
+     "target": "mycrypto",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "ledger",
+     "checked_at": "2026-10-22T07:45:15Z",
+     "severity": "ok",
+     "target": "mycrypto",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "runtime",
+     "checked_at": "2026-10-22T07:45:11Z",
+     "severity": "ok",
+     "target": "mycrypto",
+     "value": "HEALTHY"
+    },
+    {
+     "axis": "export",
+     "checked_at": "2026-10-22T07:35:07Z",
+     "severity": "ok",
+     "target": "seykota",
+     "value": "OK"
+    },
+    {
+     "axis": "google",
+     "checked_at": "2026-10-22T07:45:20Z",
+     "severity": "ok",
+     "target": "seykota",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "ledger",
+     "checked_at": "2026-10-22T07:45:15Z",
+     "severity": "alert",
+     "target": "seykota",
+     "value": "DIVERGED"
+    },
+    {
+     "axis": "runtime",
+     "checked_at": "2026-10-22T07:45:12Z",
+     "severity": "ok",
+     "target": "seykota",
+     "value": "HEALTHY"
+    },
+    {
+     "axis": "units",
+     "checked_at": "2026-10-22T07:50:05Z",
+     "severity": "ok",
+     "target": "seykota",
+     "value": "OK"
+    }
+   ],
+   "schema": "fleet-health-v1"
+  }
+ },
+ "with_null_time": {
+  "cell": "HEALTHv1|H4sIAAAAAAACA7WVX2+CMBTFv0ufJSlM5uwbUzLNiCbGLdmWZenwDgiFmlKcxPjdV/aw6ED+GHij6eX+enoO3ANyfXBD2HxQiQgysHGr6VgzjDUeERMTbL6iAfIgBkHlhSqdYJxXCaCbIPYSRN4OiO4D9YBgv+VCqs0KzI1J8ChvkMAORCAzVcFDtZZUeJDXf0pXc3m0BRnIgMdqa0dZCmpn+YiOgz+ax7nHoJo2NImB/9Eog99DNgBO58/26sGenmIZbDwQtVj97kqRK3uyXEzmzjlVpLEMohq1uYXX3u3Mtpz17OWUmcaBTOqJZiduuoy7YT0MV8J8nsiLhCbprNcT8QhimUadx7IWUx6M0jjGKWNnzb+piGvaPy2sZ2vuWPeO3Tp4Sg8et9XTV+JqHWoShOGYYL0ak7ki20redxCKmBZBKPkvmd3gmuZCb32LJbnoZrAkkIVc0p4NK1K69aswvorAsrHV2C+jpbq+PuNyt97VG6ptRNX6iwFIzQfKpK/tdHT8AXLv0JbgCAAA|HEALTHEND",
+  "table": {
+   "checked_at": "2026-10-22T07:50:05Z",
+   "generated_at": "2026-10-22T07:51:00Z",
+   "readings": [
+    {
+     "axis": "export",
+     "checked_at": "2026-10-22T07:35:07Z",
+     "severity": "ok",
+     "target": "btc-competition",
+     "value": "OK"
+    },
+    {
+     "axis": "google",
+     "checked_at": "2026-10-22T07:45:20Z",
+     "severity": "alert",
+     "target": "btc-competition",
+     "value": "DIVERGED"
+    },
+    {
+     "axis": "ledger",
+     "checked_at": "2026-10-22T07:45:18Z",
+     "severity": "ok",
+     "target": "btc-competition",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "runtime",
+     "checked_at": "2026-10-22T07:50:07Z",
+     "severity": "ok",
+     "target": "btc-competition",
+     "value": "HEALTHY"
+    },
+    {
+     "axis": "units",
+     "checked_at": "2026-10-22T07:50:05Z",
+     "severity": "ok",
+     "target": "btc-competition",
+     "value": "OK"
+    },
+    {
+     "axis": "clock",
+     "checked_at": "2026-10-22T07:50:00Z",
+     "severity": "ok",
+     "target": "host",
+     "value": "OK"
+    },
+    {
+     "axis": "export",
+     "checked_at": "2026-10-22T07:50:05Z",
+     "severity": "ok",
+     "target": "momentum",
+     "value": "OK"
+    },
+    {
+     "axis": "google",
+     "checked_at": "2026-10-22T07:45:20Z",
+     "severity": "ok",
+     "target": "momentum",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "ledger",
+     "checked_at": null,
+     "severity": "warn",
+     "target": "momentum",
+     "value": "UNAVAILABLE"
+    },
+    {
+     "axis": "runtime",
+     "checked_at": "2026-10-22T07:45:09Z",
+     "severity": "ok",
+     "target": "momentum",
+     "value": "HEALTHY"
+    },
+    {
+     "axis": "units",
+     "checked_at": "2026-10-22T07:50:05Z",
+     "severity": "ok",
+     "target": "momentum",
+     "value": "OK"
+    },
+    {
+     "axis": "export",
+     "checked_at": "2026-10-22T07:49:01Z",
+     "severity": "ok",
+     "target": "mycrypto",
+     "value": "OK"
+    },
+    {
+     "axis": "google",
+     "checked_at": "2026-10-22T07:45:20Z",
+     "severity": "ok",
+     "target": "mycrypto",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "ledger",
+     "checked_at": "2026-10-22T07:45:15Z",
+     "severity": "ok",
+     "target": "mycrypto",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "runtime",
+     "checked_at": "2026-10-22T07:45:11Z",
+     "severity": "ok",
+     "target": "mycrypto",
+     "value": "HEALTHY"
+    },
+    {
+     "axis": "export",
+     "checked_at": "2026-10-22T07:35:07Z",
+     "severity": "ok",
+     "target": "seykota",
+     "value": "OK"
+    },
+    {
+     "axis": "google",
+     "checked_at": "2026-10-22T07:45:20Z",
+     "severity": "ok",
+     "target": "seykota",
+     "value": "RECONCILED"
+    },
+    {
+     "axis": "ledger",
+     "checked_at": "2026-10-22T07:45:15Z",
+     "severity": "alert",
+     "target": "seykota",
+     "value": "DIVERGED"
+    },
+    {
+     "axis": "runtime",
+     "checked_at": "2026-10-22T07:45:12Z",
+     "severity": "ok",
+     "target": "seykota",
+     "value": "HEALTHY"
+    },
+    {
+     "axis": "units",
+     "checked_at": "2026-10-22T07:50:05Z",
+     "severity": "ok",
+     "target": "seykota",
+     "value": "OK"
+    }
+   ],
+   "schema": "fleet-health-v1"
+  }
+ }
+}
