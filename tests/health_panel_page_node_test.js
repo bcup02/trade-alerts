@@ -191,14 +191,14 @@ function fakeMcp(deliver) {
   }
 
   // a transient error keeps the last good table (its own times still say how old it is); a denial drops it
-  mcp = fakeMcp((handler) => { handler({type: 'data', result: cellResult(golden.real.cell)}); setTimeout(() => handler({type: 'error', error: {code: 'server_unavailable'}}), 5); });
+  mcp = fakeMcp((handler) => { handler({type: 'data', result: cellResult(golden.real.cell)}); setTimeout(() => handler({type: 'error', error: {code: 'server_unavailable'}}), 300); });
   page = boot({fileId: FILE_ID, mcp, nowMs: NOW});
-  await new Promise(r => setTimeout(r, 60));
+  await new Promise(r => setTimeout(r, 600));        // the table must be on screen before the error arrives (a slow runner needs the gzip decode to finish first)
   assert.ok(texts(page.panel).includes('暫時讀不到 Google Drive'));
   assert.equal(page.panel.find(n => n.tagName === 'table').length, 1);
-  mcp = fakeMcp((handler) => { handler({type: 'data', result: cellResult(golden.real.cell)}); setTimeout(() => handler({type: 'error', error: {code: 'needs_reauth'}}), 5); });
+  mcp = fakeMcp((handler) => { handler({type: 'data', result: cellResult(golden.real.cell)}); setTimeout(() => handler({type: 'error', error: {code: 'needs_reauth'}}), 300); });
   page = boot({fileId: FILE_ID, mcp, nowMs: NOW});
-  await new Promise(r => setTimeout(r, 60));
+  await new Promise(r => setTimeout(r, 600));
   assert.equal(page.panel.find(n => n.tagName === 'table').length, 0);
 
   // 8. no connector in this view at all
