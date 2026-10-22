@@ -1,5 +1,5 @@
 {
- "note": "Shared by tests/test_fleet_health.py (Python validate_health_table) and tests/health_contract_vectors_node_test.js (page validateTable): the two sides must accept and refuse exactly the same tables (f-62 review round 1).",
+ "note": "Shared by tests/test_fleet_health.py (Python validate_health_table) and tests/health_contract_vectors_node_test.js (page validateTable): the two sides must accept and refuse exactly the same tables (f-62 review round 1). 'times' are single ISO strings, 'cases' with names starting 'reading time' put the same strings into a table; validity comes from the written rule (year 1-9999, real calendar day, hour 0-23, minute/second 0-59, offset hours 0-23, offset minutes 0-59).",
  "cases": [
   {
    "name": "plain",
@@ -2052,6 +2052,1196 @@
      }
     ]
    }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07Z\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T12:00:07+08:00\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T12:00:07+08:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-21T23:00:07-05:00\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-21T23:00:07-05:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07.1Z\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07.1Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07.123456Z\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07.123456Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07.1234567Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07.1234567Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-02-28T04:00:07Z\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-02-28T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-02-29T04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-02-29T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2028-02-29T04:00:07Z\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2028-02-29T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2100-02-29T04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2100-02-29T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2000-02-29T04:00:07Z\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2000-02-29T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-02-30T04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-02-30T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-02-30T04:00:07+08:00\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-02-30T04:00:07+08:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-02-30T04:00:07-05:00\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-02-30T04:00:07-05:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-04-31T04:00:07+08:00\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-04-31T04:00:07+08:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-04-30T04:00:07+08:00\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-04-30T04:00:07+08:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-06-31T04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-06-31T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-09-31T04:00:07-03:00\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-09-31T04:00:07-03:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-11-31T04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-11-31T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-12-31T23:59:59Z\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-12-31T23:59:59Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-01-32T04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-01-32T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-00-10T04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-00-10T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-13-10T04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-13-10T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-00T04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-00T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T24:00:00Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T24:00:00Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T24:00:00+08:00\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T24:00:00+08:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T23:59:60Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T23:59:60Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T23:60:00Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T23:60:00Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T23:59:59Z\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T23:59:59Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"0000-01-01T00:00:00Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "0000-01-01T00:00:00Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"0001-01-01T00:00:00Z\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "0001-01-01T00:00:00Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"9999-12-31T23:59:59Z\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "9999-12-31T23:59:59Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07+23:59\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07+23:59"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07-23:59\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07-23:59"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07+24:00\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07+24:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07+08:59\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07+08:59"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07+08:60\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07+08:60"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07-14:82\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07-14:82"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07+99:99\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07+99:99"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07+00:00\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07+00:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07-00:00\"",
+   "valid": true,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07-00:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07+0800\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07+0800"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22 04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22 04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22t04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22t04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07Z\\n\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07Z\n"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07Z \"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07Z "
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07.Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07.Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"\\uff12\\uff10\\uff12\\uff16-10-22T04:00:07Z\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "２０２６-10-22T04:00:07Z"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22T04:00:07+\\u0660\\u0668:00\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22T04:00:07+٠٨:00"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"2026-10-22\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "2026-10-22"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"yesterday\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": "yesterday"
+     }
+    ]
+   }
+  },
+  {
+   "name": "reading time \"\"",
+   "valid": false,
+   "table": {
+    "schema": "fleet-health-v1",
+    "generated_at": "2026-10-22T04:00:10Z",
+    "checked_at": "2026-10-22T04:00:07Z",
+    "readings": [
+     {
+      "target": "host",
+      "axis": "units",
+      "value": "OK",
+      "severity": "ok",
+      "checked_at": ""
+     }
+    ]
+   }
+  }
+ ],
+ "times": [
+  {
+   "value": "2026-10-22T04:00:07Z",
+   "valid": true
+  },
+  {
+   "value": "2026-10-22T12:00:07+08:00",
+   "valid": true
+  },
+  {
+   "value": "2026-10-21T23:00:07-05:00",
+   "valid": true
+  },
+  {
+   "value": "2026-10-22T04:00:07.1Z",
+   "valid": true
+  },
+  {
+   "value": "2026-10-22T04:00:07.123456Z",
+   "valid": true
+  },
+  {
+   "value": "2026-10-22T04:00:07.1234567Z",
+   "valid": false
+  },
+  {
+   "value": "2026-02-28T04:00:07Z",
+   "valid": true
+  },
+  {
+   "value": "2026-02-29T04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2028-02-29T04:00:07Z",
+   "valid": true
+  },
+  {
+   "value": "2100-02-29T04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2000-02-29T04:00:07Z",
+   "valid": true
+  },
+  {
+   "value": "2026-02-30T04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2026-02-30T04:00:07+08:00",
+   "valid": false
+  },
+  {
+   "value": "2026-02-30T04:00:07-05:00",
+   "valid": false
+  },
+  {
+   "value": "2026-04-31T04:00:07+08:00",
+   "valid": false
+  },
+  {
+   "value": "2026-04-30T04:00:07+08:00",
+   "valid": true
+  },
+  {
+   "value": "2026-06-31T04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2026-09-31T04:00:07-03:00",
+   "valid": false
+  },
+  {
+   "value": "2026-11-31T04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2026-12-31T23:59:59Z",
+   "valid": true
+  },
+  {
+   "value": "2026-01-32T04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2026-00-10T04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2026-13-10T04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2026-10-00T04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T24:00:00Z",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T24:00:00+08:00",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T23:59:60Z",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T23:60:00Z",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T23:59:59Z",
+   "valid": true
+  },
+  {
+   "value": "0000-01-01T00:00:00Z",
+   "valid": false
+  },
+  {
+   "value": "0001-01-01T00:00:00Z",
+   "valid": true
+  },
+  {
+   "value": "9999-12-31T23:59:59Z",
+   "valid": true
+  },
+  {
+   "value": "2026-10-22T04:00:07+23:59",
+   "valid": true
+  },
+  {
+   "value": "2026-10-22T04:00:07-23:59",
+   "valid": true
+  },
+  {
+   "value": "2026-10-22T04:00:07+24:00",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T04:00:07+08:59",
+   "valid": true
+  },
+  {
+   "value": "2026-10-22T04:00:07+08:60",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T04:00:07-14:82",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T04:00:07+99:99",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T04:00:07+00:00",
+   "valid": true
+  },
+  {
+   "value": "2026-10-22T04:00:07-00:00",
+   "valid": true
+  },
+  {
+   "value": "2026-10-22T04:00:07",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T04:00:07+0800",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22 04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22t04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T04:00:07z",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T04:00:07Z\n",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T04:00:07Z ",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T04:00:07.Z",
+   "valid": false
+  },
+  {
+   "value": "２０２６-10-22T04:00:07Z",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22T04:00:07+٠٨:00",
+   "valid": false
+  },
+  {
+   "value": "2026-10-22",
+   "valid": false
+  },
+  {
+   "value": "yesterday",
+   "valid": false
+  },
+  {
+   "value": "",
+   "valid": false
   }
  ]
 }

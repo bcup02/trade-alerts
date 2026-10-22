@@ -246,7 +246,9 @@ def test_reviewers_two_reproductions_are_refused():
 
 # --- the page and the publisher must accept exactly the same tables (f-62) ----------------------------------------------
 
-_VECTORS = json.loads((Path(__file__).parent / "golden" / "health_contract_vectors.json").read_text(encoding="utf-8"))["cases"]
+_VECTOR_FILE = json.loads((Path(__file__).parent / "golden" / "health_contract_vectors.json").read_text(encoding="utf-8"))
+_VECTORS = _VECTOR_FILE["cases"]
+_TIMES = _VECTOR_FILE["times"]
 
 
 @pytest.mark.parametrize("case", _VECTORS, ids=[c["name"] for c in _VECTORS])
@@ -257,3 +259,13 @@ def test_python_accepts_and_refuses_the_same_tables_as_the_page(case):
     else:
         with pytest.raises(HealthTableError):
             validate_health_table(case["table"])
+
+
+@pytest.mark.parametrize("case", _TIMES, ids=[repr(c["value"]) for c in _TIMES])
+def test_python_reads_a_time_the_way_the_page_does(case):
+    from trade_alerts.fleet_health import _parse_iso
+    if case["valid"]:
+        _parse_iso("checked_at", case["value"])
+    else:
+        with pytest.raises(HealthTableError):
+            _parse_iso("checked_at", case["value"])

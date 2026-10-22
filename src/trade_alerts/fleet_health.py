@@ -54,7 +54,13 @@ class HealthTableError(LedgerIntegrityError):
 
 
 def _parse_iso(name: str, value: Any) -> datetime:
+    """Strict ISO 8601 with a zone; the page's ``parseIso`` applies the same rules (tests/golden/health_contract_vectors.json).
+
+    Year 1-9999, a real calendar day, hour 0-23, minute and second 0-59 (no leap second, no ``T24``), offset hours 0-23 and
+    offset minutes 0-59: ``datetime.fromisoformat`` alone accepts an offset such as ``+08:60`` that the page refuses."""
     if not isinstance(value, str) or not _ISO_RE.fullmatch(value):
+        raise HealthTableError(f"invalid {name}")
+    if value[-1] != "Z" and int(value[-2:]) > 59:
         raise HealthTableError(f"invalid {name}")
     try:
         parsed = datetime.fromisoformat(value)
