@@ -21,6 +21,7 @@ class Node_ {
   setAttribute(k, v) { this.attrs[k] = String(v); }
   addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
   click() { (this.listeners.click || []).forEach(fn => fn({preventDefault() {}})); }
+  key(k) { let prevented = false; (this.listeners.keydown || []).forEach(fn => fn({key: k, preventDefault() { prevented = true; }})); return prevented; }
   set textContent(v) { this.children = []; this._text = String(v); }
   get textContent() { return (this._text === null ? '' : this._text) + this.children.map(c => c.textContent).join(''); }
   get classList() { const n = this; return {toggle() {}, add() {}, remove() {}, contains: c => n.className.split(' ').includes(c)}; }
@@ -34,14 +35,14 @@ class Node_ {
 }
 class Text_ { constructor(t) { this.data = String(t); } get textContent() { return this.data; } }
 
-function boot({fileId, mcp, noClaude, nowMs}) {
+function boot({fileId, devFileId = null, mcp, noClaude, nowMs}) {
   const created = [];
   const byId = {};
   const document = {
     createElement: tag => { created.push(tag); return new Node_(tag); },
     createTextNode: t => new Text_(t),
     getElementById: id => {
-      if (id === 'data') { const d = JSON.parse(dataJson); d.health.sources[0].file_id = fileId; return {textContent: JSON.stringify(d)}; }
+      if (id === 'data') { const d = JSON.parse(dataJson); d.health.sources[0].file_id = fileId; d.health.sources[1].file_id = devFileId; return {textContent: JSON.stringify(d)}; }
       return byId[id] || (byId[id] = Object.assign(new Node_('div'), {id}));
     },
     querySelectorAll: () => [], querySelector: () => null,
@@ -56,7 +57,7 @@ function boot({fileId, mcp, noClaude, nowMs}) {
   }
   vm.createContext(sandbox);
   vm.runInContext(script, sandbox, {filename: 'rollout-page-script'});
-  return {byId, created, calls, timers, panel: byId.healthSources};
+  return {byId, created, calls, timers, panel: byId.healthSources, tabs: byId.healthTabs};
 }
 
 const settle = () => new Promise(r => setTimeout(r, 25));
@@ -190,14 +191,14 @@ function fakeMcp(deliver) {
   }
 
   // a transient error keeps the last good table (its own times still say how old it is); a denial drops it
-  mcp = fakeMcp((handler) => { handler({type: 'data', result: cellResult(golden.real.cell)}); setTimeout(() => handler({type: 'error', error: {code: 'server_unavailable'}}), 5); });
+  mcp = fakeMcp((handler) => { handler({type: 'data', result: cellResult(golden.real.cell)}); setTimeout(() => handler({type: 'error', error: {code: 'server_unavailable'}}), 300); });
   page = boot({fileId: FILE_ID, mcp, nowMs: NOW});
-  await new Promise(r => setTimeout(r, 60));
+  await new Promise(r => setTimeout(r, 600));        // the table must be on screen before the error arrives (a slow runner needs the gzip decode to finish first)
   assert.ok(texts(page.panel).includes('暫時讀不到 Google Drive'));
   assert.equal(page.panel.find(n => n.tagName === 'table').length, 1);
-  mcp = fakeMcp((handler) => { handler({type: 'data', result: cellResult(golden.real.cell)}); setTimeout(() => handler({type: 'error', error: {code: 'needs_reauth'}}), 5); });
+  mcp = fakeMcp((handler) => { handler({type: 'data', result: cellResult(golden.real.cell)}); setTimeout(() => handler({type: 'error', error: {code: 'needs_reauth'}}), 300); });
   page = boot({fileId: FILE_ID, mcp, nowMs: NOW});
-  await new Promise(r => setTimeout(r, 60));
+  await new Promise(r => setTimeout(r, 600));
   assert.equal(page.panel.find(n => n.tagName === 'table').length, 0);
 
   // 8. no connector in this view at all
@@ -207,6 +208,57 @@ function fakeMcp(deliver) {
   page = boot({fileId: FILE_ID, noClaude: true, nowMs: NOW});
   await settle();
   assert.ok(texts(page.panel).includes('要在 claude.ai 裡開這個頁面'));
+
+  // 10. host tabs: the page opens on A1; the development host is one click away (previewing the layout before A1 is deployed)
+  const DEV_ID = 'd'.repeat(33);
+  const visible = n => (n.hidden ? '' : (n._text === null ? '' : n._text)) + (n.hidden ? '' : n.children.map(c => c.textContent !== undefined && c.children ? visible(c) : (c.textContent || '')).join(''));
+  mcp = fakeMcp((handler, m) => { if (m.watches[m.watches.length - 1].input.fileId === DEV_ID) handler({type: 'data', result: cellResult(golden.real.cell)}); });
+  page = boot({fileId: null, devFileId: DEV_ID, mcp, nowMs: NOW});
+  await settle();
+  assert.equal(mcp.watches.length, 1);                                // only the configured host is watched
+  assert.deepEqual(mcp.watches[0].input, {fileId: DEV_ID});
+  const tabs = page.tabs.children;
+  assert.deepEqual(tabs.map(t => t.textContent), ['A1 正式機（新）', '開發機']);
+  assert.equal(page.tabs.attrs.role, 'tablist');
+  assert.ok(tabs.every(t => t.tagName === 'button' && t.attrs.role === 'tab' && t.attrs['aria-controls']));
+  const cards = page.panel.children;
+  assert.equal(cards.length, 2);
+  assert.deepEqual(cards.map(c => c.hidden), [false, true]);          // A1 is shown by default
+  assert.deepEqual(tabs.map(t => t.attrs['aria-selected']), ['true', 'false']);
+  assert.deepEqual(tabs.map(t => t.attrs.tabindex), ['0', '-1']);
+  assert.deepEqual(cards.map(c => c.attrs.role), ['tabpanel', 'tabpanel']);
+  assert.equal(cards[0].attrs['aria-labelledby'], tabs[0].id);
+  assert.equal(tabs[1].attrs['aria-controls'], cards[1].id);
+  assert.ok(visible(page.panel).includes('還沒設定讀數來源') && !visible(page.panel).includes('DIVERGED'));
+  assert.ok(texts(cards[1]).includes('DIVERGED'));                    // the dev table is already loaded behind the tab
+  tabs[1].click();
+  assert.deepEqual(cards.map(c => c.hidden), [true, false]);
+  assert.deepEqual(tabs.map(t => t.attrs['aria-selected']), ['false', 'true']);
+  assert.ok(visible(page.panel).includes('DIVERGED') && visible(page.panel).includes('開發機') && !visible(page.panel).includes('還沒設定讀數來源'));
+  tabs[0].click();
+  assert.deepEqual(cards.map(c => c.hidden), [false, true]);
+  // keyboard: arrows wrap, Home/End jump, other keys do nothing
+  assert.equal(tabs[0].key('ArrowRight'), true);
+  assert.deepEqual(cards.map(c => c.hidden), [true, false]);
+  assert.equal(tabs[1].key('ArrowRight'), true);                      // wraps to the first
+  assert.deepEqual(cards.map(c => c.hidden), [false, true]);
+  assert.equal(tabs[0].key('ArrowLeft'), true);                       // wraps to the last
+  assert.deepEqual(cards.map(c => c.hidden), [true, false]);
+  assert.equal(tabs[1].key('Home'), true);
+  assert.deepEqual(cards.map(c => c.hidden), [false, true]);
+  assert.equal(tabs[0].key('End'), true);
+  assert.deepEqual(cards.map(c => c.hidden), [true, false]);
+  assert.equal(tabs[1].key('a'), false);
+  assert.deepEqual(cards.map(c => c.hidden), [true, false]);
+  // both hosts configured: both are watched, each card keeps its own table
+  mcp = fakeMcp((handler) => handler({type: 'data', result: cellResult(golden.real.cell)}));
+  page = boot({fileId: FILE_ID, devFileId: DEV_ID, mcp, nowMs: NOW});
+  await settle();
+  assert.deepEqual(mcp.watches.map(w => w.input.fileId).sort(), [DEV_ID, FILE_ID].sort());
+  assert.equal(page.panel.find(n => n.tagName === 'table').length, 2);
+  assert.deepEqual(page.panel.children.map(c => c.hidden), [false, true]);
+  // hostile text still only ever becomes text, and the tab labels are the glossary's, not the sheet's
+  assert.ok(!page.created.some(t => ['img', 'script', 'iframe', 'object', 'embed', 'style'].includes(t)));
 
   // 9. the rest of the page still renders (the panel must not break the register)
   assert.ok(texts(page.byId.pending).length > 0 || texts(page.byId.done).length > 0);

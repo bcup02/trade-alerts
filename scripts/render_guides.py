@@ -502,6 +502,13 @@ _HEALTH_CSS = """
   .health h2{margin:0 0 6px;}
   .health-sub{font-size:13.5px;color:var(--ink-soft);line-height:1.6;margin:0 0 10px;max-width:70ch;}
   .hs{padding:14px 16px;}
+  .hs[hidden]{display:none;}
+  .hs-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;}
+  .hs-tabs[hidden]{display:none;}
+  .hs-tab{font:inherit;font-size:13.5px;padding:6px 16px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);cursor:pointer;}
+  .hs-tab:hover{border-color:var(--accent-line);}
+  .hs-tab[aria-selected="true"]{border-color:var(--accent-line);background:var(--accent-bg);color:var(--accent);font-weight:700;}
+  .hs-tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
   .hs-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;margin-bottom:6px;}
   .hs-head h3{margin:0;font-size:15.5px;}
   .hs-level{font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;color:var(--c);background:var(--cb);}
@@ -534,10 +541,39 @@ _HEALTH_PANEL_JS = r"""
   if(!H || !box) return;
   var DISPLAY = {ok:"正常", warn:"注意", alert:"異常", stale:"過期", notime:"無讀取時間"};
   var mcp = null, mcpState = "pending";          // pending -> ready | none (no connector in this view)
+  var tabs = document.getElementById("healthTabs");
   var states = H.sources.map(function(src){
-    var s = {cfg:src, card:el("div","card hs"), table:null, readAt:null, error:null, problem:null, seq:0, busy:false, unsub:null};
+    var s = {cfg:src, card:el("div","card hs"), tab:null, table:null, readAt:null, error:null, problem:null, seq:0, busy:false, unsub:null};
+    s.card.id = "hs-card-" + src.id; s.card.setAttribute("role","tabpanel"); s.card.setAttribute("aria-labelledby","hs-tab-" + src.id);
     box.appendChild(s.card); return s;
   });
+  // One card per host, one visible at a time: the first source (A1) is what the page opens on, the others are a tab away.
+  function select(i, focus){
+    states.forEach(function(s, k){
+      s.card.hidden = k !== i;
+      if(!s.tab) return;
+      s.tab.setAttribute("aria-selected", k === i ? "true" : "false");
+      s.tab.setAttribute("tabindex", k === i ? "0" : "-1");
+    });
+    if(focus && states[i].tab) states[i].tab.focus();
+  }
+  if(tabs && states.length > 1){
+    tabs.setAttribute("role","tablist");
+    states.forEach(function(s, k){
+      var b = el("button","hs-tab",s.cfg.label); b.type = "button"; b.id = "hs-tab-" + s.cfg.id;
+      b.setAttribute("role","tab"); b.setAttribute("aria-controls","hs-card-" + s.cfg.id);
+      b.addEventListener("click", function(){ select(k, false); });
+      b.addEventListener("keydown", function(ev){
+        var to = ev.key === "ArrowRight" ? (k + 1) % states.length : ev.key === "ArrowLeft" ? (k + states.length - 1) % states.length :
+                 ev.key === "Home" ? 0 : ev.key === "End" ? states.length - 1 : -1;
+        if(to < 0) return;
+        if(ev.preventDefault) ev.preventDefault();
+        select(to, true);
+      });
+      s.tab = b; tabs.appendChild(b);
+    });
+    select(0, false);
+  } else if(tabs){ tabs.hidden = true; }
   function note(text, cls){ return el("p", cls || "hs-note", text); }
   function button(label, onClick){
     var b = el("button","hs-btn",label); b.type = "button"; b.addEventListener("click", onClick); return b;
@@ -968,8 +1004,9 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
     <h2 id="healthTitle">維運讀數</h2>
     <p class="health-sub">
       維運通知每 10 分鐘對每個對象讀一輪狀態（每種讀法叫一個軸），發布單元把結果送到 Google 表，這裡用你的 Google Drive 連接器讀回來。
-      資料過期會標出來：過期的格子不會顯示成正常。
+      資料過期會標出來：過期的格子不會顯示成正常。預設顯示 A1 正式機（新），點上方分頁可切換到開發機。
     </p>
+    <div class="hs-tabs" id="healthTabs" aria-label="選擇要看哪一台主機的讀數"></div>
     <div id="healthSources"></div>
   </section>
   <div class="big">

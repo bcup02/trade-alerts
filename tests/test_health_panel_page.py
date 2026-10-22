@@ -82,13 +82,20 @@ def test_the_names_on_the_panel_are_the_glossary_and_axes_table_names(page_text,
     assert [t["label"] for t in data["targets"][:4]] == [zh["strategy.momentum"], zh["strategy.mycrypto"], zh["strategy.seykota"], zh["strategy.btc-competition"]]
     assert data["targets"][4] == {"id": "host", "label": "主機"}
     assert [(a["id"], a["label"]) for a in data["axes"]] == [(key, name) for name, key, _m, _c in module.OPS_NOTIFY_AXES]
-    assert [s["label"] for s in data["sources"]] == [zh["host.main.a1"]]
+    assert [s["label"] for s in data["sources"]] == [zh["host.main.a1"], zh["host.dev"]]      # A1 first: the page opens on it
 
 
 def test_a_source_without_a_spreadsheet_yet_is_null_and_the_page_says_so(page_text):
     data = _page_data(page_text)["health"]
-    assert [(s["id"], s["file_id"]) for s in data["sources"]] == [("a1", None)]
+    assert [(s["id"], s["file_id"]) for s in data["sources"]][0] == ("a1", None)             # A1's publisher is not deployed yet
     assert "還沒設定讀數來源" in _page_script(page_text)
+
+
+def test_the_page_opens_on_a1_and_offers_the_development_host_as_a_tab(page_text):
+    data = _page_data(page_text)["health"]
+    assert [s["id"] for s in data["sources"]] == ["a1", "dev"]
+    assert data["sources"][1]["file_id"] is not None                                       # previewable before A1 is deployed
+    assert 'id="healthTabs"' in page_text and '"tablist"' in _page_script(page_text)
 
 
 def test_the_target_keys_are_the_ones_ops_notify_publishes(module):
