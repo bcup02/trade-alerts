@@ -61,7 +61,11 @@ def _parse_iso(name: str, value: Any) -> datetime:
 
 
 def validate_health_table(table: Any) -> None:
-    """Exact shape: the four members, two ISO times, at least one reading, every reading with exactly the five non-empty strings.
+    """Exact shape: the four members, two ISO times, at least one reading, every reading with exactly the five fields.
+
+    Four of a reading's fields are non-empty strings; ``checked_at`` is an ISO time or ``None`` (f-62: the axis could not be
+    read at all, so there is no time to give -- the page shows "no reading time" and never dresses it up as fresh).  The key
+    itself is still required, and any other bad value (``""``, a number, a loose date) is refused.
 
     Used on both sides (before packing and after unpacking), so a table that decodes is a table the page can render.
     """
@@ -75,9 +79,10 @@ def validate_health_table(table: Any) -> None:
     for row in readings:
         if not isinstance(row, Mapping) or set(row) != set(_READING_FIELDS):
             raise HealthTableError("reading does not have exactly the required fields")
-        if any(not isinstance(row[field], str) or not row[field] for field in _READING_FIELDS):
+        if any(not isinstance(row[field], str) or not row[field] for field in _READING_FIELDS if field != "checked_at"):
             raise HealthTableError("reading has an empty or non-text field")
-        _parse_iso("reading checked_at", row["checked_at"])
+        if row["checked_at"] is not None:
+            _parse_iso("reading checked_at", row["checked_at"])
 
 
 def build_health_table(readings: Iterable[Mapping[str, Any]], *, generated_at: str, checked_at: str) -> dict[str, Any]:

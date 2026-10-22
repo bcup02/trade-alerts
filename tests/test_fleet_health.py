@@ -148,6 +148,64 @@ def _good() -> dict:
     return _table()
 
 
+# --- f-62: a reading that could not be read has no time (checked_at is null) ---------------------------------------------
+
+def _with_null_time() -> dict:
+    return _table([_reading("momentum", "ledger"), dict(_reading("host", "units", "UNAVAILABLE", "warn"), checked_at=None)])
+
+
+def test_a_reading_may_have_a_null_time_and_it_survives_pack_and_unpack():
+    table = _with_null_time()
+    null_row = next(r for r in table["readings"] if r["axis"] == "units")
+    assert null_row["checked_at"] is None
+    packed = encode_health_table(table)
+    assert decode_health_table(packed) == table
+    assert parse_health_cell(health_cell_text(packed)) == table
+    assert next(r for r in decode_health_table(packed)["readings"] if r["axis"] == "units")["checked_at"] is None
+
+
+def test_every_reading_may_be_null_but_the_table_times_may_not():
+    table = _table([dict(_reading(), checked_at=None)])
+    validate_health_table(table)
+    for member in ("generated_at", "checked_at"):
+        broken = _with_null_time()
+        broken[member] = None
+        with pytest.raises(HealthTableError):
+            validate_health_table(broken)
+
+
+@pytest.mark.parametrize("bad", ["", 0, 1761105607, "yesterday", "2026-10-22T04:00:07", False, [], {}])
+def test_a_null_time_is_the_only_thing_besides_an_iso_time_the_reading_time_accepts(bad):
+    table = _with_null_time()
+    table["readings"][0]["checked_at"] = bad
+    with pytest.raises(HealthTableError):
+        validate_health_table(table)
+
+
+def test_the_reading_time_key_is_still_required_even_when_it_may_be_null():
+    table = _with_null_time()
+    table["readings"][0].pop("checked_at")
+    with pytest.raises(HealthTableError):
+        validate_health_table(table)
+    with pytest.raises(HealthTableError):
+        _table([{k: v for k, v in _reading().items() if k != "checked_at"}])
+
+
+@pytest.mark.parametrize("field", ["target", "axis", "value", "severity"])
+def test_null_is_refused_for_every_other_reading_field(field):
+    table = _with_null_time()
+    table["readings"][0][field] = None
+    with pytest.raises(HealthTableError):
+        validate_health_table(table)
+
+
+def test_the_golden_cell_with_a_null_time_unpacks_in_python_as_it_does_on_the_page():
+    golden = json.loads((Path(__file__).parent / "golden" / "health_cell_real.json").read_text(encoding="utf-8"))
+    table = parse_health_cell(golden["with_null_time"]["cell"])
+    assert any(r["checked_at"] is None for r in table["readings"])
+    assert not any(r["checked_at"] is None for r in parse_health_cell(golden["real"]["cell"])["readings"])
+
+
 @pytest.mark.parametrize("mutate", [
     lambda t: t.pop("generated_at"),
     lambda t: t.pop("checked_at"),
