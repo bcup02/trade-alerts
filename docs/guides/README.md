@@ -16,6 +16,7 @@
 ## 一致性登記冊最上方的「維運讀數」面板（f-45）
 
 - 顯示一台主機上 ops-notify 最新一輪讀數（對象 × 軸的矩陣）。資料由該主機的發布單元每 10 分鐘寫進一份**只有一個分頁「維運健康」、A1 一格**的獨立 Google 試算表，頁面用**檢視者自己的 Google Drive 連接器**（`read_file_content`）讀回來；這就是頁面宣告的唯一連接器能力（`render_guides.HEALTH_CAPABILITIES`，發布頁面時要帶），用到連接器的頁面不能公開分享。
+- 面板每台主機一個分頁（`fleet-health-sources.json` 的 `sources` 順序＝分頁順序，第一個是頁面預設顯示的：A1 正式機（新），第二個是開發機；點分頁、或用方向鍵／Home／End 切換）。開發機那份有真實 `file_id`，所以 A1 的發布單元還沒部署時，也能點「開發機」預覽版面。
 - 讀哪份試算表在 `src/trade_alerts/catalog/fleet-health-sources.json`：`file_id` 是 `null` 時面板只寫「還沒設定讀數來源」、完全不呼叫連接器；填入 Drive 檔案編號後重新產生頁面並重發。主機名稱由名詞對照表（`host_term`）取得。
 - 解析與「什麼可以叫正常」的邏輯全在 `scripts/health_panel_core.js`（純函式，頁面與 `tests/health_panel_node_test.js` 載入同一個檔案；`tests/health_panel_page_node_test.js` 用假的 DOM 和假的連接器跑整個頁面）。三個時間各管一種「停止更新」：`generated_at`（發布單元）超過 25 分鐘、`checked_at`（輪詢）超過 45 分鐘、單格 `checked_at` 超過 45 分鐘就標過期，過期的格子灰掉、不顯示成正常；讀數時間是 `null`（讀不到，f-62）標「無讀取時間」。
 - 儲存格內容是不可信資料：結構逐項驗證、長度有上限、一律用 `textContent`，不會變成標記。
