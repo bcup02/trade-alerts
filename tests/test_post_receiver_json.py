@@ -129,3 +129,25 @@ def test_a_redirect_loop_back_to_the_same_host_terminates():
             post=lambda *a, **k: _Response({}, 302, {"Location": "https://example.test/receiver"}),
             get=lambda location, **k: calls.append(location) or _Response({}, 302, {"Location": "https://example.test/receiver"}))
     assert len(calls) == 3
+
+
+@pytest.mark.parametrize("status,headers", [
+    (300, {}), (304, {}), (307, {"Location": "https://evil.test/collect"}), (308, {"Location": "https://example.test/receiver"}),
+    (307, {}), (301, {}), (302, {}), (303, {}),                      # 301/302/303 without a Location are not followed either
+])
+def test_a_3xx_that_is_not_followed_never_passes_as_the_receivers_answer_even_with_a_json_body(status, headers):
+    with pytest.raises(ValueError, match="receiver_unexpected_status"):
+        post_receiver_json(endpoint="https://example.test/receiver", payload={}, post=lambda *a, **k: _Response({"ok": True}, status, headers))
+
+
+def test_a_followed_redirect_that_ends_in_a_3xx_without_location_is_refused_too():
+    with pytest.raises(ValueError, match="receiver_unexpected_status"):
+        post_receiver_json(
+            endpoint="https://script.google.com/macros/s/example/exec", payload={},
+            post=lambda *a, **k: _Response({}, 302, {"Location": "https://script.googleusercontent.com/macros/echo"}),
+            get=lambda loc, **k: _Response({"ok": True}, 307, {"Location": "https://evil.test/x"}))
+
+
+@pytest.mark.parametrize("status", [200, 201, 202, 204])
+def test_any_2xx_with_a_json_object_is_still_accepted(status):
+    assert post_receiver_json(endpoint="https://example.test/r", payload={}, post=lambda *a, **k: _Response({"ok": True}, status)) == {"ok": True}

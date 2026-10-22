@@ -89,6 +89,10 @@ def _post_json(*, endpoint: str, payload: Mapping[str, Any], post: Callable[...,
             raise ValueError("receiver_redirect_not_allowed")
         response = get(_permitted_redirect(endpoint, response.headers["Location"]), timeout=15, allow_redirects=False)
     response.raise_for_status()
+    # ``raise_for_status`` is silent for 3xx: a 307/308, or a 301/302/303 without a Location, whose body happens to be a
+    # JSON object must not pass as the receiver's answer (review of #268, round 2).
+    if not 200 <= response.status_code < 300:
+        raise ValueError("receiver_unexpected_status")
     result = response.json()
     if not isinstance(result, dict):
         raise ValueError("receiver_invalid_response")
