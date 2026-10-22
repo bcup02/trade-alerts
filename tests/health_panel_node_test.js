@@ -165,6 +165,25 @@ const plus = (iso, ms) => new Date(Date.parse(iso) + ms).toISOString().replace('
   assert.equal(P.assess(await at('2026-10-22T07:51:00Z', plus('2026-10-22T07:55:00Z', 6 * MIN), allOk), NOW).level, 'clock');
   assert.equal(P.assess(await at(plus('2026-10-22T07:55:00Z', 6 * MIN), generatedAgo(40 * MIN), allOk), NOW).level, 'clock');   // clock before staleness
 
+  // a single reading from the future (review of #270): exactly 5 minutes ahead is fine, more is not -- and never "all normal"
+  const ahead = ms => plus('2026-10-22T07:55:00Z', ms);
+  a = P.assess(await at(generatedAgo(MIN), checkedAgo(MIN), [row('a', 'b', 'RECONCILED', 'ok', ahead(5 * MIN)), ...allOk]), NOW);
+  assert.equal(a.level, 'ok'); assert.equal(a.futureRows, 0); assert.equal(a.rows[0].ageMs, -5 * MIN);
+  a = P.assess(await at(generatedAgo(MIN), checkedAgo(MIN), [row('a', 'b', 'RECONCILED', 'ok', ahead(5 * MIN + 1000)), ...allOk]), NOW);
+  assert.equal(a.level, 'clock'); assert.equal(a.future, true); assert.equal(a.futureRows, 1);
+  assert.ok(a.rows.every(r => r.display === 'stale'));                                                              // nothing on screen is green
+  assert.equal(a.counts.ok, 0);
+  a = P.assess(await at(generatedAgo(MIN), checkedAgo(MIN), [row('a', 'b', 'RECONCILED', 'ok', ahead(10 * MIN)), ...allOk]), NOW);   // the reviewer's case
+  assert.equal(a.level, 'clock'); assert.notEqual(a.rows[0].display, 'ok');
+  assert.ok(P.describeLevel(a).detail.includes('單格讀取時間') && !P.describeLevel(a).title.includes('正常'));
+  // with an alert elsewhere the clock still comes first (the table cannot be judged), and with a stale table the publisher does not outrank it
+  a = P.assess(await at(generatedAgo(MIN), checkedAgo(MIN), [row('a', 'b', 'RECONCILED', 'ok', ahead(6 * MIN)), row('seykota', 'ledger', 'DIVERGED', 'alert', checkedAgo(MIN))]), NOW);
+  assert.equal(a.level, 'clock');
+  a = P.assess(await at(generatedAgo(40 * MIN), checkedAgo(MIN), [row('a', 'b', 'RECONCILED', 'ok', ahead(6 * MIN))]), NOW);
+  assert.equal(a.level, 'clock');
+  // a null time is not "from the future"
+  assert.equal(P.assess(await at(generatedAgo(MIN), checkedAgo(MIN), [row('a', 'b', 'UNAVAILABLE', 'warn', null), ...allOk]), NOW).futureRows, 0);
+
   // no reading time (f-62): never green, never "stale" either
   a = P.assess(await at(generatedAgo(MIN), checkedAgo(MIN), [row('a', 'b', 'UNAVAILABLE', 'warn', null), ...allOk]), NOW);
   assert.deepEqual(a.rows.map(r => r.display), ['notime', 'ok', 'ok']);

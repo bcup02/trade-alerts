@@ -176,7 +176,10 @@ var HealthPanel = (function () {
     Object.keys(DEFAULTS).forEach(function (k) { o[k] = opts && typeof opts[k] === "number" ? opts[k] : DEFAULTS[k]; });
     var publishAgeMs = nowMs - table.generatedAtMs;
     var pollAgeMs = nowMs - table.checkedAtMs;
-    var future = (table.generatedAtMs - nowMs > o.futureSkewMs) || (table.checkedAtMs - nowMs > o.futureSkewMs);
+    // Any of the three kinds of time from the future (more than the skew) makes the whole table unjudgeable: a single reading
+    // "from 10 minutes ahead" has a negative age that would otherwise pass every staleness test (review of #270).
+    var futureRows = table.readings.filter(function (r) { return r.checkedAtMs !== null && r.checkedAtMs - nowMs > o.futureSkewMs; }).length;
+    var future = (table.generatedAtMs - nowMs > o.futureSkewMs) || (table.checkedAtMs - nowMs > o.futureSkewMs) || futureRows > 0;
     var publishStale = publishAgeMs > o.publishStaleMs;
     var pollStale = pollAgeMs > o.pollStaleMs;
     var tableStale = publishStale || pollStale || future;
@@ -192,7 +195,7 @@ var HealthPanel = (function () {
     });
     var level = future ? "clock" : publishStale ? "publish_stale" : pollStale ? "poll_stale"
       : counts.alert > 0 ? "alert" : (counts.warn + counts.stale + counts.notime) > 0 ? "warn" : "ok";
-    return { level: level, publishAgeMs: publishAgeMs, pollAgeMs: pollAgeMs, future: future, publishStale: publishStale,
+    return { level: level, publishAgeMs: publishAgeMs, pollAgeMs: pollAgeMs, future: future, futureRows: futureRows, publishStale: publishStale,
              pollStale: pollStale, tableStale: tableStale, counts: counts, rows: rows, limits: o };
   }
 
@@ -227,7 +230,7 @@ var HealthPanel = (function () {
     var c = a.counts;
     var detail;
     if (a.level === "clock") {
-      detail = "讀數的產生時間比這個瀏覽器的現在還晚（超過 " + Math.round(a.limits.futureSkewMs / MIN) + " 分鐘），無法判斷新舊，所以不顯示為正常。";
+      detail = "讀數裡有時間比這個瀏覽器的現在還晚（超過 " + Math.round(a.limits.futureSkewMs / MIN) + " 分鐘；產生時間、輪詢時間或單格讀取時間），無法判斷新舊，所以不顯示為正常。";
     } else if (a.level === "publish_stale") {
       detail = "讀數是 " + formatAge(a.publishAgeMs) + "產生的，發布單元每 10 分鐘會發一次，可能停了。下面的狀態都是舊的，只供參考。";
     } else if (a.level === "poll_stale") {

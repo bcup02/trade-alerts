@@ -141,6 +141,16 @@ function fakeMcp(deliver) {
   assert.ok(texts(page.panel).includes(hostile));
   assert.ok(!page.created.includes('img'));
 
+  // 5b. one reading from the future (review of #270): the whole table is "can't be judged", nothing is green
+  const future = JSON.parse(JSON.stringify(golden.real.table));
+  future.readings[0].checked_at = '2026-10-22T08:10:00Z';                       // 15 minutes after the viewer's "now"
+  mcp = fakeMcp((handler) => handler({type: 'data', result: cellResult('HEALTHv1|' + zlib.gzipSync(Buffer.from(JSON.stringify(future))).toString('base64') + '|HEALTHEND')}));
+  page = boot({fileId: FILE_ID, mcp, nowMs: NOW});
+  await settle();
+  assert.ok(texts(page.panel).includes('時鐘不一致，無法判斷新舊') && !texts(page.panel).includes('全部正常'));
+  const futureChips = page.panel.find(n => n.tagName === 'span' && /\bhv-/.test(n.className) && !/hv-age|hv-none/.test(n.className));
+  assert.ok(futureChips.length === 20 && futureChips.every(n => n.className.includes('hv-stale')));
+
   // 6. a damaged cell: say so, show no table
   for (const [name, res, expect] of [
     ['cut off', cellResult(golden.real.cell.slice(0, 200)), '截斷'],
