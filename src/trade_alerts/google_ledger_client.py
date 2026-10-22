@@ -75,10 +75,19 @@ def _permitted_redirect(endpoint: str, location: str) -> str:
     return location
 
 
+_MAX_REDIRECT_HOPS = 3
+
+
 def _post_json(*, endpoint: str, payload: Mapping[str, Any], post: Callable[..., Any], get: Callable[..., Any]) -> Any:
     response = post(endpoint, json=dict(payload), timeout=15, allow_redirects=False)
-    if response.status_code in (301, 302, 303) and response.headers.get("Location"):
-        response = get(_permitted_redirect(endpoint, response.headers["Location"]), timeout=15)
+    # Every hop is checked here and none is followed by ``requests`` itself (``allow_redirects=False`` on the GETs too):
+    # otherwise an allowed host's own second 3xx could lead anywhere (review of #268).
+    hops = 0
+    while response.status_code in (301, 302, 303) and response.headers.get("Location"):
+        hops += 1
+        if hops > _MAX_REDIRECT_HOPS:
+            raise ValueError("receiver_redirect_not_allowed")
+        response = get(_permitted_redirect(endpoint, response.headers["Location"]), timeout=15, allow_redirects=False)
     response.raise_for_status()
     result = response.json()
     if not isinstance(result, dict):
@@ -96,7 +105,7 @@ def post_receiver_json(
     """POST one signed payload to the receiver and return its JSON answer (``{"ok": ..., ...}``).
 
     The public face of the receiver transport for callers outside the ledger projection (f-45's health publisher):
-    https only, a redirect is followed only to the same host or Apps Script's ``script.googleusercontent.com``, a
+    https only, a redirect is followed only to the same host or Apps Script's ``script.googleusercontent.com`` (every hop checked, at most 3, none left to ``requests``), a
     non-2xx status or a non-object answer raises.  It does not retry and does not interpret ``ok`` -- the caller decides
     which receiver errors are worth another attempt.  Raises ``ValueError`` for a missing or non-https endpoint and for a
     redirect that is not allowed; transport errors from ``requests`` propagate.

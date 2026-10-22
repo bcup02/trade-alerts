@@ -41,12 +41,14 @@ def test_refuses_a_missing_or_non_https_endpoint_before_any_request(endpoint):
 
 def test_apps_script_redirect_is_followed_to_its_content_host_only():
     calls = []
+    kwargs_seen = []
     answer = post_receiver_json(
         endpoint="https://script.google.com/macros/s/example/exec", payload={},
         post=lambda *a, **k: _Response({}, 302, {"Location": "https://script.googleusercontent.com/macros/echo"}),
-        get=lambda location, **k: calls.append(location) or _Response({"ok": True}),
+        get=lambda location, **k: calls.append(location) or kwargs_seen.append(k) or _Response({"ok": True}),
     )
     assert answer == {"ok": True} and calls == ["https://script.googleusercontent.com/macros/echo"]
+    assert kwargs_seen == [{"timeout": 15, "allow_redirects": False}]       # the GET must not follow redirects on its own
 
 
 @pytest.mark.parametrize("location", [
@@ -83,3 +85,47 @@ def test_http_error_and_non_object_answers_raise():
 def test_a_receiver_error_answer_is_returned_not_raised_so_the_caller_can_classify_it():
     answer = post_receiver_json(endpoint="https://example.test/r", payload={}, post=lambda *a, **k: _Response({"ok": False, "error": "request_not_fresh"}))
     assert answer == {"ok": False, "error": "request_not_fresh"}
+
+
+def test_a_second_redirect_from_the_allowed_host_to_another_host_is_refused_and_never_requested():
+    calls = []
+    responses = iter([_Response({}, 302, {"Location": "https://evil.test/collect"})])
+    with pytest.raises(ValueError, match="receiver_redirect_not_allowed"):
+        post_receiver_json(
+            endpoint="https://script.google.com/macros/s/example/exec", payload={},
+            post=lambda *a, **k: _Response({}, 302, {"Location": "https://script.googleusercontent.com/macros/echo"}),
+            get=lambda location, **k: calls.append(location) or next(responses),
+        )
+    assert calls == ["https://script.googleusercontent.com/macros/echo"]      # the evil.test hop was never requested
+
+
+def test_a_chain_of_allowed_hops_is_followed_up_to_the_limit_and_no_further():
+    hosts = ["https://script.googleusercontent.com/a", "https://script.googleusercontent.com/b", "https://script.googleusercontent.com/c"]
+    calls = []
+
+    def get(location, **k):
+        calls.append(location)
+        return _Response({"ok": True}) if len(calls) == 3 else _Response({}, 302, {"Location": hosts[len(calls)]})
+
+    answer = post_receiver_json(
+        endpoint="https://script.google.com/macros/s/example/exec", payload={},
+        post=lambda *a, **k: _Response({}, 302, {"Location": hosts[0]}), get=get)
+    assert answer == {"ok": True} and calls == hosts                           # 3 hops: allowed
+
+    calls.clear()
+    with pytest.raises(ValueError, match="receiver_redirect_not_allowed"):
+        post_receiver_json(
+            endpoint="https://script.google.com/macros/s/example/exec", payload={},
+            post=lambda *a, **k: _Response({}, 302, {"Location": hosts[0]}),
+            get=lambda location, **k: calls.append(location) or _Response({}, 302, {"Location": hosts[0]}))
+    assert len(calls) == 3                                                    # the 4th hop is refused before it is requested
+
+
+def test_a_redirect_loop_back_to_the_same_host_terminates():
+    calls = []
+    with pytest.raises(ValueError, match="receiver_redirect_not_allowed"):
+        post_receiver_json(
+            endpoint="https://example.test/receiver", payload={},
+            post=lambda *a, **k: _Response({}, 302, {"Location": "https://example.test/receiver"}),
+            get=lambda location, **k: calls.append(location) or _Response({}, 302, {"Location": "https://example.test/receiver"}))
+    assert len(calls) == 3
