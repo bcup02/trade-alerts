@@ -1,0 +1,3604 @@
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index 0fd01e3..ecdd376 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -1,5 +1,5 @@
+ <title>機隊一致性登記冊</title>
+-<!-- fleet-guide-digest: 2d15dcc9841722bd -->
++<!-- fleet-guide-digest: 60f7679915b26fab -->
+ <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+ <style>
+   :root{
+@@ -251,7 +251,7 @@
+     資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-10-21 對四個 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+     「檔案:行號」證據對應的版本：趨勢策略 <code>AI-for-column5/ed-seykota-systematic-trend-following@operations 560aec0</code>；動能策略 <code>AI-for-column5/mexc-4h-momentum-trailing-stop@operations 3031e9c</code>；加密策略 <code>AI-for-column5/my-crypto-bot@operations a60e94f</code>；競賽策略 <code>AI-for-column5/btc-bull-market-competition@operations a8a1ba1</code>。各格的「A1 查證」長文（檔案雜湊、部署時間）放在 repo 的 <code>docs/registry-a1-checks.json</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+-    頁面版本碼 <code>2d15dcc9841722bd</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
++    頁面版本碼 <code>60f7679915b26fab</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
+   </div>
+ </div>
+ <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>
+@@ -292,7 +292,8 @@ var HealthPanel = (function () {
+     futureSkewMs: 5 * MIN            // the receiver's own freshness window
+   };
+ 
+-  var ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
++  // Capture groups: year, month, day, hour, minute, second, offset hour, offset minute (both undefined for "Z").
++  var ISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-](\d{2}):(\d{2}))$/;
+   var B64 = /^[A-Za-z0-9+\/]+={0,2}$/;
+   var CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+   var FILE_ID = /^[A-Za-z0-9_-]{20,100}$/;
+@@ -337,13 +338,24 @@ var HealthPanel = (function () {
+ 
+   // ---- validating the table ----------------------------------------------------------------------------------
+ 
++  // The calendar rules are written out (not left to Date.parse, which rolls Feb 30 into March, takes T24:00:00 as the next day
++  // and skips every check when the offset is not Z): the same rules as trade_alerts.fleet_health._parse_iso, and
++  // tests/golden/health_contract_vectors.json pins both sides to them.
++  function daysInMonth(year, month) {
++    if (month === 2) return (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 29 : 28;
++    return (month === 4 || month === 6 || month === 9 || month === 11) ? 30 : 31;
++  }
++
+   function parseIso(value) {
+-    if (typeof value !== "string" || !ISO.test(value)) return NaN;
++    if (typeof value !== "string") return NaN;
++    var m = ISO.exec(value);
++    if (!m) return NaN;
++    var year = +m[1], month = +m[2], day = +m[3], hour = +m[4], minute = +m[5], second = +m[6];
++    if (year < 1 || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) return NaN;
++    if (hour > 23 || minute > 59 || second > 59) return NaN;
++    if (m[7] !== undefined && (+m[7] > 23 || +m[8] > 59)) return NaN;
+     var ms = Date.parse(value);
+-    if (isNaN(ms)) return NaN;
+-    // Date.parse is lenient about impossible days (Feb 30 -> Mar 2): the calendar date must survive a round trip.
+-    if (/(Z|\+00:00|-00:00)$/.test(value) && new Date(ms).toISOString().slice(0, 10) !== value.slice(0, 10)) return NaN;
+-    return ms;
++    return isNaN(ms) ? NaN : ms;
+   }
+ 
+   function cleanText(v) {
+diff --git a/pyproject.toml b/pyproject.toml
+index 152f04b..bfd4c41 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.17"
++version = "0.30.18"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/scripts/health_panel_core.js b/scripts/health_panel_core.js
+index 32bb156..90d28d6 100644
+--- a/scripts/health_panel_core.js
++++ b/scripts/health_panel_core.js
+@@ -30,7 +30,8 @@ var HealthPanel = (function () {
+     futureSkewMs: 5 * MIN            // the receiver's own freshness window
+   };
+ 
+-  var ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
++  // Capture groups: year, month, day, hour, minute, second, offset hour, offset minute (both undefined for "Z").
++  var ISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-](\d{2}):(\d{2}))$/;
+   var B64 = /^[A-Za-z0-9+\/]+={0,2}$/;
+   var CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+   var FILE_ID = /^[A-Za-z0-9_-]{20,100}$/;
+@@ -75,13 +76,24 @@ var HealthPanel = (function () {
+ 
+   // ---- validating the table ----------------------------------------------------------------------------------
+ 
++  // The calendar rules are written out (not left to Date.parse, which rolls Feb 30 into March, takes T24:00:00 as the next day
++  // and skips every check when the offset is not Z): the same rules as trade_alerts.fleet_health._parse_iso, and
++  // tests/golden/health_contract_vectors.json pins both sides to them.
++  function daysInMonth(year, month) {
++    if (month === 2) return (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 29 : 28;
++    return (month === 4 || month === 6 || month === 9 || month === 11) ? 30 : 31;
++  }
++
+   function parseIso(value) {
+-    if (typeof value !== "string" || !ISO.test(value)) return NaN;
++    if (typeof value !== "string") return NaN;
++    var m = ISO.exec(value);
++    if (!m) return NaN;
++    var year = +m[1], month = +m[2], day = +m[3], hour = +m[4], minute = +m[5], second = +m[6];
++    if (year < 1 || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) return NaN;
++    if (hour > 23 || minute > 59 || second > 59) return NaN;
++    if (m[7] !== undefined && (+m[7] > 23 || +m[8] > 59)) return NaN;
+     var ms = Date.parse(value);
+-    if (isNaN(ms)) return NaN;
+-    // Date.parse is lenient about impossible days (Feb 30 -> Mar 2): the calendar date must survive a round trip.
+-    if (/(Z|\+00:00|-00:00)$/.test(value) && new Date(ms).toISOString().slice(0, 10) !== value.slice(0, 10)) return NaN;
+-    return ms;
++    return isNaN(ms) ? NaN : ms;
+   }
+ 
+   function cleanText(v) {
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 8296839..dafd0d1 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -347,4 +347,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.17"
++__version__ = "0.30.18"
+diff --git a/src/trade_alerts/fleet_health.py b/src/trade_alerts/fleet_health.py
+index 411277a..7a7574f 100644
+--- a/src/trade_alerts/fleet_health.py
++++ b/src/trade_alerts/fleet_health.py
+@@ -38,6 +38,11 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
+ _B64_RE = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
+ _READING_FIELDS = ("target", "axis", "value", "severity", "checked_at")
+ _TABLE_FIELDS = frozenset({"schema", "generated_at", "checked_at", "readings"})
++# The page (scripts/health_panel_core.js validateTable) refuses a table past these, so the publisher must not pack one:
++# tests/golden/health_contract_vectors.json is read by both this module's tests and tests/health_contract_vectors_node_test.js.
++MAX_READINGS = 100
++MAX_TEXT_UTF16_UNITS = 200          # JavaScript's String.length counts UTF-16 code units, not code points
++_CONTROL_RE = re.compile("[\u0000-\u001f\u007f-\u009f\u2028\u2029]")
+ # The receiver (isRecentIso) refuses a request whose issued_at or generated_at is more than 5 minutes from its clock.
+ FRESH_WINDOW = timedelta(minutes=5)
+ # Strict ISO 8601 with an explicit zone: JavaScript's Date accepts looser spellings, so the publisher is narrower than the receiver.
+@@ -49,8 +54,14 @@ class HealthTableError(LedgerIntegrityError):
+ 
+ 
+ def _parse_iso(name: str, value: Any) -> datetime:
++    """Strict ISO 8601 with a zone; the page's ``parseIso`` applies the same rules (tests/golden/health_contract_vectors.json).
++
++    Year 1-9999, a real calendar day, hour 0-23, minute and second 0-59 (no leap second, no ``T24``), offset hours 0-23 and
++    offset minutes 0-59: ``datetime.fromisoformat`` alone accepts an offset such as ``+08:60`` that the page refuses."""
+     if not isinstance(value, str) or not _ISO_RE.fullmatch(value):
+         raise HealthTableError(f"invalid {name}")
++    if value[-1] != "Z" and int(value[-2:]) > 59:
++        raise HealthTableError(f"invalid {name}")
+     try:
+         parsed = datetime.fromisoformat(value)
+     except ValueError as exc:
+@@ -60,8 +71,20 @@ def _parse_iso(name: str, value: Any) -> datetime:
+     return parsed
+ 
+ 
++def _clean_text(value: Any) -> bool:
++    """Same rule as the page's ``cleanText``: a non-empty string of at most 200 UTF-16 units with no control characters."""
++    return (isinstance(value, str) and bool(value) and len(value.encode("utf-16-le", "surrogatepass")) // 2 <= MAX_TEXT_UTF16_UNITS
++            and not _CONTROL_RE.search(value))
++
++
+ def validate_health_table(table: Any) -> None:
+-    """Exact shape: the four members, two ISO times, at least one reading, every reading with exactly the five non-empty strings.
++    """Exact shape: the four members, two ISO times, at least one reading, every reading with exactly the five fields.
++
++    Four of a reading's fields are clean text (non-empty, at most 200 UTF-16 units, no control characters) and there are at
++    most 100 readings -- the same limits the page enforces, so a table that packs is a table the page can show;
++    ``checked_at`` is an ISO time or ``None`` (f-62: the axis could not be
++    read at all, so there is no time to give -- the page shows "no reading time" and never dresses it up as fresh).  The key
++    itself is still required, and any other bad value (``""``, a number, a loose date) is refused.
+ 
+     Used on both sides (before packing and after unpacking), so a table that decodes is a table the page can render.
+     """
+@@ -72,12 +95,15 @@ def validate_health_table(table: Any) -> None:
+     readings = table["readings"]
+     if not isinstance(readings, list) or not readings:
+         raise HealthTableError("health table has no readings")
++    if len(readings) > MAX_READINGS:
++        raise HealthTableError(f"health table has {len(readings)} readings, over the page's {MAX_READINGS}")
+     for row in readings:
+         if not isinstance(row, Mapping) or set(row) != set(_READING_FIELDS):
+             raise HealthTableError("reading does not have exactly the required fields")
+-        if any(not isinstance(row[field], str) or not row[field] for field in _READING_FIELDS):
+-            raise HealthTableError("reading has an empty or non-text field")
+-        _parse_iso("reading checked_at", row["checked_at"])
++        if not all(_clean_text(row[field]) for field in _READING_FIELDS if field != "checked_at"):
++            raise HealthTableError("reading has an empty, over-long, control-character or non-text field")
++        if row["checked_at"] is not None:
++            _parse_iso("reading checked_at", row["checked_at"])
+ 
+ 
+ def build_health_table(readings: Iterable[Mapping[str, Any]], *, generated_at: str, checked_at: str) -> dict[str, Any]:
+diff --git a/tests/golden/health_cell_real.json b/tests/golden/health_cell_real.json
+index 3ddcce7..ace9960 100644
+--- a/tests/golden/health_cell_real.json
++++ b/tests/golden/health_cell_real.json
+@@ -1,6 +1,6 @@
+ {
+  "generated_at": "2026-10-22T07:51:00Z",
+- "note": "Generated from the development host's real ops-notify health.json of 2026-10-22 (ops-notify tests/fixtures/health_real_20261022.json). 'real': what the v0.30.17 publisher writes. 'with_null_time': one axis that read nothing (f-62 shape, not yet writable by the publisher).",
++ "note": "Generated from the development host's real ops-notify health.json of 2026-10-22 (ops-notify tests/fixtures/health_real_20261022.json). 'real': what the v0.30.17 publisher writes. 'with_null_time': one axis that read nothing (f-62 shape: the shared contract allows it since v0.30.18).",
+  "poll_checked_at": "2026-10-22T07:50:05Z",
+  "real": {
+   "cell": "HEALTHv1|H4sIAAAAAAACA7WVXWuDMBSG/0uuK0RX1zV3o5W1rKxQymAbY2T2TMWPlHgsldL/vriLsU1r0k7vDOeYx5P3kRyIH4Ifw+aNI2HEoc61ZVPLcdZ0xFzKqPtMBiSADCTHE102o7TqksA3URbkhL0cCN9H6oHAfiskqmIL5spldFRtkMMOZISl6hCxWiOXAVT97+hbvki3gBFGIlOlHU8KUJXlPTkOvmmBEEEC7bShyxz6h8YT+PpIA+B0/uit7rzpT2wCmwCkFmvfXDjkypssHybzxW+qLDKMUs20VYSXnu3Mu12sZ08/mUUWYa4nup2k6SfCj/Uw2goLRY4nCSZ26udJRQoZFmnnWmoxzWKY6jjsBmfkoeLR8bm8vgTUBmbixXDMqN2OKX1ZblH07UUd8z8v3G5wpl7YZ59igxfd3DM5lLFA3nNgdUq3edVuszqw6RYzzss5c7q+fuPmtF7VG2rblKv1RwKAVgg8wdDa2eT4CarAA/rvCAAA|HEALTHEND",
+diff --git a/tests/golden/health_contract_vectors.json b/tests/golden/health_contract_vectors.json
+new file mode 100644
+index 0000000..a20b95e
+--- /dev/null
++++ b/tests/golden/health_contract_vectors.json
+@@ -0,0 +1,3247 @@
++{
++ "note": "Shared by tests/test_fleet_health.py (Python validate_health_table) and tests/health_contract_vectors_node_test.js (page validateTable): the two sides must accept and refuse exactly the same tables (f-62 review round 1). 'times' are single ISO strings, 'cases' with names starting 'reading time' put the same strings into a table; validity comes from the written rule (year 1-9999, real calendar day, hour 0-23, minute/second 0-59, offset hours 0-23, offset minutes 0-59).",
++ "cases": [
++  {
++   "name": "plain",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "null reading time",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": null
++     }
++    ]
++   }
++  },
++  {
++   "name": "value 200 chars",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value 201 chars",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value 100 astral chars = 200 UTF-16 units",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value 101 astral chars = 202 UTF-16 units",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value CJK 200 chars",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value CJK 201 chars",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維維",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value with newline",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "a\nb",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value with tab",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "a\tb",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value with NUL",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "a\u0000b",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value with DEL",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "ab",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value with C1 NEL",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "ab",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value with C1 0x9f",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "ab",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value with line separator",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "a b",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value with paragraph separator",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "a b",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value with NBSP is fine",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "a b",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "value with U+00A0..U+2027 neighbours",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "a‧b‪c",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "target 201 chars",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "axis with newline",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "a\nb",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "severity with DEL",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "empty value",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "null value",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": null,
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "100 readings",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "t0",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t1",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t2",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t3",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t4",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t5",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t6",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t7",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t8",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t9",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t10",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t11",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t12",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t13",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t14",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t15",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t16",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t17",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t18",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t19",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t20",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t21",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t22",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t23",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t24",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t25",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t26",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t27",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t28",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t29",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t30",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t31",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t32",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t33",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t34",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t35",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t36",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t37",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t38",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t39",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t40",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t41",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t42",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t43",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t44",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t45",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t46",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t47",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t48",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t49",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t50",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t51",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t52",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t53",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t54",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t55",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t56",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t57",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t58",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t59",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t60",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t61",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t62",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t63",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t64",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t65",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t66",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t67",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t68",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t69",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t70",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t71",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t72",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t73",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t74",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t75",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t76",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t77",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t78",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t79",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t80",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t81",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t82",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t83",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t84",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t85",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t86",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t87",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t88",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t89",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t90",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t91",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t92",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t93",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t94",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t95",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t96",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t97",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t98",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t99",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "101 readings",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "t0",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t1",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t2",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t3",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t4",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t5",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t6",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t7",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t8",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t9",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t10",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t11",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t12",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t13",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t14",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t15",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t16",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t17",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t18",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t19",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t20",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t21",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t22",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t23",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t24",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t25",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t26",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t27",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t28",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t29",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t30",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t31",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t32",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t33",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t34",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t35",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t36",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t37",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t38",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t39",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t40",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t41",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t42",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t43",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t44",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t45",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t46",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t47",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t48",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t49",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t50",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t51",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t52",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t53",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t54",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t55",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t56",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t57",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t58",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t59",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t60",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t61",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t62",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t63",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t64",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t65",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t66",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t67",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t68",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t69",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t70",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t71",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t72",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t73",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t74",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t75",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t76",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t77",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t78",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t79",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t80",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t81",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t82",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t83",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t84",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t85",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t86",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t87",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t88",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t89",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t90",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t91",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t92",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t93",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t94",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t95",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t96",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t97",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t98",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t99",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     },
++     {
++      "target": "t100",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "no readings",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": []
++   }
++  },
++  {
++   "name": "reading time empty string",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": ""
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time number",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": 1761105607
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time without zone",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time with offset",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T12:00:07+08:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time Feb 30 in Z",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-02-30T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "table checked_at null",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": null,
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "table generated_at null",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": null,
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time key missing",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading with extra member",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z",
++      "extra": "x"
++     }
++    ]
++   }
++  },
++  {
++   "name": "table with extra member",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ],
++    "extra": "x"
++   }
++  },
++  {
++   "name": "wrong schema",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v2",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07Z\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T12:00:07+08:00\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T12:00:07+08:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-21T23:00:07-05:00\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-21T23:00:07-05:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07.1Z\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07.1Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07.123456Z\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07.123456Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07.1234567Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07.1234567Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-02-28T04:00:07Z\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-02-28T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-02-29T04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-02-29T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2028-02-29T04:00:07Z\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2028-02-29T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2100-02-29T04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2100-02-29T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2000-02-29T04:00:07Z\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2000-02-29T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-02-30T04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-02-30T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-02-30T04:00:07+08:00\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-02-30T04:00:07+08:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-02-30T04:00:07-05:00\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-02-30T04:00:07-05:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-04-31T04:00:07+08:00\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-04-31T04:00:07+08:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-04-30T04:00:07+08:00\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-04-30T04:00:07+08:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-06-31T04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-06-31T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-09-31T04:00:07-03:00\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-09-31T04:00:07-03:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-11-31T04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-11-31T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-12-31T23:59:59Z\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-12-31T23:59:59Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-01-32T04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-01-32T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-00-10T04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-00-10T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-13-10T04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-13-10T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-00T04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-00T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T24:00:00Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T24:00:00Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T24:00:00+08:00\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T24:00:00+08:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T23:59:60Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T23:59:60Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T23:60:00Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T23:60:00Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T23:59:59Z\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T23:59:59Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"0000-01-01T00:00:00Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "0000-01-01T00:00:00Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"0001-01-01T00:00:00Z\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "0001-01-01T00:00:00Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"9999-12-31T23:59:59Z\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "9999-12-31T23:59:59Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07+23:59\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07+23:59"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07-23:59\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07-23:59"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07+24:00\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07+24:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07+08:59\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07+08:59"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07+08:60\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07+08:60"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07-14:82\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07-14:82"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07+99:99\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07+99:99"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07+00:00\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07+00:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07-00:00\"",
++   "valid": true,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07-00:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07+0800\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07+0800"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22 04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22 04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22t04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22t04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07Z\\n\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z\n"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07Z \"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07Z "
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07.Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07.Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"\\uff12\\uff10\\uff12\\uff16-10-22T04:00:07Z\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "２０２６-10-22T04:00:07Z"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22T04:00:07+\\u0660\\u0668:00\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22T04:00:07+٠٨:00"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"2026-10-22\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "2026-10-22"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"yesterday\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": "yesterday"
++     }
++    ]
++   }
++  },
++  {
++   "name": "reading time \"\"",
++   "valid": false,
++   "table": {
++    "schema": "fleet-health-v1",
++    "generated_at": "2026-10-22T04:00:10Z",
++    "checked_at": "2026-10-22T04:00:07Z",
++    "readings": [
++     {
++      "target": "host",
++      "axis": "units",
++      "value": "OK",
++      "severity": "ok",
++      "checked_at": ""
++     }
++    ]
++   }
++  }
++ ],
++ "times": [
++  {
++   "value": "2026-10-22T04:00:07Z",
++   "valid": true
++  },
++  {
++   "value": "2026-10-22T12:00:07+08:00",
++   "valid": true
++  },
++  {
++   "value": "2026-10-21T23:00:07-05:00",
++   "valid": true
++  },
++  {
++   "value": "2026-10-22T04:00:07.1Z",
++   "valid": true
++  },
++  {
++   "value": "2026-10-22T04:00:07.123456Z",
++   "valid": true
++  },
++  {
++   "value": "2026-10-22T04:00:07.1234567Z",
++   "valid": false
++  },
++  {
++   "value": "2026-02-28T04:00:07Z",
++   "valid": true
++  },
++  {
++   "value": "2026-02-29T04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2028-02-29T04:00:07Z",
++   "valid": true
++  },
++  {
++   "value": "2100-02-29T04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2000-02-29T04:00:07Z",
++   "valid": true
++  },
++  {
++   "value": "2026-02-30T04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2026-02-30T04:00:07+08:00",
++   "valid": false
++  },
++  {
++   "value": "2026-02-30T04:00:07-05:00",
++   "valid": false
++  },
++  {
++   "value": "2026-04-31T04:00:07+08:00",
++   "valid": false
++  },
++  {
++   "value": "2026-04-30T04:00:07+08:00",
++   "valid": true
++  },
++  {
++   "value": "2026-06-31T04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2026-09-31T04:00:07-03:00",
++   "valid": false
++  },
++  {
++   "value": "2026-11-31T04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2026-12-31T23:59:59Z",
++   "valid": true
++  },
++  {
++   "value": "2026-01-32T04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2026-00-10T04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2026-13-10T04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2026-10-00T04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T24:00:00Z",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T24:00:00+08:00",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T23:59:60Z",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T23:60:00Z",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T23:59:59Z",
++   "valid": true
++  },
++  {
++   "value": "0000-01-01T00:00:00Z",
++   "valid": false
++  },
++  {
++   "value": "0001-01-01T00:00:00Z",
++   "valid": true
++  },
++  {
++   "value": "9999-12-31T23:59:59Z",
++   "valid": true
++  },
++  {
++   "value": "2026-10-22T04:00:07+23:59",
++   "valid": true
++  },
++  {
++   "value": "2026-10-22T04:00:07-23:59",
++   "valid": true
++  },
++  {
++   "value": "2026-10-22T04:00:07+24:00",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T04:00:07+08:59",
++   "valid": true
++  },
++  {
++   "value": "2026-10-22T04:00:07+08:60",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T04:00:07-14:82",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T04:00:07+99:99",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T04:00:07+00:00",
++   "valid": true
++  },
++  {
++   "value": "2026-10-22T04:00:07-00:00",
++   "valid": true
++  },
++  {
++   "value": "2026-10-22T04:00:07",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T04:00:07+0800",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22 04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22t04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T04:00:07z",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T04:00:07Z\n",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T04:00:07Z ",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T04:00:07.Z",
++   "valid": false
++  },
++  {
++   "value": "２０２６-10-22T04:00:07Z",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22T04:00:07+٠٨:00",
++   "valid": false
++  },
++  {
++   "value": "2026-10-22",
++   "valid": false
++  },
++  {
++   "value": "yesterday",
++   "valid": false
++  },
++  {
++   "value": "",
++   "valid": false
++  }
++ ]
++}
+diff --git a/tests/health_contract_vectors_node_test.js b/tests/health_contract_vectors_node_test.js
+new file mode 100644
+index 0000000..89e990b
+--- /dev/null
++++ b/tests/health_contract_vectors_node_test.js
+@@ -0,0 +1,24 @@
++// f-62: the page's table validation (scripts/health_panel_core.js validateTable) and the publisher's
++// (trade_alerts.fleet_health.validate_health_table) must accept and refuse exactly the same tables.  Both sides read
++// tests/golden/health_contract_vectors.json; tests/test_fleet_health.py runs the Python half.
++const assert = require('assert');
++const fs = require('fs');
++const vm = require('vm');
++
++const sandbox = {atob, Blob, DecompressionStream, TextDecoder, Uint8Array, Date, JSON, Object, Array, Math, Number, String, isNaN, console};
++vm.createContext(sandbox);
++vm.runInContext(fs.readFileSync('scripts/health_panel_core.js', 'utf8'), sandbox, {filename: 'health_panel_core.js'});
++const P = vm.runInContext('HealthPanel', sandbox);
++const {cases, times} = JSON.parse(fs.readFileSync('tests/golden/health_contract_vectors.json', 'utf8'));
++
++assert.ok(cases.length >= 30, 'the vector file should not shrink quietly');
++assert.ok(cases.some(c => c.valid) && cases.some(c => !c.valid));
++for (const c of cases) {
++  const got = P.validateTable(c.table);
++  assert.strictEqual(got.ok, c.valid, `${c.name}: page says ok=${got.ok} (${got.detail || ''}), vector says valid=${c.valid}`);
++}
++assert.ok(times.length >= 50 && times.some(t => t.valid) && times.some(t => !t.valid));
++for (const t of times) {
++  assert.strictEqual(!isNaN(P.parseIso(t.value)), t.valid, `time ${JSON.stringify(t.value)}: page disagrees with vector valid=${t.valid}`);
++}
++console.log(`health contract vectors: ${times.length} times and ${cases.length} cases agree with the page`);
+diff --git a/tests/test_fleet_health.py b/tests/test_fleet_health.py
+index 4bc7bb7..7d03db0 100644
+--- a/tests/test_fleet_health.py
++++ b/tests/test_fleet_health.py
+@@ -57,7 +57,8 @@ def test_pack_round_trip_and_determinism():
+ 
+ def test_cap_is_the_receivers_cap_and_is_enforced():
+     assert HEALTH_MAX_B64_CHARS == 9000
+-    noisy = [dict(_reading(f"t{i}", f"a{j}"), value=hashlib.sha256(f"{i}{j}".encode()).hexdigest() * 3) for i in range(20) for j in range(20)]
++    # 100 readings of 192 characters each: inside the page's limits (100 readings, 200 characters), so only the cell cap can refuse it
++    noisy = [dict(_reading(f"t{i}", f"a{j}"), value="".join(hashlib.sha256(f"{i}{j}{k}".encode()).hexdigest() for k in "abc")) for i in range(10) for j in range(10)]
+     with pytest.raises(HealthTableError, match="cap"):
+         encode_health_table(_table(noisy))
+ 
+@@ -148,6 +149,64 @@ def _good() -> dict:
+     return _table()
+ 
+ 
++# --- f-62: a reading that could not be read has no time (checked_at is null) ---------------------------------------------
++
++def _with_null_time() -> dict:
++    return _table([_reading("momentum", "ledger"), dict(_reading("host", "units", "UNAVAILABLE", "warn"), checked_at=None)])
++
++
++def test_a_reading_may_have_a_null_time_and_it_survives_pack_and_unpack():
++    table = _with_null_time()
++    null_row = next(r for r in table["readings"] if r["axis"] == "units")
++    assert null_row["checked_at"] is None
++    packed = encode_health_table(table)
++    assert decode_health_table(packed) == table
++    assert parse_health_cell(health_cell_text(packed)) == table
++    assert next(r for r in decode_health_table(packed)["readings"] if r["axis"] == "units")["checked_at"] is None
++
++
++def test_every_reading_may_be_null_but_the_table_times_may_not():
++    table = _table([dict(_reading(), checked_at=None)])
++    validate_health_table(table)
++    for member in ("generated_at", "checked_at"):
++        broken = _with_null_time()
++        broken[member] = None
++        with pytest.raises(HealthTableError):
++            validate_health_table(broken)
++
++
++@pytest.mark.parametrize("bad", ["", 0, 1761105607, "yesterday", "2026-10-22T04:00:07", False, [], {}])
++def test_a_null_time_is_the_only_thing_besides_an_iso_time_the_reading_time_accepts(bad):
++    table = _with_null_time()
++    table["readings"][0]["checked_at"] = bad
++    with pytest.raises(HealthTableError):
++        validate_health_table(table)
++
++
++def test_the_reading_time_key_is_still_required_even_when_it_may_be_null():
++    table = _with_null_time()
++    table["readings"][0].pop("checked_at")
++    with pytest.raises(HealthTableError):
++        validate_health_table(table)
++    with pytest.raises(HealthTableError):
++        _table([{k: v for k, v in _reading().items() if k != "checked_at"}])
++
++
++@pytest.mark.parametrize("field", ["target", "axis", "value", "severity"])
++def test_null_is_refused_for_every_other_reading_field(field):
++    table = _with_null_time()
++    table["readings"][0][field] = None
++    with pytest.raises(HealthTableError):
++        validate_health_table(table)
++
++
++def test_the_golden_cell_with_a_null_time_unpacks_in_python_as_it_does_on_the_page():
++    golden = json.loads((Path(__file__).parent / "golden" / "health_cell_real.json").read_text(encoding="utf-8"))
++    table = parse_health_cell(golden["with_null_time"]["cell"])
++    assert any(r["checked_at"] is None for r in table["readings"])
++    assert not any(r["checked_at"] is None for r in parse_health_cell(golden["real"]["cell"])["readings"])
++
++
+ @pytest.mark.parametrize("mutate", [
+     lambda t: t.pop("generated_at"),
+     lambda t: t.pop("checked_at"),
+@@ -183,3 +242,30 @@ def test_reviewers_two_reproductions_are_refused():
+         encode_health_table({"schema": "fleet-health-v1", "readings": []})
+     with pytest.raises(HealthTableError):
+         encode_health_table({"schema": "fleet-health-v1", "generated_at": "x", "checked_at": "x", "readings": [{"target": "a"}]})
++
++
++# --- the page and the publisher must accept exactly the same tables (f-62) ----------------------------------------------
++
++_VECTOR_FILE = json.loads((Path(__file__).parent / "golden" / "health_contract_vectors.json").read_text(encoding="utf-8"))
++_VECTORS = _VECTOR_FILE["cases"]
++_TIMES = _VECTOR_FILE["times"]
++
++
++@pytest.mark.parametrize("case", _VECTORS, ids=[c["name"] for c in _VECTORS])
++def test_python_accepts_and_refuses_the_same_tables_as_the_page(case):
++    if case["valid"]:
++        validate_health_table(case["table"])
++        assert decode_health_table(encode_health_table(case["table"])) == case["table"]
++    else:
++        with pytest.raises(HealthTableError):
++            validate_health_table(case["table"])
++
++
++@pytest.mark.parametrize("case", _TIMES, ids=[repr(c["value"]) for c in _TIMES])
++def test_python_reads_a_time_the_way_the_page_does(case):
++    from trade_alerts.fleet_health import _parse_iso
++    if case["valid"]:
++        _parse_iso("checked_at", case["value"])
++    else:
++        with pytest.raises(HealthTableError):
++            _parse_iso("checked_at", case["value"])
