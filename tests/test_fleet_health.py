@@ -57,7 +57,8 @@ def test_pack_round_trip_and_determinism():
 
 def test_cap_is_the_receivers_cap_and_is_enforced():
     assert HEALTH_MAX_B64_CHARS == 9000
-    noisy = [dict(_reading(f"t{i}", f"a{j}"), value=hashlib.sha256(f"{i}{j}".encode()).hexdigest() * 3) for i in range(20) for j in range(20)]
+    # 100 readings of 192 characters each: inside the page's limits (100 readings, 200 characters), so only the cell cap can refuse it
+    noisy = [dict(_reading(f"t{i}", f"a{j}"), value="".join(hashlib.sha256(f"{i}{j}{k}".encode()).hexdigest() for k in "abc")) for i in range(10) for j in range(10)]
     with pytest.raises(HealthTableError, match="cap"):
         encode_health_table(_table(noisy))
 
@@ -241,3 +242,18 @@ def test_reviewers_two_reproductions_are_refused():
         encode_health_table({"schema": "fleet-health-v1", "readings": []})
     with pytest.raises(HealthTableError):
         encode_health_table({"schema": "fleet-health-v1", "generated_at": "x", "checked_at": "x", "readings": [{"target": "a"}]})
+
+
+# --- the page and the publisher must accept exactly the same tables (f-62) ----------------------------------------------
+
+_VECTORS = json.loads((Path(__file__).parent / "golden" / "health_contract_vectors.json").read_text(encoding="utf-8"))["cases"]
+
+
+@pytest.mark.parametrize("case", _VECTORS, ids=[c["name"] for c in _VECTORS])
+def test_python_accepts_and_refuses_the_same_tables_as_the_page(case):
+    if case["valid"]:
+        validate_health_table(case["table"])
+        assert decode_health_table(encode_health_table(case["table"])) == case["table"]
+    else:
+        with pytest.raises(HealthTableError):
+            validate_health_table(case["table"])
