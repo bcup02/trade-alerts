@@ -2013,7 +2013,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection，:92 把事件日誌路徑、:93 策略名交給它；停放找不到開倉列的平倉時共用庫（A1 venv trade-alerts 0.30.15）寫 R1 事件 PROJECTION_ORPHAN_CLOSE_PARKED（不通知）。8b（加密 #106）。2026-10-23 台北 17:22 隨 A1 加密重開部署（operations 4fd0047；A1 上該檔與 mexc_futures_bot.py 的 blob a85437d、4208e35 與該 commit 相同）。",
+          "evidence": "google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection，:92 把事件日誌路徑、:93 策略名交給它；停放找不到開倉列的平倉時共用庫（A1 venv trade-alerts 0.30.15）寫 R1 事件 PROJECTION_ORPHAN_CLOSE_PARKED（不通知）。8b（加密 #106）。2026-10-23 台北 16:22 隨 A1 加密重開部署（operations 4fd0047；A1 上該檔與 mexc_futures_bot.py 的 blob a85437d、4208e35 與該 commit 相同）。",
           "verified_at": "2026-10-23",
           "limit": "A1 加密沒有停放過找不到開倉列的平倉，事件只在共用庫測試與開發機測試網驗證。"
         },
