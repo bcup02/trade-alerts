@@ -35,7 +35,8 @@
     "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
     "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
     "f-64": "f-64：Google 表同步佇列不被編號衝突的開倉列或成交列卡死（共用庫 v0.30.19 停放；各策略改釘後才生效）",
-    "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）"
+    "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）",
+    "f-66": "f-66：回到全 USDT 時把粉塵換成 USDT 並記進帳本（競賽；程式已合併、開發機已裝、預設關閉，A1 部署與啟用要使用者授權）"
   },
   "sources": {
     "momentum": {
@@ -870,7 +871,7 @@
     {
       "id": "ledger.capital_flow",
       "title": "手動轉入／轉出資金能登記進帳本，對帳納入（f-65）",
-      "description": "你在交易所手動轉入、轉出資金，或理財收益回到現貨，現貨餘額會變、帳本卻沒有成交可以解釋，競賽的對帳會報「帳本跟交易所對不上」（ERR-043）。競賽帳本新增「資金轉入／轉出」事件（轉入、轉出、理財收益），帳本推算餘額把它納入（早於快照讀餘額的視為已被快照包含、不重複計算），並提供操作工具 btc-competition-capital-flow（先預覽、再帶確認碼登記，查重與寫入同一把檔案鎖）。績效還沒扣掉資金進出（帳本已有淨資金進出可算，等使用的地方改）。",
+      "description": "你在交易所手動轉入、轉出資金，或理財收益回到現貨，現貨餘額會變、帳本卻沒有成交可以解釋，競賽的對帳會報「帳本跟交易所對不上」（ERR-043）。競賽帳本新增「資金轉入／轉出」事件（轉入、轉出、理財收益），帳本推算餘額把它納入（早於快照讀餘額的視為已被快照包含、不重複計算），並提供操作工具 btc-competition-capital-flow（先預覽、再帶確認碼登記，查重與寫入同一把檔案鎖）。",
       "status": {
         "seykota": {
           "state": "n/a",
@@ -888,7 +889,32 @@
           "state": "done",
           "evidence": "src/btc_competition/trade_ledger.py:246 capital_flow 追加資金進出列；src/btc_competition/trade_ledger.py:493 folded_holdings 把快照之後、未被快照吸收的資金進出折進推算餘額（:410 排除已被快照吸收的列，僅有效列參與同編號去重；無效列在折算時由 capital_flow_delta 跳過）；src/btc_competition/capital_flow.py:175 _record 在 :151 檔案鎖內重讀帳本、驗確認碼、查重、追加；src/btc_competition/reconcile_compare.py:152 證據帶 capital_flows_in_fold。競賽 #77。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a；A1 上這三個程式檔的 blob 與該 commit 相同，單元清單與環境檔雜湊不變、0 個失敗單元），12:56 補登 95.2329309 轉入與 0.2984512 理財收益，對帳仍 RECONCILED。",
           "verified_at": "2026-10-23",
-          "limit": "A1 只登記過這兩筆（都早於人工更正快照，帳本推算餘額沒變）；快照之後才發生的資金進出被折進推算餘額這條路徑，只有測試與開發機帳本複本驗證，A1 沒實際遇過；績效還沒扣資金進出（f-68）。"
+          "limit": "A1 只登記過這兩筆（都早於人工更正快照，帳本推算餘額沒變）；快照之後才發生的資金進出被折進推算餘額這條路徑，只有測試與開發機帳本複本驗證，A1 沒實際遇過。"
+        }
+      }
+    },
+    {
+      "id": "ledger.dust_convert",
+      "title": "回到全 USDT 時把粉塵換成 USDT 並記進帳本（f-66）",
+      "description": "策略賣出時整筆一次賣，低於最小下單量的零頭賣不掉。競賽新增獨立單元 btc-competition-dust-convert：策略在全 USDT（BEAR）、每種剩下的幣都在粉塵上限內時，用幣安小額資產轉換（目標 USDT）一次一種幣換掉，當場核對餘額差與交易所回應、再記進帳本（capital_flow 新種類 dust_convert_out／dust_convert_in，不算資金進出）。預設關閉，要在環境檔手動開；對不上或結果不明就停下、單元失敗，由人工補登。第一次真實轉換才是測試：幣安文件沒寫金鑰權限、最低金額、冷卻與手續費算法。",
+      "status": {
+        "seykota": {
+          "state": "n/a",
+          "reason": "這支策略做的是合約，帳戶裡沒有現貨零頭，沒有小額資產轉換的需求。"
+        },
+        "momentum": {
+          "state": "n/a",
+          "reason": "這支策略做的是合約，帳戶裡沒有現貨零頭，沒有小額資產轉換的需求。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "這支策略做的是幣安合約，帳戶裡沒有現貨零頭，沒有小額資產轉換的需求（小額資產轉換只處理現貨）。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-66",
+          "reason": "程式已合併到 development（競賽 #79）並裝上開發機（單元空跑、開關預設關）；A1 還沒部署，也還沒開啟開關（A1 部署與啟用都要使用者另外授權）。",
+          "awaits_commit": "faa295acc531a3849f1008ded0796fb791d53bd6"
         }
       }
     }
@@ -2029,17 +2055,20 @@
         "momentum": {
           "state": "pending",
           "phase": "f-64",
-          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR 還沒開。"
+          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR（mexc-4h-momentum-trailing-stop #164）已合併到 development，A1 還沒部署。",
+          "awaits_commit": "024844719ed49a0db2017fd303efa6574a379c82"
         },
         "seykota": {
           "state": "pending",
           "phase": "f-64",
-          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR 還沒開。"
+          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR（ed-seykota-systematic-trend-following #144）已合併到 development，A1 還沒部署。",
+          "awaits_commit": "4722d4adb8455a65ad20bad1a4ecc0877d3e226d"
         },
         "mycrypto": {
           "state": "pending",
           "phase": "f-64",
-          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR 還沒開。"
+          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR（my-crypto-bot #115）已合併到 development，A1 還沒部署。",
+          "awaits_commit": "6af0800163626344e8f22d501ed5840008a7fd7b"
         },
         "btc-competition": {
           "state": "done",
@@ -2052,17 +2081,20 @@
         "momentum": {
           "state": "pending",
           "phase": "f-64",
-          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR 還沒開。"
+          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR（mexc-4h-momentum-trailing-stop #164）已合併到 development，A1 還沒部署。",
+          "awaits_commit": "024844719ed49a0db2017fd303efa6574a379c82"
         },
         "seykota": {
           "state": "pending",
           "phase": "f-64",
-          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR 還沒開。"
+          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR（ed-seykota-systematic-trend-following #144）已合併到 development，A1 還沒部署。",
+          "awaits_commit": "4722d4adb8455a65ad20bad1a4ecc0877d3e226d"
         },
         "mycrypto": {
           "state": "pending",
           "phase": "f-64",
-          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR 還沒開。"
+          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR（my-crypto-bot #115）已合併到 development，A1 還沒部署。",
+          "awaits_commit": "6af0800163626344e8f22d501ed5840008a7fd7b"
         },
         "btc-competition": {
           "state": "done",
@@ -2278,11 +2310,65 @@
   "recent_changes": [
     {
       "kind": "rule",
-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "project": "seykota",
+      "aspect": "behaviour",
+      "type": "updated",
+      "note": "改釘 PR（ed-seykota-systematic-trend-following #144）已合併到 development；等 A1 部署才算已做。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "project": "momentum",
+      "aspect": "behaviour",
+      "type": "updated",
+      "note": "改釘 PR（mexc-4h-momentum-trailing-stop #164）已合併到 development；等 A1 部署才算已做。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "project": "mycrypto",
+      "aspect": "behaviour",
+      "type": "updated",
+      "note": "改釘 PR（my-crypto-bot #115）已合併到 development；等 A1 部署才算已做。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "updated",
+      "note": "改釘 PR（ed-seykota-systematic-trend-following #144）已合併到 development；等 A1 部署才算已做。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "project": "momentum",
+      "aspect": "emits_event",
+      "type": "updated",
+      "note": "改釘 PR（mexc-4h-momentum-trailing-stop #164）已合併到 development；等 A1 部署才算已做。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
       "project": "mycrypto",
       "aspect": "emits_event",
-      "type": "completed",
-      "note": "加密 A1 的停放（找不到開倉列的平倉）事件日誌（8b）隨 f-63 重開部署上線。"
+      "type": "updated",
+      "note": "改釘 PR（my-crypto-bot #115）已合併到 development；等 A1 部署才算已做。"
+    },
+    {
+      "kind": "cap",
+      "id": "ledger.capital_flow",
+      "project": "btc-competition",
+      "type": "updated",
+      "note": "拿掉績效相關說明（帳本本來就沒有績效數字）。"
+    },
+    {
+      "kind": "cap",
+      "id": "ledger.dust_convert",
+      "project": "btc-competition",
+      "type": "added",
+      "note": "新增：粉塵換 USDT 單元與帳本種類（競賽未做，等 A1 部署）。"
     }
   ]
 }
