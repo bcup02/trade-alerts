@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 68,
+  "error_ids_issued": 69,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -2186,6 +2186,39 @@
           "想讓 Google 表看起來一致：打開帳本最新一筆 trade_correction，把 corrected 裡的進場價、出場價、進場數量、進場手續費、出場手續費、毛損益、淨損益、報酬率、出場訂單編號逐欄對照，到 Google 表趨勢分頁找到該交易編號那一列，全部改成帳本的值，備註也照帳本改。只改淨損益與數量會留下對不上的欄位。",
           "手動改儲存格不會更新接收端記的稽核摘要，不能讓之後的更正恢復運作；對同一筆交易再更正，仍然會被拒收，到時要再手動處理。",
           "對帳持續標出差異（ERR-044）：確認那一列已逐欄改好，仍標出時才把該交易列入 audit/google-reconcile-ignore.json。忽略清單只讓對帳不再標出這筆，不會修正資料，不能代替上面的手動修正。這套步驟尚未實際演練過。"
+        ]
+      }
+    },
+    {
+      "error_id": "ERR-069",
+      "code": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "title": "Google 表同步佇列停放了一筆編號衝突的開倉列或成交列",
+      "project": "fleet",
+      "sources": [
+        "src/trade_alerts/projection_outbox.py:57",
+        "src/trade_alerts/projection_outbox.py:70",
+        "src/trade_alerts/projection_outbox.py:310",
+        "src/trade_alerts/projection_outbox.py:364"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "MECHANICAL",
+      "risk_tier": "R1",
+      "auto_action": "某筆開倉列或成交列送給 Google 表接收端，連續 3 次都回「編號衝突」（表上已經有同一個交易編號、但內容不同），就把它記成 REJECTED（原因 trade_id_conflict_parked）停放，排在它後面的紀錄照常送出。停放時會在事件日誌記一筆 R1 事件（只留稽核紀錄，不通知）。被停放的紀錄可以用共用庫的 requeue_rejected_projection_intents 依原順序重新排入，但接收端那一列沒變的話只會再被停放。不動帳本、不暫停。帳本跟 Google 表的差異仍由對帳照樣標出（ERR-044）。",
+      "human_action": "無需立刻處理。先判斷表上那一列是不是同一筆交易：如果是（例如舊動作寫下的開倉列，內容跟新成交列代表同一筆成交），表上其實已經有這筆，不用補；如果不是同一筆，才需要人查為什麼兩筆交易用了同一個編號。想讓對帳不再標出，才需要把它列入忽略清單 audit/google-reconcile-ignore.json（只影響對帳的比較，會逐筆列在讀數的 ignored 欄）。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-23 f-64：開發機競賽 2026-10-08 改用新的成交列動作後，補送步驟把最近 14 天內、表上早就有（舊動作寫的開倉列）的 3 筆成交重新排進佇列，接收端回「編號衝突」。共用庫把這個答案當成可重試，佇列每次只試最前面那筆，所以那一筆在最前面卡了 15 天，後面真正缺的 3 筆（10/15、10/23 兩筆）都沒送出。同一個答案不會因為重試而改變，反覆重試沒有意義；人來看也只會做同一件事（讓佇列繼續走）。停放沒有第二個選項，所以是 R1。缺口沒有被藏起來：對帳的 Google 表軸仍會標出差異並依 ERR-044 升級。",
+      "operator_message": {
+        "what": "有一筆開倉列或成交列在 Google 表上的交易編號已經被占用（內容不同），同步佇列重試 3 次後把它停放，免得擋住後面的紀錄。",
+        "direction": "不需要做決定：佇列已經繼續走，帳本是標準答案。先看表上那一列是不是同一筆交易；是的話表上其實已經有這筆，不用補。",
+        "steps": [
+          "不需要任何動作。",
+          "想確認：到 Google 表對應分頁找這個交易編號，看那一列的成交時間與數量是不是跟帳本一致。",
+          "一致就不用處理；不一致才把事件日誌裡的交易編號貼給 Claude 追查。"
         ]
       }
     }

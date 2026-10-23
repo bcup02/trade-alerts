@@ -12,6 +12,9 @@ from trade_alerts.projection_outbox import (
     CORRECTION_UNCONFIRMED_ERROR,
     CORRECTION_UNCONFIRMED_PARK_AFTER,
     ORPHAN_CLOSE_PARKED_CODE,
+    TRADE_ID_CONFLICT_ERROR,
+    TRADE_ID_CONFLICT_PARK_AFTER,
+    TRADE_ID_CONFLICT_PARKED_CODE,
     RebuiltProjection,
     dispatch_next_projection,
     enqueue_projection_intent,
@@ -584,3 +587,80 @@ def test_the_event_log_lock_wait_is_unbounded_unless_a_timeout_is_given(tmp_path
             append_fleet_event(log, project="seykota", code="X", lock_timeout=0.1)
     append_fleet_event(log, project="seykota", code="X", lock_timeout=0.1)   # free again: written
     assert len(_events(log)) == 1
+
+
+# --------------------------------------------------------------------------- #
+# f-64: an open / fill row whose trade_id the receiver already holds is parked, not retried forever
+# --------------------------------------------------------------------------- #
+def _fill_provenance(trade_id: str = "SOLUSDT-3395297505") -> LedgerProvenance:
+    return _prov("spot_fill", DIGEST_B, trade_id)
+
+
+def test_a_trade_id_conflict_on_an_open_or_fill_is_parked_so_the_queue_moves_on(tmp_path: Path, monkeypatch) -> None:
+    for action, proof in (("append_fill_v2", _fill_provenance()), ("append_open_v2", _prov("trade_open", DIGEST_B))):
+        _ticking_clock(monkeypatch)
+        path, log = tmp_path / f"{action}-outbox.jsonl", tmp_path / f"{action}-events.jsonl"
+        stuck = enqueue_projection_intent(path, action=action, provenance=proof)
+        later = enqueue_projection_intent(path, action="append_open_v2", provenance=_open_provenance())
+        conflict = _answer(TRADE_ID_CONFLICT_ERROR)
+
+        for attempt in range(1, TRADE_ID_CONFLICT_PARK_AFTER):
+            result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=conflict, fleet_event_log=log, strategy_project="btc-competition")
+            assert result.dispatch.status == "TRANSPORT_FAILED", (action, attempt)
+            assert outstanding_projection_intents(path)[0].intent_id == stuck.intent_id
+        assert _events(log) == []                                    # still retrying: nothing recorded yet
+
+        parked = dispatch_next_projection(path, rebuild=_rebuild_like, submit=conflict, fleet_event_log=log, strategy_project="btc-competition")
+        assert (parked.dispatch.status, parked.dispatch.error_code) == ("REJECTED", TRADE_ID_CONFLICT_PARKED_CODE)
+        assert [i.intent_id for i in outstanding_projection_intents(path)] == [later.intent_id]
+
+        [event] = _events(log)
+        assert (event["project"], event["code"], event["risk_tier"]) == ("fleet", "PROJECTION_TRADE_ID_CONFLICT_PARKED", "R1")
+        assert event["evidence"]["trade_id"] == proof.trade_id and event["evidence"]["intent_id"] == stuck.intent_id
+        assert event["details"]["error_code"] == TRADE_ID_CONFLICT_PARKED_CODE
+
+        delivered = dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer(None, "CONFIRMED", 2), fleet_event_log=log, strategy_project="btc-competition")
+        assert delivered.dispatch.status == "CONFIRMED" and len(_events(log)) == 1   # the next row goes out; the event is written once
+
+
+
+def test_conflict_count_restarts_when_the_answer_changes(tmp_path: Path) -> None:
+    path = tmp_path / "projection-outbox.jsonl"
+    enqueue_projection_intent(path, action="append_fill_v2", provenance=_fill_provenance())
+    for _ in range(TRADE_ID_CONFLICT_PARK_AFTER - 1):
+        dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer(TRADE_ID_CONFLICT_ERROR))
+    dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer("transport_failed"))   # a different failure breaks the run
+    result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer(TRADE_ID_CONFLICT_ERROR))
+    assert result.dispatch.status == "TRANSPORT_FAILED"                                          # one answer again, not the Nth in a row
+
+
+def test_a_close_or_correction_conflict_is_never_parked_by_this_rule(tmp_path: Path) -> None:
+    for action, event_type in (("update_close_v2", "trade_close"), ("correct_close_v2", "trade_correction")):
+        path = tmp_path / f"{action}-outbox.jsonl"
+        enqueue_projection_intent(path, action=action, provenance=_prov(event_type, DIGEST_B))
+        for _ in range(TRADE_ID_CONFLICT_PARK_AFTER + 3):
+            result = dispatch_next_projection(path, rebuild=_rebuild_like, submit=_answer(TRADE_ID_CONFLICT_ERROR))
+            assert result.dispatch.status == "TRANSPORT_FAILED", action
+
+
+def test_the_receivers_real_conflict_answer_reaches_the_park_rule_through_the_client(tmp_path: Path) -> None:
+    """End to end through ``deliver_projection_v2``: the receiver's ``trade_id_conflict`` is a retryable answer there,
+    so only the outbox's own rule can stop it blocking the head of the queue."""
+    from trade_alerts.google_ledger_client import deliver_projection_v2
+
+    class _Resp:
+        status_code = 200
+        headers: dict = {}
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"ok": False, "error": "trade_id_conflict"}
+
+    path = tmp_path / "projection-outbox.jsonl"
+    enqueue_projection_intent(path, action="append_fill_v2", provenance=_fill_provenance())
+    submit = lambda payload, _proof: deliver_projection_v2(endpoint="https://example.test/receiver", payload=payload, post=lambda url, **k: _Resp(), sleep=lambda _: None, attempts=1)  # noqa: E731
+    statuses = [dispatch_next_projection(path, rebuild=_rebuild_like, submit=submit).dispatch for _ in range(TRADE_ID_CONFLICT_PARK_AFTER)]
+    assert [d.status for d in statuses] == ["TRANSPORT_FAILED"] * (TRADE_ID_CONFLICT_PARK_AFTER - 1) + ["REJECTED"]
+    assert statuses[-1].error_code == TRADE_ID_CONFLICT_PARKED_CODE and outstanding_projection_intents(path) == ()
