@@ -34,7 +34,8 @@
     "t9-competition-retry": "t9：競賽策略失敗時當天重試（同一程序內每 15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.6 錯誤清單已改；競賽程式在 PR #45（審閱中，合併後上開發機實測），之後才部署 A1 正式機（新）",
     "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
     "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
-    "f-64": "f-64：Google 表同步佇列不被編號衝突的開倉列或成交列卡死（共用庫 v0.30.19 停放；各策略改釘後才生效）"
+    "f-64": "f-64：Google 表同步佇列不被編號衝突的開倉列或成交列卡死（共用庫 v0.30.19 停放；各策略改釘後才生效）",
+    "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）"
   },
   "sources": {
     "momentum": {
@@ -863,6 +864,31 @@
         "btc-competition": {
           "state": "n/a",
           "reason": "競賽策略不用 binance-trading-toolkit，自己在 src/btc_competition/rebalance.py:126 取整（floor(value / step + 1e-10) * step，已加誤差補丁）。2026-10-18 查證：送單前 ccxt 4.5.71 會再依交易所精度格式化數量（Binance 公開資料：BTC/USDT 1e-5、ETH/BTC 與 ETH/USDT 1e-4、BNB/BTC 與 SOL/BTC 1e-3）；四種步長各 40 萬筆對照十進位精確值，沒有少捨或多進一手。"
+        }
+      }
+    },
+    {
+      "id": "ledger.capital_flow",
+      "title": "手動轉入／轉出資金能登記進帳本，對帳納入（f-65）",
+      "description": "你在交易所手動轉入、轉出資金，或理財收益回到現貨，現貨餘額會變、帳本卻沒有成交可以解釋，競賽的對帳會報「帳本跟交易所對不上」（ERR-043）。競賽帳本新增「資金轉入／轉出」事件（轉入、轉出、理財收益），帳本推算餘額把它納入（早於快照讀餘額的視為已被快照包含、不重複計算），並提供操作工具 btc-competition-capital-flow（先預覽、再帶確認碼登記，查重與寫入同一把檔案鎖）。績效還沒扣掉資金進出（帳本已有淨資金進出可算，等使用的地方改）。",
+      "status": {
+        "seykota": {
+          "state": "n/a",
+          "reason": "這支策略的對帳只比持倉與成交（ledger_status 的證據是 position_diffs／unmatched_exchange_fills），不比現貨餘額，手動轉入轉出資金不會讓它對不上，所以不需要資金進出登記。"
+        },
+        "momentum": {
+          "state": "n/a",
+          "reason": "這支策略的對帳只比持倉與成交（ledger_status 的證據是 position_diffs／unmatched_exchange_fills），不比現貨餘額，手動轉入轉出資金不會讓它對不上，所以不需要資金進出登記。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "這支策略的對帳只比持倉與成交（ledger_status 的證據是 position_diffs／unmatched_exchange_fills），不比現貨餘額，手動轉入轉出資金不會讓它對不上，所以不需要資金進出登記。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-65",
+          "awaits_commit": "6cbacd907aeea8d78fd145cc09ef2285dc8da729",
+          "reason": "程式已合併（競賽 #77），開發機 2026-10-23 已部署並用帳本複本實測（預覽、登記、重複登記被拒）；A1 還沒部署，要使用者明確授權。上 A1 後改已做，再補登 10/23 的 95.2329309 轉入與約 0.2985 理財收益。"
         }
       }
     }
@@ -2247,10 +2273,10 @@
   ],
   "recent_changes": [
     {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "kind": "cap",
+      "id": "ledger.capital_flow",
       "type": "added",
-      "note": "新增 ERR-069：Google 表同步佇列停放編號衝突的開倉列或成交列（R1，自動、不通知；缺口仍由對帳標出）。四支策略都還沒改釘，全部列未做。"
+      "note": "新增「手動轉入／轉出資金登記」：競賽帳本支援資金進出、對帳納入（開發機已實測；A1 未部署，競賽列未做）；其他三支不適用（對帳不比餘額）。"
     }
   ]
 }
