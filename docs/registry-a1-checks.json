@@ -228,6 +228,54 @@
     },
     "rule:MYC.PROTECTION_REPLACE_FAILED:behaviour|mycrypto": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-19 台北 19:25–19:33）：my-crypto-bot operations a60e94f 於 2026-10-19 台北 19:25 部署（A1 日誌 JST 20:25）；A1 /opt/my-crypto-bot 的 53 個檔案（根目錄 *.py、deploy/*、pyproject.toml、requirements*）與 operations a60e94f 逐檔 blob 差異 0（A1 以 git hash-object 比對）；venv trade-alerts 0.30.9；主程式 active、LIVE_ONLINE、EXCHANGE=binance；真倉空單 0.001 BTC（進場 81639.9，台北 10/17 17:30）與交易所端停損單 2000001518956057（STOP_MARKET 85721.8，隨機 client id，舊程式掛的）部署前後不變；帳本 161 筆事件部署前後雜湊相同（23a84744c0cfd228）；對帳（帳本對交易所、帳本對 Google 表）RECONCILED、0 個失敗單元、單元啟用狀態部署前後相同；手動跑一輪對帳、Google 投影（sent=0）、修復機器人（無候選）正常，部署後完整一輪（JST 20:30）日誌乾淨。A1 沒有遇過 -2021、重複送單、漏記平倉、接手倉位，這些新路徑在 A1 沒有實際觸發過；開發機測試網 2026-10-18 實測：重複送單自動更正整條通過、-2021→reduce-only 市價平倉通過，2026-10-19 台北 19:14 持倉中重啟乾淨接手。A1 現有停損單是舊編號，新程式移動停損時才換成 mc-t- 編號，這條路徑沒有對應案例。"
+    },
+    "rule:SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.PROTECTION_UNVERIFIED:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.POSITION_AMBIGUOUS:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.RECONCILE_FAILED:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.EXCHANGE_TARGET_UNSAFE:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.RUNTIME_CYCLE_FAILED:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.PROTECTION_REPLACE_FAILED:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.PROTECTION_REPLACE_FAILED:behaviour|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.PROTECTION_CLOSE_CANCEL_FAILED:behaviour|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.PROTECTION_CLOSE_CANCEL_FAILED:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.CLOSE_FILL_PENDING:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.TRADE_EXIT:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.ENTRY_SKIPPED_MIN_CAPITAL:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:SEY.CORRECTION_BASE_MISMATCH:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
     }
   }
 }
