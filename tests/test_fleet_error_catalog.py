@@ -401,7 +401,7 @@ def test_every_pasted_command_is_valid_bash_and_has_no_unquoted_placeholder(cata
 def test_the_catalog_does_have_quoted_placeholders_to_check(catalog):
     # a guard that sees no placeholder at all would pass for the wrong reason
     spans = [s for e in catalog["entries"] for _n, s in _command_spans(e) if "<" in s]
-    assert len(spans) >= 10 and all("<確認碼>" in s or "<交易編號>" in s for s in spans)
+    assert len(spans) >= 10 and all("<確認碼>" in s or "<交易編號>" in s or "<金額>" in s for s in spans)
     assert any(_inner_script(s) is not None for s in spans)
 
 
