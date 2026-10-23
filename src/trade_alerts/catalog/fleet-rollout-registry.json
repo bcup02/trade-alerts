@@ -886,7 +886,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/trade_ledger.py:246 capital_flow 追加資金進出列；src/btc_competition/trade_ledger.py:493 folded_holdings 把快照之後、未被快照吸收的資金進出折進推算餘額（:410 只留可用列、同編號只算一次）；src/btc_competition/capital_flow.py:175 _record 在 :151 檔案鎖內重讀帳本、驗確認碼、查重、追加；src/btc_competition/reconcile_compare.py:152 證據帶 capital_flows_in_fold。競賽 #77。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a；A1 上這三個程式檔的 blob 與該 commit 相同，單元清單與環境檔雜湊不變、0 個失敗單元），12:56 補登 95.2329309 轉入與 0.2984512 理財收益，對帳仍 RECONCILED。",
+          "evidence": "src/btc_competition/trade_ledger.py:246 capital_flow 追加資金進出列；src/btc_competition/trade_ledger.py:493 folded_holdings 把快照之後、未被快照吸收的資金進出折進推算餘額（:410 排除已被快照吸收的列，僅有效列參與同編號去重；無效列在折算時由 capital_flow_delta 跳過）；src/btc_competition/capital_flow.py:175 _record 在 :151 檔案鎖內重讀帳本、驗確認碼、查重、追加；src/btc_competition/reconcile_compare.py:152 證據帶 capital_flows_in_fold。競賽 #77。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a；A1 上這三個程式檔的 blob 與該 commit 相同，單元清單與環境檔雜湊不變、0 個失敗單元），12:56 補登 95.2329309 轉入與 0.2984512 理財收益，對帳仍 RECONCILED。",
           "verified_at": "2026-10-23",
           "limit": "A1 只登記過這兩筆（都早於人工更正快照，帳本推算餘額沒變）；快照之後才發生的資金進出被折進推算餘額這條路徑，只有測試與開發機帳本複本驗證，A1 沒實際遇過；績效還沒扣資金進出（f-68）。"
         }
