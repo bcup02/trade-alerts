@@ -7,7 +7,7 @@
 
 ## 做了什麼
 
-`fleet-health-sources.json` 的 A1 來源 `file_id` 由 null 改成 A1 讀數試算表編號（A1 的 ops-notify 發布單元 2026-10-23 台北 14:43 首次送出成功；開發端用 Drive 連接器讀回該格，`HEALTHv1|…|HEALTHEND` 完整，解開是 21 筆讀數）；`test_a_source_without_a_spreadsheet_yet_is_null_and_the_page_says_so` 改成兩個來源都有 file_id；一致性登記冊頁面重新產生並重發（Version 73）。
+`fleet-health-sources.json` 的 A1 來源 `file_id` 由 null 改成 A1 讀數試算表編號（A1 的 ops-notify 發布單元 2026-10-23 台北 13:43 首次送出成功；開發端用 Drive 連接器讀回該格，`HEALTHv1|…|HEALTHEND` 完整，解開是 21 筆讀數）；`test_a_source_without_a_spreadsheet_yet_is_null_and_the_page_says_so` 改成兩個來源都有 file_id；一致性登記冊頁面重新產生並重發（Version 73）。
 
 ## 重點
 
