@@ -913,7 +913,7 @@
           "state": "done",
           "evidence": "src/btc_competition/dust_convert.py:119 decide：BEAR、無安全暫停、無待完成調倉、狀態檔至少 10 分鐘沒寫、每種風險幣不超過 20 USDT、每策略日一次才放行；:314 第一次轉換呼叫前先記嘗試；:276 _guard 每種幣前確認 bot 服務為 inactive 或 failed（查不到就停）、狀態檔未變、餘額與規劃一致；:151 coin_rows 餘額差須與交易所回應對得上才記 dust_convert_out／dust_convert_in（src/btc_competition/trade_ledger.py:62，不算資金進出）；src/btc_competition/dust_convert.py:357 開關沒開就結束。deploy/btc-competition-dust-convert.timer:7 每天 UTC 01:00。2026-10-23 台北 20:13 隨 A1 部署（operations 9a6b0c9）。",
           "verified_at": "2026-10-23",
-          "limit": "開關預設關、A1 沒開過也沒真實轉換過；幣安沒寫金鑰權限、最低金額、冷卻、手續費算法，第一次真實轉換才驗證。"
+          "limit": "開關 2026-10-23 台北 21:26 在 A1 打開並手動跑一輪（交易所 BTC、ETH、SOL 都是 0，判斷沒有零頭、沒呼叫轉換），尚未真實轉換過；幣安沒寫金鑰權限、最低金額、冷卻、手續費算法，第一次真實轉換才驗證。"
         }
       }
     }
@@ -2324,132 +2324,11 @@
   ],
   "recent_changes": [
     {
-      "kind": "rule",
-      "id": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.PROTECTION_UNVERIFIED",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.POSITION_AMBIGUOUS",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.RECONCILE_FAILED",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.EXCHANGE_TARGET_UNSAFE",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.RUNTIME_CYCLE_FAILED",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.PROTECTION_REPLACE_FAILED",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.PROTECTION_REPLACE_FAILED",
-      "project": "seykota",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
-      "project": "seykota",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.CLOSE_FILL_PENDING",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.TRADE_EXIT",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "SEY.CORRECTION_BASE_MISMATCH",
-      "project": "seykota",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+      "kind": "cap",
+      "id": "ledger.dust_convert",
+      "project": "btc-competition",
+      "type": "updated",
+      "note": "A1 粉塵開關已打開（台北 10/23 21:26），限制句改成現況。"
     }
   ]
 }
