@@ -35,29 +35,28 @@
     "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
     "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
     "f-64": "f-64：Google 表同步佇列不被編號衝突的開倉列或成交列卡死（共用庫 v0.30.19 停放；各策略改釘後才生效）",
-    "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）",
-    "f-66": "f-66：回到全 USDT 時把粉塵換成 USDT 並記進帳本（競賽；程式已合併、開發機已裝、預設關閉，A1 部署與啟用要使用者授權）"
+    "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）"
   },
   "sources": {
     "momentum": {
       "repo": "AI-for-column5/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "3031e9c04d8b1c8e629440377deef864cf8ca8d5"
+      "commit": "03fef20b4cd9349f4e9348e3780eb77be18677ed"
     },
     "seykota": {
       "repo": "AI-for-column5/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "560aec073667283c3022b7341a0aaad1d70322b1"
+      "commit": "156882632e2c31369db09e88e5891b0ea665d731"
     },
     "mycrypto": {
       "repo": "AI-for-column5/my-crypto-bot",
       "branch": "operations",
-      "commit": "4fd0047e98e30b7e1cc4b9f07adb61e7aac74e14"
+      "commit": "599c60786d710cb896d2ea1b04cafb2724d3b702"
     },
     "btc-competition": {
       "repo": "AI-for-column5/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "6f7457a0922445a8575fb7671cfce09e4206e3b1"
+      "commit": "9a6b0c9a3c11c99d7aed4566c6497c6c91318b9b"
     }
   },
   "capabilities": [
@@ -72,7 +71,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:483 build_safe_halt（Phase 4c）"
+          "evidence": "src/seykota_bot/bot.py:490 build_safe_halt（Phase 4c）"
         },
         "mycrypto": {
           "state": "n/a",
@@ -118,7 +117,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed 只處理 EXCHANGE_TARGET_UNSAFE 與 FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 兩種：重啟後把原本擋下的守門檢查再跑一次，通過就追加 safe_halt_cleared（method=config_fixed_restart）、清掉暫停並記 safe_halt_cleared_after_config_fix（:599）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫它；解除工具 src/seykota_bot/safe_halt_resume.py:134 仍刻意拒絕這兩類（只准改好設定重啟）。PR #79（f-12）。",
+          "evidence": "src/seykota_bot/bot.py:566 _clear_config_halt_if_fixed 只處理 EXCHANGE_TARGET_UNSAFE 與 FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE 兩種：重啟後把原本擋下的守門檢查再跑一次，通過就追加 safe_halt_cleared（method=config_fixed_restart）、清掉暫停並記 safe_halt_cleared_after_config_fix（:606）；src/seykota_bot/bot.py:2409 策略在線時每輪先呼叫它；解除工具 src/seykota_bot/safe_halt_resume.py:134 仍刻意拒絕這兩類（只准改好設定重啟）。PR #79（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 沒有發生過這兩類設定錯誤暫停，沒有實際觸發過；錯誤清單 ERR-009／ERR-010 的處理步驟與追查指令已改成現況（共用庫 v0.30.8，2026-10-15 台北隨 A1 部署，A1 讀得到的錯誤清單已沒有「已知缺陷」文字）；新文字沒有在真實暫停時被收到過。"
         },
@@ -143,7 +142,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:54 _CONSECUTIVE_FAILURE_LATCH_THRESHOLD Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）；計數只算非暫時性的失敗：對帳讀取與 K 線抓取遇到暫時性網路錯誤（HTTP 5xx／408、後端碼 -1000／-1001／-1006／-1007）不計入、下一輪直接重試（src/seykota_bot/bot.py:1599、src/seykota_bot/bot.py:2282，#89）"
+          "evidence": "src/seykota_bot/bot.py:54 _CONSECUTIVE_FAILURE_LATCH_THRESHOLD Phase 4d 連續失敗計數器（RECONCILE_FAILED／RUNTIME_CYCLE_FAILED）；計數只算非暫時性的失敗：對帳讀取與 K 線抓取遇到暫時性網路錯誤（HTTP 5xx／408、後端碼 -1000／-1001／-1006／-1007）不計入、下一輪直接重試（src/seykota_bot/bot.py:1762、src/seykota_bot/bot.py:2446，#89）"
         },
         "mycrypto": {
           "state": "done",
@@ -511,7 +510,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:760 _resolve_market_order：送出前先記下已送出（:795 mark_pending_submitted），之後查不到只繼續查、絕不重送；:60 _MARKET_ORDER_VISIBILITY_SECONDS 60 秒仍查不到就以 POSITION_AMBIGUOUS 安全暫停（:822）。PR #65，2026-09-24 18:40 UTC 上正式機。"
+          "evidence": "src/seykota_bot/bot.py:799 _resolve_market_order：送出前先記下已送出（:834 mark_pending_submitted），之後查不到只繼續查、絕不重送；:60 _MARKET_ORDER_VISIBILITY_SECONDS 60 秒仍查不到就以 POSITION_AMBIGUOUS 安全暫停（:861）。PR #65，2026-09-24 18:40 UTC 上正式機。"
         },
         "mycrypto": {
           "state": "done",
@@ -534,7 +533,7 @@
         },
         "momentum": {
           "state": "done",
-          "evidence": "src/reconcile_compare.py:68 帳本對交易所走共用 exchange_ledger_compare，更正涵蓋的單號算已記、部位不變；src/google_ledger_provenance.py:99 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正，src/google_ledger_provenance.py:224 依佇列的 ledger digest 選擇；src/google_projection_worker.py:75 送出時帶入該 digest；src/portfolio_snapshot_adapter.py:184 LINE 查詢快照套用 apply_trade_corrections；scripts/append_trade_correction.py:151 兩段式人工更正工具（預覽→確認碼→寫入）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
+          "evidence": "src/reconcile_compare.py:68 帳本對交易所走共用 exchange_ledger_compare，更正涵蓋的單號算已記、部位不變；src/google_ledger_provenance.py:99 correction_projection 以 correct_close_v2 鏈到原平倉或上一次更正，src/google_ledger_provenance.py:224 依佇列的 ledger digest 選擇；src/google_projection_worker.py:76 送出時帶入該 digest；src/portfolio_snapshot_adapter.py:184 LINE 查詢快照套用 apply_trade_corrections；scripts/append_trade_correction.py:151 兩段式人工更正工具（預覽→確認碼→寫入）。PR #104（g1-4），2026-09-25 03:18 UTC 上正式機（operations 43be152；/opt 內 src、scripts、deploy 69 檔與該 commit 逐檔 sha256 相同），03:20 UTC 第一輪修復機器人計時器：修復輪零候選、帳本少記成交 0 筆、無錯誤。"
         },
         "mycrypto": {
           "state": "done",
@@ -569,7 +568,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:285 新計時器 btc-competition-unrecorded-fill 每 15 分鐘跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關 BTC_COMPETITION_REPAIR_PAUSED 一併擋）：只有交易所回報的 clientOrderId 與帳本已記訂單相同才把那張單補記成一筆現貨成交；src/btc_competition/trade_ledger.py:380 已被批次持倉快照包含的補記不再重算。PR #37（g1-5），2026-09-25 開發機 DEMO 故意重複送單實測整條通過；2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:285 新計時器 btc-competition-unrecorded-fill 每 15 分鐘跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關 BTC_COMPETITION_REPAIR_PAUSED 一併擋）：只有交易所回報的 clientOrderId 與帳本已記訂單相同才把那張單補記成一筆現貨成交；src/btc_competition/trade_ledger.py:385 已被批次持倉快照包含的補記不再重算。PR #37（g1-5），2026-09-25 開發機 DEMO 故意重複送單實測整條通過；2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
         }
       }
     },
@@ -641,7 +640,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/graceful_stop.py:54 install_signal_handlers；src/seykota_bot/cli.py:19 啟動時安裝；src/seykota_bot/bot.py:2354 停止時記 graceful_stop_done；deploy/seykota-bot.service:20 TimeoutStopSec=300。PR #79（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。同日 17:50 重開機時日誌 graceful_stop_done reason=SIGTERM、乾淨停止，重啟後狀態 FLAT、20:00 台北 K 棒（08:00 UTC 那根）已處理。"
+          "evidence": "src/seykota_bot/graceful_stop.py:54 install_signal_handlers；src/seykota_bot/cli.py:19 啟動時安裝；src/seykota_bot/bot.py:2518 停止時記 graceful_stop_done；deploy/seykota-bot.service:20 TimeoutStopSec=300。PR #79（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。同日 17:50 重開機時日誌 graceful_stop_done reason=SIGTERM、乾淨停止，重啟後狀態 FLAT、20:00 台北 K 棒（08:00 UTC 那根）已處理。"
         },
         "mycrypto": {
           "state": "done",
@@ -665,7 +664,7 @@
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:83 ENTRY_INTENT_KEY；src/seykota_bot/bot.py:1250 _record_entry_intent 送單前先記進場意圖；src/seykota_bot/bot.py:1364 重啟後依 entry_intent 補掛原價停損（沿用同一個編號，交易所拒絕重複編號）。PR #79（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO 強制終止實測（2026-10-02 開 XRP 小部位後 SIGKILL，30 秒內自動重啟、接管部位、帳本單一 trade_id、補掛停損）；A1 正式機還沒發生過被中斷的進場，沒有實際觸發過。"
+          "evidence": "src/seykota_bot/bot.py:83 ENTRY_INTENT_KEY；src/seykota_bot/bot.py:1413 _record_entry_intent 送單前先記進場意圖；src/seykota_bot/bot.py:1527 重啟後依 entry_intent 補掛原價停損（沿用同一個編號，交易所拒絕重複編號）。PR #79（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ed50b1d；/opt 內 src、scripts、deploy 與根目錄 .py 共 51 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO 強制終止實測（2026-10-02 開 XRP 小部位後 SIGKILL，30 秒內自動重啟、接管部位、帳本單一 trade_id、補掛停損）；A1 正式機還沒發生過被中斷的進場，沒有實際觸發過。"
         },
         "mycrypto": {
           "state": "done",
@@ -674,7 +673,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/trade_ledger.py:153 order_attempt；src/btc_competition/runner.py:312 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:84 重啟後的補記輪讀沒結清的 order_attempt，依交易所回答補寫成交或標記結清。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO；A1 正式機沒有發生過被中斷的調整。"
+          "evidence": "src/btc_competition/trade_ledger.py:157 order_attempt；src/btc_competition/runner.py:312 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:84 重啟後的補記輪讀沒結清的 order_attempt，依交易所回答補寫成交或標記結清。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO；A1 正式機沒有發生過被中斷的調整。"
         }
       }
     },
@@ -712,12 +711,12 @@
       "status": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫，策略沒有自己的實作；pyproject.toml 釘 v0.28.0）。",
+          "evidence": "src/seykota_bot/google_projection_worker.py:93 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫，策略沒有自己的實作；pyproject.toml 釘 v0.28.0）。",
           "limit": "A1 沒有遇到過帳本更正卡住，停放路徑只在共用庫與策略端測試、開發機實測（開發機 2026-10-08 台北 18:21 一筆已連續 582 次的更正，在新版下下一次回答就停放）。"
         },
         "momentum": {
           "state": "done",
-          "evidence": "src/google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫；pyproject.toml 釘 v0.28.0）。",
+          "evidence": "src/google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫；pyproject.toml 釘 v0.28.0）。",
           "limit": "同趨勢，A1 上停放路徑沒有實際被觸發過。"
         },
         "mycrypto": {
@@ -887,7 +886,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/trade_ledger.py:246 capital_flow 追加資金進出列；src/btc_competition/trade_ledger.py:493 folded_holdings 把快照之後、未被快照吸收的資金進出折進推算餘額（:410 排除已被快照吸收的列，僅有效列參與同編號去重；無效列在折算時由 capital_flow_delta 跳過）；src/btc_competition/capital_flow.py:175 _record 在 :151 檔案鎖內重讀帳本、驗確認碼、查重、追加；src/btc_competition/reconcile_compare.py:152 證據帶 capital_flows_in_fold。競賽 #77。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a；A1 上這三個程式檔的 blob 與該 commit 相同，單元清單與環境檔雜湊不變、0 個失敗單元），12:56 補登 95.2329309 轉入與 0.2984512 理財收益，對帳仍 RECONCILED。",
+          "evidence": "src/btc_competition/trade_ledger.py:250 capital_flow 追加資金進出列；src/btc_competition/trade_ledger.py:498 folded_holdings 把快照之後、未被快照吸收的資金進出折進推算餘額（:415 排除已被快照吸收的列，僅有效列參與同編號去重；無效列在折算時由 capital_flow_delta 跳過）；src/btc_competition/capital_flow.py:175 _record 在 :151 檔案鎖內重讀帳本、驗確認碼、查重、追加；src/btc_competition/reconcile_compare.py:152 證據帶 capital_flows_in_fold。競賽 #77。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a；A1 上這三個程式檔的 blob 與該 commit 相同，單元清單與環境檔雜湊不變、0 個失敗單元），12:56 補登 95.2329309 轉入與 0.2984512 理財收益，對帳仍 RECONCILED。",
           "verified_at": "2026-10-23",
           "limit": "A1 只登記過這兩筆（都早於人工更正快照，帳本推算餘額沒變）；快照之後才發生的資金進出被折進推算餘額這條路徑，只有測試與開發機帳本複本驗證，A1 沒實際遇過。"
         }
@@ -911,10 +910,10 @@
           "reason": "這支策略做的是幣安合約，帳戶裡沒有現貨零頭，沒有小額資產轉換的需求（小額資產轉換只處理現貨）。"
         },
         "btc-competition": {
-          "state": "pending",
-          "phase": "f-66",
-          "reason": "程式已合併到 development（競賽 #79）並裝上開發機（單元空跑、開關預設關）；A1 還沒部署，也還沒開啟開關（A1 部署與啟用都要使用者另外授權）。",
-          "awaits_commit": "faa295acc531a3849f1008ded0796fb791d53bd6"
+          "state": "done",
+          "evidence": "src/btc_competition/dust_convert.py:119 decide：BEAR、無安全暫停、無待完成調倉、狀態檔至少 10 分鐘沒寫、每種風險幣不超過 20 USDT、每策略日一次才放行；:314 第一次轉換呼叫前先記嘗試；:276 _guard 每種幣前確認 bot 服務為 inactive 或 failed（查不到就停）、狀態檔未變、餘額與規劃一致；:151 coin_rows 餘額差須與交易所回應對得上才記 dust_convert_out／dust_convert_in（src/btc_competition/trade_ledger.py:62，不算資金進出）；src/btc_competition/dust_convert.py:357 開關沒開就結束。deploy/btc-competition-dust-convert.timer:7 每天 UTC 01:00。2026-10-23 台北 20:13 隨 A1 部署（operations 9a6b0c9）。",
+          "verified_at": "2026-10-23",
+          "limit": "開關預設關、A1 沒開過也沒真實轉換過；幣安沒寫金鑰權限、最低金額、冷卻、手續費算法，第一次真實轉換才驗證。"
         }
       }
     }
@@ -925,7 +924,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:506 _clear_automatic_safe_halt 確認已平倉後自動解除"
+          "evidence": "src/seykota_bot/bot.py:513 _clear_automatic_safe_halt 確認已平倉後自動解除"
         }
       },
       "emits_event": {
@@ -941,7 +940,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:897 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+          "evidence": "src/seykota_bot/bot.py:936 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
         }
       },
       "emits_event": {
@@ -974,13 +973,13 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:987 移動停損先以 :909 _resolve_stop_cancel（60 秒上限）取消舊停損；確定舊單仍在（open）時 :995 保留舊停損、記 PROTECTIVE_STOP_MOVE_DEFERRED、這輪不移動，之後由 :1072 _retry_deferred_stop_move 每 10 分鐘（:91 _STOP_MOVE_RETRY_INTERVAL_SECONDS）自動重試（f-14，PR #81）；結果不明才 :1002 PROTECTION_REPLACE_FAILED。PR #74（h11），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）；f-14 隨 2026-10-04 台北 17:18–17:22 的 A1 正式機（新）部署上線（operations ed50b1d）。"
+          "evidence": "src/seykota_bot/bot.py:1026 移動停損先以 :948 _resolve_stop_cancel（60 秒上限）取消舊停損；確定舊單仍在（open）時 :1034 保留舊停損、記 PROTECTIVE_STOP_MOVE_DEFERRED、這輪不移動，之後由 :1119 _retry_deferred_stop_move 每 10 分鐘（:91 _STOP_MOVE_RETRY_INTERVAL_SECONDS）自動重試（f-14，PR #81）；結果不明才 :1041 PROTECTION_REPLACE_FAILED。PR #74（h11），2026-09-25 01:26 UTC 上正式機（operations 3e3b6f7）；f-14 隨 2026-10-04 台北 17:18–17:22 的 A1 正式機（新）部署上線（operations ed50b1d）。"
         }
       },
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1040 _note_stop_move_failure 每次失敗寫一筆 PROTECTION_MOVE_DEFERRED 事件（:1061），連續第 3 次（:92 _STOP_MOVE_ESCALATE_AFTER）以 R3 升格並附 notice_text、只升格一次（失敗次數存在 pending_operations，重啟後照算）；PR #81（f-14，審閱 PASS）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d，/opt 檔案與該 commit 逐檔雜湊相同）。",
+          "evidence": "src/seykota_bot/bot.py:1087 _note_stop_move_failure 每次失敗寫一筆 PROTECTION_MOVE_DEFERRED 事件（:1108），連續第 3 次（:92 _STOP_MOVE_ESCALATE_AFTER）以 R3 升格並附 notice_text、只升格一次（失敗次數存在 pending_operations，重啟後照算）；PR #81（f-14，審閱 PASS）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d，/opt 檔案與該 commit 逐檔雜湊相同）。",
           "limit": "正式機沒有發生過舊停損取消不掉的情形，升格路徑只在開發機與測試驗證。"
         }
       }
@@ -1007,7 +1006,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1447 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
+          "evidence": "src/seykota_bot/bot.py:1610 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）"
         }
       },
       "emits_event": {
@@ -1023,7 +1022,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1695 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :822 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）"
+          "evidence": "src/seykota_bot/bot.py:1858 _enter_safe_halt 暫停並等人以 seykota-resume 解除，不自動下單（Phase 4c）；另 :861 市價單送出後 60 秒查不到也以此代碼暫停（PR #65）"
         }
       },
       "emits_event": {
@@ -1039,7 +1038,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）；計數只算非暫時性失敗（解析失敗、非預期結構）：HTTP 5xx／408 與後端碼 -1000／-1001／-1006／-1007 的讀取逾時不前進也不重置連續失敗計數、下一輪重試（src/seykota_bot/bot.py:1599 _is_transient_network_error，#89）"
+          "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）；計數只算非暫時性失敗（解析失敗、非預期結構）：HTTP 5xx／408 與後端碼 -1000／-1001／-1006／-1007 的讀取逾時不前進也不重置連續失敗計數、下一輪重試（src/seykota_bot/bot.py:1762 _is_transient_network_error，#89）"
         }
       },
       "emits_event": {
@@ -1055,7 +1054,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。",
+          "evidence": "src/seykota_bot/bot.py:566 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2409 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令已改成現況（共用庫 v0.30.8，2026-10-15 台北隨 A1 部署，A1 讀得到的錯誤清單已沒有『已知缺陷』文字）；新文字沒有在真實暫停時被收到過。"
         }
@@ -1073,7 +1072,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:559 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2246 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。",
+          "evidence": "src/seykota_bot/bot.py:566 _clear_config_halt_if_fixed：改好設定、重啟後守門檢查通過，暫停由程式自己清掉（safe_halt_cleared，method=config_fixed_restart）；src/seykota_bot/bot.py:2409 策略在線時每輪先呼叫；解除工具 src/seykota_bot/safe_halt_resume.py:134 對這個代碼仍刻意拒絕。PR #79（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 沒有發生過這個暫停，沒有實際觸發過；錯誤清單的處理步驟與追查指令已改成現況（共用庫 v0.30.8，2026-10-15 台北隨 A1 部署，A1 讀得到的錯誤清單已沒有『已知缺陷』文字）；新文字沒有在真實暫停時被收到過。"
         }
@@ -1091,7 +1090,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）；未分類的例外才計數：K 線抓取遇暫時性網路錯誤時直接重試、不計入（src/seykota_bot/bot.py:2282，#89）"
+          "evidence": "src/seykota_bot/bot.py:54 連續 3 次失敗才暫停（Phase 4d）；未分類的例外才計數：K 線抓取遇暫時性網路錯誤時直接重試、不計入（src/seykota_bot/bot.py:2446，#89）"
         }
       },
       "emits_event": {
@@ -1107,7 +1106,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1883 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）"
+          "evidence": "src/seykota_bot/bot.py:2046 _close_locally_after_native_stop 只記錄、下一輪再確認成交（Phase 3）"
         }
       },
       "emits_event": {
@@ -1123,7 +1122,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1975 只記錄出場（Phase 3）"
+          "evidence": "src/seykota_bot/bot.py:2138 只記錄出場（Phase 3）"
         }
       },
       "emits_event": {
@@ -1139,7 +1138,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:2055 資金不足跳過進場、只記錄（Phase 3）"
+          "evidence": "src/seykota_bot/bot.py:2218 資金不足跳過進場、只記錄（Phase 3）"
         }
       },
       "emits_event": {
@@ -1916,7 +1915,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1261 送單前先記下進場意圖 entry_intent；src/seykota_bot/bot.py:1458 重啟後依 entry_intent 找回被中斷的進場，沿用同一個 trade_id，並由 :1478 補寫該次進場沒來得及寫的 trade_open；src/seykota_bot/bot.py:1385 停損掛到一半被中斷時，用記下的原價重新掛上。PR #79（f-12）。",
+          "evidence": "src/seykota_bot/bot.py:1424 送單前先記下進場意圖 entry_intent；src/seykota_bot/bot.py:1621 重啟後依 entry_intent 找回被中斷的進場，沿用同一個 trade_id，並由 :1641 補寫該次進場沒來得及寫的 trade_open；src/seykota_bot/bot.py:1548 停損掛到一半被中斷時，用記下的原價重新掛上。PR #79（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 正式機沒有發生過被中斷的進場，沒有實際觸發過。"
         }
@@ -1924,7 +1923,7 @@
       "emits_event": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/bot.py:1403 _record_position_adoption 把接管寫成 R3 事件 POSITION_ADOPTED_AFTER_INTERRUPTION（src/seykota_bot/fleet_events.py:23，風險分級 :44），kind 有 interrupted_entry／stop_rearmed／unknown_origin 三種，呼叫點 src/seykota_bot/bot.py:1547，一次接管通知一次；事件由趨勢修復機器人每輪刷新匯出檔（scripts/repair_bot.py:234）交給維運通知。PR #79（f-12）。",
+          "evidence": "src/seykota_bot/bot.py:1566 _record_position_adoption 把接管寫成 R3 事件 POSITION_ADOPTED_AFTER_INTERRUPTION（src/seykota_bot/fleet_events.py:23，風險分級 :44），kind 有 interrupted_entry／stop_rearmed／unknown_origin 三種，呼叫點 src/seykota_bot/bot.py:1710，一次接管通知一次；事件由趨勢修復機器人每輪刷新匯出檔（scripts/repair_bot.py:234）交給維運通知。PR #79（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "這個事件在 A1 沒有實際發生過；匯出檔→維運通知→手機這條路只用受控測試事件（ERR-037）驗過，不是這個事件。"
         }
@@ -2007,12 +2006,12 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "src/google_projection_worker.py:86 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。",
+          "evidence": "src/google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。",
           "limit": "A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。",
+          "evidence": "src/seykota_bot/google_projection_worker.py:93 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。",
           "limit": "A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
         },
         "mycrypto": {
@@ -2053,22 +2052,22 @@
       "code": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
       "behaviour": {
         "momentum": {
-          "state": "pending",
-          "phase": "f-64",
-          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR（mexc-4h-momentum-trailing-stop #164）已合併到 development，A1 還沒部署。",
-          "awaits_commit": "024844719ed49a0db2017fd303efa6574a379c82"
+          "state": "done",
+          "evidence": "src/google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox（pyproject.toml:70 釘 v0.30.19）：開倉列或成交列連續 3 次回 trade_id_conflict 就記 REJECTED（原因 trade_id_conflict_parked），後面的紀錄照常送出；tests/test_trade_id_conflict_pin_guard.py:43 守門測試。2026-10-23 台北 20:14 隨 A1 正式機（新）部署（operations 03fef20；A1 venv trade-alerts 0.30.19，投遞佇列模組檔的 blob 583bc2e 與 tag v0.30.19 相同）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒遇過編號衝突，只在共用庫與策略端測試驗證。"
         },
         "seykota": {
-          "state": "pending",
-          "phase": "f-64",
-          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR（ed-seykota-systematic-trend-following #144）已合併到 development，A1 還沒部署。",
-          "awaits_commit": "4722d4adb8455a65ad20bad1a4ecc0877d3e226d"
+          "state": "done",
+          "evidence": "src/seykota_bot/google_projection_worker.py:93 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox（requirements.lock:10 釘 v0.30.19）：開倉列或成交列連續 3 次回 trade_id_conflict 就記 REJECTED（原因 trade_id_conflict_parked），後面的紀錄照常送出；tests/test_trade_id_conflict_pin_guard.py:43 守門測試。2026-10-23 台北 20:15 隨 A1 正式機（新）部署（operations 1568826；A1 venv trade-alerts 0.30.19，投遞佇列模組檔的 blob 583bc2e 與 tag v0.30.19 相同）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒遇過編號衝突，只在共用庫與策略端測試驗證。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "f-64",
-          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR（my-crypto-bot #115）已合併到 development，A1 還沒部署。",
-          "awaits_commit": "6af0800163626344e8f22d501ed5840008a7fd7b"
+          "state": "done",
+          "evidence": "google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox（pyproject.toml:15 釘 v0.30.19）：開倉列或成交列連續 3 次回 trade_id_conflict 就記 REJECTED（原因 trade_id_conflict_parked），後面的紀錄照常送出；tests/test_trade_id_conflict_pin_guard.py:43 守門測試。2026-10-23 台北 20:16 隨 A1 正式機（新）部署（operations 599c607；A1 venv trade-alerts 0.30.19，投遞佇列模組檔的 blob 583bc2e 與 tag v0.30.19 相同）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒遇過編號衝突，只在共用庫與策略端測試驗證。"
         },
         "btc-competition": {
           "state": "done",
@@ -2079,22 +2078,22 @@
       },
       "emits_event": {
         "momentum": {
-          "state": "pending",
-          "phase": "f-64",
-          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR（mexc-4h-momentum-trailing-stop #164）已合併到 development，A1 還沒部署。",
-          "awaits_commit": "024844719ed49a0db2017fd303efa6574a379c82"
+          "state": "done",
+          "evidence": "src/google_projection_worker.py:92 把事件日誌路徑與 :93 策略名交給共用庫；停放時共用庫寫 R1 事件 PROJECTION_TRADE_ID_CONFLICT_PARKED（不通知）；A1 venv trade-alerts 0.30.19（投遞佇列模組檔的 blob 583bc2e 與 tag v0.30.19 相同）。2026-10-23 台北 20:14 隨 A1 部署。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒有實際停放過，事件只在測試看過。"
         },
         "seykota": {
-          "state": "pending",
-          "phase": "f-64",
-          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR（ed-seykota-systematic-trend-following #144）已合併到 development，A1 還沒部署。",
-          "awaits_commit": "4722d4adb8455a65ad20bad1a4ecc0877d3e226d"
+          "state": "done",
+          "evidence": "src/seykota_bot/google_projection_worker.py:98 把事件日誌路徑與 :99 策略名交給共用庫；停放時共用庫寫 R1 事件 PROJECTION_TRADE_ID_CONFLICT_PARKED（不通知）；A1 venv trade-alerts 0.30.19（投遞佇列模組檔的 blob 583bc2e 與 tag v0.30.19 相同）。2026-10-23 台北 20:15 隨 A1 部署。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒有實際停放過，事件只在測試看過。"
         },
         "mycrypto": {
-          "state": "pending",
-          "phase": "f-64",
-          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR（my-crypto-bot #115）已合併到 development，A1 還沒部署。",
-          "awaits_commit": "6af0800163626344e8f22d501ed5840008a7fd7b"
+          "state": "done",
+          "evidence": "google_projection_worker.py:92 把事件日誌路徑與 :93 策略名交給共用庫；停放時共用庫寫 R1 事件 PROJECTION_TRADE_ID_CONFLICT_PARKED（不通知）；A1 venv trade-alerts 0.30.19（投遞佇列模組檔的 blob 583bc2e 與 tag v0.30.19 相同）。2026-10-23 台北 20:16 隨 A1 部署。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒有實際停放過，事件只在測試看過。"
         },
         "btc-competition": {
           "state": "done",
@@ -2293,7 +2292,7 @@
       "behaviour": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/google_projection_worker.py:92 直接呼叫共用庫的 dispatch_next_projection；src/seykota_bot/google_ledger_provenance.py:141／:144 更正鏈用上一次更正的完整投影摘要當下一次的 corrects_payload_digest；拒收與停放在共用庫：google_ledger_client 的 correction_base_mismatch 屬終態拒收（記 REJECTED、不重試），接收端比對在 Apps Script google_ledger_receiver.gs（錯誤清單 ERR-068）。",
+          "evidence": "src/seykota_bot/google_projection_worker.py:93 直接呼叫共用庫的 dispatch_next_projection；src/seykota_bot/google_ledger_provenance.py:141／:144 更正鏈用上一次更正的完整投影摘要當下一次的 corrects_payload_digest；拒收與停放在共用庫：google_ledger_client 的 correction_base_mismatch 屬終態拒收（記 REJECTED、不重試），接收端比對在 Apps Script google_ledger_receiver.gs（錯誤清單 ERR-068）。",
           "verified_at": "2026-10-19",
           "limit": "A1 沒有真的遇到過：A1 趨勢共用庫已於 2026-10-19 台北 18:56 部署 v0.30.11，這個後果已生效，但目前沒有人對那兩筆再做第二次更正；第二次更正被拒收後的手動處理步驟尚未實際演練，而且手動改儲存格不會更新接收端稽核摘要，之後對同一筆再更正仍會被拒收。"
         }
@@ -2313,62 +2312,55 @@
       "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
       "project": "seykota",
       "aspect": "behaviour",
-      "type": "updated",
-      "note": "改釘 PR（ed-seykota-systematic-trend-following #144）已合併到 development；等 A1 部署才算已做。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "project": "momentum",
-      "aspect": "behaviour",
-      "type": "updated",
-      "note": "改釘 PR（mexc-4h-momentum-trailing-stop #164）已合併到 development；等 A1 部署才算已做。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "project": "mycrypto",
-      "aspect": "behaviour",
-      "type": "updated",
-      "note": "改釘 PR（my-crypto-bot #115）已合併到 development；等 A1 部署才算已做。"
+      "type": "completed",
+      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:15）上線。"
     },
     {
       "kind": "rule",
       "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
       "project": "seykota",
       "aspect": "emits_event",
-      "type": "updated",
-      "note": "改釘 PR（ed-seykota-systematic-trend-following #144）已合併到 development；等 A1 部署才算已做。"
+      "type": "completed",
+      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "project": "momentum",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:14）上線。"
     },
     {
       "kind": "rule",
       "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
       "project": "momentum",
       "aspect": "emits_event",
-      "type": "updated",
-      "note": "改釘 PR（mexc-4h-momentum-trailing-stop #164）已合併到 development；等 A1 部署才算已做。"
+      "type": "completed",
+      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:14）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "project": "mycrypto",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:16）上線。"
     },
     {
       "kind": "rule",
       "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
       "project": "mycrypto",
       "aspect": "emits_event",
-      "type": "updated",
-      "note": "改釘 PR（my-crypto-bot #115）已合併到 development；等 A1 部署才算已做。"
-    },
-    {
-      "kind": "cap",
-      "id": "ledger.capital_flow",
-      "project": "btc-competition",
-      "type": "updated",
-      "note": "拿掉績效相關說明（帳本本來就沒有績效數字）。"
+      "type": "completed",
+      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:16）上線。"
     },
     {
       "kind": "cap",
       "id": "ledger.dust_convert",
       "project": "btc-competition",
-      "type": "added",
-      "note": "新增：粉塵換 USDT 單元與帳本種類（競賽未做，等 A1 部署）。"
+      "type": "completed",
+      "note": "粉塵換 USDT 單元隨 A1 部署上線（開關預設關）。"
     }
   ]
 }
