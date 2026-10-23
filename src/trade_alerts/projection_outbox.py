@@ -49,6 +49,15 @@ CORRECTION_PARKED_CODE = "correction_close_not_confirmed"
 #: The receiver's terminal answer to a correction whose "which version do I replace" digest does not match
 #: the confirmed row (ERR-068).  ``google_ledger_client`` makes it a terminal REJECTED on the first answer.
 CORRECTION_BASE_MISMATCH_ERROR = "correction_base_mismatch"
+#: An open or fill row whose trade_id the receiver already holds with different content (``trade_id_conflict``)
+#: can never succeed on its own: the answer does not change between retries, and the next dispatch only ever tries
+#: the head of the queue, so one such intent hid every later row for 15 days (f-64: the competition's re-queued old
+#: fills, whose rows were already on the sheet under the old ``append_open_v2`` action).  After this many
+#: consecutive answers it is parked as REJECTED so the queue moves on; the sheet check keeps reporting any real gap.
+TRADE_ID_CONFLICT_ERROR = "trade_id_conflict"
+TRADE_ID_CONFLICT_PARK_AFTER = 3
+TRADE_ID_CONFLICT_PARKED_CODE = "trade_id_conflict_parked"
+_ROW_WRITE_ACTIONS = frozenset({"append_open_v2", "append_fill_v2"})
 
 #: Fleet event log names (8b).  A parked orphan close is the fleet-wide ERR-056 (``FLEET.`` code, so the event
 #: is recorded under project ``fleet``); a base mismatch is the trend strategy's ERR-068 (``SEY.`` code).
@@ -58,6 +67,7 @@ CORRECTION_BASE_MISMATCH_ERROR = "correction_base_mismatch"
 PARK_EVENT_LOCK_TIMEOUT_SECONDS = 2.0
 ORPHAN_CLOSE_PARKED_EVENT = "PROJECTION_ORPHAN_CLOSE_PARKED"
 CORRECTION_BASE_MISMATCH_EVENT = "CORRECTION_BASE_MISMATCH"
+TRADE_ID_CONFLICT_PARKED_EVENT = "PROJECTION_TRADE_ID_CONFLICT_PARKED"          # ERR-069
 
 
 @dataclass(frozen=True)
@@ -297,6 +307,9 @@ def record_projection_park_event(
     if dispatch.error_code in (ORPHAN_CLOSE_PARKED_CODE, CORRECTION_PARKED_CODE):    # both are ERR-056
         project, code = "fleet", ORPHAN_CLOSE_PARKED_EVENT
         summary = "平倉（或它的帳本更正）送到 Google 表接收端連續被退回，已停放"
+    elif dispatch.error_code == TRADE_ID_CONFLICT_PARKED_CODE:                                   # ERR-069
+        project, code = "fleet", TRADE_ID_CONFLICT_PARKED_EVENT
+        summary = "開倉列或成交列送到 Google 表接收端連續被回「編號衝突」，已停放"
     elif (dispatch.error_code == CORRECTION_BASE_MISMATCH_ERROR and intent.action == "correct_close_v2"
           and strategy_project == "seykota"):          # the catalog entry (ERR-068) exists for the trend strategy only
         project, code = strategy_project, CORRECTION_BASE_MISMATCH_EVENT
@@ -348,6 +361,9 @@ def _dispatch_next_locked(
         if status == "TRANSPORT_FAILED" and error_code == ORPHAN_CLOSE_ERROR and intent.action in _CLOSE_ACTIONS:
             if _consecutive_orphan_answers(path, intent.intent_id) + 1 >= ORPHAN_CLOSE_PARK_AFTER:
                 status, receiver_row, error_code = "REJECTED", None, ORPHAN_CLOSE_PARKED_CODE
+        elif status == "TRANSPORT_FAILED" and error_code == TRADE_ID_CONFLICT_ERROR and intent.action in _ROW_WRITE_ACTIONS:
+            if _consecutive_answers(path, intent.intent_id, TRADE_ID_CONFLICT_ERROR) + 1 >= TRADE_ID_CONFLICT_PARK_AFTER:
+                status, receiver_row, error_code = "REJECTED", None, TRADE_ID_CONFLICT_PARKED_CODE
         elif status == "TRANSPORT_FAILED" and error_code == CORRECTION_UNCONFIRMED_ERROR and intent.action == "correct_close_v2":
             if _consecutive_answers(path, intent.intent_id, CORRECTION_UNCONFIRMED_ERROR) + 1 >= CORRECTION_UNCONFIRMED_PARK_AFTER:
                 status, receiver_row, error_code = "REJECTED", None, CORRECTION_PARKED_CODE

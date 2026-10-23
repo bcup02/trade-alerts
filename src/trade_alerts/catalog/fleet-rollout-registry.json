@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-21",
+  "updated_at": "2026-10-23",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -33,7 +33,8 @@
     "x3-crypto-binance": "加密策略換到 Binance（x 系列）：2026-10-17 台北 17:30 起 A1 加密是 Binance 主網真倉（第一筆空 0.001 BTC 持倉中，觀察一週）；x4 等價驗證、x5 開發機測試網實測已結案。2026-10-19 台北 19:25 起 A1 跑 operations a60e94f（共用庫 v0.30.9）：接手成交配對守門測試（#100）、自家單號 mc- 與少記成交自動更正（g1-6，#102）、停損觸發價被越過（-2021）改市價平倉（f-54，#104）都已上 A1，但 A1 沒有遇過這些情境，只有測試與開發機測試網實測；A1 還沒走過的：人工更正工具對真實 Binance 的端到端、真實平倉與停損觸發走過 Google 新版投影、開發機 x5b 乾淨的接手→對帳端到端（通知經 A1 送到手機已於 2026-10-18 驗過）；Google 新版投影（x3e-1～x3e-5）與人工更正工具（x3e-6）已於 2026-10-16 上 A1，共用庫已隨 x3b 升到 v0.30.7",
     "t9-competition-retry": "t9：競賽策略失敗時當天重試（同一程序內每 15 分鐘一次、共 3 次）並在失敗時通知——共用庫 v0.27.6 錯誤清單已改；競賽程式在 PR #45（審閱中，合併後上開發機實測），之後才部署 A1 正式機（新）",
     "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
-    "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）"
+    "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
+    "f-64": "f-64：Google 表同步佇列不被編號衝突的開倉列或成交列卡死（共用庫 v0.30.19 停放；各策略改釘後才生效）"
   },
   "sources": {
     "momentum": {
@@ -1995,6 +1996,53 @@
       }
     },
     {
+      "code": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "behaviour": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-64",
+          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR 還沒開。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "f-64",
+          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR 還沒開。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "f-64",
+          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR 還沒開。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-64",
+          "reason": "共用庫 v0.30.19 才有停放『編號衝突』的邏輯（projection_outbox：連續 3 次回 trade_id_conflict 就記 REJECTED、原因 trade_id_conflict_parked）；這支策略的改釘 PR 還沒開。"
+        }
+      },
+      "emits_event": {
+        "momentum": {
+          "state": "pending",
+          "phase": "f-64",
+          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR 還沒開。"
+        },
+        "seykota": {
+          "state": "pending",
+          "phase": "f-64",
+          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR 還沒開。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "f-64",
+          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR 還沒開。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "f-64",
+          "reason": "事件由共用庫 v0.30.19 寫進事件日誌（R1，只留稽核紀錄、不通知）；這支策略改釘 v0.30.19 後才有，改釘 PR 還沒開。"
+        }
+      }
+    },
+    {
       "code": "SEY.FUNDING_SHEET_WRITE_FAILED",
       "behaviour": {
         "seykota": {
@@ -2197,5 +2245,12 @@
       }
     }
   ],
-  "recent_changes": []
+  "recent_changes": [
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "type": "added",
+      "note": "新增 ERR-069：Google 表同步佇列停放編號衝突的開倉列或成交列（R1，自動、不通知；缺口仍由對帳標出）。四支策略都還沒改釘，全部列未做。"
+    }
+  ]
 }
