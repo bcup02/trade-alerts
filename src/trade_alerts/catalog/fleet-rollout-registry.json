@@ -466,8 +466,8 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "google_reconcile.py:87 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒（A1 venv trade-alerts 0.30.9）；守門測試 tests/test_google_reconcile.py:551、:559、:565（剛進場、剛平倉不算對不上；老交易缺列仍 DIVERGED）。my-crypto-bot #85（x3e-3）。",
-          "verified_at": "2026-10-16",
+          "evidence": "google_reconcile.py:87 compare() 呼叫共用 sheet_ledger_compare，沒有傳 projection_grace_seconds，套用共用庫預設 3600 秒（A1 venv trade-alerts 0.30.19；sheet_ledger_compare 這個預設在 v0.30.9→v0.30.19 沒變）；守門測試 tests/test_google_reconcile.py:551、:559、:565（剛進場、剛平倉不算對不上；老交易缺列仍 DIVERGED）。my-crypto-bot #85（x3e-3）。",
+          "verified_at": "2026-10-23",
           "limit": "A1 加密 2026-10-17 台北 17:30 起有真倉：首筆開倉已投影到正式表並通過對帳（RECONCILED），但寬限路徑（新交易等同步而被放過）到目前沒有實際遇到，只有單元測試；遇到並看到結果才算實測。"
         },
         "btc-competition": {
@@ -711,18 +711,18 @@
       "status": {
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/google_projection_worker.py:93 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫，策略沒有自己的實作；pyproject.toml 釘 v0.28.0）。",
+          "evidence": "src/seykota_bot/google_projection_worker.py:93 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫 v0.27.9 起就有，策略沒有自己的實作；pyproject.toml:66 現釘 v0.30.19）。",
           "limit": "A1 沒有遇到過帳本更正卡住，停放路徑只在共用庫與策略端測試、開發機實測（開發機 2026-10-08 台北 18:21 一筆已連續 582 次的更正，在新版下下一次回答就停放）。"
         },
         "momentum": {
           "state": "done",
-          "evidence": "src/google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫；pyproject.toml 釘 v0.28.0）。",
+          "evidence": "src/google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫 v0.27.9 起就有；pyproject.toml:70 現釘 v0.30.19）。",
           "limit": "同趨勢，A1 上停放路徑沒有實際被觸發過。"
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫 projection_outbox，A1 venv trade-alerts 0.30.9 的 CORRECTION_PARKED_CODE，策略沒有自己的實作）；drain 指令稿 scripts/drain_google_projection_outbox.py:46 與投影計時器走同一條送出路徑。my-crypto-bot #81（x3e-1）。",
-          "verified_at": "2026-10-16",
+          "evidence": "google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection（停放邏輯在共用庫 projection_outbox，A1 venv trade-alerts 0.30.19 的 CORRECTION_PARKED_CODE，策略沒有自己的實作）；drain 指令稿 scripts/drain_google_projection_outbox.py:46 與投影計時器走同一條送出路徑。my-crypto-bot #81（x3e-1）。",
+          "verified_at": "2026-10-23",
           "limit": "A1 加密沒有任何更正事件（2026-10-17 台北 17:30 才有真倉、尚無平倉），停放路徑只在共用庫與策略端測試驗證，沒在 A1 觸發過。"
         },
         "btc-competition": {
@@ -2006,18 +2006,18 @@
       "behaviour": {
         "momentum": {
           "state": "done",
-          "evidence": "src/google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。",
+          "evidence": "src/google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 venv 的 trade-alerts 0.30.19，其 projection_outbox 模組檔 blob 583bc2e 與 tag v0.30.19 同檔（2026-10-23 台北唯讀量測；v0.30.15→v0.30.19 該檔只新增編號衝突停放，平倉停放邏輯沒變）。",
           "limit": "A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
         },
         "seykota": {
           "state": "done",
-          "evidence": "src/seykota_bot/google_projection_worker.py:93 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 三支策略的 venv 現在都載入 trade-alerts 0.30.4，其 projection_outbox 模組檔 blob 是 400c681（2026-10-15 台北唯讀量測），與 2026-10-08 部署時查證的 v0.28.0 同檔（見能力『Google 表同步佇列：帳本更正卡在被停放的平倉後面時』）。",
+          "evidence": "src/seykota_bot/google_projection_worker.py:93 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED（原因 orphan_close_no_open_row），後面的紀錄照常送出；A1 venv 的 trade-alerts 0.30.19，其 projection_outbox 模組檔 blob 583bc2e 與 tag v0.30.19 同檔（2026-10-23 台北唯讀量測；v0.30.15→v0.30.19 該檔只新增編號衝突停放，平倉停放邏輯沒變）。",
           "limit": "A1 沒有遇到過被停放的平倉，只在共用庫與策略端測試、開發機實測。"
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox（A1 venv trade-alerts 0.30.9 的 ORPHAN_CLOSE_PARKED_CODE）：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED，後面的紀錄照常送出。",
-          "verified_at": "2026-10-16",
+          "evidence": "google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection；停放邏輯在共用庫 projection_outbox（A1 venv trade-alerts 0.30.19 的 ORPHAN_CLOSE_PARKED_CODE）：平倉投影連續 12 次回 trade_id_not_found 就記 REJECTED，後面的紀錄照常送出。",
+          "verified_at": "2026-10-23",
           "limit": "A1 加密 2026-10-17 台北 17:30 才有真倉、尚無平倉，沒遇到過被停放的平倉，只在共用庫與策略端測試驗證。"
         },
         "btc-competition": {
@@ -2038,7 +2038,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection，:92 把事件日誌路徑、:93 策略名交給它；停放找不到開倉列的平倉時共用庫（A1 venv trade-alerts 0.30.15）寫 R1 事件 PROJECTION_ORPHAN_CLOSE_PARKED（不通知）。8b（加密 #106）。2026-10-23 台北 16:22 隨 A1 加密重開部署（operations 4fd0047；A1 上該檔與 mexc_futures_bot.py 的 blob a85437d、4208e35 與該 commit 相同）。",
+          "evidence": "google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection，:92 把事件日誌路徑、:93 策略名交給它；停放找不到開倉列的平倉時共用庫（A1 venv trade-alerts 0.30.19）寫 R1 事件 PROJECTION_ORPHAN_CLOSE_PARKED（不通知）。8b（加密 #106）。2026-10-23 台北 16:22 隨 A1 加密重開部署、20:16 改釘 v0.30.19 再部署（operations 599c607；A1 上該檔與 mexc_futures_bot.py 的 blob a85437d、4208e35 與該 commit 相同）。",
           "verified_at": "2026-10-23",
           "limit": "A1 加密沒有停放過找不到開倉列的平倉，事件只在共用庫測試與開發機測試網驗證。"
         },
