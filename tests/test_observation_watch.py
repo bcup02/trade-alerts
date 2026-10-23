@@ -316,7 +316,7 @@ def test_a_delivered_real_alert_is_observed_but_still_needs_the_phone():
     assert result.state == ow.OBSERVED and result.needs_human and not result.closable
     assert result.key == "Oct 14 03:10:01"
     # three stages kept apart: the event, the first message's delivery, and the second message that is NOT claimed delivered
-    assert result.evidence[0].startswith("事件：") and result.evidence[1].startswith("第一則：") and "momentum:ledger@" in result.evidence[1]
+    assert result.evidence[0].startswith("事件：") and result.evidence[1].startswith("第一則：") and "momentum:ledger " in result.evidence[1] and "（台北）" in result.evidence[1]
     assert result.evidence[2].startswith("第二則：") and "沒有送達證據" in result.evidence[2]
 
 
@@ -338,7 +338,7 @@ def test_reminders_wait_until_one_has_gone_out_then_remember_it_ended():
     assert first.state == ow.OBSERVED and first.needs_human and "還在提醒" in first.evidence[0]
     # the alert recovers: the entry disappears, the watcher still remembers it sent 2
     ended = ow.check_reminders(ow.Context(reminder_remote({}), NOW, first.extra))
-    assert ended.state == ow.OBSERVED and "已恢復並停止" in ended.evidence[0] and ended.key.endswith(":ended")
+    assert ended.state == ow.OBSERVED and "已停止提醒" in ended.evidence[0] and ended.key.endswith(":ended")
 
 
 def test_a_reminder_send_failure_is_a_failure():
@@ -1618,3 +1618,74 @@ def test_the_preflight_is_called_from_the_installer_before_any_install_step_and_
     installer = (_ROOT / "deploy" / "observation-watch" / "install.sh").read_text(encoding="utf-8")
     assert "set -euo pipefail" in installer
     assert installer.index("watch_preflight \"$HOME_DIR\"") < installer.index("install -d -m 755 /opt/observation-watch")
+
+
+# --- 2026-10-23: the reminders notice says WHICH alert, in Taipei time, and what to look for on Telegram -----------------
+
+FIRST_NOTICE = "2026-10-22T11:10:00+00:00"       # 台北 10/22 19:10
+
+
+def _reminders_result(value="STALE", count=12, ended=False):
+    remote = reminder_remote({"mycrypto:runtime": {"since": FIRST_NOTICE, "count": count, "last_at": "2026-10-23T05:10:00+00:00"}})
+    remote.files[("a1", "/var/lib/ops-notify/state.json")] = json.dumps({
+        "_reminders": {"mycrypto:runtime": {"since": FIRST_NOTICE, "count": count, "last_at": "2026-10-23T05:10:00+00:00"}},
+        "mycrypto:runtime": {"value": value, "severity": "warn" if value else "ok"}})
+    first = ow.check_reminders(ctx(remote))
+    if not ended:
+        return first
+    return ow.check_reminders(ow.Context(reminder_remote({}), NOW, first.extra))
+
+
+def test_the_reminders_notice_names_the_error_in_taipei_time_and_says_what_to_look_for_on_telegram():
+    result = _reminders_result()
+    text = "\n".join([result.summary, *result.evidence])
+    assert "ERR-048" in result.summary and "加密策略的運行狀態軸（ERR-048 策略停止回報" in result.evidence[0]
+    assert "10/22 19:10" in result.evidence[0] and "12 次" in result.evidence[0] and "10/23 16:10" in result.evidence[0]   # 12th by schedule (08:10 UTC); the state file's last_at is only the last sample
+    assert "2026-" not in text and "+00:00" not in text and "UTC" not in text                    # no raw ISO / UTC anywhere
+    assert "【ERR-0xx】" in result.evidence[1] and "第 N 次提醒" in result.evidence[1] and "1 排到 12" in result.evidence[1]
+    # nominal schedule: 30 min x 6, then every 3 hours (ops_notify.reminders)
+    assert "第 1 次 10/22 19:40" in result.evidence[2] and "第 6 次 10/22 22:10" in result.evidence[2]
+    assert "第 7 次 10/23 01:10" in result.evidence[2] and "第 12 次 10/23 16:10" in result.evidence[2]
+
+
+def test_the_reminder_error_code_is_exact_when_the_value_is_known_and_lists_the_candidates_when_it_is_not():
+    assert "ERR-045" in ow._reminder_errors("runtime", "ERROR") and "ERR-048" not in ow._reminder_errors("runtime", "SAFE_HALT")
+    assert ow._reminder_errors("runtime", "UNAVAILABLE").startswith("ERR-048")
+    both = ow._reminder_errors("runtime", None)
+    assert "ERR-048" in both and "ERR-045" in both
+    assert ow._reminder_errors("ledger", "DIVERGED").startswith("ERR-043") and ow._reminder_errors("google", None).startswith("ERR-044")
+    # the episode was seen live with a stale reading, then ended: the ended notice still knows which error it was
+    ended = _reminders_result(ended=True)
+    assert "ERR-048" in ended.summary and "已停止提醒" in ended.evidence[0]
+
+
+def test_the_reminder_error_codes_are_the_ones_the_axes_table_announces():
+    spec = importlib.util.spec_from_file_location("render_guides_for_axes", _ROOT / "scripts" / "render_guides.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["render_guides_for_axes"] = module
+    spec.loader.exec_module(module)
+    catalog = json.loads((_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v2.json").read_text(encoding="utf-8"))
+    by_code = {e["code"]: e["error_id"] for e in catalog["entries"]}
+    axes = {key: [by_code[c] for c in codes] for _name, key, _meaning, codes in module.OPS_NOTIFY_AXES}
+    for axis, options in ow._AXIS_ERRORS.items():
+        for code, _title in options:
+            assert code in axes[axis], (axis, code, axes[axis])
+    assert set(ow._AXIS_ERRORS) == set(axes) and set(ow._AXIS_NAMES) == set(axes)
+
+
+def test_times_shown_to_the_operator_are_taipei_time_whatever_the_source_zone():
+    assert ow.taipei_text("2026-10-23T05:10:00+00:00") == "10/23 13:10（台北）"
+    assert ow.taipei_text("2026-10-23T05:10:00Z") == "10/23 13:10（台北）"
+    assert ow.taipei_text("2026-10-23T13:10:00+08:00") == "10/23 13:10（台北）"
+    assert ow.taipei_text(None) == "（沒有）" and ow.taipei_text("not a time") == "not a time"
+    assert ow.a1_journal_time("Oct 13 06:00:04", 2026) == "10/13 05:00（台北）"                  # the A1 journal runs on Tokyo time
+    assert ow.a1_journal_time("garbage", 2026) == "garbage"
+
+
+def test_the_status_alert_notice_shows_taipei_time_not_utc():
+    remote = journal_remote(line(1, 2, 2))
+    remote.files[("a1", "/var/lib/ops-notify/state.json")] = json.dumps(
+        {"momentum:ledger": {"notified_at": "2026-10-23T00:50:00.991201+00:00"}})
+    result = ow.check_status_alerts(ctx(remote))
+    text = "\n".join(result.evidence)
+    assert "UTC" not in text and "+00:00" not in text and "（台北）" in text

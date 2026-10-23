@@ -202,6 +202,25 @@ def taipei(moment: datetime) -> str:
     return moment.astimezone(TAIPEI).strftime("%m/%d %H:%M")
 
 
+def taipei_text(value: Any) -> str:
+    """An ISO time (any offset) as ``MM/DD HH:MM`` Taipei time; the raw text when it cannot be read, "（沒有）" when empty.
+    Every time shown to the operator goes through here: a UTC or Tokyo (A1 journal) time pasted into a notice made the
+    operator convert it by hand (2026-10-23: "最後一次 2026-10-23T05:10:00+00:00")."""
+    if value in (None, ""):
+        return "（沒有）"
+    moment = parse_time(value if isinstance(value, str) else None)
+    return taipei(moment) + "（台北）" if moment else str(value)
+
+
+def a1_journal_time(prefix: str, year: int) -> str:
+    """The ``Oct 13 06:00:04`` prefix of an A1 journal line (the host runs on Tokyo time, UTC+9) as Taipei time."""
+    try:
+        moment = datetime.strptime(f"{year} {prefix.strip()}", "%Y %b %d %H:%M:%S").replace(tzinfo=timezone(timedelta(hours=9)))
+    except ValueError:
+        return prefix
+    return taipei(moment) + "（台北）"
+
+
 def jsonl(text: str) -> Iterator[dict[str, Any]]:
     for line in text.splitlines():
         line = line.strip()
@@ -306,7 +325,7 @@ def check_crypto_equity(ctx: Context) -> Result:
     state = load_json(ctx.remote, "a1", audit("mycrypto", "exchange_state.json"))
     fetched = parse_time(state.get("fetched_at"))
     if not _fresh(fetched, ctx.now, 45):
-        raise RemoteError(f"加密策略的交易所讀數太舊，判斷不了權益（fetched_at={state.get('fetched_at')}）")
+        raise RemoteError(f"加密策略的交易所讀數太舊，判斷不了權益（讀數時間 {taipei_text(state.get('fetched_at'))}）")
     if state.get("execution_mode") != "LIVE" or state.get("environment") != "mainnet":
         raise RemoteError(f"加密策略的讀數不是真倉主網（execution_mode={state.get('execution_mode')}、environment={state.get('environment')}）")
     if (state.get("fetch_status") or {}).get("complete") is not True:
@@ -446,7 +465,7 @@ def check_competition_fill(ctx: Context) -> Result:
                       closable=True, key=str(len(fills)))
     if verdict == "diverged":
         return Result(FAILED, "競賽策略有新的現貨成交，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"])
-    return Result(WAITING, "競賽策略有新成交，等成交寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {status.get('checked_at')}"])
+    return Result(WAITING, "競賽策略有新成交，等成交寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {taipei_text(status.get('checked_at'))}"])
 
 
 def check_trend_addon(ctx: Context) -> Result:
@@ -482,7 +501,7 @@ def check_dev_trend_entry(ctx: Context) -> Result:
                       closable=True, key=str(len(entries)))
     if verdict == "diverged":
         return Result(FAILED, "開發機趨勢策略有進場，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"])
-    return Result(WAITING, "開發機趨勢策略有進場，等進場寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {status.get('checked_at')}"])
+    return Result(WAITING, "開發機趨勢策略有進場，等進場寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {taipei_text(status.get('checked_at'))}"])
 
 
 _X5B_BASELINE = datetime(2026, 10, 18, 8, 0, tzinfo=timezone.utc)   # 台北 16:00: after the hand-made duplicate-send tests of that day
@@ -605,11 +624,46 @@ def check_status_alerts(ctx: Context) -> Result:
                   if not k.startswith("_") and isinstance(v, Mapping) and (parse_time(v.get("notified_at")) or base) > base)
     first = real[0]
     return Result(OBSERVED, "A1 出現真實的狀態告警。第一則送出有日誌與狀態檔證據；第二則的送達沒有證據，要你在手機確認第二則帶著指令、貼上能跑。",
-                  [f"事件：{len(real)} 輪日誌有通知（第一輪 {first[0]}，UTC）",
+                  [f"事件：{len(real)} 輪日誌有通知（第一輪 {a1_journal_time(first[0], ctx.now.year)}）",
                    f"第一則：該輪通知 {first[1]}、嘗試 {first[2]}、送出 {first[3]}；" + (
-                       "狀態檔送出時間 " + "、".join(f"{k}@{t}" for k, t in told[:3]) if told else "狀態檔已沒有送出時間（可能已恢復清除）"),
+                       "狀態檔送出時間 " + "、".join(f"{k} {taipei_text(t)}" for k, t in told[:3]) if told else "狀態檔已沒有送出時間（可能已恢復清除）"),
                    "第二則：日誌沒有送失敗的紀錄，但成功不會被記錄，所以沒有送達證據"],
                   needs_human=True, key=first[0])
+
+
+#: ``<target>:<axis>`` of a status alert -> the words the operator sees.  The names are the glossary's / the axes table's.
+_TARGET_NAMES = {"momentum": "動能策略", "mycrypto": "加密策略", "seykota": "趨勢策略", "btc-competition": "競賽策略", "host": "主機"}
+_AXIS_NAMES = {"ledger": "帳本軸", "google": "Google 表軸", "runtime": "運行狀態軸", "units": "服務單元軸", "export": "匯出檔軸", "clock": "時鐘軸"}
+#: axis -> the catalog error(s) its alert is announced under (the runtime axis has two, told apart by the reading's value)
+_AXIS_ERRORS = {"ledger": (("ERR-043", "帳本跟交易所對不上"),),
+                "google": (("ERR-044", "帳本跟 Google 表對不上"),),
+                "runtime": (("ERR-048", "策略停止回報（狀態檔不見或太舊）"), ("ERR-045", "策略出錯或安全暫停")),
+                "units": (("ERR-046", "背景服務掛掉"),),
+                "export": (("ERR-047", "匯出檔讀不到或太舊"),),
+                "clock": (("ERR-049", "主機時鐘同步被關掉"),)}
+_RUNTIME_STALE_VALUES = frozenset({"STALE", "UNAVAILABLE"})
+
+
+def _reminder_errors(axis: str, value: Any) -> str:
+    """The error code(s) the alert is announced under: exact when the reading's value is known, otherwise every candidate."""
+    options = _AXIS_ERRORS.get(axis)
+    if not options:
+        return "（沒有對應的錯誤編號）"
+    if axis == "runtime" and isinstance(value, str) and value:
+        options = options[:1] if value.upper() in _RUNTIME_STALE_VALUES else options[1:]
+    return "、".join(f"{code} {title}" for code, title in options) if len(options) == 1 else " 或 ".join(f"{code} {title}" for code, title in options)
+
+
+def _reminder_due(number: int) -> timedelta:
+    """How long after the alert's first notice the ``number``-th reminder is due: every 30 minutes for the first 3 hours
+    (reminders 1..6), then every 3 hours (ops_notify.reminders)."""
+    return timedelta(minutes=30 * number) if number <= 6 else timedelta(hours=3 * (number - 5))
+
+
+def _reminder_times(since: datetime | None, count: int) -> str:
+    if since is None or count < 1:
+        return "（沒有起算時間）"
+    return "、".join(f"第 {n} 次 {taipei(since + _reminder_due(n))}" for n in range(1, count + 1))
 
 
 def check_reminders(ctx: Context) -> Result:
@@ -620,8 +674,10 @@ def check_reminders(ctx: Context) -> Result:
     for key, entry in reminders.items():
         if isinstance(entry, Mapping) and isinstance(entry.get("count"), int):
             old = seen.get(key, {})
+            reading = state.get(key) if isinstance(state.get(key), Mapping) else {}
+            value = reading.get("value") if reading.get("severity") not in (None, "ok") else old.get("value")
             seen[key] = {"since": entry.get("since"), "max_count": max(entry["count"], old.get("max_count", 0)),
-                         "last_at": entry.get("last_at"), "ended": False}
+                         "last_at": entry.get("last_at"), "ended": False, "value": value or old.get("value")}
     for key, old in seen.items():
         if key not in reminders:
             old["ended"] = True
@@ -634,9 +690,22 @@ def check_reminders(ctx: Context) -> Result:
     if not sent:
         return Result(WAITING, "A1 還沒有進入持續提醒的告警。", extra=extra)
     ended = [k for k, v in sent.items() if v.get("ended")]
-    evidence = [f"{k}：提醒 {v['max_count']} 次，最後一次 {v.get('last_at')}，{'已恢復並停止' if v.get('ended') else '還在提醒'}" for k, v in sent.items()]
-    return Result(OBSERVED, "A1 的持續提醒已送出" + ("，恢復後也停了。" if ended else "（還沒恢復，等它恢復才能確認會停）。")
-                  + "請確認 Telegram 收到的次數與間隔。", evidence, needs_human=True, key=",".join(sorted(sent)) + (":ended" if ended else ""), extra=extra)
+    evidence, codes = [], []
+    for key, v in sent.items():
+        target, _, axis = key.partition(":")
+        name = f"{_TARGET_NAMES.get(target, target)}的{_AXIS_NAMES.get(axis, axis)}"
+        errors = _reminder_errors(axis, v.get("value"))
+        codes.append(errors.split(" ")[0])
+        since = parse_time(v.get("since")) if isinstance(v.get("since"), str) else None
+        count = v["max_count"]
+        evidence.append(f"{name}（{errors}）：{taipei_text(v.get('since'))}第一次告警（LINE）後，維運通知在 Telegram 重複提醒了 {count} 次，"
+                        f"第 {count} 次依排程是 {taipei(since + _reminder_due(count)) if since else '（不明）'}；" + ("策略恢復後已停止提醒。" if v.get("ended") else "目前還在提醒。"))
+        evidence.append("你在 Telegram 要找的：標題第一行是「【ERR-0xx】…」、標題尾端帶「｜第 N 次提醒」的訊息，"
+                        f"N 應該從 1 排到 {count}（A1 的提醒只發 Telegram）。")
+        evidence.append("預期的台北時間（維運通知每 10 分鐘輪詢一次，實際可能晚到 10 分鐘內）：" + _reminder_times(since, count) + "。")
+    return Result(OBSERVED, "A1 的持續提醒（" + "、".join(sorted(set(codes))) + "）已送出" + ("，策略恢復後也停了。" if ended else "（還沒恢復，等它恢復才能確認會停）。")
+                  + "請對照 Telegram：收到的提醒次數與時間，是否和下面一致。", evidence, needs_human=True,
+                  key=",".join(sorted(sent)) + (":ended" if ended else ""), extra=extra)
 
 
 def _a1_event_logs() -> list[tuple[str, str]]:
@@ -1055,7 +1124,7 @@ def save_state(path: Path, state: Mapping[str, Any]) -> None:
 
 
 def report(state: Mapping[str, Any]) -> str:
-    rows = [f"檢查時間：{state.get('checked_at', '（還沒跑過）')}"]
+    rows = [f"檢查時間：{taipei_text(state.get('checked_at')) if state.get('checked_at') else '（還沒跑過）'}"]
     for entry in (state.get("items") or {}).values():
         if entry["state"] == OBSERVED and entry.get("acked_key") == f"{entry['state']}:{entry.get('key', '')}":
             rows.append(f"✓ 已處理 {'／'.join(entry['covers'])}（{entry['title']}）")
