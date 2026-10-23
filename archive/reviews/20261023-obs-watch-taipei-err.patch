@@ -1,0 +1,252 @@
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index b3715f2..7f17bc5 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -202,6 +202,25 @@ def taipei(moment: datetime) -> str:
+     return moment.astimezone(TAIPEI).strftime("%m/%d %H:%M")
+ 
+ 
++def taipei_text(value: Any) -> str:
++    """An ISO time (any offset) as ``MM/DD HH:MM`` Taipei time; the raw text when it cannot be read, "（沒有）" when empty.
++    Every time shown to the operator goes through here: a UTC or Tokyo (A1 journal) time pasted into a notice made the
++    operator convert it by hand (2026-10-23: "最後一次 2026-10-23T05:10:00+00:00")."""
++    if value in (None, ""):
++        return "（沒有）"
++    moment = parse_time(value if isinstance(value, str) else None)
++    return taipei(moment) + "（台北）" if moment else str(value)
++
++
++def a1_journal_time(prefix: str, year: int) -> str:
++    """The ``Oct 13 06:00:04`` prefix of an A1 journal line (the host runs on Tokyo time, UTC+9) as Taipei time."""
++    try:
++        moment = datetime.strptime(f"{year} {prefix.strip()}", "%Y %b %d %H:%M:%S").replace(tzinfo=timezone(timedelta(hours=9)))
++    except ValueError:
++        return prefix
++    return taipei(moment) + "（台北）"
++
++
+ def jsonl(text: str) -> Iterator[dict[str, Any]]:
+     for line in text.splitlines():
+         line = line.strip()
+@@ -306,7 +325,7 @@ def check_crypto_equity(ctx: Context) -> Result:
+     state = load_json(ctx.remote, "a1", audit("mycrypto", "exchange_state.json"))
+     fetched = parse_time(state.get("fetched_at"))
+     if not _fresh(fetched, ctx.now, 45):
+-        raise RemoteError(f"加密策略的交易所讀數太舊，判斷不了權益（fetched_at={state.get('fetched_at')}）")
++        raise RemoteError(f"加密策略的交易所讀數太舊，判斷不了權益（讀數時間 {taipei_text(state.get('fetched_at'))}）")
+     if state.get("execution_mode") != "LIVE" or state.get("environment") != "mainnet":
+         raise RemoteError(f"加密策略的讀數不是真倉主網（execution_mode={state.get('execution_mode')}、environment={state.get('environment')}）")
+     if (state.get("fetch_status") or {}).get("complete") is not True:
+@@ -446,7 +465,7 @@ def check_competition_fill(ctx: Context) -> Result:
+                       closable=True, key=str(len(fills)))
+     if verdict == "diverged":
+         return Result(FAILED, "競賽策略有新的現貨成交，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"])
+-    return Result(WAITING, "競賽策略有新成交，等成交寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {status.get('checked_at')}"])
++    return Result(WAITING, "競賽策略有新成交，等成交寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {taipei_text(status.get('checked_at'))}"])
+ 
+ 
+ def check_trend_addon(ctx: Context) -> Result:
+@@ -482,7 +501,7 @@ def check_dev_trend_entry(ctx: Context) -> Result:
+                       closable=True, key=str(len(entries)))
+     if verdict == "diverged":
+         return Result(FAILED, "開發機趨勢策略有進場，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"])
+-    return Result(WAITING, "開發機趨勢策略有進場，等進場寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {status.get('checked_at')}"])
++    return Result(WAITING, "開發機趨勢策略有進場，等進場寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {taipei_text(status.get('checked_at'))}"])
+ 
+ 
+ _X5B_BASELINE = datetime(2026, 10, 18, 8, 0, tzinfo=timezone.utc)   # 台北 16:00: after the hand-made duplicate-send tests of that day
+@@ -605,13 +624,48 @@ def check_status_alerts(ctx: Context) -> Result:
+                   if not k.startswith("_") and isinstance(v, Mapping) and (parse_time(v.get("notified_at")) or base) > base)
+     first = real[0]
+     return Result(OBSERVED, "A1 出現真實的狀態告警。第一則送出有日誌與狀態檔證據；第二則的送達沒有證據，要你在手機確認第二則帶著指令、貼上能跑。",
+-                  [f"事件：{len(real)} 輪日誌有通知（第一輪 {first[0]}，UTC）",
++                  [f"事件：{len(real)} 輪日誌有通知（第一輪 {a1_journal_time(first[0], ctx.now.year)}）",
+                    f"第一則：該輪通知 {first[1]}、嘗試 {first[2]}、送出 {first[3]}；" + (
+-                       "狀態檔送出時間 " + "、".join(f"{k}@{t}" for k, t in told[:3]) if told else "狀態檔已沒有送出時間（可能已恢復清除）"),
++                       "狀態檔送出時間 " + "、".join(f"{k} {taipei_text(t)}" for k, t in told[:3]) if told else "狀態檔已沒有送出時間（可能已恢復清除）"),
+                    "第二則：日誌沒有送失敗的紀錄，但成功不會被記錄，所以沒有送達證據"],
+                   needs_human=True, key=first[0])
+ 
+ 
++#: ``<target>:<axis>`` of a status alert -> the words the operator sees.  The names are the glossary's / the axes table's.
++_TARGET_NAMES = {"momentum": "動能策略", "mycrypto": "加密策略", "seykota": "趨勢策略", "btc-competition": "競賽策略", "host": "主機"}
++_AXIS_NAMES = {"ledger": "帳本軸", "google": "Google 表軸", "runtime": "運行狀態軸", "units": "服務單元軸", "export": "匯出檔軸", "clock": "時鐘軸"}
++#: axis -> the catalog error(s) its alert is announced under (the runtime axis has two, told apart by the reading's value)
++_AXIS_ERRORS = {"ledger": (("ERR-043", "帳本跟交易所對不上"),),
++                "google": (("ERR-044", "帳本跟 Google 表對不上"),),
++                "runtime": (("ERR-048", "策略停止回報（狀態檔不見或太舊）"), ("ERR-045", "策略出錯或安全暫停")),
++                "units": (("ERR-046", "背景服務掛掉"),),
++                "export": (("ERR-047", "匯出檔讀不到或太舊"),),
++                "clock": (("ERR-049", "主機時鐘同步被關掉"),)}
++_RUNTIME_STALE_VALUES = frozenset({"STALE", "UNAVAILABLE"})
++
++
++def _reminder_errors(axis: str, value: Any) -> str:
++    """The error code(s) the alert is announced under: exact when the reading's value is known, otherwise every candidate."""
++    options = _AXIS_ERRORS.get(axis)
++    if not options:
++        return "（沒有對應的錯誤編號）"
++    if axis == "runtime" and isinstance(value, str) and value:
++        options = options[:1] if value.upper() in _RUNTIME_STALE_VALUES else options[1:]
++    return "、".join(f"{code} {title}" for code, title in options) if len(options) == 1 else " 或 ".join(f"{code} {title}" for code, title in options)
++
++
++def _reminder_due(number: int) -> timedelta:
++    """How long after the alert's first notice the ``number``-th reminder is due: every 30 minutes for the first 3 hours
++    (reminders 1..6), then every 3 hours (ops_notify.reminders)."""
++    return timedelta(minutes=30 * number) if number <= 6 else timedelta(hours=3 * (number - 5))
++
++
++def _reminder_times(since: datetime | None, count: int) -> str:
++    if since is None or count < 1:
++        return "（沒有起算時間）"
++    return "、".join(f"第 {n} 次 {taipei(since + _reminder_due(n))}" for n in range(1, count + 1))
++
++
+ def check_reminders(ctx: Context) -> Result:
+     """f-39: an unresolved status alert is re-sent on Telegram (30 min, then 3 h) and stops when it recovers."""
+     state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
+@@ -620,8 +674,10 @@ def check_reminders(ctx: Context) -> Result:
+     for key, entry in reminders.items():
+         if isinstance(entry, Mapping) and isinstance(entry.get("count"), int):
+             old = seen.get(key, {})
++            reading = state.get(key) if isinstance(state.get(key), Mapping) else {}
++            value = reading.get("value") if reading.get("severity") not in (None, "ok") else old.get("value")
+             seen[key] = {"since": entry.get("since"), "max_count": max(entry["count"], old.get("max_count", 0)),
+-                         "last_at": entry.get("last_at"), "ended": False}
++                         "last_at": entry.get("last_at"), "ended": False, "value": value or old.get("value")}
+     for key, old in seen.items():
+         if key not in reminders:
+             old["ended"] = True
+@@ -634,9 +690,22 @@ def check_reminders(ctx: Context) -> Result:
+     if not sent:
+         return Result(WAITING, "A1 還沒有進入持續提醒的告警。", extra=extra)
+     ended = [k for k, v in sent.items() if v.get("ended")]
+-    evidence = [f"{k}：提醒 {v['max_count']} 次，最後一次 {v.get('last_at')}，{'已恢復並停止' if v.get('ended') else '還在提醒'}" for k, v in sent.items()]
+-    return Result(OBSERVED, "A1 的持續提醒已送出" + ("，恢復後也停了。" if ended else "（還沒恢復，等它恢復才能確認會停）。")
+-                  + "請確認 Telegram 收到的次數與間隔。", evidence, needs_human=True, key=",".join(sorted(sent)) + (":ended" if ended else ""), extra=extra)
++    evidence, codes = [], []
++    for key, v in sent.items():
++        target, _, axis = key.partition(":")
++        name = f"{_TARGET_NAMES.get(target, target)}的{_AXIS_NAMES.get(axis, axis)}"
++        errors = _reminder_errors(axis, v.get("value"))
++        codes.append(errors.split(" ")[0])
++        since = parse_time(v.get("since")) if isinstance(v.get("since"), str) else None
++        count = v["max_count"]
++        evidence.append(f"{name}（{errors}）：{taipei_text(v.get('since'))}第一次告警（LINE）後，維運通知在 Telegram 重複提醒了 {count} 次，"
++                        f"第 {count} 次依排程是 {taipei(since + _reminder_due(count)) if since else '（不明）'}；" + ("策略恢復後已停止提醒。" if v.get("ended") else "目前還在提醒。"))
++        evidence.append("你在 Telegram 要找的：標題第一行是「【ERR-0xx】…」、標題尾端帶「｜第 N 次提醒」的訊息，"
++                        f"N 應該從 1 排到 {count}（A1 的提醒只發 Telegram）。")
++        evidence.append("預期的台北時間（維運通知每 10 分鐘輪詢一次，實際可能晚到 10 分鐘內）：" + _reminder_times(since, count) + "。")
++    return Result(OBSERVED, "A1 的持續提醒（" + "、".join(sorted(set(codes))) + "）已送出" + ("，策略恢復後也停了。" if ended else "（還沒恢復，等它恢復才能確認會停）。")
++                  + "請對照 Telegram：收到的提醒次數與時間，是否和下面一致。", evidence, needs_human=True,
++                  key=",".join(sorted(sent)) + (":ended" if ended else ""), extra=extra)
+ 
+ 
+ def _a1_event_logs() -> list[tuple[str, str]]:
+@@ -1055,7 +1124,7 @@ def save_state(path: Path, state: Mapping[str, Any]) -> None:
+ 
+ 
+ def report(state: Mapping[str, Any]) -> str:
+-    rows = [f"檢查時間：{state.get('checked_at', '（還沒跑過）')}"]
++    rows = [f"檢查時間：{taipei_text(state.get('checked_at')) if state.get('checked_at') else '（還沒跑過）'}"]
+     for entry in (state.get("items") or {}).values():
+         if entry["state"] == OBSERVED and entry.get("acked_key") == f"{entry['state']}:{entry.get('key', '')}":
+             rows.append(f"✓ 已處理 {'／'.join(entry['covers'])}（{entry['title']}）")
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index a378cb7..04ff779 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -316,7 +316,7 @@ def test_a_delivered_real_alert_is_observed_but_still_needs_the_phone():
+     assert result.state == ow.OBSERVED and result.needs_human and not result.closable
+     assert result.key == "Oct 14 03:10:01"
+     # three stages kept apart: the event, the first message's delivery, and the second message that is NOT claimed delivered
+-    assert result.evidence[0].startswith("事件：") and result.evidence[1].startswith("第一則：") and "momentum:ledger@" in result.evidence[1]
++    assert result.evidence[0].startswith("事件：") and result.evidence[1].startswith("第一則：") and "momentum:ledger " in result.evidence[1] and "（台北）" in result.evidence[1]
+     assert result.evidence[2].startswith("第二則：") and "沒有送達證據" in result.evidence[2]
+ 
+ 
+@@ -338,7 +338,7 @@ def test_reminders_wait_until_one_has_gone_out_then_remember_it_ended():
+     assert first.state == ow.OBSERVED and first.needs_human and "還在提醒" in first.evidence[0]
+     # the alert recovers: the entry disappears, the watcher still remembers it sent 2
+     ended = ow.check_reminders(ow.Context(reminder_remote({}), NOW, first.extra))
+-    assert ended.state == ow.OBSERVED and "已恢復並停止" in ended.evidence[0] and ended.key.endswith(":ended")
++    assert ended.state == ow.OBSERVED and "已停止提醒" in ended.evidence[0] and ended.key.endswith(":ended")
+ 
+ 
+ def test_a_reminder_send_failure_is_a_failure():
+@@ -1618,3 +1618,74 @@ def test_the_preflight_is_called_from_the_installer_before_any_install_step_and_
+     installer = (_ROOT / "deploy" / "observation-watch" / "install.sh").read_text(encoding="utf-8")
+     assert "set -euo pipefail" in installer
+     assert installer.index("watch_preflight \"$HOME_DIR\"") < installer.index("install -d -m 755 /opt/observation-watch")
++
++
++# --- 2026-10-23: the reminders notice says WHICH alert, in Taipei time, and what to look for on Telegram -----------------
++
++FIRST_NOTICE = "2026-10-22T11:10:00+00:00"       # 台北 10/22 19:10
++
++
++def _reminders_result(value="STALE", count=12, ended=False):
++    remote = reminder_remote({"mycrypto:runtime": {"since": FIRST_NOTICE, "count": count, "last_at": "2026-10-23T05:10:00+00:00"}})
++    remote.files[("a1", "/var/lib/ops-notify/state.json")] = json.dumps({
++        "_reminders": {"mycrypto:runtime": {"since": FIRST_NOTICE, "count": count, "last_at": "2026-10-23T05:10:00+00:00"}},
++        "mycrypto:runtime": {"value": value, "severity": "warn" if value else "ok"}})
++    first = ow.check_reminders(ctx(remote))
++    if not ended:
++        return first
++    return ow.check_reminders(ow.Context(reminder_remote({}), NOW, first.extra))
++
++
++def test_the_reminders_notice_names_the_error_in_taipei_time_and_says_what_to_look_for_on_telegram():
++    result = _reminders_result()
++    text = "\n".join([result.summary, *result.evidence])
++    assert "ERR-048" in result.summary and "加密策略的運行狀態軸（ERR-048 策略停止回報" in result.evidence[0]
++    assert "10/22 19:10" in result.evidence[0] and "12 次" in result.evidence[0] and "10/23 16:10" in result.evidence[0]   # 12th by schedule (08:10 UTC); the state file's last_at is only the last sample
++    assert "2026-" not in text and "+00:00" not in text and "UTC" not in text                    # no raw ISO / UTC anywhere
++    assert "【ERR-0xx】" in result.evidence[1] and "第 N 次提醒" in result.evidence[1] and "1 排到 12" in result.evidence[1]
++    # nominal schedule: 30 min x 6, then every 3 hours (ops_notify.reminders)
++    assert "第 1 次 10/22 19:40" in result.evidence[2] and "第 6 次 10/22 22:10" in result.evidence[2]
++    assert "第 7 次 10/23 01:10" in result.evidence[2] and "第 12 次 10/23 16:10" in result.evidence[2]
++
++
++def test_the_reminder_error_code_is_exact_when_the_value_is_known_and_lists_the_candidates_when_it_is_not():
++    assert "ERR-045" in ow._reminder_errors("runtime", "ERROR") and "ERR-048" not in ow._reminder_errors("runtime", "SAFE_HALT")
++    assert ow._reminder_errors("runtime", "UNAVAILABLE").startswith("ERR-048")
++    both = ow._reminder_errors("runtime", None)
++    assert "ERR-048" in both and "ERR-045" in both
++    assert ow._reminder_errors("ledger", "DIVERGED").startswith("ERR-043") and ow._reminder_errors("google", None).startswith("ERR-044")
++    # the episode was seen live with a stale reading, then ended: the ended notice still knows which error it was
++    ended = _reminders_result(ended=True)
++    assert "ERR-048" in ended.summary and "已停止提醒" in ended.evidence[0]
++
++
++def test_the_reminder_error_codes_are_the_ones_the_axes_table_announces():
++    spec = importlib.util.spec_from_file_location("render_guides_for_axes", _ROOT / "scripts" / "render_guides.py")
++    module = importlib.util.module_from_spec(spec)
++    sys.modules["render_guides_for_axes"] = module
++    spec.loader.exec_module(module)
++    catalog = json.loads((_ROOT / "src" / "trade_alerts" / "catalog" / "fleet-error-catalog-v2.json").read_text(encoding="utf-8"))
++    by_code = {e["code"]: e["error_id"] for e in catalog["entries"]}
++    axes = {key: [by_code[c] for c in codes] for _name, key, _meaning, codes in module.OPS_NOTIFY_AXES}
++    for axis, options in ow._AXIS_ERRORS.items():
++        for code, _title in options:
++            assert code in axes[axis], (axis, code, axes[axis])
++    assert set(ow._AXIS_ERRORS) == set(axes) and set(ow._AXIS_NAMES) == set(axes)
++
++
++def test_times_shown_to_the_operator_are_taipei_time_whatever_the_source_zone():
++    assert ow.taipei_text("2026-10-23T05:10:00+00:00") == "10/23 13:10（台北）"
++    assert ow.taipei_text("2026-10-23T05:10:00Z") == "10/23 13:10（台北）"
++    assert ow.taipei_text("2026-10-23T13:10:00+08:00") == "10/23 13:10（台北）"
++    assert ow.taipei_text(None) == "（沒有）" and ow.taipei_text("not a time") == "not a time"
++    assert ow.a1_journal_time("Oct 13 06:00:04", 2026) == "10/13 05:00（台北）"                  # the A1 journal runs on Tokyo time
++    assert ow.a1_journal_time("garbage", 2026) == "garbage"
++
++
++def test_the_status_alert_notice_shows_taipei_time_not_utc():
++    remote = journal_remote(line(1, 2, 2))
++    remote.files[("a1", "/var/lib/ops-notify/state.json")] = json.dumps(
++        {"momentum:ledger": {"notified_at": "2026-10-23T00:50:00.991201+00:00"}})
++    result = ow.check_status_alerts(ctx(remote))
++    text = "\n".join(result.evidence)
++    assert "UTC" not in text and "+00:00" not in text and "（台北）" in text
