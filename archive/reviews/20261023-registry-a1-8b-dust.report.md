@@ -11,7 +11,7 @@
 
 ## 審閱 BLOCK 與修正
 
-- **首審 BLOCK-01**：換 sources 後，`FLEET.PROJECTION_ORPHAN_CLOSE_PARKED` 趨勢、動能行為格仍寫「A1 三支策略的 venv **現在**都載入 trade-alerts 0.30.4、blob 400c681」，與同一份登記冊新格的 0.30.19、583bc2e 互相矛盾。修：全登記冊重搜版本／blob／venv／「現在」字樣，改了 9 處（ORPHAN 趨勢動能 2＋加密 2、park_unconfirmed 趨勢動能「釘 v0.28.0」改現況＋加密 1、google_projection_grace 加密 1），並把三段 2026-10-16 的 A1 查證段落（docs/registry-a1-checks.json）改成 2026-10-23 的重新量測（verified_at 同步，既有測試要求一致）。有日期的歷史部署量測與「功能出現在哪一版」不是 A1 現況宣稱，保留。
+- **首審 BLOCK-01**：換 sources 後，`FLEET.PROJECTION_ORPHAN_CLOSE_PARKED` 趨勢、動能行為格仍寫「A1 三支策略的 venv **現在**都載入 trade-alerts 0.30.4、blob 400c681」，與同一份登記冊新格的 0.30.19、583bc2e 互相矛盾。修：全登記冊重搜版本／blob／venv／「現在」字樣，改了 9 處（ORPHAN 趨勢動能 2＋加密 3（行為 1、事件日誌 2 句）、park_unconfirmed 趨勢動能「釘 v0.28.0」改現況＋加密 1、google_projection_grace 加密 1），並把三段 2026-10-16 的 A1 查證段落（docs/registry-a1-checks.json）改成 2026-10-23 的重新量測（verified_at 同步，既有測試要求一致）。有日期的歷史部署量測與「功能出現在哪一版」不是 A1 現況宣稱，保留。
 - 教訓：**換 sources 時除了 file:line，還要全搜「A1 現在載入什麼版本」這類現況句**——verify_registry_evidence.py 完全看不到；改完用 grep 確認沒有無日期的舊版本號。
 
 ## 發布與觀察區
