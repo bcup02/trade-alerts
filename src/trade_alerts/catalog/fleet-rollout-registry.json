@@ -929,9 +929,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:497 安全暫停時若是真倉或模擬倉且代碼在事件表，:501 以目錄風險等級寫進事件日誌並標 escalated（R3 一定通知、R2 到這裡才升格、R1 只留紀錄）；src/seykota_bot/bot.py:929 這個代碼在此安全暫停；src/seykota_bot/fleet_events.py:30 登記風險等級；tests/test_event_per_code.py:79 走真實路徑驗證只留 R1 一行、不通知。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 趨勢沒有發生過這類安全暫停，事件日誌只在測試驗證（2026-10-23 唯讀量測：A1 事件日誌至今只有 TRADE_EXIT、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種）。"
         }
       }
     },
@@ -945,9 +946,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:497 安全暫停時若是真倉或模擬倉且代碼在事件表，:501 以目錄風險等級寫進事件日誌並標 escalated（R3 一定通知、R2 到這裡才升格、R1 只留紀錄）；src/seykota_bot/bot.py:936 這個代碼在此安全暫停；src/seykota_bot/fleet_events.py:31 登記風險等級；tests/test_event_per_code.py:88 走真實路徑驗證寫 R3 事件。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 趨勢沒有發生過這類安全暫停，事件日誌只在測試驗證（2026-10-23 唯讀量測：A1 事件日誌至今只有 TRADE_EXIT、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種）。"
         }
       }
     },
@@ -955,16 +957,18 @@
       "code": "SEY.PROTECTION_REPLACE_FAILED",
       "behaviour": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前：換單失敗就暫停等人。v2：立即以原停損價重掛，最多 3 次，失敗才通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:1060 移動停損新停損沒掛上（舊單已取消）時，src/seykota_bot/bot.py:1240 先讀交易所現有停損（已有同價的就接手、有別的就不再掛第二張），再以原停損價重掛，最多 src/seykota_bot/bot.py:96 次；成功就回到舊價繼續，3 次都失敗才 :1074 latch 並升格通知。tests/test_trend_retries_8b.py:55、:88 接手已掛上的單、:124 另有停損時不加第二張。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒發生過移動停損換單失敗，重掛路徑只有測試驗證；2026-10-20 在開發機測試網只確認了交易所行為（價格被越過時回 -2021 拒單、舊單取消後可用原價新單重掛），策略程式沒在測試網實際走過這條重掛。"
         }
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:1065 重掛成功時留一行 R2 稽核事件（details.recovered）、不通知；:1074 重掛 3 次都失敗才 latch，經 :497／:501 以 escalated 寫進事件日誌（ops-notify 才通知）；tests/test_trend_retries_8b.py:67 與 :77 驗證兩條路；tests/test_event_per_code.py:105 驗證 R2 事件。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 趨勢沒有發生過這類安全暫停，事件日誌只在測試驗證（2026-10-23 唯讀量測：A1 事件日誌至今只有 TRADE_EXIT、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種）。"
         }
       }
     },
@@ -988,16 +992,18 @@
       "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
       "behaviour": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前：只記錄、不處理。v2：先確認已無部位再自動重試取消，失敗才通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:1301 平倉後取消停損單失敗，src/seykota_bot/bot.py:1163 記下單號與失敗次數（存在 pending_operations，重啟後接續）；:2439 每輪呼叫 src/seykota_bot/bot.py:1193：交易所確認已無部位、且距上次滿 src/seykota_bot/bot.py:102 才只取消那張單號，成功或單已不在就清掉備忘；連續第 src/seykota_bot/bot.py:103 次失敗才升格通知一次。tests/test_trend_retries_8b.py:163～:236 逐項驗證。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒發生過平倉後取消停損單失敗，重試路徑只有測試驗證；2026-10-20 開發機測試網觀察到交易所行為：平倉瞬間仍掛著的停損單會自己消失，所以實務上多半走「單已不在」。"
         }
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:1182 每次取消失敗都 fleet_events.record：前兩次是 R2 稽核行，第 3 次 escalated 並附 notice_text 給 ops-notify 通知一次；tests/test_event_per_code.py:126 與 tests/test_trend_retries_8b.py:214 驗證。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 趨勢沒有發生過這類安全暫停，事件日誌只在測試驗證（2026-10-23 唯讀量測：A1 事件日誌至今只有 TRADE_EXIT、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種）。"
         }
       }
     },
@@ -1011,9 +1017,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:497 安全暫停時若是真倉或模擬倉且代碼在事件表，:501 以目錄風險等級寫進事件日誌並標 escalated（R3 一定通知、R2 到這裡才升格、R1 只留紀錄）；src/seykota_bot/bot.py:1610 這個代碼在此安全暫停；src/seykota_bot/fleet_events.py:35 登記風險等級；tests/test_graceful_stop.py:450 驗證只寫一則 R3 事件（第一次暫停勝出）。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 趨勢沒有發生過這類安全暫停，事件日誌只在測試驗證（2026-10-23 唯讀量測：A1 事件日誌至今只有 TRADE_EXIT、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種）。"
         }
       }
     },
@@ -1027,9 +1034,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:497 安全暫停時若是真倉或模擬倉且代碼在事件表，:501 以目錄風險等級寫進事件日誌並標 escalated（R3 一定通知、R2 到這裡才升格、R1 只留紀錄）；src/seykota_bot/bot.py:861 這個代碼在此安全暫停；src/seykota_bot/fleet_events.py:36 登記風險等級；tests/test_event_per_code.py:55 逐代碼驗證寫 R3 事件。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 趨勢沒有發生過這類安全暫停，事件日誌只在測試驗證（2026-10-23 唯讀量測：A1 事件日誌至今只有 TRADE_EXIT、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種）。"
         }
       }
     },
@@ -1043,9 +1051,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:497 安全暫停時若是真倉或模擬倉且代碼在事件表，:501 以目錄風險等級寫進事件日誌並標 escalated（R3 一定通知、R2 到這裡才升格、R1 只留紀錄）；src/seykota_bot/bot.py:1797 這個代碼在此安全暫停；src/seykota_bot/fleet_events.py:37 登記風險等級；tests/test_graceful_stop.py:459 驗證暫停就是 R2 的升格事件。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 趨勢沒有發生過這類安全暫停，事件日誌只在測試驗證（2026-10-23 唯讀量測：A1 事件日誌至今只有 TRADE_EXIT、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種）。"
         }
       }
     },
@@ -1061,9 +1070,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:497 安全暫停時若是真倉或模擬倉且代碼在事件表，:501 以目錄風險等級寫進事件日誌並標 escalated（R3 一定通知、R2 到這裡才升格、R1 只留紀錄）；src/seykota_bot/bot.py:2413 這個代碼在此安全暫停；src/seykota_bot/fleet_events.py:38 登記風險等級；tests/test_event_per_code.py:55 逐代碼驗證寫 R3 事件。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 趨勢沒有發生過這類安全暫停，事件日誌只在測試驗證（2026-10-23 唯讀量測：A1 事件日誌至今只有 TRADE_EXIT、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種）。"
         }
       }
     },
@@ -1079,9 +1089,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:497 安全暫停時若是真倉或模擬倉且代碼在事件表，:501 以目錄風險等級寫進事件日誌並標 escalated（R3 一定通知、R2 到這裡才升格、R1 只留紀錄）；src/seykota_bot/bot.py:2424 這個代碼在此安全暫停；src/seykota_bot/fleet_events.py:39 登記風險等級；tests/test_event_per_code.py:55 逐代碼驗證寫 R3 事件。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 趨勢沒有發生過這類安全暫停，事件日誌只在測試驗證（2026-10-23 唯讀量測：A1 事件日誌至今只有 TRADE_EXIT、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種）。"
         }
       }
     },
@@ -1095,9 +1106,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:497 安全暫停時若是真倉或模擬倉且代碼在事件表，:501 以目錄風險等級寫進事件日誌並標 escalated（R3 一定通知、R2 到這裡才升格、R1 只留紀錄）；src/seykota_bot/bot.py:2506 這個代碼在此安全暫停；src/seykota_bot/fleet_events.py:40 登記風險等級；tests/test_event_per_code.py:55 逐代碼驗證寫 R2 升格事件。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 趨勢沒有發生過這類安全暫停，事件日誌只在測試驗證（2026-10-23 唯讀量測：A1 事件日誌至今只有 TRADE_EXIT、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種）。"
         }
       }
     },
@@ -1111,9 +1123,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:2103 交易所部位消失但成交資料未到時送出這個通知；src/seykota_bot/bot.py:425 把通知名稱對到目錄代碼，src/seykota_bot/bot.py:430 在真倉或模擬倉寫進事件日誌（R0 只留紀錄、不通知）；tests/test_event_per_code.py:138 驗證。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒觸發過，只有測試驗證。"
         }
       }
     },
@@ -1127,9 +1140,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:2327 平倉通知；src/seykota_bot/bot.py:425 把通知名稱對到目錄代碼，src/seykota_bot/bot.py:430 在真倉或模擬倉寫進事件日誌（R0 只留紀錄、不通知）；tests/test_graceful_stop.py:466 驗證。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 實際記過一則 TRADE_EXIT（2026-10-22 台北 10:29，v0.30.11 時期的程式）；8b 版本在 A1 還沒有新的平倉。"
         }
       }
     },
@@ -1143,9 +1157,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "目前只寫自己的稽核紀錄與 log，沒有寫進共用事件日誌，所以不會有白話通知。"
+          "state": "done",
+          "evidence": "src/seykota_bot/bot.py:2219 權益低於最低下單資金時送出這個通知；src/seykota_bot/bot.py:425 把通知名稱對到目錄代碼，src/seykota_bot/bot.py:430 在真倉或模擬倉寫進事件日誌（R0 只留紀錄、不通知）；tests/test_event_per_code.py:147 驗證。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒觸發過，只有測試驗證。"
         }
       }
     },
@@ -2299,9 +2314,10 @@
       },
       "emits_event": {
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "拒收只記在 Google 同步紀錄（REJECTED／correction_base_mismatch），沒有寫進共用事件日誌；R1 本來就不通知，等第 8 關補寫事件日誌。"
+          "state": "done",
+          "evidence": "src/seykota_bot/google_projection_worker.py:98 把事件日誌路徑與 :99 策略名交給共用庫；更正被接收端以 correction_base_mismatch 拒收時，共用庫 projection_outbox（A1 venv trade-alerts 0.30.19，模組檔 blob 583bc2e 與 tag v0.30.19 同檔）寫 R1 事件 CORRECTION_BASE_MISMATCH（ERR-068，只留紀錄、不通知）。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
+          "verified_at": "2026-10-23",
+          "limit": "A1 沒遇過更正被拒收；趨勢自己的測試只驗了停放平倉那一條，這個事件由共用庫的測試驗證，趨勢端沒有逐碼測試。"
         }
       }
     }
@@ -2309,58 +2325,131 @@
   "recent_changes": [
     {
       "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "project": "seykota",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:15）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "id": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
       "project": "seykota",
       "aspect": "emits_event",
       "type": "completed",
-      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:15）上線。"
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
     },
     {
       "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "project": "momentum",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:14）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "project": "momentum",
+      "id": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
+      "project": "seykota",
       "aspect": "emits_event",
       "type": "completed",
-      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:14）上線。"
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
     },
     {
       "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "project": "mycrypto",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:16）上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "project": "mycrypto",
+      "id": "SEY.PROTECTION_UNVERIFIED",
+      "project": "seykota",
       "aspect": "emits_event",
       "type": "completed",
-      "note": "改釘共用庫 v0.30.19 隨 A1 部署（台北 10/23 20:16）上線。"
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
     },
     {
-      "kind": "cap",
-      "id": "ledger.dust_convert",
-      "project": "btc-competition",
+      "kind": "rule",
+      "id": "SEY.POSITION_AMBIGUOUS",
+      "project": "seykota",
+      "aspect": "emits_event",
       "type": "completed",
-      "note": "粉塵換 USDT 單元隨 A1 部署上線（開關預設關）。"
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.RECONCILE_FAILED",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.EXCHANGE_TARGET_UNSAFE",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.RUNTIME_CYCLE_FAILED",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.PROTECTION_REPLACE_FAILED",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.PROTECTION_REPLACE_FAILED",
+      "project": "seykota",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
+      "project": "seykota",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.CLOSE_FILL_PENDING",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.TRADE_EXIT",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
+    },
+    {
+      "kind": "rule",
+      "id": "SEY.CORRECTION_BASE_MISMATCH",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢 8b（事件日誌與自動重試）隨 A1 部署（台北 10/23 20:15）上線。"
     }
   ]
 }
