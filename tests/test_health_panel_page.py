@@ -87,7 +87,10 @@ def test_the_names_on_the_panel_are_the_glossary_and_axes_table_names(page_text,
 
 def test_a_source_without_a_spreadsheet_yet_is_null_and_the_page_says_so(page_text):
     data = _page_data(page_text)["health"]
-    assert [(s["id"], s["file_id"]) for s in data["sources"]][0] == ("a1", None)             # A1's publisher is not deployed yet
+    # A1's publisher went live on 2026-10-23 (first publish succeeded), so both shipped sources carry their file id; the
+    # page keeps its "not set up yet" branch for a source whose file_id is still null (a new host).
+    assert [(s["id"], bool(s["file_id"])) for s in data["sources"]] == [("a1", True), ("dev", True)]
+    assert data["sources"][0]["file_id"] == "1TyCEF1x60MbWtbZJeO42VhiMkxkXyx5XaFL8zdLX0T4"
     assert "還沒設定讀數來源" in _page_script(page_text)
 
 

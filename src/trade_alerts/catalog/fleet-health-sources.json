@@ -1,10 +1,10 @@
 {
-  "note": "Where the rule-register page reads the ops-notify health table from (f-45).  Each source is a Google spreadsheet that holds ONLY the tab 維運健康 with the table in A1 (written by that host's ops-notify publisher through its own Apps Script project).  file_id stays null until that spreadsheet exists; the page then says 'not set up yet' and calls no connector.  The label is looked up in the glossary by host_term, so the page can only use the glossary's name for a host.  The first source is the tab the page opens on (A1); the others are reached by clicking their tab.  The development host's source (host.dev) carries its real file_id from 2026-10-22 so the layout can be previewed before A1's publisher is deployed.",
+  "note": "Where the rule-register page reads the ops-notify health table from (f-45).  Each source is a Google spreadsheet that holds ONLY the tab 維運健康 with the table in A1 (written by that host's ops-notify publisher through its own Apps Script project).  file_id stays null until that spreadsheet exists; the page then says 'not set up yet' and calls no connector.  The label is looked up in the glossary by host_term, so the page can only use the glossary's name for a host.  The first source is the tab the page opens on (A1); the others are reached by clicking their tab.  The development host's source (host.dev) carries its real file_id from 2026-10-22; A1's (host.main.a1) from 2026-10-23, after its first publish succeeded.",
   "server": "Google Drive",
   "tool": "read_file_content",
   "refresh_ms": 60000,
   "sources": [
-    {"id": "a1", "host_term": "host.main.a1", "file_id": null},
+    {"id": "a1", "host_term": "host.main.a1", "file_id": "1TyCEF1x60MbWtbZJeO42VhiMkxkXyx5XaFL8zdLX0T4"},
     {"id": "dev", "host_term": "host.dev", "file_id": "1f5-xCORjbkqrgSSRYyu71m5PRO91Nipc0I8EE3GP2e4"}
   ]
 }
