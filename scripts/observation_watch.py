@@ -678,23 +678,29 @@ CRYPTO_REOPENED = datetime(2026, 10, 23, 8, 22, tzinfo=timezone.utc)
 OPS_READING_FRESH_MINUTES = 90            # ops-notify polls every 10 minutes; the slowest reading (export, google) is a few polls old
 _HEALTHY_VALUES = frozenset({"OK", "RECONCILED", "HEALTHY"})
 _STABLE_TARGETS = tuple(REPOS) + ("host",)
+_STRATEGY_AXES = ("runtime", "ledger", "google", "export", "units")
+#: Every reading the stability check needs: five axes per strategy and the host clock (21 in all).
+REQUIRED_READINGS = tuple(f"{t}:{a}" for t in REPOS for a in _STRATEGY_AXES) + ("host:clock",)
+#: The only axis that has no ``checked_at`` by design (ops-notify's units axis is a systemctl look at the moment of the poll).
+#: Every other required reading must carry a parseable, fresh ``checked_at``; this one is judged by the others being fresh.
+_NO_TIMESTAMP_AXES = frozenset({"units"})
 
 
 def _ops_readings(ctx: Context) -> dict[str, Mapping[str, Any]]:
-    """Every ``<target>:<axis>`` reading in ops-notify's state file on A1.  The file not holding the readings the stability
-    check needs, or a reading that has not been refreshed lately, is an error: ops-notify itself is then not looking."""
+    """The 21 ``REQUIRED_READINGS`` from ops-notify's state file on A1.  A missing reading, a reading that is not an object, a
+    missing / unparseable / stale ``checked_at`` (except on the units axis) is an error: ops-notify itself is then not looking,
+    and an unobservable state is never a quiet pass (review of #306)."""
     state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
-    readings = {k: v for k, v in state.items() if not k.startswith("_") and isinstance(v, Mapping)}
-    missing = [t for t in _STABLE_TARGETS if not any(k.startswith(t + ":") for k in readings)]
+    missing = [k for k in REQUIRED_READINGS if not isinstance(state.get(k), Mapping)]
     if missing:
-        raise RemoteError(f"ops-notify 狀態檔沒有這些對象的讀數：{', '.join(missing)}")
-    for key, reading in readings.items():
-        if key.partition(":")[0] not in _STABLE_TARGETS:
+        raise RemoteError(f"ops-notify 狀態檔缺少 {len(missing)} 個必要讀數：{', '.join(missing[:6])}")
+    for key in REQUIRED_READINGS:
+        raw = state[key].get("checked_at")
+        if key.partition(":")[2] in _NO_TIMESTAMP_AXES and raw is None:
             continue
-        checked = parse_time(reading.get("checked_at"))
-        if reading.get("checked_at") is not None and not _fresh(checked, ctx.now, OPS_READING_FRESH_MINUTES):
-            raise RemoteError(f"{key} 的讀數太舊，維運通知可能沒在檢查（檢查時間 {taipei_text(reading.get('checked_at'))}）")
-    return {k: v for k, v in readings.items() if k.partition(":")[0] in _STABLE_TARGETS}
+        if not _fresh(parse_time(raw), ctx.now, OPS_READING_FRESH_MINUTES):
+            raise RemoteError(f"{key} 的檢查時間缺少、讀不懂或太舊，維運通知可能沒在檢查（{taipei_text(raw)}）")
+    return {k: state[k] for k in REQUIRED_READINGS}
 
 
 def check_a1_stable(ctx: Context) -> Result:
@@ -706,7 +712,7 @@ def check_a1_stable(ctx: Context) -> Result:
     and that no stop price or stop order changed are NOT read here -- say so when closing the items."""
     readings = _ops_readings(ctx)
     bad = sorted(k for k, v in readings.items() if v.get("severity") != "ok" or v.get("value") not in _HEALTHY_VALUES)
-    evidence = [f"{len(readings)} 個讀數（四支策略各 5 項＋主機時鐘）"]
+    evidence = [f"{len(readings)} 個必要讀數（四支策略各 5 項＋主機時鐘）全部讀到且新鮮"]
     if bad:
         return Result(WAITING, "A1 現在有讀數不正常，穩定時間重新算：" + "、".join(f"{k}={readings[k].get('value')}" for k in bad[:5]) + "。", evidence)
     since, held, extra = _streak(ctx)
@@ -806,7 +812,9 @@ def check_momentum_halt_notice(ctx: Context) -> Result:
     state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
     exported = state.get("_export") if isinstance(state.get("_export"), Mapping) else {}
     target = exported.get("momentum") if isinstance(exported.get("momentum"), Mapping) else {}
-    export_reading = state.get("momentum:export") if isinstance(state.get("momentum:export"), Mapping) else {}
+    export_reading = state.get("momentum:export")
+    if not isinstance(export_reading, Mapping) or not isinstance(export_reading.get("severity"), str):
+        raise RemoteError("ops-notify 狀態檔沒有 momentum:export 的讀數（或沒有 severity），判斷不了匯出檔軸是否正常")
     baseline = parse_time(target.get("baseline_at"))
     evidence, late, unsent, unproven = [], [], [], []
     for _, event in events[:5]:
@@ -827,8 +835,8 @@ def check_momentum_halt_notice(ctx: Context) -> Result:
     owed = [str(eid) for _, e in events[:5] if (eid := e.get("event_id")) in (target.get("ai_pending") or {})
             and ctx.now - (parse_time((target.get("ai_pending") or {})[eid]) or ctx.now) > SECOND_MESSAGE_OVERDUE]
     key = str(events[0][1].get("event_id"))
-    if export_reading.get("severity") not in (None, "ok") or late or owed:
-        why = "匯出檔軸不正常（刷新計時器可能壞了）" if export_reading.get("severity") not in (None, "ok") else "維運通知超過預期時間沒送出，或第二則一直送不出去"
+    if export_reading["severity"] != "ok" or late or owed:
+        why = "匯出檔軸不正常（刷新計時器可能壞了）" if export_reading["severity"] != "ok" else "維運通知超過預期時間沒送出，或第二則一直送不出去"
         return Result(FAILED, "A1 動能策略的安全暫停通知不如預期：" + why + "。", evidence, key="bad:" + key)
     if unsent:
         return Result(WAITING, "事件已記錄，等維運通知下一輪送出。", evidence)

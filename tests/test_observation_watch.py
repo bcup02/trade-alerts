@@ -2003,3 +2003,77 @@ def test_batch2_checks_are_registered_with_their_items():
     assert ids["a1-stable"].covers == ("phase-x8", "f-63", "phase-x5")
     assert ids["crypto-one-entry-a-day"].covers == ("f-63",) and ids["crypto-stop"].covers == ("phase-x5",)
     assert ids["momentum-halt-notice"].covers == ("f-38",)
+
+
+# --- review of #306 (BLOCK-306-01 / 02, f-38 export axis) ----------------------------------------------------------------------
+
+LONG_STREAK = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
+
+
+def test_the_stability_check_needs_exactly_the_21_required_readings():
+    assert len(ow.REQUIRED_READINGS) == 21 and len(set(ow.REQUIRED_READINGS)) == 21
+    assert set(ow.REQUIRED_READINGS) == set(ops_readings())
+
+
+@pytest.mark.parametrize("axis", ow.REQUIRED_READINGS)
+def test_a1_stable_any_single_missing_reading_is_an_error_never_a_streak(axis):
+    """BLOCK-306-01: the target is still there, only one of its axes is not -- with a 100-hour streak stored it must not close."""
+    state = ops_readings()
+    del state[axis]
+    r = FakeRemote()
+    r.files[("a1", OPS_STATE)] = json.dumps(state)
+    with pytest.raises(ow.RemoteError):
+        ow.check_a1_stable(b2_ctx(r, LONG_STREAK))
+
+
+def test_a1_stable_five_runtime_readings_alone_cannot_close():
+    state = {k: v for k, v in ops_readings().items() if k.endswith(":runtime") or k == "host:clock"}
+    r = FakeRemote()
+    r.files[("a1", OPS_STATE)] = json.dumps(state)
+    with pytest.raises(ow.RemoteError):
+        ow.check_a1_stable(b2_ctx(r, LONG_STREAK))
+
+
+@pytest.mark.parametrize("reading", [
+    {"checked_at": None}, {"checked_at": ""}, {"checked_at": "garbage"}, {"checked_at": iso(B2_NOW - timedelta(hours=3))},
+    {"checked_at": iso(B2_NOW + timedelta(hours=3))}, "not an object", None,
+])
+@pytest.mark.parametrize("axis", ["mycrypto__runtime", "momentum__ledger", "seykota__google", "btc-competition__export", "host__clock"])
+def test_a1_stable_a_timestamped_axis_without_a_usable_checked_at_is_an_error(axis, reading):
+    """BLOCK-306-02: only the units axis may lack ``checked_at``; every other one must have a parseable fresh time."""
+    state = ops_readings()
+    state[axis.replace("__", ":")] = reading if not isinstance(reading, dict) else {**state[axis.replace("__", ":")], **reading}
+    if reading is None:
+        state[axis.replace("__", ":")] = None
+    r = FakeRemote()
+    r.files[("a1", OPS_STATE)] = json.dumps(state)
+    with pytest.raises(ow.RemoteError):
+        ow.check_a1_stable(b2_ctx(r, LONG_STREAK))
+
+
+def test_a1_stable_only_the_units_axis_may_lack_a_timestamp_and_a_bad_one_there_still_fails():
+    ok = ow.check_a1_stable(b2_ctx(ops_remote(), LONG_STREAK))
+    assert ok.state == ow.OBSERVED and ow._NO_TIMESTAMP_AXES == {"units"}
+    for bad in ("garbage", iso(B2_NOW - timedelta(hours=3))):
+        with pytest.raises(ow.RemoteError):
+            ow.check_a1_stable(b2_ctx(ops_remote(**{"momentum__units": {"checked_at": bad}}), LONG_STREAK))
+    assert ops_readings()["seykota:units"]["checked_at"] is None                        # the fixture really models the by-design gap
+
+
+@pytest.mark.parametrize("reading", [None, {}, {"value": "OK"}, {"severity": None, "value": "OK"}, {"severity": 1}, "ok"])
+def test_momentum_halt_a_missing_or_severity_less_export_reading_is_an_error_not_closable(reading):
+    r = halt_remote(sent_after_minutes=3)
+    state = json.loads(r.files[("a1", OPS_STATE)])
+    if reading is None:
+        del state["momentum:export"]
+    else:
+        state["momentum:export"] = reading
+    r.files[("a1", OPS_STATE)] = json.dumps(state)
+    with pytest.raises(ow.RemoteError):
+        ow.check_momentum_halt_notice(ctx(r))
+
+
+def test_momentum_halt_only_an_ok_export_severity_closes():
+    for severity in ("warn", "critical", "OK", ""):
+        assert ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=3, export_severity=severity))).state == ow.FAILED, severity
+    assert ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=3))).closable

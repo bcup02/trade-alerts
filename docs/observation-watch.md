@@ -67,10 +67,10 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項�
 ## f-70 第二批：A1 穩定天數、f-63、x5、f-38（`a1-stable`、`crypto-one-entry-a-day`、`crypto-stop`、`momentum-halt-notice`）
 沒有新增可讀路徑（只讀已在清單內的 `/var/lib/ops-notify/state.json`、加密的 `trading_ledger.jsonl`／`ledger_status.json`／`state/state.json`、動能的 `fleet_event_log.jsonl`）。
 
-- **`a1-stable`（x8、f-63、x5 第三項）**：讀維運通知的讀數檔裡四支策略各 5 個軸（運行狀態＝HEALTHY、帳本與 Google 表＝RECONCILED、匯出檔與服務單元＝OK）＋主機時鐘，全部 `severity` 為 ok 且值正常才算正常。穩定時間沿用第一批的 `_streak`（72 小時、前一個正常輪次超過 45 分鐘就重算），有任何一個讀數不正常也重算。讀數超過 90 分鐘沒更新、或某個對象整個沒有讀數是 `error`（維運通知自己沒在看，不能當通過）。**只涵蓋維運通知看的項目**：資金費同步每 4 小時 exit 0、停損價與停損單不變，程式沒讀，結案前我另外到主機查（通知文字會寫明）。
+- **`a1-stable`（x8、f-63、x5 第三項）**：讀維運通知的讀數檔裡四支策略各 5 個軸（運行狀態＝HEALTHY、帳本與 Google 表＝RECONCILED、匯出檔與服務單元＝OK）＋主機時鐘，全部 `severity` 為 ok 且值正常才算正常。穩定時間沿用第一批的 `_streak`（72 小時、前一個正常輪次超過 45 分鐘就重算），有任何一個讀數不正常也重算。必要讀數共 21 個（四支策略各 5 軸＋`host:clock`），缺任何一個、不是物件、或 `checked_at` 缺少／讀不懂／超過 90 分鐘都是 `error`（維運通知自己沒在看，不能當通過）；唯一設計上沒有 `checked_at` 的是服務單元軸（`units`），那一軸有時間戳時仍要新鮮（審閱 #306 BLOCK-306-01／02）。**只涵蓋維運通知看的項目**：資金費同步每 4 小時 exit 0、停損價與停損單不變，程式沒讀，結案前我另外到主機查（通知文字會寫明）。
 - **`crypto-one-entry-a-day`（f-63）**：A1 加密帳本 2026-10-23 台北 16:22（重開）之後 `source=entry_signal`、LIVE 的 `trade_open`，按 UTC 日分組；同一個 UTC 日有兩個不同 `trade_id` 的進場立刻 `failed`（同一筆交易的加碼不算）。可結案的條件：重開後有進場，且那一天（UTC）已結束、當天只進場一次——代表策略帶著修法活過一次 UTC 午夜。證據行會寫那幾天有沒有出場；「出場後同一天再進場」這個真正出過事的情形沒測到時會明說。
 - **`crypto-stop`（x5 前兩項）**：停損觸發＝重開後 LIVE 的 `trade_close` 且 `source` 以 `native_stop` 開頭，要等其後（超過寬限）的帳本對交易所對帳 `RECONCILED` 才算看到，`DIVERGED` 是 `failed`；移動停損沿用開發機 x5b 的判斷（`_follow_stop`，從 x5b 檢查抽出，行為不變）：同一筆交易兩輪之間停損單號換新且價格收緊（空單往下、多單往上）。**永遠不可結案（`needs_human`）**：撤舊再掛「沒有空窗」從這些檔案看不出來，結案時我到交易所查。兩輪（30 分鐘）之間移動又平倉會看漏。
-- **`momentum-halt-notice`（f-38）**：A1 動能的真實（非測試）R3 事件，量 `recorded_at` 到維運通知的 `delivered` 時間（上限 15 分鐘＝匯出計時器 1 分鐘＋輪詢 10 分鐘＋餘裕），並看動能的匯出檔軸是 OK（刷新計時器壞掉會讓它變過期）；超過時間、第二則欠送超過 70 分鐘、匯出檔軸不正常都是 `failed`。匯出檔本身的修改時間沒有讀，用送達延遲推定「約一分鐘內更新」，證據行會寫明。與 `safe-halt-notice`（f-35／f-37）看同一類事件，同一則動能 R3 事件可能各傳一則通知（涵蓋的項目不同）。
+- **`momentum-halt-notice`（f-38）**：A1 動能的真實（非測試）R3 事件，量 `recorded_at` 到維運通知的 `delivered` 時間（上限 15 分鐘＝匯出計時器 1 分鐘＋輪詢 10 分鐘＋餘裕），並看動能的匯出檔軸是 OK（讀數缺少或沒有 severity 是 `error`，不是 OK 就是 `failed`，都不會可結案）（刷新計時器壞掉會讓它變過期）；超過時間、第二則欠送超過 70 分鐘、匯出檔軸不正常都是 `failed`。匯出檔本身的修改時間沒有讀，用送達延遲推定「約一分鐘內更新」，證據行會寫明。與 `safe-halt-notice`（f-35／f-37）看同一類事件，同一則動能 R3 事件可能各傳一則通知（涵蓋的項目不同）。
 
 ## 開發機加密策略的 x5b 測試網檢查（`dev-crypto-x5b`，phase-x5b）
 x5b 剩下三件事要等開發機加密策略**自己**出訊號才驗得到（乾淨接手、停損真的觸發、移動停損撤舊再掛）。這個檢查只負責「看到」，不結案：
