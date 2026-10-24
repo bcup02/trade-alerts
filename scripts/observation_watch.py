@@ -79,9 +79,16 @@ class RemoteFileMissing(RemoteError):
     state must never look like "the event has not happened")."""
 
 
+#: f-45: the health-reading publisher's own state (same path on A1 and on the dev host).
+HEALTH_PUBLISH_STATE = "/var/lib/ops-notify/health-publish-state.json"
+#: f-66: the competition's dust-convert attempt record (``state/dust_convert_attempt.json``), A1 only.
+DUST_ATTEMPT_PATH = f"/opt/{REPOS['btc-competition']}/state/dust_convert_attempt.json"
+
+
 def _allowed_paths() -> frozenset[str]:
     """Exactly the files the checks below read -- nothing else under /opt, /var/lib or anywhere is readable."""
-    paths = {"/var/lib/portfolio-query/my-crypto-bot/current.json", "/var/lib/ops-notify/state.json"}
+    paths = {"/var/lib/portfolio-query/my-crypto-bot/current.json", "/var/lib/ops-notify/state.json",
+             HEALTH_PUBLISH_STATE, DUST_ATTEMPT_PATH}
     for key in REPOS:
         paths |= {audit(key, name) for name in ("ledger_status.json", "google_reconcile_status.json", "trading_ledger.jsonl")}
     paths |= {audit(key, "fleet_event_log.jsonl") for key in ("seykota", "momentum", "btc-competition")}
@@ -532,6 +539,118 @@ def check_dev_crypto_x5b(ctx: Context) -> Result:
 
 
 _NOTICE_LINE = re.compile(r"notices=(\d+) attempted=(\d+) sent=(\d+) consecutive_send_failures=(\d+)")
+# --- f-70: "AI check" items turned into automatic checks (batch 1) -----------------------------------------------
+
+#: A streak must be this long before "stable for days" is announced.  72 hours (2026-10-24, default; adjustable here).
+STABLE_STREAK = timedelta(hours=72)
+HEALTH_PUBLISH_FRESH_MINUTES = 25         # the publisher runs every 10 minutes
+#: A streak is only continuous if the run before this one also saw both publishers healthy no more than this long ago (the
+#: detector runs every 30 minutes).  A run that could not read, an unreadable file or a detector that was down in between
+#: all leave a longer gap -- ``run_checks`` keeps a failed run's ``extra``, so the gap is what ends the streak (review of #304).
+STREAK_MAX_GAP = timedelta(minutes=45)
+
+
+def check_dev_trend_reconcile(ctx: Context) -> Result:
+    """f-7 (second half): the dev host's trend ledger-vs-exchange reconcile is back to RECONCILED.
+
+    Twenty hand-made test orders (2026-10-17..20) left 25 exchange fills the ledger never recorded; the reconcile only looks at
+    the last 168 hours, so the verdict should flip by itself once the last of them slides out (2026-10-27 17:00 Taipei).  The
+    first half of f-7 (a real entry on a signal) is ``dev-trend-entry``.  A stale or unreadable status is never "recovered"."""
+    status = load_json(ctx.remote, "dev", audit("seykota", "ledger_status.json"))
+    checked = parse_time(status.get("checked_at"))
+    if not _fresh(checked, ctx.now, 90):
+        raise RemoteError(f"開發機趨勢的對帳狀態太舊，判斷不了是否恢復（檢查時間 {taipei_text(status.get('checked_at'))}）")
+    value = status.get("value")
+    if value == "RECONCILED":
+        return Result(OBSERVED, "開發機趨勢策略的帳本對交易所對帳已回到 RECONCILED（那批手動測試單已滑出 168 小時窗口）。",
+                      [f"對帳：{status.get('note')}（{taipei(checked)} 台北）",
+                       "這只是 f-7 的對帳那一半；進場那一半由 dev-trend-entry 看。那串 UNRESOLVED 請求是否自動撤回，這支檢查沒有讀。"],
+                      key="reconciled")
+    return Result(WAITING, f"開發機趨勢策略的帳本對交易所對帳還是 {value}。", [f"對帳：{status.get('note')}（{taipei(checked)} 台北）"])
+
+
+def _health_publish(ctx: Context, host: str) -> tuple[bool, str, int]:
+    """(healthy, sentence, consecutive_failures) of one host's health-reading publisher."""
+    state = load_json(ctx.remote, host, HEALTH_PUBLISH_STATE)
+    failures = state.get("consecutive_failures")
+    if isinstance(failures, bool) or not isinstance(failures, int) or failures < 0:
+        raise RemoteError(f"{host}: health-publish-state 的 consecutive_failures 讀不懂：{failures!r}")
+    success = parse_time(state.get("last_success_at"))
+    name = "A1" if host == "a1" else "開發機"
+    fresh = _fresh(success, ctx.now, HEALTH_PUBLISH_FRESH_MINUTES)
+    sentence = f"{name}：連續失敗 {failures} 次、最近成功 {taipei_text(state.get('last_success_at'))}"
+    return failures == 0 and fresh, sentence, failures
+
+
+def check_health_publish(ctx: Context) -> Result:
+    """f-45: both hosts' health-reading publishers have been healthy for ``STABLE_STREAK`` in a row.
+
+    Healthy = ``consecutive_failures`` is 0 and ``last_success_at`` is within 25 minutes.  The streak starts at the first run that
+    saw both hosts healthy (it cannot see the past) and restarts from zero whenever either one is not -- and also whenever the
+    previous healthy run is more than ``STREAK_MAX_GAP`` old, i.e. when a run in between could not read (an error keeps the
+    stored ``extra``, so the gap is what ends the streak).  Three failures in a row on a host is ``failed``.  A file that cannot
+    be read is an error, never a quiet pass."""
+    results = {host: _health_publish(ctx, host) for host in ("a1", "dev")}
+    sentences = [results[h][1] for h in ("a1", "dev")]
+    broken = [h for h in ("a1", "dev") if results[h][2] >= 3]
+    if broken:
+        return Result(FAILED, "維運讀數發布單元連續失敗 3 次以上。", sentences, key="failing-" + "-".join(broken))
+    if not all(results[h][0] for h in results):
+        return Result(WAITING, "維運讀數發布單元現在不是兩台都正常，穩定天數重新算。", sentences)
+    since = parse_time((ctx.previous or {}).get("healthy_since"))
+    last_seen = parse_time((ctx.previous or {}).get("last_seen"))
+    if since is None or last_seen is None or not timedelta(0) <= ctx.now - last_seen <= STREAK_MAX_GAP:
+        since = ctx.now            # no earlier healthy run, or an unobserved stretch in between: the streak starts again
+    held = ctx.now - since
+    extra = {"healthy_since": since.isoformat(timespec="seconds"), "last_seen": ctx.now.isoformat(timespec="seconds")}
+    hours = int(held.total_seconds() // 3600)
+    if held >= STABLE_STREAK:
+        return Result(OBSERVED, f"維運讀數發布單元兩台都已連續正常 {hours} 小時，可以結案（登記冊面板的分頁是否被標過期，另看一眼頁面）。",
+                      sentences + [f"從 {taipei(since)}（台北）起每一輪偵測都看到兩台正常"], closable=True, key="stable", extra=extra)
+    return Result(WAITING, f"維運讀數發布單元兩台都正常，已連續 {hours} 小時（滿 {int(STABLE_STREAK.total_seconds() // 3600)} 小時通知）。",
+                  sentences, extra=extra)
+
+
+def check_dust_convert(ctx: Context) -> Result:
+    """f-66: the first real dust conversion of the competition strategy, and whether it came out right.
+
+    Reads the competition ledger (``capital_flow`` rows of kind ``dust_convert_out`` per coin and ``dust_convert_in`` for the USDT,
+    LIVE only) and the strategy day's attempt record.  ``needs_review`` / ``failed`` is ``failed`` (told once per day and status).
+    ``partial`` (some coins converted, then an error) and a ``converting`` record older than 30 minutes (the run died mid-way, the
+    result is unknown) are ``failed`` too.  Rows plus ``done`` plus a fresh RECONCILED after them is ``observed`` -- but comparing
+    with Binance's own conversion record (the tranId in the row's note) is something only the operator can do, so it stays
+    ``needs_human``."""
+    try:
+        attempt = load_json(ctx.remote, "a1", DUST_ATTEMPT_PATH)
+    except RemoteFileMissing:
+        attempt = {}
+    status = str(attempt.get("status") or "")
+    started = parse_time(attempt.get("at"))
+    stuck = status == "converting" and started is not None and ctx.now - started > timedelta(minutes=30)
+    if status in ("needs_review", "failed", "partial") or stuck:
+        return Result(FAILED, f"競賽策略的粉塵轉換結果不明或失敗（策略日 {attempt.get('day')}，狀態 {status}），要人工核對（見 docs/dust-convert.md）。",
+                      [f"說明：{str(attempt.get('detail'))[:200]}", f"記錄時間 {taipei_text(attempt.get('at'))}"], key=f"{attempt.get('day')}-{status}")
+    rows = [e for e in jsonl(ctx.remote.read("a1", audit("btc-competition", "trading_ledger.jsonl")))
+            if e.get("event_type") == "capital_flow" and e.get("kind") in ("dust_convert_out", "dust_convert_in")
+            and str(e.get("execution_mode") or "").upper() == "LIVE" and not is_test_event(e)]
+    if not rows:
+        extra = f"（最近一次嘗試：策略日 {attempt.get('day')}，{status}）" if status else ""
+        return Result(WAITING, "競賽策略還沒有真實的粉塵轉換。" + extra)
+    outs = [e for e in rows if e["kind"] == "dust_convert_out"]
+    ins = [e for e in rows if e["kind"] == "dust_convert_in"]
+    last = max(parse_time(e.get("event_time")) or datetime.min.replace(tzinfo=timezone.utc) for e in rows)
+    ledger = load_json(ctx.remote, "a1", audit("btc-competition", "ledger_status.json"))
+    verdict = reconcile_covers(ledger, last, ctx.now)
+    evidence = [f"轉出 {len(outs)} 列（{', '.join(sorted({str(e.get('asset')) for e in outs}))}）、轉入 {len(ins)} 列；最近 {taipei(last)}（台北）",
+                f"策略日 {attempt.get('day')} 的嘗試狀態：{status or '（沒有記錄）'}；對帳：{ledger.get('value')}"]
+    if verdict == "diverged":
+        return Result(FAILED, "競賽策略粉塵轉換後帳本對交易所對帳對不上。", evidence, key=f"diverged-{len(rows)}")
+    if verdict != "covered" or status != "done" or not outs or not ins:
+        return Result(WAITING, "競賽策略有粉塵轉換的帳本列，等狀態變 done 與轉換後的對帳。", evidence)
+    return Result(OBSERVED, "競賽策略完成第一次真實的粉塵轉換：機器查到帳本列、狀態 done、對帳一致；請對照幣安 App 的小額資產轉換紀錄與備註裡的 tranId。",
+                  evidence, needs_human=True, key=f"{len(outs)}-{len(ins)}")
+
+
 _NOTIFY_FAILURES = re.compile(r"status_ai_send_failed|status_ai_dropped|status_ai_render_failed|reminder_send_failed|reminders_unavailable")
 _A1_STATUS_BASELINE = "2026-10-13 04:28:00"   # f-41 deployed to A1 at 台北 12:28
 
@@ -910,6 +1029,9 @@ CHECKS: tuple[Check, ...] = (
     Check("trend-addon", "A1 趨勢策略加碼交易", ("e-5",), check_trend_addon),
     Check("dev-trend-entry", "開發機趨勢策略依訊號進場", ("f-7",), check_dev_trend_entry),
     Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
+    Check("dev-trend-reconcile", "開發機趨勢策略對帳回到 RECONCILED（f-7 後半）", ("f-7",), check_dev_trend_reconcile),
+    Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
+    Check("dust-convert", "競賽策略第一次真實粉塵轉換", ("f-66",), check_dust_convert),
     Check("status-alerts", "A1 第一則真實狀態告警", ("f-23", "f-40", "f-41"), check_status_alerts),
     Check("reminders", "A1 持續提醒", ("f-39",), check_reminders),
     Check("pending-expired", "對帳標記逾時通知", ("f-30",), check_pending_expired),

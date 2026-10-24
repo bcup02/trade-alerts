@@ -387,6 +387,167 @@ def demo_check(monkeypatch):
     return check
 
 
+# --- f-70 batch 1: dev trend reconcile, health publishers, dust convert --------------------------------------------------
+
+def _status_file(value, minutes_ago=10, note="n"):
+    return {"value": value, "checked_at": iso(NOW - timedelta(minutes=minutes_ago)), "note": note}
+
+
+def test_dev_trend_reconcile_waits_while_diverged_and_tells_once_it_is_reconciled():
+    r = FakeRemote()
+    put(r, "dev", "seykota", "ledger_status.json", _status_file("DIVERGED", note="18 exchange fill(s) not recorded in the ledger"))
+    waiting = ow.check_dev_trend_reconcile(ctx(r))
+    assert waiting.state == ow.WAITING and "DIVERGED" in waiting.summary
+    put(r, "dev", "seykota", "ledger_status.json", _status_file("RECONCILED"))
+    done = ow.check_dev_trend_reconcile(ctx(r))
+    assert done.state == ow.OBSERVED and not done.needs_human and not done.closable and done.key == "reconciled"
+    assert "dev-trend-entry" in " ".join(done.evidence)
+
+
+def test_dev_trend_reconcile_raises_on_a_stale_or_missing_status():
+    r = FakeRemote()
+    put(r, "dev", "seykota", "ledger_status.json", _status_file("RECONCILED", minutes_ago=200))
+    with pytest.raises(ow.RemoteError):
+        ow.check_dev_trend_reconcile(ctx(r))
+    with pytest.raises(ow.RemoteError):
+        ow.check_dev_trend_reconcile(ctx(FakeRemote()))
+
+
+def _publish_remote(a1=None, dev=None):
+    r = FakeRemote()
+    for host, state in (("a1", a1), ("dev", dev)):
+        r.files[(host, ow.HEALTH_PUBLISH_STATE)] = json.dumps(state if state is not None else
+                                                              {"consecutive_failures": 0, "last_error": None,
+                                                               "last_success_at": iso(NOW - timedelta(minutes=4))})
+    return r
+
+
+def test_health_publish_starts_a_streak_and_announces_it_only_after_72_hours():
+    first = ow.check_health_publish(ctx(_publish_remote()))
+    assert first.state == ow.WAITING and first.extra["healthy_since"] == iso(NOW)
+    early = ow.check_health_publish(ctx(_publish_remote(), {"healthy_since": iso(NOW - timedelta(hours=71)), "last_seen": iso(NOW - timedelta(minutes=30))}))
+    assert early.state == ow.WAITING and early.extra["healthy_since"] == iso(NOW - timedelta(hours=71)) and early.extra["last_seen"] == iso(NOW)
+    done = ow.check_health_publish(ctx(_publish_remote(), {"healthy_since": iso(NOW - timedelta(hours=73)), "last_seen": iso(NOW - timedelta(minutes=30))}))
+    assert done.state == ow.OBSERVED and done.closable and not done.needs_human and done.key == "stable"
+    assert done.extra["healthy_since"] == iso(NOW - timedelta(hours=73))
+
+
+def test_health_publish_restarts_the_streak_when_either_host_is_not_healthy():
+    stale = {"consecutive_failures": 0, "last_error": None, "last_success_at": iso(NOW - timedelta(minutes=40))}
+    one_bad = ow.check_health_publish(ctx(_publish_remote(dev=stale), {"healthy_since": iso(NOW - timedelta(hours=100)), "last_seen": iso(NOW - timedelta(minutes=30))}))
+    assert one_bad.state == ow.WAITING and one_bad.extra == {}
+    failing = {"consecutive_failures": 1, "last_error": "x", "last_success_at": iso(NOW - timedelta(minutes=4))}
+    assert ow.check_health_publish(ctx(_publish_remote(a1=failing))).state == ow.WAITING
+
+
+def test_health_publish_three_failures_in_a_row_is_failed_and_unreadable_state_is_an_error():
+    bad = {"consecutive_failures": 3, "last_error": "x", "last_success_at": iso(NOW - timedelta(hours=1))}
+    failed = ow.check_health_publish(ctx(_publish_remote(dev=bad)))
+    assert failed.state == ow.FAILED and failed.key == "failing-dev"
+    for broken in ({"consecutive_failures": "0"}, {"consecutive_failures": True}, {"consecutive_failures": -1}, {}):
+        with pytest.raises(ow.RemoteError):
+            ow.check_health_publish(ctx(_publish_remote(a1=broken)))
+    with pytest.raises(ow.RemoteError):
+        ow.check_health_publish(ctx(FakeRemote()))
+
+
+def test_health_publish_streak_survives_between_runs():
+    check = next(c for c in ow.CHECKS if c.id == "health-publish")
+    items = ow.run_checks(_publish_remote(), NOW, {}, [check])
+    assert items["health-publish"]["extra"]["healthy_since"] == iso(NOW)
+    state = {"items": items}
+    for step in range(1, 145):                 # one run every 30 minutes for 72 hours
+        moment = NOW + timedelta(minutes=30 * step)
+        state = {"items": ow.run_checks(_healthy_publish_at(moment), moment, state, [check])}
+        assert state["items"]["health-publish"]["state"] == (ow.OBSERVED if step == 144 else ow.WAITING), step
+    assert state["items"]["health-publish"]["closable"] and state["items"]["health-publish"]["key"] == "stable"
+
+
+def _healthy_publish_at(moment):
+    r = FakeRemote()
+    for host in ("a1", "dev"):
+        r.files[(host, ow.HEALTH_PUBLISH_STATE)] = json.dumps({"consecutive_failures": 0, "last_error": None, "last_success_at": iso(moment - timedelta(minutes=3))})
+    return r
+
+
+def test_health_publish_a_run_that_could_not_read_ends_the_streak_even_though_the_error_keeps_the_old_extra():
+    """Review of #304 (BLOCK-304-01): healthy -> unreadable -> healthy again must not count the unobserved stretch."""
+    check = next(c for c in ow.CHECKS if c.id == "health-publish")
+    state = {"items": ow.run_checks(_healthy_publish_at(NOW), NOW, {}, [check])}
+    broken_at = NOW + timedelta(hours=25)
+    state = {"items": ow.run_checks(FakeRemote(), broken_at, state, [check])}                    # the files cannot be read
+    assert state["items"]["health-publish"]["state"] == ow.ERROR
+    assert state["items"]["health-publish"]["extra"]["healthy_since"] == iso(NOW)                 # run_checks keeps a failed run's extra
+    back = NOW + timedelta(hours=73)
+    state = {"items": ow.run_checks(_healthy_publish_at(back), back, state, [check])}
+    entry = state["items"]["health-publish"]
+    assert entry["state"] == ow.WAITING and not entry["closable"] and entry["extra"]["healthy_since"] == iso(back)
+
+
+def test_health_publish_a_gap_longer_than_one_run_restarts_the_streak_and_a_normal_cadence_does_not():
+    prev = {"healthy_since": iso(NOW - timedelta(hours=100))}
+    for gap, restarted in ((30, False), (45, False), (46, True), (120, True)):
+        result = ow.check_health_publish(ctx(_publish_remote(), {**prev, "last_seen": iso(NOW - timedelta(minutes=gap))}))
+        assert (result.extra["healthy_since"] == iso(NOW)) == restarted, gap
+    no_seen = ow.check_health_publish(ctx(_publish_remote(), prev))                                # an old record without last_seen
+    assert no_seen.extra["healthy_since"] == iso(NOW)
+
+
+def _dust_rows(hours=3, mode="LIVE", test=False):
+    base = {"event_type": "capital_flow", "event_time": hours_ago(hours), "execution_mode": mode}
+    rows = [{**base, "event_id": "o1", "kind": "dust_convert_out", "asset": "ETH", "amount": 0.001},
+            {**base, "event_id": "i1", "kind": "dust_convert_in", "asset": "USDT", "amount": 3.0}]
+    if test:
+        rows = [{**row, "details": {"test": True}} for row in rows]
+    return rows
+
+
+def _dust_remote(rows=(), attempt=None, ledger="RECONCILED", ledger_minutes=20):
+    r = FakeRemote()
+    put(r, "a1", "btc-competition", "trading_ledger.jsonl", list(rows), jsonl=True)
+    put(r, "a1", "btc-competition", "ledger_status.json", _status_file(ledger, ledger_minutes))
+    if attempt is not None:
+        r.files[("a1", ow.DUST_ATTEMPT_PATH)] = json.dumps(attempt)
+    return r
+
+
+def test_dust_convert_waits_without_real_conversion_rows_and_ignores_test_and_demo_rows():
+    assert ow.check_dust_convert(ctx(_dust_remote())).state == ow.WAITING
+    assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(test=True)))).state == ow.WAITING
+    assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(mode="DEMO")))).state == ow.WAITING
+    nothing = ow.check_dust_convert(ctx(_dust_remote(attempt={"day": "2026-10-25", "status": "nothing_offered", "at": iso(NOW)})))
+    assert nothing.state == ow.WAITING and "nothing_offered" in nothing.summary
+
+
+@pytest.mark.parametrize("status", ["needs_review", "failed", "partial"])
+def test_dust_convert_failure_statuses_are_failed_and_told_once_per_day_and_status(status):
+    result = ow.check_dust_convert(ctx(_dust_remote(attempt={"day": "2026-10-25", "status": status, "detail": "d", "at": iso(NOW)})))
+    assert result.state == ow.FAILED and result.key == f"2026-10-25-{status}"
+
+
+def test_dust_convert_a_converting_record_is_only_failed_when_it_has_been_stuck():
+    fresh = {"day": "2026-10-25", "status": "converting", "at": iso(NOW - timedelta(minutes=5))}
+    assert ow.check_dust_convert(ctx(_dust_remote(attempt=fresh))).state == ow.WAITING
+    stuck = {**fresh, "at": iso(NOW - timedelta(minutes=45))}
+    assert ow.check_dust_convert(ctx(_dust_remote(attempt=stuck))).state == ow.FAILED
+
+
+def test_dust_convert_first_real_conversion_is_observed_but_still_needs_the_operator_to_compare_with_binance():
+    done = {"day": "2026-10-25", "status": "done", "detail": "x", "at": iso(NOW - timedelta(hours=3))}
+    result = ow.check_dust_convert(ctx(_dust_remote(_dust_rows(), done)))
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and result.key == "1-1"
+    assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(), {**done, "status": "converting", "at": iso(NOW)}))).state == ow.WAITING
+    assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(), done, ledger_minutes=170))).state == ow.WAITING     # not reconciled after the grace yet
+    assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(), done, ledger="DIVERGED"))).state == ow.FAILED
+
+
+def test_f70_batch1_checks_are_registered_and_read_only_whitelisted():
+    ids = {c.id: c for c in ow.CHECKS}
+    assert ids["dev-trend-reconcile"].covers == ("f-7",) and ids["health-publish"].covers == ("f-45",) and ids["dust-convert"].covers == ("f-66",)
+    assert ow.HEALTH_PUBLISH_STATE in ow.ALLOWED_PATHS and ow.DUST_ATTEMPT_PATH in ow.ALLOWED_PATHS
+    assert ow.audit("seykota", "ledger_status.json") in ow.ALLOWED_PATHS and ow.audit("btc-competition", "ledger_status.json") in ow.ALLOWED_PATHS
+
+
 # --- command line -----------------------------------------------------------------------------------------------------
 
 def test_run_report_and_ack_round_trip(tmp_path, capsys, demo_check):
