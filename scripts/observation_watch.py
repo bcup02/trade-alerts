@@ -479,26 +479,21 @@ def _side(value: Any) -> str | None:
     return "short" if text in ("short", "sell") else "long" if text in ("long", "buy") else None
 
 
-def check_dev_crypto_x5b(ctx: Context) -> Result:
-    """x5b: what the dev host's crypto strategy has to do by itself before the last testnet checks can run --
-    open a position on a signal, move its stop (cancel the old order, place a new one), and get stopped out.
+def _stop_memory(previous: Mapping[str, Any]) -> tuple[dict[str, list[str]], dict[str, float], dict[str, str]]:
+    """The stop-order ids seen per trade, the last stop price and the last order id, as stored by the previous run."""
+    seen = {k: list(v) for k, v in dict(previous.get("stops") or {}).items()}
+    prices = {k: float(v) for k, v in dict(previous.get("prices") or {}).items()}
+    last_ids = {k: str(v) for k, v in dict(previous.get("last_ids") or {}).items()}
+    return seen, prices, last_ids
 
-    Nothing here closes the item: the clean take-over test and the checks of ledger, sheet and ids need a person (and the
-    user's per-item authorisation).  A move is seen as a changed ``stop_plan_order_id`` of the same trade between two runs
-    (the move is not ledgered) together with a stop price that tightened (down for a short, up for a long); a changed id with an
-    equal or looser price is somebody else's order and only resets the baseline.  A move and the close between two 30-minute
-    runs can be missed, and so can a stranger's order that happens to tighten the stop."""
-    events = list(jsonl(ctx.remote.read("dev", audit("mycrypto", "trading_ledger.jsonl"))))
-    entries, stops = _own_dev_crypto_trades(events)
-    seen: dict[str, list[str]] = {k: list(v) for k, v in dict(ctx.previous.get("stops") or {}).items()}
-    prices: dict[str, float] = {k: float(v) for k, v in dict(ctx.previous.get("prices") or {}).items()}
-    last_ids: dict[str, str] = {k: str(v) for k, v in dict(ctx.previous.get("last_ids") or {}).items()}
-    if not entries:
-        return Result(WAITING, "開發機加密策略還沒有因進場訊號而下的測試網單。", extra={"stops": seen, "prices": prices, "last_ids": last_ids})
-    try:
-        state = load_json(ctx.remote, "dev", f"/opt/{REPOS['mycrypto']}/state/state.json")
-    except RemoteFileMissing:
-        state = {}                                    # flat: the strategy has no state file; nothing to learn about a stop
+
+def _follow_stop(previous: Mapping[str, Any], state: Mapping[str, Any], entries: list[dict[str, Any]]
+                 ) -> tuple[dict[str, list[str]], dict[str, float], dict[str, str]]:
+    """Follow the open trade's native stop between two runs: a move is not ledgered, it shows only as a new
+    ``stop_plan_order_id`` in the strategy's state file.  Only the strategy tightening its stop (a short's goes down, a long's
+    up, against the price of the previous run) counts as a move; a changed id with the same or a looser price is somebody
+    else's order and only resets the baseline (the 10/20 dry-run accident).  Only trades in ``entries`` are kept."""
+    seen, prices, last_ids = _stop_memory(previous)
     trade, order = state.get("trade_id"), state.get("stop_plan_order_id")
     if trade and order is not None:
         trade, order = str(trade), str(order)
@@ -506,9 +501,6 @@ def check_dev_crypto_x5b(ctx: Context) -> Result:
         price = _number(state.get("active_stop_price"))
         if order != last_ids.get(trade):
             side = next((_side(e.get("side")) for e in reversed(entries) if str(e.get("trade_id")) == trade), None)
-            # A new order id alone is not a move: only the strategy tightening its stop is (a short's stop goes down, a long's
-            # up), measured against the price seen on the previous run.  An id that changed with the same or a looser price --
-            # somebody else's order replaced and restored, like the 10/20 dry-run accident -- is never counted.
             tightened = (price is not None and trade in prices and side is not None
                          and (price < prices[trade] if side == "short" else price > prices[trade]))
             if order not in ids and (not ids or tightened):
@@ -520,6 +512,28 @@ def check_dev_crypto_x5b(ctx: Context) -> Result:
     seen = {t: ids for t, ids in seen.items() if t in own_trades}      # nothing else is ever looked at, so nothing else is kept
     prices = {t: v for t, v in prices.items() if t in own_trades}
     last_ids = {t: v for t, v in last_ids.items() if t in own_trades}
+    return seen, prices, last_ids
+
+
+def check_dev_crypto_x5b(ctx: Context) -> Result:
+    """x5b: what the dev host's crypto strategy has to do by itself before the last testnet checks can run --
+    open a position on a signal, move its stop (cancel the old order, place a new one), and get stopped out.
+
+    Nothing here closes the item: the clean take-over test and the checks of ledger, sheet and ids need a person (and the
+    user's per-item authorisation).  A move is seen as a changed ``stop_plan_order_id`` of the same trade between two runs
+    (the move is not ledgered) together with a stop price that tightened (down for a short, up for a long); a changed id with an
+    equal or looser price is somebody else's order and only resets the baseline.  A move and the close between two 30-minute
+    runs can be missed, and so can a stranger's order that happens to tighten the stop."""
+    events = list(jsonl(ctx.remote.read("dev", audit("mycrypto", "trading_ledger.jsonl"))))
+    entries, stops = _own_dev_crypto_trades(events)
+    if not entries:
+        seen, prices, last_ids = _stop_memory(ctx.previous)
+        return Result(WAITING, "開發機加密策略還沒有因進場訊號而下的測試網單。", extra={"stops": seen, "prices": prices, "last_ids": last_ids})
+    try:
+        state = load_json(ctx.remote, "dev", f"/opt/{REPOS['mycrypto']}/state/state.json")
+    except RemoteFileMissing:
+        state = {}                                    # flat: the strategy has no state file; nothing to learn about a stop
+    seen, prices, last_ids = _follow_stop(ctx.previous, state, entries)
     moved = sorted(t for t, ids in seen.items() if len(ids) >= 2)
     last = max(parse_time(e["event_time"]) for e in entries)
     status = load_json(ctx.remote, "dev", audit("mycrypto", "google_reconcile_status.json"))
@@ -582,6 +596,17 @@ def _health_publish(ctx: Context, host: str) -> tuple[bool, str, int]:
     return failures == 0 and fresh, sentence, failures
 
 
+def _streak(ctx: Context) -> tuple[datetime, timedelta, dict[str, str]]:
+    """(streak start, how long it has held, the ``extra`` to store) for a run that saw everything healthy.  The streak
+    restarts when there is no earlier healthy run or the previous one is more than ``STREAK_MAX_GAP`` old (see there)."""
+    since = parse_time((ctx.previous or {}).get("healthy_since"))
+    last_seen = parse_time((ctx.previous or {}).get("last_seen"))
+    if since is None or last_seen is None or not timedelta(0) <= ctx.now - last_seen <= STREAK_MAX_GAP:
+        since = ctx.now            # no earlier healthy run, or an unobserved stretch in between: the streak starts again
+    extra = {"healthy_since": since.isoformat(timespec="seconds"), "last_seen": ctx.now.isoformat(timespec="seconds")}
+    return since, ctx.now - since, extra
+
+
 def check_health_publish(ctx: Context) -> Result:
     """f-45: both hosts' health-reading publishers have been healthy for ``STABLE_STREAK`` in a row.
 
@@ -597,12 +622,7 @@ def check_health_publish(ctx: Context) -> Result:
         return Result(FAILED, "維運讀數發布單元連續失敗 3 次以上。", sentences, key="failing-" + "-".join(broken))
     if not all(results[h][0] for h in results):
         return Result(WAITING, "維運讀數發布單元現在不是兩台都正常，穩定天數重新算。", sentences)
-    since = parse_time((ctx.previous or {}).get("healthy_since"))
-    last_seen = parse_time((ctx.previous or {}).get("last_seen"))
-    if since is None or last_seen is None or not timedelta(0) <= ctx.now - last_seen <= STREAK_MAX_GAP:
-        since = ctx.now            # no earlier healthy run, or an unobserved stretch in between: the streak starts again
-    held = ctx.now - since
-    extra = {"healthy_since": since.isoformat(timespec="seconds"), "last_seen": ctx.now.isoformat(timespec="seconds")}
+    since, held, extra = _streak(ctx)
     hours = int(held.total_seconds() // 3600)
     if held >= STABLE_STREAK:
         return Result(OBSERVED, f"維運讀數發布單元兩台都已連續正常 {hours} 小時，可以結案（登記冊面板的分頁是否被標過期，另看一眼頁面）。",
@@ -649,6 +669,172 @@ def check_dust_convert(ctx: Context) -> Result:
         return Result(WAITING, "競賽策略有粉塵轉換的帳本列，等狀態變 done 與轉換後的對帳。", evidence)
     return Result(OBSERVED, "競賽策略完成第一次真實的粉塵轉換：機器查到帳本列、狀態 done、對帳一致；請對照幣安 App 的小額資產轉換紀錄與備註裡的 tranId。",
                   evidence, needs_human=True, key=f"{len(outs)}-{len(ins)}")
+
+
+# --- f-70 batch 2: A1 stability, f-63 one entry a day, x5 stop, f-38 -----------------------------------------------------
+
+#: When A1's crypto strategy was reopened with the f-63 fix (2026-10-23 16:22 Taipei); nothing before it counts for f-63 / x5.
+CRYPTO_REOPENED = datetime(2026, 10, 23, 8, 22, tzinfo=timezone.utc)
+OPS_READING_FRESH_MINUTES = 90            # ops-notify polls every 10 minutes; the slowest reading (export, google) is a few polls old
+_HEALTHY_VALUES = frozenset({"OK", "RECONCILED", "HEALTHY"})
+_STABLE_TARGETS = tuple(REPOS) + ("host",)
+
+
+def _ops_readings(ctx: Context) -> dict[str, Mapping[str, Any]]:
+    """Every ``<target>:<axis>`` reading in ops-notify's state file on A1.  The file not holding the readings the stability
+    check needs, or a reading that has not been refreshed lately, is an error: ops-notify itself is then not looking."""
+    state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
+    readings = {k: v for k, v in state.items() if not k.startswith("_") and isinstance(v, Mapping)}
+    missing = [t for t in _STABLE_TARGETS if not any(k.startswith(t + ":") for k in readings)]
+    if missing:
+        raise RemoteError(f"ops-notify 狀態檔沒有這些對象的讀數：{', '.join(missing)}")
+    for key, reading in readings.items():
+        if key.partition(":")[0] not in _STABLE_TARGETS:
+            continue
+        checked = parse_time(reading.get("checked_at"))
+        if reading.get("checked_at") is not None and not _fresh(checked, ctx.now, OPS_READING_FRESH_MINUTES):
+            raise RemoteError(f"{key} 的讀數太舊，維運通知可能沒在檢查（檢查時間 {taipei_text(reading.get('checked_at'))}）")
+    return {k: v for k, v in readings.items() if k.partition(":")[0] in _STABLE_TARGETS}
+
+
+def check_a1_stable(ctx: Context) -> Result:
+    """x8 / f-63 / x5 (third part): A1 has had no unhealthy reading for ``STABLE_STREAK``.
+
+    Reads the readings ops-notify keeps for all four strategies and the host (runtime HEALTHY, ledger and Google RECONCILED,
+    export / units / clock OK, each with ``severity`` ok).  The streak is ``_streak``'s: it restarts on any unhealthy reading and
+    after any stretch no run could see.  This is only what ops-notify watches: that the funding-fee sync exits 0 every 4 hours
+    and that no stop price or stop order changed are NOT read here -- say so when closing the items."""
+    readings = _ops_readings(ctx)
+    bad = sorted(k for k, v in readings.items() if v.get("severity") != "ok" or v.get("value") not in _HEALTHY_VALUES)
+    evidence = [f"{len(readings)} 個讀數（四支策略各 5 項＋主機時鐘）"]
+    if bad:
+        return Result(WAITING, "A1 現在有讀數不正常，穩定時間重新算：" + "、".join(f"{k}={readings[k].get('value')}" for k in bad[:5]) + "。", evidence)
+    since, held, extra = _streak(ctx)
+    hours = int(held.total_seconds() // 3600)
+    if held >= STABLE_STREAK:
+        return Result(OBSERVED, f"A1 四支策略與主機的讀數已連續正常 {hours} 小時。這只涵蓋維運通知看的項目；資金費同步每 4 小時 exit 0、"
+                      "停損價與停損單不變，我結案前會另外到主機查。",
+                      evidence + [f"從 {taipei(since)}（台北）起每一輪偵測都看到全部正常"], closable=True, key="stable", extra=extra)
+    return Result(WAITING, f"A1 讀數全部正常，已連續 {hours} 小時（滿 {int(STABLE_STREAK.total_seconds() // 3600)} 小時通知）。", evidence, extra=extra)
+
+
+def _live_crypto_entries(events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [e for e in events if e.get("event_type") == "trade_open" and e.get("source") == "entry_signal"
+            and str(e.get("execution_mode") or "").upper() == "LIVE" and parse_time(e.get("event_time"))]
+
+
+def check_crypto_one_entry_a_day(ctx: Context) -> Result:
+    """f-63: A1's crypto strategy enters at most once per UTC day (the 10/22 same-day re-entry must not come back).
+
+    A day with entries of two different trades is ``failed`` at once.  Closable only when an entry made after the reopening
+    lies on a UTC day that is over and held exactly one entry -- the strategy then lived through a UTC midnight (the daily-candle
+    judgement) with the fix.  Entries before the reopening never count."""
+    events = list(jsonl(ctx.remote.read("a1", audit("mycrypto", "trading_ledger.jsonl"))))
+    entries = [e for e in _live_crypto_entries(events) if parse_time(e["event_time"]) > CRYPTO_REOPENED]
+    closes = [e for e in events if e.get("event_type") == "trade_close" and str(e.get("execution_mode") or "").upper() == "LIVE"
+              and (parse_time(e.get("event_time")) or CRYPTO_REOPENED) > CRYPTO_REOPENED]
+    days: dict[str, set[str]] = {}
+    for entry in entries:
+        days.setdefault(parse_time(entry["event_time"]).strftime("%Y-%m-%d"), set()).add(str(entry.get("trade_id")))
+    twice = sorted(d for d, trades in days.items() if len(trades) > 1)
+    if twice:
+        return Result(FAILED, "A1 加密策略在同一個 UTC 日進場超過一次（f-63 的修法沒擋住）。",
+                      [f"{d}（UTC）：{len(days[d])} 筆進場，trade_id {', '.join(sorted(t[:8] for t in days[d]))}" for d in twice], key=",".join(twice))
+    today = ctx.now.strftime("%Y-%m-%d")
+    over = sorted(d for d in days if d < today)
+    if not entries:
+        return Result(WAITING, "A1 加密策略自 f-63 重開後還沒有新的進場。")
+    close_days = {parse_time(e["event_time"]).strftime("%Y-%m-%d") for e in closes}
+    evidence = [f"重開後進場 {len(entries)} 筆，落在 {len(days)} 個 UTC 日（{', '.join(sorted(days))}），每天只有一筆",
+                "其中有出場的日子：" + (", ".join(sorted(close_days & set(days))) or "（沒有，還沒測到出場後同日再進場的情形）")]
+    if not over:
+        return Result(WAITING, "A1 加密策略重開後有進場，但進場那天（UTC）還沒結束，等過了 UTC 午夜才能確認同一天只進一次。", evidence)
+    return Result(OBSERVED, "A1 加密策略重開後，已有 UTC 日結束且當天只進場一次。", evidence, closable=True, key=",".join(over))
+
+
+def check_crypto_stop(ctx: Context) -> Result:
+    """x5 (first two parts): on A1 the crypto stop really triggers, and the stop is moved by cancel-and-place.
+
+    A trigger is a LIVE ``trade_close`` whose ``source`` starts with ``native_stop`` after the reopening; it is only counted once the
+    ledger-vs-exchange check after it (past its grace) says RECONCILED -- ``DIVERGED`` is ``failed``.  A move is seen as the dev
+    check sees it (``_follow_stop``: a tightened stop with a new order id, between two runs; a move and the close inside one 30-minute
+    gap are missed).  That the old order was cancelled and the new one placed WITHOUT a gap cannot be seen from these files, so this
+    check never closes: it says what it saw, and the gap is looked at on the exchange when the item is closed."""
+    events = list(jsonl(ctx.remote.read("a1", audit("mycrypto", "trading_ledger.jsonl"))))
+    entries = _live_crypto_entries(events)
+    stops = [e for e in events if e.get("event_type") == "trade_close" and str(e.get("source") or "").startswith("native_stop")
+             and str(e.get("execution_mode") or "").upper() == "LIVE" and (parse_time(e.get("event_time")) or CRYPTO_REOPENED) > CRYPTO_REOPENED]
+    try:
+        state = load_json(ctx.remote, "a1", f"/opt/{REPOS['mycrypto']}/state/state.json")
+    except RemoteFileMissing:
+        state = {}                                    # flat: no state file, so no stop to follow
+    seen, prices, last_ids = _follow_stop(ctx.previous, state, entries)
+    extra = {"stops": seen, "prices": prices, "last_ids": last_ids}
+    moved = sorted(t for t, ids in seen.items() if len(ids) >= 2)
+    stop_ok = False
+    if stops:
+        last = max(parse_time(e["event_time"]) for e in stops)
+        verdict = reconcile_covers(load_json(ctx.remote, "a1", audit("mycrypto", "ledger_status.json")), last, ctx.now)
+        if verdict == "diverged":
+            return Result(FAILED, "A1 加密策略的停損觸發後，帳本對交易所對帳對不上。",
+                          [f"停損平倉 {len(stops)} 筆，最近 {taipei(last)}（台北）"], key=f"diverged:{len(stops)}", extra=extra)
+        stop_ok = verdict == "covered"
+    if not moved and not stop_ok:
+        return Result(WAITING, "A1 加密策略重開後還沒看到移動停損，也還沒有（對帳確認過的）停損觸發。", extra=extra)
+    summary = ("A1 加密策略" + ("移動停損了（停損單號換新、價格收緊）" if moved else "還沒看到移動停損") + "；"
+               + ("停損觸發並已對帳一致" if stop_ok else "停損還沒觸發") + "。撤舊再掛有沒有空窗，檔案看不出來，要到交易所查。")
+    evidence = [f"停損單號變動：{', '.join(f'{t[:8]}={len(seen[t])} 個' for t in moved) or '尚無'}",
+                f"停損平倉：{', '.join(str(e.get('trade_id'))[:8] for e in stops) or '尚無'}"]
+    return Result(OBSERVED, summary, evidence, needs_human=True, key="|".join([*(["move"] if moved else []), *(["stop"] if stop_ok else [])]), extra=extra)
+
+
+#: ops-notify's export timer runs every minute and ops-notify polls every 10 minutes: a notice should be out within ~11.
+EXPORT_NOTICE_LATENCY = timedelta(minutes=15)
+_MOMENTUM_REAL_FROM = datetime(2026, 10, 13, 4, 0, tzinfo=timezone.utc)
+
+
+def check_momentum_halt_notice(ctx: Context) -> Result:
+    """f-38: a real R3 event of the momentum strategy reaches the maintenance channel within the export-and-poll time.
+
+    Measures ``recorded_at`` -> ops-notify's ``delivered`` time (at most ``EXPORT_NOTICE_LATENCY``) and that the momentum export
+    reading (the refresh timer's output going stale is what it reports) is OK.  The export file's own modification time is not
+    read: the delivery latency stands in for "updated within about a minute", and the line says so.  A second message owed and
+    not sent for 70 minutes is ``failed`` like in the other strategies' notice check."""
+    events = [(k, e) for k, e in _real_events(ctx, _MOMENTUM_REAL_FROM, tiers={"R3"}) if k == "momentum"]
+    if not events:
+        return Result(WAITING, "A1 動能策略還沒有真實的 R3 事件（安全暫停）。")
+    state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
+    exported = state.get("_export") if isinstance(state.get("_export"), Mapping) else {}
+    target = exported.get("momentum") if isinstance(exported.get("momentum"), Mapping) else {}
+    export_reading = state.get("momentum:export") if isinstance(state.get("momentum:export"), Mapping) else {}
+    baseline = parse_time(target.get("baseline_at"))
+    evidence, late, unsent, unproven = [], [], [], []
+    for _, event in events[:5]:
+        at, event_id = parse_time(event.get("recorded_at")), event.get("event_id")
+        sent = parse_time((target.get("delivered") or {}).get(event_id))
+        label = f"動能策略 {event.get('code')}（事件 {taipei(at)} 台北）"
+        if sent is not None and baseline is not None and at <= baseline:
+            unproven.append(label)
+            evidence.append(label + "；早於維運通知建立基準，送出紀錄只是略過標記")
+        elif sent is None:
+            (late if ctx.now - at > EXPORT_NOTICE_LATENCY else unsent).append(label)
+            evidence.append(label + "；維運通知還沒有送出紀錄")
+        elif sent - at > EXPORT_NOTICE_LATENCY:
+            late.append(label)
+            evidence.append(label + f"；事件到送出隔了 {int((sent - at).total_seconds() // 60)} 分鐘（上限 {int(EXPORT_NOTICE_LATENCY.total_seconds() // 60)}）")
+        else:
+            evidence.append(label + f"；事件後 {max(0, int((sent - at).total_seconds() // 60))} 分鐘送出（推定匯出檔約一分鐘內更新，沒有直接讀檔案時間）")
+    owed = [str(eid) for _, e in events[:5] if (eid := e.get("event_id")) in (target.get("ai_pending") or {})
+            and ctx.now - (parse_time((target.get("ai_pending") or {})[eid]) or ctx.now) > SECOND_MESSAGE_OVERDUE]
+    key = str(events[0][1].get("event_id"))
+    if export_reading.get("severity") not in (None, "ok") or late or owed:
+        why = "匯出檔軸不正常（刷新計時器可能壞了）" if export_reading.get("severity") not in (None, "ok") else "維運通知超過預期時間沒送出，或第二則一直送不出去"
+        return Result(FAILED, "A1 動能策略的安全暫停通知不如預期：" + why + "。", evidence, key="bad:" + key)
+    if unsent:
+        return Result(WAITING, "事件已記錄，等維運通知下一輪送出。", evidence)
+    if unproven:
+        return Result(OBSERVED, "A1 動能策略出現 R3 事件，但無法從紀錄證明維運通知有送出，請你確認有沒有收到。", evidence, needs_human=True, key="unproven:" + key)
+    return Result(OBSERVED, "A1 動能策略的 R3 事件已在預期時間內送出維運通知，匯出檔軸正常。", evidence, closable=True, key=key)
 
 
 _NOTIFY_FAILURES = re.compile(r"status_ai_send_failed|status_ai_dropped|status_ai_render_failed|reminder_send_failed|reminders_unavailable")
@@ -1032,6 +1218,10 @@ CHECKS: tuple[Check, ...] = (
     Check("dev-trend-reconcile", "開發機趨勢策略對帳回到 RECONCILED（f-7 後半）", ("f-7",), check_dev_trend_reconcile),
     Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
     Check("dust-convert", "競賽策略第一次真實粉塵轉換", ("f-66",), check_dust_convert),
+    Check("a1-stable", "A1 四支策略與主機讀數連續正常（x8、f-63、x5 的穩定天數）", ("phase-x8", "f-63", "phase-x5"), check_a1_stable),
+    Check("crypto-one-entry-a-day", "A1 加密策略同一個 UTC 日只進場一次", ("f-63",), check_crypto_one_entry_a_day),
+    Check("crypto-stop", "A1 加密策略停損觸發與移動停損", ("phase-x5",), check_crypto_stop),
+    Check("momentum-halt-notice", "A1 動能策略真實安全暫停通知在預期時間內送出", ("f-38",), check_momentum_halt_notice),
     Check("status-alerts", "A1 第一則真實狀態告警", ("f-23", "f-40", "f-41"), check_status_alerts),
     Check("reminders", "A1 持續提醒", ("f-39",), check_reminders),
     Check("pending-expired", "對帳標記逾時通知", ("f-30",), check_pending_expired),

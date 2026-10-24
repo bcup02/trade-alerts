@@ -1750,3 +1750,256 @@ def test_the_status_alert_notice_shows_taipei_time_not_utc():
     result = ow.check_status_alerts(ctx(remote))
     text = "\n".join(result.evidence)
     assert "UTC" not in text and "+00:00" not in text and "（台北）" in text
+
+
+# --- f-70 batch 2: A1 stability, f-63 one entry a day, x5 stop, f-38 ------------------------------------------------------
+
+B2_NOW = datetime(2026, 10, 26, 3, 0, tzinfo=timezone.utc)
+
+
+def b2_ctx(remote, previous=None, now=B2_NOW):
+    return ow.Context(remote, now, previous or {})
+
+
+OPS_STATE = "/var/lib/ops-notify/state.json"
+_AXIS_VALUES = {"runtime": "HEALTHY", "ledger": "RECONCILED", "google": "RECONCILED", "export": "OK", "units": "OK"}
+
+
+def ops_readings(now=B2_NOW, **overrides):
+    """ops-notify's per-axis readings for the four strategies and the host clock; ``overrides`` maps ``target:axis`` to a dict."""
+    state = {}
+    for target in (*ow.REPOS, "host"):
+        for axis, value in (_AXIS_VALUES.items() if target != "host" else [("clock", "OK")]):
+            state[f"{target}:{axis}"] = {"severity": "ok", "value": value,
+                                         "checked_at": None if axis == "units" else iso(now - timedelta(minutes=5))}
+    for key, patch in overrides.items():
+        state[key.replace("__", ":")] = {**state[key.replace("__", ":")], **patch}
+    return state
+
+
+def ops_remote(now=B2_NOW, **overrides):
+    r = FakeRemote()
+    r.files[("a1", OPS_STATE)] = json.dumps({**ops_readings(now, **overrides), "_meta": {"consecutive_send_failures": 0}})
+    return r
+
+
+def test_a1_stable_starts_a_streak_and_announces_after_72_hours_only():
+    first = ow.check_a1_stable(b2_ctx(ops_remote()))
+    assert first.state == ow.WAITING and first.extra["healthy_since"] == iso(B2_NOW)
+    prev = {"last_seen": iso(B2_NOW - timedelta(minutes=30))}
+    early = ow.check_a1_stable(b2_ctx(ops_remote(), {**prev, "healthy_since": iso(B2_NOW - timedelta(hours=71))}))
+    done = ow.check_a1_stable(b2_ctx(ops_remote(), {**prev, "healthy_since": iso(B2_NOW - timedelta(hours=73))}))
+    assert early.state == ow.WAITING and not early.closable
+    assert done.state == ow.OBSERVED and done.closable and not done.needs_human and done.key == "stable"
+    assert "資金費同步" in done.summary                                                    # says what it did not read
+
+
+@pytest.mark.parametrize("override", [
+    {"mycrypto__runtime": {"severity": "critical", "value": "STALE"}},
+    {"momentum__ledger": {"severity": "warn", "value": "DIVERGED"}},
+    {"seykota__units": {"severity": "critical", "value": "FAILED"}},
+    {"host__clock": {"value": "UNSYNCED"}},                                                # severity ok but not a healthy value
+])
+def test_a1_stable_any_unhealthy_reading_restarts_the_streak(override):
+    prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
+    result = ow.check_a1_stable(b2_ctx(ops_remote(**override), prev))
+    assert result.state == ow.WAITING and not result.closable and "healthy_since" not in result.extra
+
+
+def test_a1_stable_a_stale_reading_or_a_missing_target_is_an_error_not_a_pass():
+    stale = ops_remote(**{"mycrypto__export": {"checked_at": iso(B2_NOW - timedelta(hours=3))}})
+    with pytest.raises(ow.RemoteError):
+        ow.check_a1_stable(b2_ctx(stale))
+    r = FakeRemote()
+    r.files[("a1", OPS_STATE)] = json.dumps({k: v for k, v in ops_readings().items() if not k.startswith("mycrypto")})
+    with pytest.raises(ow.RemoteError):
+        ow.check_a1_stable(b2_ctx(r))
+    with pytest.raises(ow.RemoteError):
+        ow.check_a1_stable(b2_ctx(FakeRemote()))
+
+
+def test_a1_stable_a_run_that_could_not_read_ends_the_streak_over_a_144_run_cadence():
+    check = next(c for c in ow.CHECKS if c.id == "a1-stable")
+    state = {"items": ow.run_checks(ops_remote(B2_NOW), B2_NOW, {}, [check])}
+    for step in range(1, 145):                                                            # one run every 30 minutes for 72 hours
+        moment = B2_NOW + timedelta(minutes=30 * step)
+        state = {"items": ow.run_checks(ops_remote(moment), moment, state, [check])}
+        assert state["items"]["a1-stable"]["state"] == (ow.OBSERVED if step == 144 else ow.WAITING), step
+    # healthy -> unreadable -> healthy again: the unobserved stretch is not counted
+    state = {"items": ow.run_checks(ops_remote(B2_NOW), B2_NOW, {}, [check])}
+    state = {"items": ow.run_checks(FakeRemote(), B2_NOW + timedelta(hours=25), state, [check])}
+    assert state["items"]["a1-stable"]["state"] == ow.ERROR
+    back = B2_NOW + timedelta(hours=73)
+    entry = ow.run_checks(ops_remote(back), back, state, [check])["a1-stable"]
+    assert entry["state"] == ow.WAITING and entry["extra"]["healthy_since"] == iso(back)
+
+
+def test_the_stable_check_reads_no_new_path():
+    assert OPS_STATE in ow.ALLOWED_PATHS and "/var/lib/ops-notify/state.json" == OPS_STATE
+
+
+# f-63: one entry a day
+
+def crypto_entry(day_hours_ago, trade_id, *, mode="LIVE", source="entry_signal", kind="trade_open", **extra):
+    return {"event_type": kind, "event_time": iso(B2_NOW - timedelta(hours=day_hours_ago)), "event_id": f"{kind}-{trade_id}",
+            "trade_id": trade_id, "execution_mode": mode, "source": source, **extra}
+
+
+def crypto_remote(events, *, state=None, reconcile="RECONCILED", ledger_minutes=5):
+    r = FakeRemote()
+    put(r, "a1", "mycrypto", "trading_ledger.jsonl", events, jsonl=True)
+    put(r, "a1", "mycrypto", "ledger_status.json", {"value": reconcile, "checked_at": iso(B2_NOW - timedelta(minutes=ledger_minutes)), "note": "n"})
+    if state is not None:
+        r.files[("a1", STATE_PATH)] = json.dumps(state)
+    return r
+
+
+@pytest.mark.parametrize("events", [
+    [],
+    [crypto_entry(2, "OLD", ) | {"event_time": "2026-10-22T06:24:00+00:00"}],               # before the reopening
+    [crypto_entry(2, "T", mode="DEMO")],
+    [crypto_entry(2, "T", source="backfilled_historical_trade")],
+])
+def test_one_entry_a_day_waits_without_a_countable_entry(events):
+    assert ow.check_crypto_one_entry_a_day(b2_ctx(crypto_remote(events))).state == ow.WAITING
+
+
+def test_one_entry_a_day_two_trades_on_one_utc_day_fails_at_once():
+    events = [crypto_entry(2.5, "AAAAAAAA1"), crypto_entry(2, "BBBBBBBB2")]              # 00:30 and 01:00 UTC on 10/26
+    result = ow.check_crypto_one_entry_a_day(b2_ctx(crypto_remote(events)))
+    assert result.state == ow.FAILED and result.key == "2026-10-26" and "AAAAAAAA" in result.evidence[0]
+
+
+def test_one_entry_a_day_a_pyramid_add_of_the_same_trade_is_not_a_second_entry():
+    events = [crypto_entry(2.5, "T1"), crypto_entry(2, "T1")]
+    assert ow.check_crypto_one_entry_a_day(b2_ctx(crypto_remote(events))).state == ow.WAITING
+
+
+def test_one_entry_a_day_is_closable_only_after_the_entry_day_is_over():
+    today = [crypto_entry(2, "T1")]                                                        # 01:00 UTC 10/26, "now" is 03:00 the same day
+    waiting = ow.check_crypto_one_entry_a_day(b2_ctx(crypto_remote(today)))
+    assert waiting.state == ow.WAITING and "UTC 午夜" in waiting.summary
+    yesterday = [crypto_entry(10, "T1")]                                                   # 17:00 UTC 10/25
+    done = ow.check_crypto_one_entry_a_day(b2_ctx(crypto_remote(yesterday)))
+    assert done.state == ow.OBSERVED and done.closable and not done.needs_human and done.key == "2026-10-25"
+    assert "沒有，還沒測到出場後同日再進場" in done.evidence[1]
+    with_close = yesterday + [crypto_entry(9, "T1", kind="trade_close", source="trend_reversal")]
+    assert "2026-10-25" in ow.check_crypto_one_entry_a_day(b2_ctx(crypto_remote(with_close))).evidence[1]
+
+
+# x5: stop trigger and trailing stop on A1
+
+def crypto_stop_state(order, price, trade="T1"):
+    return {"trade_id": trade, "stop_plan_order_id": order, "active_stop_price": price}
+
+
+def stop_run(events, order, price, previous=None, **kw):
+    return ow.check_crypto_stop(b2_ctx(crypto_remote(events, state=crypto_stop_state(order, price), **kw), previous))
+
+
+SHORT = [crypto_entry(40, "T1", side="short") | {"event_time": "2026-10-22T06:24:00+00:00"}]    # opened BEFORE the reopening, still held
+
+
+def test_crypto_stop_waits_and_remembers_the_first_order_id():
+    first = stop_run(SHORT, 111, 86800.0)
+    assert first.state == ow.WAITING and first.extra["stops"] == {"T1": ["111"]}
+
+
+def test_crypto_stop_sees_a_tightened_short_stop_as_a_move_and_never_closes():
+    first = stop_run(SHORT, 111, 86800.0)
+    second = stop_run(SHORT, 222, 85000.0, first.extra)
+    assert second.state == ow.OBSERVED and second.needs_human and not second.closable and second.key == "move"
+    assert "空窗" in second.summary
+    assert stop_run(SHORT, 222, 85000.0, second.extra).key == "move"                       # announced once
+    replaced = stop_run(SHORT, 333, 86800.0, first.extra)                                  # a new id with the same price is not a move
+    assert replaced.state == ow.WAITING
+
+
+def stop_close(hours, trade="T1", source="native_stop_reconciled", mode="LIVE"):
+    return crypto_entry(hours, trade, kind="trade_close", source=source, mode=mode)
+
+
+def test_crypto_stop_a_trigger_counts_only_once_the_reconcile_after_it_agrees():
+    close = SHORT + [stop_close(2)]                                                         # 01:00 UTC; grace over at 02:01
+    assert stop_run(close, 111, 86800.0, reconcile="RECONCILED").key == "stop"
+    pending = stop_run(close, 111, 86800.0, reconcile="RECONCILED", ledger_minutes=90)       # checked 01:30: inside the grace / stale
+    assert pending.state == ow.WAITING
+    bad = stop_run(close, 111, 86800.0, reconcile="DIVERGED")
+    assert bad.state == ow.FAILED and bad.key == "diverged:1"
+
+
+@pytest.mark.parametrize("closing", [
+    stop_close(2, source="trend_reversal"), stop_close(2, mode="DEMO"),
+    crypto_entry(2, "T1", kind="trade_close", source="native_stop_price_estimate") | {"event_time": "2026-10-23T07:00:00+00:00"},   # before the reopening
+])
+def test_crypto_stop_other_closes_are_not_a_trigger(closing):
+    assert stop_run(SHORT + [closing], 111, 86800.0).state == ow.WAITING
+
+
+def test_crypto_stop_both_stages_have_their_own_key():
+    first = stop_run(SHORT, 111, 86800.0)
+    both = stop_run(SHORT + [stop_close(2)], 222, 85000.0, first.extra)
+    assert both.key == "move|stop"
+
+
+def test_crypto_stop_a_missing_state_file_is_flat_and_an_unreadable_one_is_an_error():
+    r = crypto_remote(SHORT)                                                                 # no state file: flat
+    assert ow.check_crypto_stop(b2_ctx(r)).state == ow.WAITING
+    r.files[("a1", STATE_PATH)] = "not json"
+    with pytest.raises(ow.RemoteError):
+        ow.check_crypto_stop(b2_ctx(r))
+
+
+# f-38: momentum safe-halt notice
+
+def halt_remote(*, sent_after_minutes=None, delivered_extra=None, export_severity="ok", recorded_hours=2, baseline="2026-09-23T19:10:05+00:00",
+                ai_pending=None, test=False):
+    ev = event("PROTECTION_UNVERIFIED", hours=recorded_hours, test=test, event_id="E1")
+    r = events_remote(momentum=[ev], baseline={"momentum": baseline}, ai_pending=ai_pending)
+    state = json.loads(r.files[("a1", OPS_STATE)])
+    if sent_after_minutes is not None:
+        state["_export"]["momentum"]["delivered"] = {"E1": iso(NOW_AT(recorded_hours) + timedelta(minutes=sent_after_minutes))}
+    else:
+        state["_export"]["momentum"]["delivered"] = {}
+    state["momentum:export"] = {"severity": export_severity, "value": "OK" if export_severity == "ok" else "STALE"}
+    r.files[("a1", OPS_STATE)] = json.dumps(state)
+    return r
+
+
+def NOW_AT(hours):
+    return NOW - timedelta(hours=hours)
+
+
+def test_momentum_halt_waits_without_a_real_event_and_ignores_test_events_and_other_strategies():
+    assert ow.check_momentum_halt_notice(ctx(events_remote())).state == ow.WAITING
+    assert ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=3, test=True))).state == ow.WAITING
+    other = events_remote(seykota=[event("PROTECTION_UNVERIFIED", event_id="S1")])
+    assert ow.check_momentum_halt_notice(ctx(other)).state == ow.WAITING
+
+
+def test_momentum_halt_delivered_in_time_with_a_healthy_export_is_closable():
+    result = ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=11)))
+    assert result.state == ow.OBSERVED and result.closable and not result.needs_human and result.key == "E1"
+    assert "沒有直接讀檔案時間" in result.evidence[0]                                         # the proxy is stated
+
+
+def test_momentum_halt_a_late_or_missing_notice_or_a_broken_export_fails():
+    assert ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=16))).state == ow.FAILED
+    assert ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=None))).state == ow.FAILED          # 2 h and never sent
+    broken = ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=3, export_severity="critical")))
+    assert broken.state == ow.FAILED and "匯出檔軸" in broken.summary
+    stuck = ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=3, ai_pending={"momentum": {"E1": iso(NOW - timedelta(minutes=80))}})))
+    assert stuck.state == ow.FAILED
+
+
+def test_momentum_halt_a_fresh_event_is_waiting_and_a_baseline_mark_is_not_proof():
+    assert ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=None, recorded_hours=0))).state == ow.WAITING
+    marked = ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=0, baseline=iso(NOW))))
+    assert marked.state == ow.OBSERVED and marked.needs_human and not marked.closable
+
+
+def test_batch2_checks_are_registered_with_their_items():
+    ids = {c.id: c for c in ow.CHECKS}
+    assert ids["a1-stable"].covers == ("phase-x8", "f-63", "phase-x5")
+    assert ids["crypto-one-entry-a-day"].covers == ("f-63",) and ids["crypto-stop"].covers == ("phase-x5",)
+    assert ids["momentum-halt-notice"].covers == ("f-38",)

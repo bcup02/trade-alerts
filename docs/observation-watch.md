@@ -58,11 +58,19 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項�
 - 狀態檔在取得檔案鎖「之後」才讀（`run` 與 `ack` 都是）：排在另一輪後面的那一輪，依前一輪存下的結果決定要不要通知，不會用鎖之前讀到的舊狀態重複發送。`ack` 會等鎖（等到前一輪結束），`run` 遇到鎖仍是略過這一輪。
 
 ## f-70 第一批：原本靠收尾手動查的三項（`dev-trend-reconcile`、`health-publish`、`dust-convert`）
-2026-10-24 使用者要求把觀察區「AI檢查」的項目改成偵測程式自動通知。第一批是資料單純、不用記「連續幾天」以外狀態的三項；第二批（A1 健康穩定天數、f-63 同一天只進一次、x5 停損觸發與移動、f-38）另開 PR。
+2026-10-24 使用者要求把觀察區「AI檢查」的項目改成偵測程式自動通知。第一批是資料單純、不用記「連續幾天」以外狀態的三項；第二批（A1 健康穩定天數、f-63 同一天只進一次、x5 停損觸發與移動、f-38）見下一節。
 
 - **`dev-trend-reconcile`（f-7 後半）**：開發機趨勢的 `ledger_status.json`。20 張手動測試單留下 25 筆帳本沒記的成交，對帳只看最近 168 小時，所以最後一批滑出窗口（2026-10-27 台北 17:00）後應自動回到 `RECONCILED`。讀數超過 90 分鐘或讀不到是 `error`；`RECONCILED` 為 `observed`（發一則，不算可結案：f-7 的進場那一半由 `dev-trend-entry` 看；那串 UNRESOLVED 請求有沒有自動撤回，這支沒讀）；其他值是 `waiting`。
 - **`health-publish`（f-45）**：兩台主機的 `/var/lib/ops-notify/health-publish-state.json`（新增兩個可讀路徑之一；A1 與開發機同一個路徑）。每台「正常」＝`consecutive_failures` 是 0 且 `last_success_at` 在 25 分鐘內。連續 `STABLE_STREAK`（72 小時，預設）每一輪都兩台正常才發「可結案」一則；中間任何一輪有一台不正常就把穩定時間歸零；**前一個看到兩台正常的輪次離這一輪超過 45 分鐘也歸零**（`STREAK_MAX_GAP`；中間有一輪讀不到、讀檔失敗或偵測沒跑，就是看不到的空窗，不能算進連續時間——檢查出錯的那一輪會保留舊的 `extra`，所以靠這個間隔判斷；2026-10-24 審閱 #304 BLOCK-304-01 抓到）。起點與最近看到的時間記在檢查自己的 `extra.healthy_since`／`extra.last_seen`，看不到過去，所以從第一個看到兩台正常的那一輪起算；任一台連續失敗 3 次以上是 `failed`；檔案讀不懂是 `error`。登記冊面板的 A1／開發機分頁有沒有被標過期，這支沒讀，結案時仍要看一眼頁面。
 - **`dust-convert`（f-66）**：競賽策略第一次真實的粉塵轉換。讀競賽帳本裡 `capital_flow` 的 `dust_convert_out`／`dust_convert_in`（只算 LIVE、不算 `details.test`）、競賽的 `ledger_status.json`，以及 `state/dust_convert_attempt.json`（新增的第二個可讀路徑；沒有這個檔案＝還沒試過，不是錯誤）。`needs_review`、`failed`、`partial`，或 `converting` 超過 30 分鐘沒更新（程式中途掛了、結果不明）都是 `failed`（同一策略日同一狀態只通知一次）；帳本有轉出與轉入列＋狀態 `done`＋轉換後（超過寬限）對帳 `RECONCILED` 才是 `observed`，而且保持 `needs_human`：對照幣安 App 的小額資產轉換紀錄與備註裡的 tranId，只有你能做。對帳 `DIVERGED` 是 `failed`。
+
+## f-70 第二批：A1 穩定天數、f-63、x5、f-38（`a1-stable`、`crypto-one-entry-a-day`、`crypto-stop`、`momentum-halt-notice`）
+沒有新增可讀路徑（只讀已在清單內的 `/var/lib/ops-notify/state.json`、加密的 `trading_ledger.jsonl`／`ledger_status.json`／`state/state.json`、動能的 `fleet_event_log.jsonl`）。
+
+- **`a1-stable`（x8、f-63、x5 第三項）**：讀維運通知的讀數檔裡四支策略各 5 個軸（運行狀態＝HEALTHY、帳本與 Google 表＝RECONCILED、匯出檔與服務單元＝OK）＋主機時鐘，全部 `severity` 為 ok 且值正常才算正常。穩定時間沿用第一批的 `_streak`（72 小時、前一個正常輪次超過 45 分鐘就重算），有任何一個讀數不正常也重算。讀數超過 90 分鐘沒更新、或某個對象整個沒有讀數是 `error`（維運通知自己沒在看，不能當通過）。**只涵蓋維運通知看的項目**：資金費同步每 4 小時 exit 0、停損價與停損單不變，程式沒讀，結案前我另外到主機查（通知文字會寫明）。
+- **`crypto-one-entry-a-day`（f-63）**：A1 加密帳本 2026-10-23 台北 16:22（重開）之後 `source=entry_signal`、LIVE 的 `trade_open`，按 UTC 日分組；同一個 UTC 日有兩個不同 `trade_id` 的進場立刻 `failed`（同一筆交易的加碼不算）。可結案的條件：重開後有進場，且那一天（UTC）已結束、當天只進場一次——代表策略帶著修法活過一次 UTC 午夜。證據行會寫那幾天有沒有出場；「出場後同一天再進場」這個真正出過事的情形沒測到時會明說。
+- **`crypto-stop`（x5 前兩項）**：停損觸發＝重開後 LIVE 的 `trade_close` 且 `source` 以 `native_stop` 開頭，要等其後（超過寬限）的帳本對交易所對帳 `RECONCILED` 才算看到，`DIVERGED` 是 `failed`；移動停損沿用開發機 x5b 的判斷（`_follow_stop`，從 x5b 檢查抽出，行為不變）：同一筆交易兩輪之間停損單號換新且價格收緊（空單往下、多單往上）。**永遠不可結案（`needs_human`）**：撤舊再掛「沒有空窗」從這些檔案看不出來，結案時我到交易所查。兩輪（30 分鐘）之間移動又平倉會看漏。
+- **`momentum-halt-notice`（f-38）**：A1 動能的真實（非測試）R3 事件，量 `recorded_at` 到維運通知的 `delivered` 時間（上限 15 分鐘＝匯出計時器 1 分鐘＋輪詢 10 分鐘＋餘裕），並看動能的匯出檔軸是 OK（刷新計時器壞掉會讓它變過期）；超過時間、第二則欠送超過 70 分鐘、匯出檔軸不正常都是 `failed`。匯出檔本身的修改時間沒有讀，用送達延遲推定「約一分鐘內更新」，證據行會寫明。與 `safe-halt-notice`（f-35／f-37）看同一類事件，同一則動能 R3 事件可能各傳一則通知（涵蓋的項目不同）。
 
 ## 開發機加密策略的 x5b 測試網檢查（`dev-crypto-x5b`，phase-x5b）
 x5b 剩下三件事要等開發機加密策略**自己**出訊號才驗得到（乾淨接手、停損真的觸發、移動停損撤舊再掛）。這個檢查只負責「看到」，不結案：
