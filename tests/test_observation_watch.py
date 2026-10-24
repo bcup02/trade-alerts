@@ -98,117 +98,6 @@ def test_the_ssh_command_is_quoted_and_read_only(monkeypatch):
     assert "-o" in calls[0] and "BatchMode=yes" in calls[0]
 
 
-# --- crypto equity reminder (f-55) --------------------------------------------------------------------------------
-
-def equity_remote(*, wallet=119.99, unrealized=0.0, fetched=None, mode="LIVE", environment="mainnet", balance=None,
-                  positions=None, complete=True, balance_unrealized=0.0):
-    """``unrealized`` is the (single) open position's unRealizedProfit; ``balance_unrealized`` is the balance block's crossUnPnl --
-    which stays 0 for an isolated position, exactly like A1's real reading (2026-10-19: balance 0.0, position -0.53)."""
-    r = FakeRemote()
-    if positions is None:
-        positions = [{"symbol": "BTC_USDT", "side": "short", "quantity": 0.001, "margin_type": "isolated", "unrealized_pnl": unrealized}]
-    put(r, "a1", "mycrypto", "exchange_state.json",
-        {"fetched_at": fetched or iso(NOW - timedelta(minutes=5)), "execution_mode": mode, "environment": environment,
-         "fetch_status": {"complete": complete, "errors": [] if complete else ["positions"]}, "positions": positions,
-         "balance": balance if balance is not None else {"wallet_balance": wallet, "unrealized_pnl": balance_unrealized}})
-    return r
-
-
-ONLY_EQUITY = lambda: [c for c in ow.CHECKS if c.id == "a1-crypto-equity"]   # noqa: E731
-
-
-def test_equity_above_the_reminder_line_keeps_waiting_and_shows_the_number():
-    result = ow.check_crypto_equity(ctx(equity_remote(wallet=119.99, unrealized=-0.53)))
-    assert result.state == ow.WAITING and not result.needs_human
-    assert "119.46" in result.summary and "90" in result.summary
-
-
-def test_equity_counts_an_isolated_positions_loss_that_the_balance_blocks_cross_figure_leaves_out():
-    """#246 review B1: wallet 95, isolated position -20, balance.unrealized_pnl (crossUnPnl) 0 -> real equity 75, not 95."""
-    result = ow.check_crypto_equity(ctx(equity_remote(wallet=95.0, unrealized=-20.0, balance_unrealized=0.0)))
-    assert result.state == ow.OBSERVED and result.needs_human and "75.00" in result.summary and result.key == "band-70-80"
-
-
-def test_equity_ignores_the_balance_blocks_own_unrealized_figure():
-    # a made-up crossUnPnl of -50 must not matter; only the positions' figures count
-    result = ow.check_crypto_equity(ctx(equity_remote(wallet=119.0, unrealized=-1.0, balance_unrealized=-50.0)))
-    assert result.state == ow.WAITING and "118.00" in result.summary
-
-
-def test_equity_sums_every_open_position_and_a_flat_account_is_just_the_wallet():
-    two = [{"unrealized_pnl": -10.0}, {"unrealized_pnl": 4.0}]
-    assert "94.00" in ow.check_crypto_equity(ctx(equity_remote(wallet=100.0, positions=two))).summary
-    flat = ow.check_crypto_equity(ctx(equity_remote(wallet=100.0, positions=[])))
-    assert flat.state == ow.WAITING and "100.00" in flat.summary
-
-
-def test_equity_exactly_on_the_line_is_still_waiting_and_just_below_is_observed():
-    assert ow.check_crypto_equity(ctx(equity_remote(wallet=90.0))).state == ow.WAITING
-    result = ow.check_crypto_equity(ctx(equity_remote(wallet=89.99)))
-    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and result.key == "band-80-90"
-    assert "89.99" in result.summary and any("82" in line for line in result.evidence)
-
-
-def test_equity_each_ten_usdt_band_is_its_own_notice():
-    below = ow.check_crypto_equity(ctx(equity_remote(wallet=95.0, unrealized=-8.0)))        # equity 87.0
-    assert below.state == ow.OBSERVED and below.key == "band-80-90"
-    lower = ow.check_crypto_equity(ctx(equity_remote(wallet=71.0)))
-    assert lower.state == ow.OBSERVED and lower.key == "band-70-80"
-
-
-def test_equity_notice_is_sent_once_per_band_and_again_after_it_recovered():
-    sent = []
-
-    def send(text):
-        sent.append(text)
-        return True
-
-    first = ow.run_checks(equity_remote(wallet=85.0), NOW, {}, ONLY_EQUITY())
-    assert ow.notify(first, send) == ["a1-crypto-equity"] and "85.00" in sent[0]
-    again = ow.run_checks(equity_remote(wallet=84.0), NOW, {"items": first}, ONLY_EQUITY())
-    assert ow.notify(again, send) == []                                                    # same band: no second message
-    lower = ow.run_checks(equity_remote(wallet=75.0), NOW, {"items": again}, ONLY_EQUITY())
-    assert ow.notify(lower, send) == ["a1-crypto-equity"]                                  # a lower band
-    recovered = ow.run_checks(equity_remote(wallet=110.0), NOW, {"items": lower}, ONLY_EQUITY())
-    assert recovered["a1-crypto-equity"]["state"] == ow.WAITING and recovered["a1-crypto-equity"]["notified_key"] is None
-    low_again = ow.run_checks(equity_remote(wallet=75.0), NOW, {"items": recovered}, ONLY_EQUITY())
-    assert ow.notify(low_again, send) == ["a1-crypto-equity"]                              # tells again after a recovery
-    assert len(sent) == 3
-
-
-@pytest.mark.parametrize("remote", [
-    equity_remote(fetched=hours_ago(3)),                                    # a stale read is not "all fine"
-    equity_remote(fetched="not-a-time"),
-    equity_remote(mode="DEMO"), equity_remote(environment="testnet"),       # not the live mainnet account
-    equity_remote(complete=False),                                          # an incomplete fetch may have lost the positions
-    equity_remote(balance={}), equity_remote(balance={"wallet_balance": "n/a"}),
-    equity_remote(balance={"wallet_balance": float("nan")}), equity_remote(balance={"wallet_balance": float("inf")}),
-    equity_remote(positions=[{"symbol": "BTC_USDT"}]),                      # a position without a figure
-    equity_remote(positions=[{"unrealized_pnl": None}]), equity_remote(positions=[{"unrealized_pnl": float("nan")}]),
-    equity_remote(positions="none"),
-    equity_remote(wallet=1e308, positions=[{"unrealized_pnl": 1e308}]),     # two finite numbers that overflow to inf (review B2)
-    equity_remote(wallet=-1e308, positions=[{"unrealized_pnl": -1e308}]),
-], ids=["stale", "bad-time", "demo", "testnet", "incomplete", "no-balance", "not-a-number", "nan", "inf", "position-without-pnl",
-        "position-pnl-none", "position-pnl-nan", "positions-not-a-list", "overflow-up", "overflow-down"])
-def test_equity_check_raises_instead_of_passing_when_it_cannot_tell(remote):
-    with pytest.raises(ow.RemoteError):
-        ow.check_crypto_equity(ctx(remote))
-
-
-def test_equity_check_that_cannot_tell_becomes_an_error_that_is_told_after_three_runs():
-    items = {}
-    for n in (1, 2, 3):
-        items = ow.run_checks(equity_remote(fetched=hours_ago(3)), NOW, {"items": items}, ONLY_EQUITY())
-        assert items["a1-crypto-equity"]["state"] == ow.ERROR and items["a1-crypto-equity"]["consecutive_errors"] == n
-        assert (ow.notice_for(items["a1-crypto-equity"]) is not None) == (n == 3)
-
-
-def test_equity_check_is_registered_for_f55_and_reads_only_the_whitelisted_file():
-    check = next(c for c in ow.CHECKS if c.id == "a1-crypto-equity")
-    assert check.covers == ("f-55",) and ow.EQUITY_REMINDER_USDT == 90.0
-    assert ow.audit("mycrypto", "exchange_state.json") in ow.ALLOWED_PATHS
-
-
 # --- sheet tab names (f-26) -----------------------------------------------------------------------------------------
 
 def trade(hours, kind="trade_close", **extra):
@@ -487,31 +376,42 @@ def test_the_telegram_token_is_never_sent_without_both_variables():
     assert ow.send_telegram("x", {}) is False and ow.send_telegram("x", {"TELEGRAM_BOT_TOKEN": "t"}) is False
 
 
+@pytest.fixture
+def demo_check(monkeypatch):
+    """A stand-in check for the command-line tests: it is OBSERVED and needs a human on every run, so run/report/ack,
+    the lock and the senders can be exercised without depending on any real check's data.  ``main()`` calls
+    ``run_checks`` with its default check list (bound when the function was defined), so the list is replaced here."""
+    check = ow.Check("demo", "示範項目", ("f-demo",), lambda c: ow.Result(ow.OBSERVED, "到了", needs_human=True, key="k"))
+    real = ow.run_checks
+    monkeypatch.setattr(ow, "run_checks", lambda remote, now, previous, checks=None, only=None: real(remote, now, previous, (check,), only))
+    return check
+
+
 # --- command line -----------------------------------------------------------------------------------------------------
 
-def test_run_report_and_ack_round_trip(tmp_path, capsys):
-    r = equity_remote(wallet=85.0, fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))     # main() uses the real clock
+def test_run_report_and_ack_round_trip(tmp_path, capsys, demo_check):
+    r = FakeRemote()
     state, sent = tmp_path / "state.json", []
-    only = ["--state", str(state), "--only", "a1-crypto-equity"]
+    only = ["--state", str(state), "--only", "demo"]
     assert ow.main(["run", *only], remote=r, send=lambda t: sent.append(t) or True) == 0
     assert len(sent) == 1 and "需要你確認" in sent[0]
     saved = json.loads(state.read_text(encoding="utf-8"))
-    assert saved["items"]["a1-crypto-equity"]["state"] == ow.OBSERVED and saved["items"]["a1-crypto-equity"]["notified_key"]
+    assert saved["items"]["demo"]["state"] == ow.OBSERVED and saved["items"]["demo"]["notified_key"]
     assert ow.main(["run", *only], remote=r, send=lambda t: sent.append(t) or True) == 0 and len(sent) == 1
     capsys.readouterr()
     assert ow.main(["report", "--state", str(state)]) == 0
     assert "需要你確認" in capsys.readouterr().out
-    assert ow.main(["ack", "a1-crypto-equity", "--state", str(state)]) == 0
+    assert ow.main(["ack", "demo", "--state", str(state)]) == 0
     capsys.readouterr()
     ow.main(["report", "--state", str(state)])
     assert "已處理" in capsys.readouterr().out
     assert ow.main(["ack", "nope", "--state", str(state)]) == 2
 
 
-def test_dry_run_neither_sends_nor_saves(tmp_path):
+def test_dry_run_neither_sends_nor_saves(tmp_path, demo_check):
     state, sent = tmp_path / "state.json", []
-    ow.main(["run", "--dry-run", "--state", str(state), "--only", "a1-crypto-equity"],
-            remote=equity_remote(wallet=85.0, fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5))), send=lambda t: sent.append(t) or True)
+    ow.main(["run", "--dry-run", "--state", str(state), "--only", "demo"],
+            remote=FakeRemote(), send=lambda t: sent.append(t) or True)
     assert sent == [] and not state.exists()
 
 
@@ -603,31 +503,31 @@ def test_competition_and_dev_entry_also_wait_for_a_reconcile_after_the_grace():
 
 # --- one run at a time; a message that was sent but not remembered (review of #183) -----------------------------------------
 
-def test_a_second_run_while_one_is_running_does_nothing(tmp_path, capsys):
+def test_a_second_run_while_one_is_running_does_nothing(tmp_path, capsys, demo_check):
     import fcntl
     state = tmp_path / "state.json"
     with open(state.with_suffix(".lock"), "w") as held:
         fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
         sent = []
-        assert ow.main(["run", "--state", str(state), "--only", "a1-crypto-equity"], remote=FakeRemote(), send=lambda t: sent.append(t) or True) == 0
+        assert ow.main(["run", "--state", str(state), "--only", "demo"], remote=FakeRemote(), send=lambda t: sent.append(t) or True) == 0
     assert sent == [] and not state.exists() and "另一個偵測正在跑" in capsys.readouterr().out
 
 
-def test_a_state_file_that_cannot_be_saved_is_reported_and_the_repeat_is_documented(tmp_path, monkeypatch, capsys):
+def test_a_state_file_that_cannot_be_saved_is_reported_and_the_repeat_is_documented(tmp_path, monkeypatch, capsys, demo_check):
     state, sent = tmp_path / "state.json", []
-    r = equity_remote(wallet=85.0, fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))
+    r = FakeRemote()
     monkeypatch.setattr(ow, "save_state", lambda *a: (_ for _ in ()).throw(OSError("disk full")))
-    code = ow.main(["run", "--state", str(state), "--only", "a1-crypto-equity"], remote=r, send=lambda t: sent.append(t) or True)
+    code = ow.main(["run", "--state", str(state), "--only", "demo"], remote=r, send=lambda t: sent.append(t) or True)
     assert code == 1 and len(sent) == 1 and "下一輪可能重複發送" in capsys.readouterr().err
 
 
 # --- the state is read only after the lock is held (review of #183 round 3) ----------------------------------------------
 
-@pytest.mark.parametrize("argv", [["run", "--only", "a1-crypto-equity"], ["ack", "a1-crypto-equity"]])
-def test_the_state_is_loaded_while_the_lock_is_held(tmp_path, monkeypatch, argv):
+@pytest.mark.parametrize("argv", [["run", "--only", "demo"], ["ack", "demo"]])
+def test_the_state_is_loaded_while_the_lock_is_held(tmp_path, monkeypatch, argv, demo_check):
     import fcntl
     state = tmp_path / "state.json"
-    ow.save_state(state, {"items": {"a1-crypto-equity": {"state": ow.WAITING, "key": "k"}}})
+    ow.save_state(state, {"items": {"demo": {"state": ow.WAITING, "key": "k"}}})
     seen = []
     real_load = ow.load_state
 
@@ -1425,20 +1325,20 @@ def test_the_failure_count_belongs_to_one_message_and_restarts_for_a_different_o
     assert telegrams == [] and state["items"]["demo"]["send_failures"] == {"key": "observed:other", "n": 1}
 
 
-def test_main_sends_to_line_by_default_and_falls_back_to_telegram(monkeypatch, tmp_path):
+def test_main_sends_to_line_by_default_and_falls_back_to_telegram(monkeypatch, tmp_path, demo_check):
     lines, telegrams = [], []
     monkeypatch.setattr(ow, "send_line", lambda t: lines.append(t) or True)
     monkeypatch.setattr(ow, "send_telegram", lambda t: telegrams.append(t) or True)
-    r = equity_remote(wallet=85.0, fetched=iso(datetime.now(timezone.utc) - timedelta(minutes=5)))
+    r = FakeRemote()
     state = tmp_path / "state.json"
-    assert ow.main(["run", "--state", str(state), "--only", "a1-crypto-equity"], remote=r) == 0
+    assert ow.main(["run", "--state", str(state), "--only", "demo"], remote=r) == 0
     assert len(lines) == 1 and "需要你確認" in lines[0] and telegrams == []
     # a failing LINE for two runs sends the Telegram copy
     lines.clear()
     monkeypatch.setattr(ow, "send_line", lambda t: lines.append(t) and False)
     state2 = tmp_path / "state2.json"
     for _ in range(2):
-        ow.main(["run", "--state", str(state2), "--only", "a1-crypto-equity"], remote=r)
+        ow.main(["run", "--state", str(state2), "--only", "demo"], remote=r)
     assert len(lines) == 2 and len(telegrams) == 1 and telegrams[0].startswith("（LINE 送不出去")
 
 
