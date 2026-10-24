@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the observation watcher (f-43) on the dev host (trading-dev, or fleet-standby-1 with WATCH_USER=ubuntu).  Idempotent.
+# Install the observation watcher (f-43) on the dev host (fleet-standby-1 / A1-dev with WATCH_USER=ubuntu; the old GCP trading-dev was deleted 2026-10-24).  Idempotent.
 #
 #   sudo bash deploy/observation-watch/install.sh            # WATCH_USER defaults to ai001; on fleet-standby-1: sudo WATCH_USER=ubuntu bash ...
 #
