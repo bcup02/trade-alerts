@@ -77,7 +77,7 @@ function fakeMcp(deliver) {
   let page = boot({fileId: null, noClaude: true, nowMs: NOW});
   await settle();
   assert.ok(texts(page.panel).includes('還沒設定讀數來源'));
-  assert.ok(texts(page.panel).includes('A1 正式機（新）'));              // the glossary's name for the host
+  assert.ok(texts(page.panel).includes('正式機'));              // the glossary's name for the host
   assert.equal(page.calls.use, 0);
   page = boot({fileId: null, mcp: () => { throw new Error('must not be asked'); }, nowMs: NOW});
   await settle();
@@ -218,7 +218,7 @@ function fakeMcp(deliver) {
   assert.equal(mcp.watches.length, 1);                                // only the configured host is watched
   assert.deepEqual(mcp.watches[0].input, {fileId: DEV_ID});
   const tabs = page.tabs.children;
-  assert.deepEqual(tabs.map(t => t.textContent), ['A1 正式機（新）', '開發機']);
+  assert.deepEqual(tabs.map(t => t.textContent), ['正式機', '開發機']);
   assert.equal(page.tabs.attrs.role, 'tablist');
   assert.ok(tabs.every(t => t.tagName === 'button' && t.attrs.role === 'tab' && t.attrs['aria-controls']));
   const cards = page.panel.children;

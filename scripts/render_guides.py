@@ -1004,7 +1004,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
     <h2 id="healthTitle">維運讀數</h2>
     <p class="health-sub">
       維運通知每 10 分鐘對每個對象讀一輪狀態（每種讀法叫一個軸），發布單元把結果送到 Google 表，這裡用你的 Google Drive 連接器讀回來。
-      資料過期會標出來：過期的格子不會顯示成正常。預設顯示 A1 正式機（新），點上方分頁可切換到開發機。
+      資料過期會標出來：過期的格子不會顯示成正常。預設顯示正式機，點上方分頁可切換到開發機。
     </p>
     <div class="hs-tabs" id="healthTabs" aria-label="選擇要看哪一台主機的讀數"></div>
     <div id="healthSources"></div>
