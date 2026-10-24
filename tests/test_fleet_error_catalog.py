@@ -291,7 +291,7 @@ def test_pasted_commands_run_as_the_service_account_from_the_repo_directory(cata
 
 
 def test_steps_name_the_host_with_the_glossary_wording(catalog):
-    # Until trading-main is retired the glossary forbids a bare 「正式機」 for a host (fleet-glossary.json).
+    # The error messages keep the explicit 「A1 正式機（新）」 wording (a bare 「正式機」 now also means A1 since trading-main was deleted on 2026-10-24, but existing messages are not rewritten).
     problems = []
     for entry in catalog["entries"]:
         text = json.dumps(entry["operator_message"], ensure_ascii=False)
