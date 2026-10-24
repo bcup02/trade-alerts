@@ -428,11 +428,13 @@ def test_a_rule_whose_other_aspect_is_still_pending_is_still_flagged_recent(regi
     as an ordinary pending row, so the latest change was invisible."""
     render_guides = _render_guides()
     edited = copy.deepcopy(registry)
+    # No live row is in this shape any more (every emits_event cell is done), so build one: a rule
+    # whose behaviour is done on momentum and whose emits_event cell is turned back into pending.
+    project = "momentum"
     row = next(r for r in edited["catalog"]
-               for p, st in r["behaviour"].items()
-               if st["state"] == "done" and r["emits_event"][p]["state"] == "pending")
-    project = next(p for p, st in row["behaviour"].items()
-                   if st["state"] == "done" and row["emits_event"][p]["state"] == "pending")
+               if r["behaviour"].get(project, {}).get("state") == "done"
+               and r["emits_event"].get(project, {}).get("state") == "done")
+    row["emits_event"][project] = {"state": "pending", "phase": "8-momentum", "reason": "x"}
     edited["recent_changes"] = [{"kind": "rule", "id": row["code"], "project": project,
                                  "aspect": "behaviour", "note": "x"}]
     assert registry_problems(edited, catalog) == []

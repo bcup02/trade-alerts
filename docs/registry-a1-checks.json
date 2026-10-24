@@ -276,6 +276,12 @@
     },
     "rule:SEY.CORRECTION_BASE_MISMATCH:emits_event|seykota": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
+    },
+    "rule:FLEET.PROJECTION_ORPHAN_CLOSE_PARKED:emits_event|momentum": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-24 台北 10:35）：operations 03fef20；/opt/mexc-4h-momentum-trailing-stop 的 src/google_projection_worker.py（79aa10e）、src/fleet_events.py（ac38de8）與該 commit 同檔相同；venv trade-alerts 0.30.19，projection_outbox 模組檔 blob 583bc2e 與 tag v0.30.19 同檔，內有 ORPHAN_CLOSE_PARKED_EVENT（第 68 行）與 record_projection_park_event；mexc-momentum-bot active、NRestarts=0、mexc-momentum-google-projection.timer active、0 個失敗單元；A1 audit/fleet_event_log.jsonl 至今事件：VERIFIED_CLOSE_REPAIR_BLOCKED 1 筆、PROTECTION_UNVERIFIED 1 筆（沒有停放過平倉）。"
+    },
+    "rule:FLEET.PROJECTION_ORPHAN_CLOSE_PARKED:emits_event|seykota": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-24 台北 10:35）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/google_projection_worker.py（c0d1de8）、src/seykota_bot/fleet_events.py（1896da8）與該 commit 同檔相同；venv trade-alerts 0.30.19，projection_outbox 模組檔 blob 583bc2e 與 tag v0.30.19 同檔，內有 ORPHAN_CLOSE_PARKED_EVENT（第 68 行）與 record_projection_park_event；seykota-bot active、NRestarts=0、seykota-google-projection.timer active、0 個失敗單元；A1 audit/fleet_event_log.jsonl 至今事件：VERIFIED_CLOSE_REPAIR_BLOCKED、UNRECORDED_FILL_UNRESOLVED、TRADE_EXIT 各 1 筆（沒有停放過平倉）。"
     }
   }
 }
