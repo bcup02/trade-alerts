@@ -297,10 +297,11 @@
       "category": "修復機器人",
       "zh": "共用修復執行器",
       "en": [
+        "trade_alerts.repair_runner",
         "trade_alerts.verified_close_backfill",
         "v2-W2"
       ],
-      "definition": "計畫中兩支策略共用的同一份修復程式，之後取代各自的修復機器人主體。",
+      "definition": "動能策略、趨勢策略共用的同一份修復程式（trade_alerts.repair_runner）；兩支各自的修復機器人只負責接上自己的帳本與交易所。已在正式機 A1 上跑。",
       "retired": [
         "共用執行器"
       ]
