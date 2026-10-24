@@ -57,6 +57,13 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項�
 
 - 狀態檔在取得檔案鎖「之後」才讀（`run` 與 `ack` 都是）：排在另一輪後面的那一輪，依前一輪存下的結果決定要不要通知，不會用鎖之前讀到的舊狀態重複發送。`ack` 會等鎖（等到前一輪結束），`run` 遇到鎖仍是略過這一輪。
 
+## f-70 第一批：原本靠收尾手動查的三項（`dev-trend-reconcile`、`health-publish`、`dust-convert`）
+2026-10-24 使用者要求把觀察區「AI檢查」的項目改成偵測程式自動通知。第一批是資料單純、不用記「連續幾天」以外狀態的三項；第二批（A1 健康穩定天數、f-63 同一天只進一次、x5 停損觸發與移動、f-38）另開 PR。
+
+- **`dev-trend-reconcile`（f-7 後半）**：開發機趨勢的 `ledger_status.json`。20 張手動測試單留下 25 筆帳本沒記的成交，對帳只看最近 168 小時，所以最後一批滑出窗口（2026-10-27 台北 17:00）後應自動回到 `RECONCILED`。讀數超過 90 分鐘或讀不到是 `error`；`RECONCILED` 為 `observed`（發一則，不算可結案：f-7 的進場那一半由 `dev-trend-entry` 看；那串 UNRESOLVED 請求有沒有自動撤回，這支沒讀）；其他值是 `waiting`。
+- **`health-publish`（f-45）**：兩台主機的 `/var/lib/ops-notify/health-publish-state.json`（新增兩個可讀路徑之一；A1 與開發機同一個路徑）。每台「正常」＝`consecutive_failures` 是 0 且 `last_success_at` 在 25 分鐘內。連續 `STABLE_STREAK`（72 小時，預設）每一輪都兩台正常才發「可結案」一則；中間任何一輪有一台不正常就把穩定時間歸零（只記在檢查自己的 `extra.healthy_since`，看不到過去，所以從第一個看到兩台正常的那一輪起算）；任一台連續失敗 3 次以上是 `failed`；檔案讀不懂是 `error`。登記冊面板的 A1／開發機分頁有沒有被標過期，這支沒讀，結案時仍要看一眼頁面。
+- **`dust-convert`（f-66）**：競賽策略第一次真實的粉塵轉換。讀競賽帳本裡 `capital_flow` 的 `dust_convert_out`／`dust_convert_in`（只算 LIVE、不算 `details.test`）、競賽的 `ledger_status.json`，以及 `state/dust_convert_attempt.json`（新增的第二個可讀路徑；沒有這個檔案＝還沒試過，不是錯誤）。`needs_review`、`failed`、`partial`，或 `converting` 超過 30 分鐘沒更新（程式中途掛了、結果不明）都是 `failed`（同一策略日同一狀態只通知一次）；帳本有轉出與轉入列＋狀態 `done`＋轉換後（超過寬限）對帳 `RECONCILED` 才是 `observed`，而且保持 `needs_human`：對照幣安 App 的小額資產轉換紀錄與備註裡的 tranId，只有你能做。對帳 `DIVERGED` 是 `failed`。
+
 ## 開發機加密策略的 x5b 測試網檢查（`dev-crypto-x5b`，phase-x5b）
 x5b 剩下三件事要等開發機加密策略**自己**出訊號才驗得到（乾淨接手、停損真的觸發、移動停損撤舊再掛）。這個檢查只負責「看到」，不結案：
 
