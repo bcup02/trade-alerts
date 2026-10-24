@@ -439,7 +439,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "sync_funding_fees_entry.py:475 main 讀 exchange.env，只認 binance，走 :452～473 的 Binance 分支（共用 Binance 工具的 sync_funding_fees，固定查 BTCUSDT〔:49〕，整批驗證後寫進本機帳本，:468 記 funding_sync_done）；其他值（含 mexc）在 sync_funding_fees_entry.py:481 記 unsupported_exchange 後以 1 結束（x8 已移除 MEXC 分支）。配 my-crypto-bot-funding-sync.service／.timer（每 4 小時）；帳本寫好後把累計資金費同步到 Google『帳戶餘額總表』分頁。",
+          "evidence": "sync_funding_fees_entry.py:475 main 讀 exchange.env（exchange_choice 只認 binance，其他值含 mexc 丟 ExchangeChoiceError），走 :452～473 的 Binance 分支（共用 Binance 工具的 sync_funding_fees，固定查 BTCUSDT〔:49〕，整批驗證後寫進本機帳本，:468 記 funding_sync_done）；ExchangeChoiceError 在 sync_funding_fees_entry.py:478 被捕捉後以 1 結束，MEXC 分支已於 x8 移除。配 my-crypto-bot-funding-sync.service／.timer（每 4 小時）；帳本寫好後把累計資金費同步到 Google『帳戶餘額總表』分頁。",
           "verified_at": "2026-10-24",
           "limit": "A1 的 Binance 資金費紀錄目前只有 3 筆（每 8 小時結算一次），多頁分頁沒有用真資料驗過。"
         },
