@@ -82,7 +82,7 @@ def test_the_names_on_the_panel_are_the_glossary_and_axes_table_names(page_text,
     assert [t["label"] for t in data["targets"][:4]] == [zh["strategy.momentum"], zh["strategy.mycrypto"], zh["strategy.seykota"], zh["strategy.btc-competition"]]
     assert data["targets"][4] == {"id": "host", "label": "主機"}
     assert [(a["id"], a["label"]) for a in data["axes"]] == [(key, name) for name, key, _m, _c in module.OPS_NOTIFY_AXES]
-    assert [s["label"] for s in data["sources"]] == [zh["host.main.a1"], zh["host.dev"]]      # A1 first: the page opens on it
+    assert [s["label"] for s in data["sources"]] == [zh["host.main"], zh["host.dev"]]      # A1 first: the page opens on it
 
 
 def test_a_source_without_a_spreadsheet_yet_is_null_and_the_page_says_so(page_text):
@@ -107,7 +107,7 @@ def test_the_target_keys_are_the_ones_ops_notify_publishes(module):
 
 
 GOOD = {"server": "Google Drive", "tool": "read_file_content", "refresh_ms": 60000,
-        "sources": [{"id": "a1", "host_term": "host.main.a1", "file_id": "a" * 33}]}
+        "sources": [{"id": "a1", "host_term": "host.main", "file_id": "a" * 33}]}
 
 
 def _with(**changes):
@@ -116,18 +116,18 @@ def _with(**changes):
 
 def test_a_good_source_document_passes_and_carries_the_file_id(module):
     data = module.health_panel_data(load_glossary(), GOOD)
-    assert data["sources"] == [{"id": "a1", "label": "A1 正式機（新）", "file_id": "a" * 33}]
+    assert data["sources"] == [{"id": "a1", "label": "正式機", "file_id": "a" * 33}]
 
 
 @pytest.mark.parametrize("doc,why", [
-    (_with(sources=[{"id": "a1", "host_term": "host.main.a1", "file_id": "short"}]), "file_id"),
-    (_with(sources=[{"id": "a1", "host_term": "host.main.a1", "file_id": "has space " + "a" * 30}]), "file_id"),
-    (_with(sources=[{"id": "a1", "host_term": "host.main.a1", "file_id": 12345678901234567890}]), "file_id"),
+    (_with(sources=[{"id": "a1", "host_term": "host.main", "file_id": "short"}]), "file_id"),
+    (_with(sources=[{"id": "a1", "host_term": "host.main", "file_id": "has space " + "a" * 30}]), "file_id"),
+    (_with(sources=[{"id": "a1", "host_term": "host.main", "file_id": 12345678901234567890}]), "file_id"),
     (_with(sources=[{"id": "a1", "host_term": "no.such.term", "file_id": None}]), "glossary"),
-    (_with(sources=[{"id": "A1", "host_term": "host.main.a1", "file_id": None}]), "id"),
-    (_with(sources=[{"id": "a1", "host_term": "host.main.a1", "file_id": None}, {"id": "a1", "host_term": "host.dev", "file_id": None}]), "repeated"),
-    (_with(sources=[{"id": "a1", "host_term": "host.main.a1"}]), "members"),
-    (_with(sources=[{"id": "a1", "host_term": "host.main.a1", "file_id": None, "label": "A1"}]), "members"),
+    (_with(sources=[{"id": "A1", "host_term": "host.main", "file_id": None}]), "id"),
+    (_with(sources=[{"id": "a1", "host_term": "host.main", "file_id": None}, {"id": "a1", "host_term": "host.dev", "file_id": None}]), "repeated"),
+    (_with(sources=[{"id": "a1", "host_term": "host.main"}]), "members"),
+    (_with(sources=[{"id": "a1", "host_term": "host.main", "file_id": None, "label": "A1"}]), "members"),
     (_with(sources=[]), "no health source"),
     (_with(server="Gmail"), "Google Drive"),
     (_with(tool="search_files"), "read_file_content"),
