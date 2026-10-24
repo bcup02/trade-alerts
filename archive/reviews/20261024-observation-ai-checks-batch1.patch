@@ -1,0 +1,341 @@
+diff --git a/docs/observation-watch.md b/docs/observation-watch.md
+index c6a3112..d338af6 100644
+--- a/docs/observation-watch.md
++++ b/docs/observation-watch.md
+@@ -57,6 +57,13 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項
+ 
+ - 狀態檔在取得檔案鎖「之後」才讀（`run` 與 `ack` 都是）：排在另一輪後面的那一輪，依前一輪存下的結果決定要不要通知，不會用鎖之前讀到的舊狀態重複發送。`ack` 會等鎖（等到前一輪結束），`run` 遇到鎖仍是略過這一輪。
+ 
++## f-70 第一批：原本靠收尾手動查的三項（`dev-trend-reconcile`、`health-publish`、`dust-convert`）
++2026-10-24 使用者要求把觀察區「AI檢查」的項目改成偵測程式自動通知。第一批是資料單純、不用記「連續幾天」以外狀態的三項；第二批（A1 健康穩定天數、f-63 同一天只進一次、x5 停損觸發與移動、f-38）另開 PR。
++
++- **`dev-trend-reconcile`（f-7 後半）**：開發機趨勢的 `ledger_status.json`。20 張手動測試單留下 25 筆帳本沒記的成交，對帳只看最近 168 小時，所以最後一批滑出窗口（2026-10-27 台北 17:00）後應自動回到 `RECONCILED`。讀數超過 90 分鐘或讀不到是 `error`；`RECONCILED` 為 `observed`（發一則，不算可結案：f-7 的進場那一半由 `dev-trend-entry` 看；那串 UNRESOLVED 請求有沒有自動撤回，這支沒讀）；其他值是 `waiting`。
++- **`health-publish`（f-45）**：兩台主機的 `/var/lib/ops-notify/health-publish-state.json`（新增兩個可讀路徑之一；A1 與開發機同一個路徑）。每台「正常」＝`consecutive_failures` 是 0 且 `last_success_at` 在 25 分鐘內。連續 `STABLE_STREAK`（72 小時，預設）每一輪都兩台正常才發「可結案」一則；中間任何一輪有一台不正常就把穩定時間歸零；**前一個看到兩台正常的輪次離這一輪超過 45 分鐘也歸零**（`STREAK_MAX_GAP`；中間有一輪讀不到、讀檔失敗或偵測沒跑，就是看不到的空窗，不能算進連續時間——檢查出錯的那一輪會保留舊的 `extra`，所以靠這個間隔判斷；2026-10-24 審閱 #304 BLOCK-304-01 抓到）。起點與最近看到的時間記在檢查自己的 `extra.healthy_since`／`extra.last_seen`，看不到過去，所以從第一個看到兩台正常的那一輪起算；任一台連續失敗 3 次以上是 `failed`；檔案讀不懂是 `error`。登記冊面板的 A1／開發機分頁有沒有被標過期，這支沒讀，結案時仍要看一眼頁面。
++- **`dust-convert`（f-66）**：競賽策略第一次真實的粉塵轉換。讀競賽帳本裡 `capital_flow` 的 `dust_convert_out`／`dust_convert_in`（只算 LIVE、不算 `details.test`）、競賽的 `ledger_status.json`，以及 `state/dust_convert_attempt.json`（新增的第二個可讀路徑；沒有這個檔案＝還沒試過，不是錯誤）。`needs_review`、`failed`、`partial`，或 `converting` 超過 30 分鐘沒更新（程式中途掛了、結果不明）都是 `failed`（同一策略日同一狀態只通知一次）；帳本有轉出與轉入列＋狀態 `done`＋轉換後（超過寬限）對帳 `RECONCILED` 才是 `observed`，而且保持 `needs_human`：對照幣安 App 的小額資產轉換紀錄與備註裡的 tranId，只有你能做。對帳 `DIVERGED` 是 `failed`。
++
+ ## 開發機加密策略的 x5b 測試網檢查（`dev-crypto-x5b`，phase-x5b）
+ x5b 剩下三件事要等開發機加密策略**自己**出訊號才驗得到（乾淨接手、停損真的觸發、移動停損撤舊再掛）。這個檢查只負責「看到」，不結案：
+ 
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index 12f73fc..fe68d62 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -79,9 +79,16 @@ class RemoteFileMissing(RemoteError):
+     state must never look like "the event has not happened")."""
+ 
+ 
++#: f-45: the health-reading publisher's own state (same path on A1 and on the dev host).
++HEALTH_PUBLISH_STATE = "/var/lib/ops-notify/health-publish-state.json"
++#: f-66: the competition's dust-convert attempt record (``state/dust_convert_attempt.json``), A1 only.
++DUST_ATTEMPT_PATH = f"/opt/{REPOS['btc-competition']}/state/dust_convert_attempt.json"
++
++
+ def _allowed_paths() -> frozenset[str]:
+     """Exactly the files the checks below read -- nothing else under /opt, /var/lib or anywhere is readable."""
+-    paths = {"/var/lib/portfolio-query/my-crypto-bot/current.json", "/var/lib/ops-notify/state.json"}
++    paths = {"/var/lib/portfolio-query/my-crypto-bot/current.json", "/var/lib/ops-notify/state.json",
++             HEALTH_PUBLISH_STATE, DUST_ATTEMPT_PATH}
+     for key in REPOS:
+         paths |= {audit(key, name) for name in ("ledger_status.json", "google_reconcile_status.json", "trading_ledger.jsonl")}
+     paths |= {audit(key, "fleet_event_log.jsonl") for key in ("seykota", "momentum", "btc-competition")}
+@@ -532,6 +539,118 @@ def check_dev_crypto_x5b(ctx: Context) -> Result:
+ 
+ 
+ _NOTICE_LINE = re.compile(r"notices=(\d+) attempted=(\d+) sent=(\d+) consecutive_send_failures=(\d+)")
++# --- f-70: "AI check" items turned into automatic checks (batch 1) -----------------------------------------------
++
++#: A streak must be this long before "stable for days" is announced.  72 hours (2026-10-24, default; adjustable here).
++STABLE_STREAK = timedelta(hours=72)
++HEALTH_PUBLISH_FRESH_MINUTES = 25         # the publisher runs every 10 minutes
++#: A streak is only continuous if the run before this one also saw both publishers healthy no more than this long ago (the
++#: detector runs every 30 minutes).  A run that could not read, an unreadable file or a detector that was down in between
++#: all leave a longer gap -- ``run_checks`` keeps a failed run's ``extra``, so the gap is what ends the streak (review of #304).
++STREAK_MAX_GAP = timedelta(minutes=45)
++
++
++def check_dev_trend_reconcile(ctx: Context) -> Result:
++    """f-7 (second half): the dev host's trend ledger-vs-exchange reconcile is back to RECONCILED.
++
++    Twenty hand-made test orders (2026-10-17..20) left 25 exchange fills the ledger never recorded; the reconcile only looks at
++    the last 168 hours, so the verdict should flip by itself once the last of them slides out (2026-10-27 17:00 Taipei).  The
++    first half of f-7 (a real entry on a signal) is ``dev-trend-entry``.  A stale or unreadable status is never "recovered"."""
++    status = load_json(ctx.remote, "dev", audit("seykota", "ledger_status.json"))
++    checked = parse_time(status.get("checked_at"))
++    if not _fresh(checked, ctx.now, 90):
++        raise RemoteError(f"開發機趨勢的對帳狀態太舊，判斷不了是否恢復（檢查時間 {taipei_text(status.get('checked_at'))}）")
++    value = status.get("value")
++    if value == "RECONCILED":
++        return Result(OBSERVED, "開發機趨勢策略的帳本對交易所對帳已回到 RECONCILED（那批手動測試單已滑出 168 小時窗口）。",
++                      [f"對帳：{status.get('note')}（{taipei(checked)} 台北）",
++                       "這只是 f-7 的對帳那一半；進場那一半由 dev-trend-entry 看。那串 UNRESOLVED 請求是否自動撤回，這支檢查沒有讀。"],
++                      key="reconciled")
++    return Result(WAITING, f"開發機趨勢策略的帳本對交易所對帳還是 {value}。", [f"對帳：{status.get('note')}（{taipei(checked)} 台北）"])
++
++
++def _health_publish(ctx: Context, host: str) -> tuple[bool, str, int]:
++    """(healthy, sentence, consecutive_failures) of one host's health-reading publisher."""
++    state = load_json(ctx.remote, host, HEALTH_PUBLISH_STATE)
++    failures = state.get("consecutive_failures")
++    if isinstance(failures, bool) or not isinstance(failures, int) or failures < 0:
++        raise RemoteError(f"{host}: health-publish-state 的 consecutive_failures 讀不懂：{failures!r}")
++    success = parse_time(state.get("last_success_at"))
++    name = "A1" if host == "a1" else "開發機"
++    fresh = _fresh(success, ctx.now, HEALTH_PUBLISH_FRESH_MINUTES)
++    sentence = f"{name}：連續失敗 {failures} 次、最近成功 {taipei_text(state.get('last_success_at'))}"
++    return failures == 0 and fresh, sentence, failures
++
++
++def check_health_publish(ctx: Context) -> Result:
++    """f-45: both hosts' health-reading publishers have been healthy for ``STABLE_STREAK`` in a row.
++
++    Healthy = ``consecutive_failures`` is 0 and ``last_success_at`` is within 25 minutes.  The streak starts at the first run that
++    saw both hosts healthy (it cannot see the past) and restarts from zero whenever either one is not -- and also whenever the
++    previous healthy run is more than ``STREAK_MAX_GAP`` old, i.e. when a run in between could not read (an error keeps the
++    stored ``extra``, so the gap is what ends the streak).  Three failures in a row on a host is ``failed``.  A file that cannot
++    be read is an error, never a quiet pass."""
++    results = {host: _health_publish(ctx, host) for host in ("a1", "dev")}
++    sentences = [results[h][1] for h in ("a1", "dev")]
++    broken = [h for h in ("a1", "dev") if results[h][2] >= 3]
++    if broken:
++        return Result(FAILED, "維運讀數發布單元連續失敗 3 次以上。", sentences, key="failing-" + "-".join(broken))
++    if not all(results[h][0] for h in results):
++        return Result(WAITING, "維運讀數發布單元現在不是兩台都正常，穩定天數重新算。", sentences)
++    since = parse_time((ctx.previous or {}).get("healthy_since"))
++    last_seen = parse_time((ctx.previous or {}).get("last_seen"))
++    if since is None or last_seen is None or not timedelta(0) <= ctx.now - last_seen <= STREAK_MAX_GAP:
++        since = ctx.now            # no earlier healthy run, or an unobserved stretch in between: the streak starts again
++    held = ctx.now - since
++    extra = {"healthy_since": since.isoformat(timespec="seconds"), "last_seen": ctx.now.isoformat(timespec="seconds")}
++    hours = int(held.total_seconds() // 3600)
++    if held >= STABLE_STREAK:
++        return Result(OBSERVED, f"維運讀數發布單元兩台都已連續正常 {hours} 小時，可以結案（登記冊面板的分頁是否被標過期，另看一眼頁面）。",
++                      sentences + [f"從 {taipei(since)}（台北）起每一輪偵測都看到兩台正常"], closable=True, key="stable", extra=extra)
++    return Result(WAITING, f"維運讀數發布單元兩台都正常，已連續 {hours} 小時（滿 {int(STABLE_STREAK.total_seconds() // 3600)} 小時通知）。",
++                  sentences, extra=extra)
++
++
++def check_dust_convert(ctx: Context) -> Result:
++    """f-66: the first real dust conversion of the competition strategy, and whether it came out right.
++
++    Reads the competition ledger (``capital_flow`` rows of kind ``dust_convert_out`` per coin and ``dust_convert_in`` for the USDT,
++    LIVE only) and the strategy day's attempt record.  ``needs_review`` / ``failed`` is ``failed`` (told once per day and status).
++    ``partial`` (some coins converted, then an error) and a ``converting`` record older than 30 minutes (the run died mid-way, the
++    result is unknown) are ``failed`` too.  Rows plus ``done`` plus a fresh RECONCILED after them is ``observed`` -- but comparing
++    with Binance's own conversion record (the tranId in the row's note) is something only the operator can do, so it stays
++    ``needs_human``."""
++    try:
++        attempt = load_json(ctx.remote, "a1", DUST_ATTEMPT_PATH)
++    except RemoteFileMissing:
++        attempt = {}
++    status = str(attempt.get("status") or "")
++    started = parse_time(attempt.get("at"))
++    stuck = status == "converting" and started is not None and ctx.now - started > timedelta(minutes=30)
++    if status in ("needs_review", "failed", "partial") or stuck:
++        return Result(FAILED, f"競賽策略的粉塵轉換結果不明或失敗（策略日 {attempt.get('day')}，狀態 {status}），要人工核對（見 docs/dust-convert.md）。",
++                      [f"說明：{str(attempt.get('detail'))[:200]}", f"記錄時間 {taipei_text(attempt.get('at'))}"], key=f"{attempt.get('day')}-{status}")
++    rows = [e for e in jsonl(ctx.remote.read("a1", audit("btc-competition", "trading_ledger.jsonl")))
++            if e.get("event_type") == "capital_flow" and e.get("kind") in ("dust_convert_out", "dust_convert_in")
++            and str(e.get("execution_mode") or "").upper() == "LIVE" and not is_test_event(e)]
++    if not rows:
++        extra = f"（最近一次嘗試：策略日 {attempt.get('day')}，{status}）" if status else ""
++        return Result(WAITING, "競賽策略還沒有真實的粉塵轉換。" + extra)
++    outs = [e for e in rows if e["kind"] == "dust_convert_out"]
++    ins = [e for e in rows if e["kind"] == "dust_convert_in"]
++    last = max(parse_time(e.get("event_time")) or datetime.min.replace(tzinfo=timezone.utc) for e in rows)
++    ledger = load_json(ctx.remote, "a1", audit("btc-competition", "ledger_status.json"))
++    verdict = reconcile_covers(ledger, last, ctx.now)
++    evidence = [f"轉出 {len(outs)} 列（{', '.join(sorted({str(e.get('asset')) for e in outs}))}）、轉入 {len(ins)} 列；最近 {taipei(last)}（台北）",
++                f"策略日 {attempt.get('day')} 的嘗試狀態：{status or '（沒有記錄）'}；對帳：{ledger.get('value')}"]
++    if verdict == "diverged":
++        return Result(FAILED, "競賽策略粉塵轉換後帳本對交易所對帳對不上。", evidence, key=f"diverged-{len(rows)}")
++    if verdict != "covered" or status != "done" or not outs or not ins:
++        return Result(WAITING, "競賽策略有粉塵轉換的帳本列，等狀態變 done 與轉換後的對帳。", evidence)
++    return Result(OBSERVED, "競賽策略完成第一次真實的粉塵轉換：機器查到帳本列、狀態 done、對帳一致；請對照幣安 App 的小額資產轉換紀錄與備註裡的 tranId。",
++                  evidence, needs_human=True, key=f"{len(outs)}-{len(ins)}")
++
++
+ _NOTIFY_FAILURES = re.compile(r"status_ai_send_failed|status_ai_dropped|status_ai_render_failed|reminder_send_failed|reminders_unavailable")
+ _A1_STATUS_BASELINE = "2026-10-13 04:28:00"   # f-41 deployed to A1 at 台北 12:28
+ 
+@@ -910,6 +1029,9 @@ CHECKS: tuple[Check, ...] = (
+     Check("trend-addon", "A1 趨勢策略加碼交易", ("e-5",), check_trend_addon),
+     Check("dev-trend-entry", "開發機趨勢策略依訊號進場", ("f-7",), check_dev_trend_entry),
+     Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
++    Check("dev-trend-reconcile", "開發機趨勢策略對帳回到 RECONCILED（f-7 後半）", ("f-7",), check_dev_trend_reconcile),
++    Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
++    Check("dust-convert", "競賽策略第一次真實粉塵轉換", ("f-66",), check_dust_convert),
+     Check("status-alerts", "A1 第一則真實狀態告警", ("f-23", "f-40", "f-41"), check_status_alerts),
+     Check("reminders", "A1 持續提醒", ("f-39",), check_reminders),
+     Check("pending-expired", "對帳標記逾時通知", ("f-30",), check_pending_expired),
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index 41d9e69..0293dce 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -387,6 +387,167 @@ def demo_check(monkeypatch):
+     return check
+ 
+ 
++# --- f-70 batch 1: dev trend reconcile, health publishers, dust convert --------------------------------------------------
++
++def _status_file(value, minutes_ago=10, note="n"):
++    return {"value": value, "checked_at": iso(NOW - timedelta(minutes=minutes_ago)), "note": note}
++
++
++def test_dev_trend_reconcile_waits_while_diverged_and_tells_once_it_is_reconciled():
++    r = FakeRemote()
++    put(r, "dev", "seykota", "ledger_status.json", _status_file("DIVERGED", note="18 exchange fill(s) not recorded in the ledger"))
++    waiting = ow.check_dev_trend_reconcile(ctx(r))
++    assert waiting.state == ow.WAITING and "DIVERGED" in waiting.summary
++    put(r, "dev", "seykota", "ledger_status.json", _status_file("RECONCILED"))
++    done = ow.check_dev_trend_reconcile(ctx(r))
++    assert done.state == ow.OBSERVED and not done.needs_human and not done.closable and done.key == "reconciled"
++    assert "dev-trend-entry" in " ".join(done.evidence)
++
++
++def test_dev_trend_reconcile_raises_on_a_stale_or_missing_status():
++    r = FakeRemote()
++    put(r, "dev", "seykota", "ledger_status.json", _status_file("RECONCILED", minutes_ago=200))
++    with pytest.raises(ow.RemoteError):
++        ow.check_dev_trend_reconcile(ctx(r))
++    with pytest.raises(ow.RemoteError):
++        ow.check_dev_trend_reconcile(ctx(FakeRemote()))
++
++
++def _publish_remote(a1=None, dev=None):
++    r = FakeRemote()
++    for host, state in (("a1", a1), ("dev", dev)):
++        r.files[(host, ow.HEALTH_PUBLISH_STATE)] = json.dumps(state if state is not None else
++                                                              {"consecutive_failures": 0, "last_error": None,
++                                                               "last_success_at": iso(NOW - timedelta(minutes=4))})
++    return r
++
++
++def test_health_publish_starts_a_streak_and_announces_it_only_after_72_hours():
++    first = ow.check_health_publish(ctx(_publish_remote()))
++    assert first.state == ow.WAITING and first.extra["healthy_since"] == iso(NOW)
++    early = ow.check_health_publish(ctx(_publish_remote(), {"healthy_since": iso(NOW - timedelta(hours=71)), "last_seen": iso(NOW - timedelta(minutes=30))}))
++    assert early.state == ow.WAITING and early.extra["healthy_since"] == iso(NOW - timedelta(hours=71)) and early.extra["last_seen"] == iso(NOW)
++    done = ow.check_health_publish(ctx(_publish_remote(), {"healthy_since": iso(NOW - timedelta(hours=73)), "last_seen": iso(NOW - timedelta(minutes=30))}))
++    assert done.state == ow.OBSERVED and done.closable and not done.needs_human and done.key == "stable"
++    assert done.extra["healthy_since"] == iso(NOW - timedelta(hours=73))
++
++
++def test_health_publish_restarts_the_streak_when_either_host_is_not_healthy():
++    stale = {"consecutive_failures": 0, "last_error": None, "last_success_at": iso(NOW - timedelta(minutes=40))}
++    one_bad = ow.check_health_publish(ctx(_publish_remote(dev=stale), {"healthy_since": iso(NOW - timedelta(hours=100)), "last_seen": iso(NOW - timedelta(minutes=30))}))
++    assert one_bad.state == ow.WAITING and one_bad.extra == {}
++    failing = {"consecutive_failures": 1, "last_error": "x", "last_success_at": iso(NOW - timedelta(minutes=4))}
++    assert ow.check_health_publish(ctx(_publish_remote(a1=failing))).state == ow.WAITING
++
++
++def test_health_publish_three_failures_in_a_row_is_failed_and_unreadable_state_is_an_error():
++    bad = {"consecutive_failures": 3, "last_error": "x", "last_success_at": iso(NOW - timedelta(hours=1))}
++    failed = ow.check_health_publish(ctx(_publish_remote(dev=bad)))
++    assert failed.state == ow.FAILED and failed.key == "failing-dev"
++    for broken in ({"consecutive_failures": "0"}, {"consecutive_failures": True}, {"consecutive_failures": -1}, {}):
++        with pytest.raises(ow.RemoteError):
++            ow.check_health_publish(ctx(_publish_remote(a1=broken)))
++    with pytest.raises(ow.RemoteError):
++        ow.check_health_publish(ctx(FakeRemote()))
++
++
++def test_health_publish_streak_survives_between_runs():
++    check = next(c for c in ow.CHECKS if c.id == "health-publish")
++    items = ow.run_checks(_publish_remote(), NOW, {}, [check])
++    assert items["health-publish"]["extra"]["healthy_since"] == iso(NOW)
++    state = {"items": items}
++    for step in range(1, 145):                 # one run every 30 minutes for 72 hours
++        moment = NOW + timedelta(minutes=30 * step)
++        state = {"items": ow.run_checks(_healthy_publish_at(moment), moment, state, [check])}
++        assert state["items"]["health-publish"]["state"] == (ow.OBSERVED if step == 144 else ow.WAITING), step
++    assert state["items"]["health-publish"]["closable"] and state["items"]["health-publish"]["key"] == "stable"
++
++
++def _healthy_publish_at(moment):
++    r = FakeRemote()
++    for host in ("a1", "dev"):
++        r.files[(host, ow.HEALTH_PUBLISH_STATE)] = json.dumps({"consecutive_failures": 0, "last_error": None, "last_success_at": iso(moment - timedelta(minutes=3))})
++    return r
++
++
++def test_health_publish_a_run_that_could_not_read_ends_the_streak_even_though_the_error_keeps_the_old_extra():
++    """Review of #304 (BLOCK-304-01): healthy -> unreadable -> healthy again must not count the unobserved stretch."""
++    check = next(c for c in ow.CHECKS if c.id == "health-publish")
++    state = {"items": ow.run_checks(_healthy_publish_at(NOW), NOW, {}, [check])}
++    broken_at = NOW + timedelta(hours=25)
++    state = {"items": ow.run_checks(FakeRemote(), broken_at, state, [check])}                    # the files cannot be read
++    assert state["items"]["health-publish"]["state"] == ow.ERROR
++    assert state["items"]["health-publish"]["extra"]["healthy_since"] == iso(NOW)                 # run_checks keeps a failed run's extra
++    back = NOW + timedelta(hours=73)
++    state = {"items": ow.run_checks(_healthy_publish_at(back), back, state, [check])}
++    entry = state["items"]["health-publish"]
++    assert entry["state"] == ow.WAITING and not entry["closable"] and entry["extra"]["healthy_since"] == iso(back)
++
++
++def test_health_publish_a_gap_longer_than_one_run_restarts_the_streak_and_a_normal_cadence_does_not():
++    prev = {"healthy_since": iso(NOW - timedelta(hours=100))}
++    for gap, restarted in ((30, False), (45, False), (46, True), (120, True)):
++        result = ow.check_health_publish(ctx(_publish_remote(), {**prev, "last_seen": iso(NOW - timedelta(minutes=gap))}))
++        assert (result.extra["healthy_since"] == iso(NOW)) == restarted, gap
++    no_seen = ow.check_health_publish(ctx(_publish_remote(), prev))                                # an old record without last_seen
++    assert no_seen.extra["healthy_since"] == iso(NOW)
++
++
++def _dust_rows(hours=3, mode="LIVE", test=False):
++    base = {"event_type": "capital_flow", "event_time": hours_ago(hours), "execution_mode": mode}
++    rows = [{**base, "event_id": "o1", "kind": "dust_convert_out", "asset": "ETH", "amount": 0.001},
++            {**base, "event_id": "i1", "kind": "dust_convert_in", "asset": "USDT", "amount": 3.0}]
++    if test:
++        rows = [{**row, "details": {"test": True}} for row in rows]
++    return rows
++
++
++def _dust_remote(rows=(), attempt=None, ledger="RECONCILED", ledger_minutes=20):
++    r = FakeRemote()
++    put(r, "a1", "btc-competition", "trading_ledger.jsonl", list(rows), jsonl=True)
++    put(r, "a1", "btc-competition", "ledger_status.json", _status_file(ledger, ledger_minutes))
++    if attempt is not None:
++        r.files[("a1", ow.DUST_ATTEMPT_PATH)] = json.dumps(attempt)
++    return r
++
++
++def test_dust_convert_waits_without_real_conversion_rows_and_ignores_test_and_demo_rows():
++    assert ow.check_dust_convert(ctx(_dust_remote())).state == ow.WAITING
++    assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(test=True)))).state == ow.WAITING
++    assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(mode="DEMO")))).state == ow.WAITING
++    nothing = ow.check_dust_convert(ctx(_dust_remote(attempt={"day": "2026-10-25", "status": "nothing_offered", "at": iso(NOW)})))
++    assert nothing.state == ow.WAITING and "nothing_offered" in nothing.summary
++
++
++@pytest.mark.parametrize("status", ["needs_review", "failed", "partial"])
++def test_dust_convert_failure_statuses_are_failed_and_told_once_per_day_and_status(status):
++    result = ow.check_dust_convert(ctx(_dust_remote(attempt={"day": "2026-10-25", "status": status, "detail": "d", "at": iso(NOW)})))
++    assert result.state == ow.FAILED and result.key == f"2026-10-25-{status}"
++
++
++def test_dust_convert_a_converting_record_is_only_failed_when_it_has_been_stuck():
++    fresh = {"day": "2026-10-25", "status": "converting", "at": iso(NOW - timedelta(minutes=5))}
++    assert ow.check_dust_convert(ctx(_dust_remote(attempt=fresh))).state == ow.WAITING
++    stuck = {**fresh, "at": iso(NOW - timedelta(minutes=45))}
++    assert ow.check_dust_convert(ctx(_dust_remote(attempt=stuck))).state == ow.FAILED
++
++
++def test_dust_convert_first_real_conversion_is_observed_but_still_needs_the_operator_to_compare_with_binance():
++    done = {"day": "2026-10-25", "status": "done", "detail": "x", "at": iso(NOW - timedelta(hours=3))}
++    result = ow.check_dust_convert(ctx(_dust_remote(_dust_rows(), done)))
++    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and result.key == "1-1"
++    assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(), {**done, "status": "converting", "at": iso(NOW)}))).state == ow.WAITING
++    assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(), done, ledger_minutes=170))).state == ow.WAITING     # not reconciled after the grace yet
++    assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(), done, ledger="DIVERGED"))).state == ow.FAILED
++
++
++def test_f70_batch1_checks_are_registered_and_read_only_whitelisted():
++    ids = {c.id: c for c in ow.CHECKS}
++    assert ids["dev-trend-reconcile"].covers == ("f-7",) and ids["health-publish"].covers == ("f-45",) and ids["dust-convert"].covers == ("f-66",)
++    assert ow.HEALTH_PUBLISH_STATE in ow.ALLOWED_PATHS and ow.DUST_ATTEMPT_PATH in ow.ALLOWED_PATHS
++    assert ow.audit("seykota", "ledger_status.json") in ow.ALLOWED_PATHS and ow.audit("btc-competition", "ledger_status.json") in ow.ALLOWED_PATHS
++
++
+ # --- command line -----------------------------------------------------------------------------------------------------
+ 
+ def test_run_report_and_ack_round_trip(tmp_path, capsys, demo_check):
