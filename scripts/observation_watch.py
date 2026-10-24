@@ -544,6 +544,10 @@ _NOTICE_LINE = re.compile(r"notices=(\d+) attempted=(\d+) sent=(\d+) consecutive
 #: A streak must be this long before "stable for days" is announced.  72 hours (2026-10-24, default; adjustable here).
 STABLE_STREAK = timedelta(hours=72)
 HEALTH_PUBLISH_FRESH_MINUTES = 25         # the publisher runs every 10 minutes
+#: A streak is only continuous if the run before this one also saw both publishers healthy no more than this long ago (the
+#: detector runs every 30 minutes).  A run that could not read, an unreadable file or a detector that was down in between
+#: all leave a longer gap -- ``run_checks`` keeps a failed run's ``extra``, so the gap is what ends the streak (review of #304).
+STREAK_MAX_GAP = timedelta(minutes=45)
 
 
 def check_dev_trend_reconcile(ctx: Context) -> Result:
@@ -582,8 +586,10 @@ def check_health_publish(ctx: Context) -> Result:
     """f-45: both hosts' health-reading publishers have been healthy for ``STABLE_STREAK`` in a row.
 
     Healthy = ``consecutive_failures`` is 0 and ``last_success_at`` is within 25 minutes.  The streak starts at the first run that
-    saw both hosts healthy (it cannot see the past) and restarts from zero whenever either one is not; three failures in a row
-    on a host is ``failed``.  A file that cannot be read is an error, never a quiet pass."""
+    saw both hosts healthy (it cannot see the past) and restarts from zero whenever either one is not -- and also whenever the
+    previous healthy run is more than ``STREAK_MAX_GAP`` old, i.e. when a run in between could not read (an error keeps the
+    stored ``extra``, so the gap is what ends the streak).  Three failures in a row on a host is ``failed``.  A file that cannot
+    be read is an error, never a quiet pass."""
     results = {host: _health_publish(ctx, host) for host in ("a1", "dev")}
     sentences = [results[h][1] for h in ("a1", "dev")]
     broken = [h for h in ("a1", "dev") if results[h][2] >= 3]
@@ -591,9 +597,12 @@ def check_health_publish(ctx: Context) -> Result:
         return Result(FAILED, "維運讀數發布單元連續失敗 3 次以上。", sentences, key="failing-" + "-".join(broken))
     if not all(results[h][0] for h in results):
         return Result(WAITING, "維運讀數發布單元現在不是兩台都正常，穩定天數重新算。", sentences)
-    since = parse_time((ctx.previous or {}).get("healthy_since")) or ctx.now
+    since = parse_time((ctx.previous or {}).get("healthy_since"))
+    last_seen = parse_time((ctx.previous or {}).get("last_seen"))
+    if since is None or last_seen is None or not timedelta(0) <= ctx.now - last_seen <= STREAK_MAX_GAP:
+        since = ctx.now            # no earlier healthy run, or an unobserved stretch in between: the streak starts again
     held = ctx.now - since
-    extra = {"healthy_since": since.isoformat(timespec="seconds")}
+    extra = {"healthy_since": since.isoformat(timespec="seconds"), "last_seen": ctx.now.isoformat(timespec="seconds")}
     hours = int(held.total_seconds() // 3600)
     if held >= STABLE_STREAK:
         return Result(OBSERVED, f"維運讀數發布單元兩台都已連續正常 {hours} 小時，可以結案（登記冊面板的分頁是否被標過期，另看一眼頁面）。",

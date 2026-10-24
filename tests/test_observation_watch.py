@@ -425,16 +425,16 @@ def _publish_remote(a1=None, dev=None):
 def test_health_publish_starts_a_streak_and_announces_it_only_after_72_hours():
     first = ow.check_health_publish(ctx(_publish_remote()))
     assert first.state == ow.WAITING and first.extra["healthy_since"] == iso(NOW)
-    early = ow.check_health_publish(ctx(_publish_remote(), {"healthy_since": iso(NOW - timedelta(hours=71))}))
-    assert early.state == ow.WAITING and early.extra["healthy_since"] == iso(NOW - timedelta(hours=71))
-    done = ow.check_health_publish(ctx(_publish_remote(), {"healthy_since": iso(NOW - timedelta(hours=73))}))
+    early = ow.check_health_publish(ctx(_publish_remote(), {"healthy_since": iso(NOW - timedelta(hours=71)), "last_seen": iso(NOW - timedelta(minutes=30))}))
+    assert early.state == ow.WAITING and early.extra["healthy_since"] == iso(NOW - timedelta(hours=71)) and early.extra["last_seen"] == iso(NOW)
+    done = ow.check_health_publish(ctx(_publish_remote(), {"healthy_since": iso(NOW - timedelta(hours=73)), "last_seen": iso(NOW - timedelta(minutes=30))}))
     assert done.state == ow.OBSERVED and done.closable and not done.needs_human and done.key == "stable"
     assert done.extra["healthy_since"] == iso(NOW - timedelta(hours=73))
 
 
 def test_health_publish_restarts_the_streak_when_either_host_is_not_healthy():
     stale = {"consecutive_failures": 0, "last_error": None, "last_success_at": iso(NOW - timedelta(minutes=40))}
-    one_bad = ow.check_health_publish(ctx(_publish_remote(dev=stale), {"healthy_since": iso(NOW - timedelta(hours=100))}))
+    one_bad = ow.check_health_publish(ctx(_publish_remote(dev=stale), {"healthy_since": iso(NOW - timedelta(hours=100)), "last_seen": iso(NOW - timedelta(minutes=30))}))
     assert one_bad.state == ow.WAITING and one_bad.extra == {}
     failing = {"consecutive_failures": 1, "last_error": "x", "last_success_at": iso(NOW - timedelta(minutes=4))}
     assert ow.check_health_publish(ctx(_publish_remote(a1=failing))).state == ow.WAITING
@@ -455,12 +455,42 @@ def test_health_publish_streak_survives_between_runs():
     check = next(c for c in ow.CHECKS if c.id == "health-publish")
     items = ow.run_checks(_publish_remote(), NOW, {}, [check])
     assert items["health-publish"]["extra"]["healthy_since"] == iso(NOW)
-    later = NOW + timedelta(hours=73)
+    state = {"items": items}
+    for step in range(1, 145):                 # one run every 30 minutes for 72 hours
+        moment = NOW + timedelta(minutes=30 * step)
+        state = {"items": ow.run_checks(_healthy_publish_at(moment), moment, state, [check])}
+        assert state["items"]["health-publish"]["state"] == (ow.OBSERVED if step == 144 else ow.WAITING), step
+    assert state["items"]["health-publish"]["closable"] and state["items"]["health-publish"]["key"] == "stable"
+
+
+def _healthy_publish_at(moment):
     r = FakeRemote()
     for host in ("a1", "dev"):
-        r.files[(host, ow.HEALTH_PUBLISH_STATE)] = json.dumps({"consecutive_failures": 0, "last_error": None, "last_success_at": iso(later - timedelta(minutes=3))})
-    again = ow.run_checks(r, later, {"items": items}, [check])
-    assert again["health-publish"]["state"] == ow.OBSERVED and again["health-publish"]["closable"]
+        r.files[(host, ow.HEALTH_PUBLISH_STATE)] = json.dumps({"consecutive_failures": 0, "last_error": None, "last_success_at": iso(moment - timedelta(minutes=3))})
+    return r
+
+
+def test_health_publish_a_run_that_could_not_read_ends_the_streak_even_though_the_error_keeps_the_old_extra():
+    """Review of #304 (BLOCK-304-01): healthy -> unreadable -> healthy again must not count the unobserved stretch."""
+    check = next(c for c in ow.CHECKS if c.id == "health-publish")
+    state = {"items": ow.run_checks(_healthy_publish_at(NOW), NOW, {}, [check])}
+    broken_at = NOW + timedelta(hours=25)
+    state = {"items": ow.run_checks(FakeRemote(), broken_at, state, [check])}                    # the files cannot be read
+    assert state["items"]["health-publish"]["state"] == ow.ERROR
+    assert state["items"]["health-publish"]["extra"]["healthy_since"] == iso(NOW)                 # run_checks keeps a failed run's extra
+    back = NOW + timedelta(hours=73)
+    state = {"items": ow.run_checks(_healthy_publish_at(back), back, state, [check])}
+    entry = state["items"]["health-publish"]
+    assert entry["state"] == ow.WAITING and not entry["closable"] and entry["extra"]["healthy_since"] == iso(back)
+
+
+def test_health_publish_a_gap_longer_than_one_run_restarts_the_streak_and_a_normal_cadence_does_not():
+    prev = {"healthy_since": iso(NOW - timedelta(hours=100))}
+    for gap, restarted in ((30, False), (45, False), (46, True), (120, True)):
+        result = ow.check_health_publish(ctx(_publish_remote(), {**prev, "last_seen": iso(NOW - timedelta(minutes=gap))}))
+        assert (result.extra["healthy_since"] == iso(NOW)) == restarted, gap
+    no_seen = ow.check_health_publish(ctx(_publish_remote(), prev))                                # an old record without last_seen
+    assert no_seen.extra["healthy_since"] == iso(NOW)
 
 
 def _dust_rows(hours=3, mode="LIVE", test=False):
