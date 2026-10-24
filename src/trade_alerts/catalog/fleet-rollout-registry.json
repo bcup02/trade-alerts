@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-23",
+  "updated_at": "2026-10-24",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -2042,20 +2042,22 @@
       },
       "emits_event": {
         "momentum": {
-          "state": "pending",
-          "phase": "8-momentum",
-          "reason": "停放目前只記在 Google 同步紀錄（REJECTED／orphan_close_no_open_row），沒有寫進共用事件日誌；R1 本來就不通知，等第 8 關補寫事件日誌。"
+          "state": "done",
+          "evidence": "src/google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection，:92 把事件日誌路徑、:93 策略名交給它；停放找不到開倉列的平倉時共用庫（A1 venv trade-alerts 0.30.19 的 projection_outbox）寫 R1 事件 PROJECTION_ORPHAN_CLOSE_PARKED（不通知）；tests/test_google_projection_worker.py:109-125 測試讀回該事件。",
+          "verified_at": "2026-10-24",
+          "limit": "A1 動能沒有停放過找不到開倉列的平倉，事件只在共用庫與策略端測試驗證。"
         },
         "seykota": {
-          "state": "pending",
-          "phase": "8-seykota",
-          "reason": "同上：只記在 Google 同步紀錄，還沒寫進共用事件日誌。"
+          "state": "done",
+          "evidence": "src/seykota_bot/google_projection_worker.py:93 直接呼叫共用庫的 dispatch_next_projection，:98 把事件日誌路徑、:99 策略名交給它；停放找不到開倉列的平倉時共用庫（A1 venv trade-alerts 0.30.19 的 projection_outbox）寫 R1 事件 PROJECTION_ORPHAN_CLOSE_PARKED（不通知）；tests/test_google_projection_worker.py:95-111 測試讀回該事件。",
+          "verified_at": "2026-10-24",
+          "limit": "A1 趨勢沒有停放過找不到開倉列的平倉，事件只在共用庫與策略端測試驗證。"
         },
         "mycrypto": {
           "state": "done",
           "evidence": "google_projection_worker.py:87 直接呼叫共用庫的 dispatch_next_projection，:92 把事件日誌路徑、:93 策略名交給它；停放找不到開倉列的平倉時共用庫（A1 venv trade-alerts 0.30.19）寫 R1 事件 PROJECTION_ORPHAN_CLOSE_PARKED（不通知）。8b（加密 #106）。2026-10-23 台北 16:22 隨 A1 加密重開部署、20:16 改釘 v0.30.19 再部署（operations 599c607；A1 上該檔與 mexc_futures_bot.py 的 blob a85437d、4208e35 與該 commit 相同）。",
           "verified_at": "2026-10-23",
-          "limit": "A1 加密沒有停放過找不到開倉列的平倉，事件只在共用庫測試與開發機測試網驗證。"
+          "limit": "A1 加密沒有停放過找不到開倉列的平倉，事件只在共用庫與策略端測試驗證。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -2324,11 +2326,20 @@
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "ledger.dust_convert",
-      "project": "btc-competition",
-      "type": "updated",
-      "note": "A1 粉塵開關已打開（台北 10/23 21:26），限制句改成現況。"
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+      "project": "momentum",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "動能：停放的平倉寫進事件日誌（R1 不通知），程式早已隨 8b 上 A1，這格補改已做。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+      "project": "seykota",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "趨勢：停放的平倉寫進事件日誌（R1 不通知），程式早已隨 8b 上 A1，這格補改已做。"
     }
   ]
 }
