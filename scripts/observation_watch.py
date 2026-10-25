@@ -13,9 +13,10 @@ status alert, the next real trade ...).  Each *check* here knows
 A run writes ``state.json`` (the result of every check) and sends ONE message when a check changes into
 ``observed`` or ``failed`` (never again for the same thing; see ``notified_key``).  The message goes to LINE (the
 channel the operator watches first); only after LINE has failed for ``LINE_FAILED_RUNS_BEFORE_TELEGRAM`` runs in a row for
-that same message is it sent once to Telegram instead, saying so.  The progress-page items are closed
-or reopened by Claude when it reads ``state.json`` at the start / end of a session -- this tool decides nothing about the
-page, and a script cannot judge what it cannot measure.
+that same message is it sent once to Telegram instead, saying so.  Once a result has been acked (``ack``) it is not
+announced again if the check leaves ``observed`` and comes back with the same ``key``.  The progress-page items are closed
+or reopened by Claude as soon as it sees the message or reads ``state.json`` (start / end of a session) -- this tool
+decides nothing about the page, and a script cannot judge what it cannot measure.
 
 Everything here is standard library only and runs unprivileged on the dev host; production (A1) is read over ssh with
 ``sudo cat`` / ``sudo journalctl`` on a fixed whitelist of paths and units (see ``Remote``).
@@ -1280,16 +1281,21 @@ def notice_for(entry: Mapping[str, Any]) -> str | None:
         return None
     if state not in (OBSERVED, FAILED, ERROR) or entry.get("notified_key") == key:
         return None
+    # An ack is kept while the check goes back to waiting (``notified_key`` is not): when the very same result comes
+    # back, it was already dealt with -- telling again would send a message nobody can act on (f-71).
+    if state == OBSERVED and entry.get("acked_key") == key:
+        return None
     covers = "、".join(entry["covers"])
     if state == OBSERVED:
         head = f"【觀察區】{covers}：" + ("條件已到，機器查證全部通過，可以結案" if entry.get("closable") and not entry.get("needs_human")
                                           else "條件已到，需要你確認")
-        tail = ("我下次開工讀到後會附證據結案。" if entry.get("closable") and not entry.get("needs_human")
+        tail = ("我在對話中讀到就當場查證、結案並標記處理完；標記之前，報告會一直顯示這一項。"
+                if entry.get("closable") and not entry.get("needs_human")
                 else "確認後在對話裡告訴我，我再結案。")
     elif state == FAILED:
-        head, tail = f"【觀察區失敗】{covers}：不符合預期", "我開工讀到後會重開這一項、加進等待決定並查原因。"
+        head, tail = f"【觀察區失敗】{covers}：不符合預期", "我在對話中讀到就當場重開這一項、加進等待決定並查原因。"
     else:
-        head, tail = f"【觀察區】{covers}：自動檢查壞了", "我開工讀到後會修。"
+        head, tail = f"【觀察區】{covers}：自動檢查壞了", "我在對話中讀到就當場修。"
     lines = [head, entry["summary"], *(f"・{e}" for e in entry.get("evidence", [])[:4]), tail]
     return "\n".join(lines)
 
