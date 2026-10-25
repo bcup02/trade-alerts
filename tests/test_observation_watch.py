@@ -334,6 +334,57 @@ def test_an_observation_is_announced_once_and_again_only_after_it_went_back_to_w
     assert len(sent) == 2 and all("可以結案" in text and "f-x" in text for text in sent)
 
 
+def _round_trip(tmp_path, results, ack_after):
+    """Run the demo check through ``results`` (one per run, announcing each time); ``ack`` it through the real command after
+    run number ``ack_after``.  Returns the texts that were sent."""
+    check, sent, state, path = one_check(lambda n: results[n - 1]), [], {}, tmp_path / "state.json"
+    for run in range(1, len(results) + 1):
+        state = {"items": ow.run_checks(ow.Remote("k"), NOW, state, [check])}
+        ow.notify(state["items"], lambda text: sent.append(text) or True)
+        ow.save_state(path, state)
+        if run == ack_after:
+            assert ow.main(["ack", "demo", "--state", str(path)]) == 0
+        state = ow.load_state(path)
+    return sent
+
+
+def test_an_acked_result_is_not_announced_again_when_it_comes_back_the_same(tmp_path):
+    """f-71: f-26 went observed -> waiting -> observed with the same result every time a new trade was inside the grace period,
+    and each return sent the message again although it had been acked."""
+    seq = [ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k"), ow.Result(ow.WAITING, "w"),
+           ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k"), ow.Result(ow.WAITING, "w"),
+           ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k")]
+    assert len(_round_trip(tmp_path, seq, ack_after=1)) == 1
+
+
+def test_an_acked_result_is_announced_when_it_comes_back_different(tmp_path):
+    seq = [ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k1"), ow.Result(ow.WAITING, "w"),
+           ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k2")]
+    assert len(_round_trip(tmp_path, seq, ack_after=1)) == 2
+
+
+def test_without_an_ack_every_return_from_waiting_is_still_announced(tmp_path):
+    seq = [ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k"), ow.Result(ow.WAITING, "w"),
+           ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k")]
+    assert len(_round_trip(tmp_path, seq, ack_after=0)) == 2
+
+
+def test_an_ack_does_not_silence_a_failure_that_returns(tmp_path):
+    """A failure that comes back is new information whatever was acked before: only ``observed`` is silenced."""
+    seq = [ow.Result(ow.FAILED, "不符", key="k"), ow.Result(ow.WAITING, "w"), ow.Result(ow.FAILED, "不符", key="k")]
+    assert len(_round_trip(tmp_path, seq, ack_after=1)) == 2
+
+
+def test_no_message_promises_to_act_at_the_next_session():
+    """f-71: 「下次開工」 read as permission to leave a closable result open; every kind of message now says Claude acts when it reads it."""
+    for result in (ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k"), ow.Result(ow.FAILED, "不符", key="k"),
+                   ow.Result(ow.ERROR, "壞了")):
+        entry = ow.run_checks(ow.Remote("k"), NOW, {}, [one_check(lambda n, r=result: r)])["demo"]
+        entry["consecutive_errors"] = ow.ERRORS_BEFORE_NOTICE
+        text = ow.notice_for(entry)
+        assert text and "下次開工" not in text and "開工讀到" not in text and "當場" in text
+
+
 def test_a_failed_send_is_retried_on_the_next_run():
     check = one_check(lambda n: ow.Result(ow.FAILED, "不符", key="k"))
     state = {"items": ow.run_checks(ow.Remote("k"), NOW, {}, [check])}
