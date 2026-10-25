@@ -1,0 +1,118 @@
+diff --git a/docs/observation-watch.md b/docs/observation-watch.md
+index 053f17d..e78b116 100644
+--- a/docs/observation-watch.md
++++ b/docs/observation-watch.md
+@@ -26,6 +26,8 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項
+   **第二則的成功維運通知不記錄**（只記失敗），所以永遠不宣稱它送達，一律問人。
+ - 維運通知狀態檔的 `delivered` 不一定是真的送出：它第一次看到某個策略時，會把當時已存在的通知全標成 `delivered` 但**不發送**。所以事件早於該策略的 `baseline_at` 時，送出紀錄不算證據，結果會明寫「無法證明有送出」並請你確認有沒有收到。
+ - Google 對帳的 `RECONCILED` 只有在**對帳時間晚於那筆新交易的 61 分鐘寬限之後**才算數（新交易 60 分鐘內本來就可以還沒上表）；之前的 RECONCILED、寬限內的 RECONCILED、過期（超過 90 分鐘）的都不算，只會繼續等待。
++- 已 `ack` 的結果不會重發：檢查在 `observed` 與 `waiting` 之間來回時（例如四支策略的分頁名檢查，每有一筆新交易進入對帳寬限就退回 `waiting`），「已通知」記錄會清掉，但 `ack` 記錄保留；回到 `observed` 時結果的 `key` 若和 `ack` 的一樣就不再發。要再通知，`key` 必須不同（例如競賽成交筆數變了）。只靜音 `observed`，`failed` 回來一律再發。
++- 通知結尾不約定「下次開工」：Claude 在對話中讀到就當場查證、結案、`ack`；`ack` 之前報告會一直顯示該項。
+ - 已知限制：Telegram 送出但狀態檔存不進去時，下一輪可能重複發送（會印出錯誤並以結束碼 1 結束）；同時只會有一個在跑（檔案鎖）。
+ - 受控測試事件靠 `details.test`／`evidence.test` 排除；維運通知日誌本身分不出測試與真實，所以狀態告警那一項一律要人確認。
+ 
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index e5dd652..124243f 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -13,9 +13,10 @@ status alert, the next real trade ...).  Each *check* here knows
+ A run writes ``state.json`` (the result of every check) and sends ONE message when a check changes into
+ ``observed`` or ``failed`` (never again for the same thing; see ``notified_key``).  The message goes to LINE (the
+ channel the operator watches first); only after LINE has failed for ``LINE_FAILED_RUNS_BEFORE_TELEGRAM`` runs in a row for
+-that same message is it sent once to Telegram instead, saying so.  The progress-page items are closed
+-or reopened by Claude when it reads ``state.json`` at the start / end of a session -- this tool decides nothing about the
+-page, and a script cannot judge what it cannot measure.
++that same message is it sent once to Telegram instead, saying so.  Once a result has been acked (``ack``) it is not
++announced again if the check leaves ``observed`` and comes back with the same ``key``.  The progress-page items are closed
++or reopened by Claude as soon as it sees the message or reads ``state.json`` (start / end of a session) -- this tool
++decides nothing about the page, and a script cannot judge what it cannot measure.
+ 
+ Everything here is standard library only and runs unprivileged on the dev host; production (A1) is read over ssh with
+ ``sudo cat`` / ``sudo journalctl`` on a fixed whitelist of paths and units (see ``Remote``).
+@@ -1280,16 +1281,21 @@ def notice_for(entry: Mapping[str, Any]) -> str | None:
+         return None
+     if state not in (OBSERVED, FAILED, ERROR) or entry.get("notified_key") == key:
+         return None
++    # An ack is kept while the check goes back to waiting (``notified_key`` is not): when the very same result comes
++    # back, it was already dealt with -- telling again would send a message nobody can act on (f-71).
++    if state == OBSERVED and entry.get("acked_key") == key:
++        return None
+     covers = "、".join(entry["covers"])
+     if state == OBSERVED:
+         head = f"【觀察區】{covers}：" + ("條件已到，機器查證全部通過，可以結案" if entry.get("closable") and not entry.get("needs_human")
+                                           else "條件已到，需要你確認")
+-        tail = ("我下次開工讀到後會附證據結案。" if entry.get("closable") and not entry.get("needs_human")
++        tail = ("我在對話中讀到就當場查證、結案並標記處理完；標記之前，報告會一直顯示這一項。"
++                if entry.get("closable") and not entry.get("needs_human")
+                 else "確認後在對話裡告訴我，我再結案。")
+     elif state == FAILED:
+-        head, tail = f"【觀察區失敗】{covers}：不符合預期", "我開工讀到後會重開這一項、加進等待決定並查原因。"
++        head, tail = f"【觀察區失敗】{covers}：不符合預期", "我在對話中讀到就當場重開這一項、加進等待決定並查原因。"
+     else:
+-        head, tail = f"【觀察區】{covers}：自動檢查壞了", "我開工讀到後會修。"
++        head, tail = f"【觀察區】{covers}：自動檢查壞了", "我在對話中讀到就當場修。"
+     lines = [head, entry["summary"], *(f"・{e}" for e in entry.get("evidence", [])[:4]), tail]
+     return "\n".join(lines)
+ 
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index 157f02d..a7a199c 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -334,6 +334,57 @@ def test_an_observation_is_announced_once_and_again_only_after_it_went_back_to_w
+     assert len(sent) == 2 and all("可以結案" in text and "f-x" in text for text in sent)
+ 
+ 
++def _round_trip(tmp_path, results, ack_after):
++    """Run the demo check through ``results`` (one per run, announcing each time); ``ack`` it through the real command after
++    run number ``ack_after``.  Returns the texts that were sent."""
++    check, sent, state, path = one_check(lambda n: results[n - 1]), [], {}, tmp_path / "state.json"
++    for run in range(1, len(results) + 1):
++        state = {"items": ow.run_checks(ow.Remote("k"), NOW, state, [check])}
++        ow.notify(state["items"], lambda text: sent.append(text) or True)
++        ow.save_state(path, state)
++        if run == ack_after:
++            assert ow.main(["ack", "demo", "--state", str(path)]) == 0
++        state = ow.load_state(path)
++    return sent
++
++
++def test_an_acked_result_is_not_announced_again_when_it_comes_back_the_same(tmp_path):
++    """f-71: f-26 went observed -> waiting -> observed with the same result every time a new trade was inside the grace period,
++    and each return sent the message again although it had been acked."""
++    seq = [ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k"), ow.Result(ow.WAITING, "w"),
++           ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k"), ow.Result(ow.WAITING, "w"),
++           ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k")]
++    assert len(_round_trip(tmp_path, seq, ack_after=1)) == 1
++
++
++def test_an_acked_result_is_announced_when_it_comes_back_different(tmp_path):
++    seq = [ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k1"), ow.Result(ow.WAITING, "w"),
++           ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k2")]
++    assert len(_round_trip(tmp_path, seq, ack_after=1)) == 2
++
++
++def test_without_an_ack_every_return_from_waiting_is_still_announced(tmp_path):
++    seq = [ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k"), ow.Result(ow.WAITING, "w"),
++           ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k")]
++    assert len(_round_trip(tmp_path, seq, ack_after=0)) == 2
++
++
++def test_an_ack_does_not_silence_a_failure_that_returns(tmp_path):
++    """A failure that comes back is new information whatever was acked before: only ``observed`` is silenced."""
++    seq = [ow.Result(ow.FAILED, "不符", key="k"), ow.Result(ow.WAITING, "w"), ow.Result(ow.FAILED, "不符", key="k")]
++    assert len(_round_trip(tmp_path, seq, ack_after=1)) == 2
++
++
++def test_no_message_promises_to_act_at_the_next_session():
++    """f-71: 「下次開工」 read as permission to leave a closable result open; every kind of message now says Claude acts when it reads it."""
++    for result in (ow.Result(ow.OBSERVED, "o", ["e"], closable=True, key="k"), ow.Result(ow.FAILED, "不符", key="k"),
++                   ow.Result(ow.ERROR, "壞了")):
++        entry = ow.run_checks(ow.Remote("k"), NOW, {}, [one_check(lambda n, r=result: r)])["demo"]
++        entry["consecutive_errors"] = ow.ERRORS_BEFORE_NOTICE
++        text = ow.notice_for(entry)
++        assert text and "下次開工" not in text and "開工讀到" not in text and "當場" in text
++
++
+ def test_a_failed_send_is_retried_on_the_next_run():
+     check = one_check(lambda n: ow.Result(ow.FAILED, "不符", key="k"))
+     state = {"items": ow.run_checks(ow.Remote("k"), NOW, {}, [check])}
