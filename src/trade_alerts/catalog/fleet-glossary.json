@@ -1,6 +1,6 @@
 {
   "glossary_version": "fleet-glossary/v1",
-  "updated_at": "2026-10-24",
+  "updated_at": "2026-10-25",
   "note": "機隊全專案中文用詞對照表。給人看的文字一律用 zh；retired 是不要再用的舊叫法，tests/test_fleet_glossary.py 會掃描 trade-alerts 內給人看的文字，出現就擋。英文代號只如實列出，不在這裡改。",
   "entries": [
     {
@@ -124,13 +124,28 @@
       "note": "2026-10-20 建立。"
     },
     {
-      "id": "host.workstation",
+      "id": "host.workstation_l",
       "category": "主機",
-      "zh": "工作機",
-      "en": [],
-      "definition": "使用者自己的電腦（Windows，裡面跑 WSL2 Ubuntu），用來跑 Claude 對話、開 PR 與審閱；不跑任何交易程式，也不是開發機。",
+      "zh": "工作機L",
+      "en": [
+        "WSL2 Ubuntu",
+        "Column-Dell"
+      ],
+      "definition": "使用者自己的電腦（Column-Dell）裡的 WSL2 Ubuntu（Linux）；機隊的 Claude 在這裡跑，負責除 ATSR 之外的所有開發。所有設定與金鑰（ssh、gh、憑證）、記憶、CLAUDE.md、名詞對照表與機隊進度頁都在這裡。不跑任何交易程式，也不是開發機。",
       "retired": [],
-      "note": "2026-10-21 定：舊 GCP 的 trading-dev 開發機除役後（2026-10-24 已刪除），Claude 的工作環境改在這裡。"
+      "note": "2026-10-25 定：原本的「工作機」拆成工作機L 與工作機W，單獨寫「工作機」不再使用（沒有放進舊叫法清單，因為它是這兩個正式名稱的一部分，測試的比對會誤擋；改由 CLAUDE.md 的規則要求）。"
+    },
+    {
+      "id": "host.workstation_w",
+      "category": "主機",
+      "zh": "工作機W",
+      "en": [
+        "Windows",
+        "C:\\Users\\Column\\Project\\ATSR"
+      ],
+      "definition": "同一台電腦的 Windows，工作目錄是 C:\\Users\\Column\\Project\\ATSR；目前只負責 ATSR 的開發（ATSR 的程式、文件、PR，以及操作使用者已登入的 Chrome 與 TradingView）。不放機隊的金鑰、不連任何交易主機，也不是開發機。",
+      "retired": [],
+      "note": "2026-10-25 定。和工作機L 是同一台實體電腦裡兩個不同的 Claude 對話，記憶與工具各自一份，靠交接資料夾（C:\\Users\\Column\\Project\\handoff）溝通。"
     },
     {
       "id": "mode.live",
