@@ -1,0 +1,188 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index a2fb117..dbde065 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.20"
++version = "0.30.21"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 96c823d..4b50c0d 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -36,7 +36,7 @@
+     "btc-competition": "btc-bull-market-competition",
+     "fleet": "(cross-repo: same condition implemented in every strategy)"
+   },
+-  "error_ids_issued": 69,
++  "error_ids_issued": 70,
+   "entries": [
+     {
+       "error_id": "ERR-001",
+@@ -2222,6 +2222,39 @@
+           "一致就不用處理；不一致才把事件日誌裡的交易編號貼給 Claude 追查。"
+         ]
+       }
++    },
++    {
++      "error_id": "ERR-070",
++      "code": "BTC.PAXG_DATA_UNAVAILABLE",
++      "title": "競賽策略連續 3 個 UTC 日讀不到 PAXG 行情",
++      "project": "btc-competition",
++      "sources": [
++        "src/btc_competition/runner.py:768"
++      ],
++      "current": {
++        "latch": null,
++        "notify": null,
++        "unit_exit": null
++      },
++      "verdict": "JUDGEMENT",
++      "risk_tier": "R2",
++      "auto_action": "開啟 PAXG（BTC_COMP_PAXG=on）後，每次每日執行會讀 PAXGUSDT 日線；讀不到就把 PAXG 多頭指標當成關閉：目標變成全 USDT，BTC 與勝者的主策略照常。若手上持有 PAXG，賣出 PAXG 的單照一般換倉流程送出——可能成交、被拒、或沒完成而留作待完成目標由下一輪續跑，並不保證這一輪已經賣完，成交價也可能和估值不同。每個 UTC 日只算一次（同日重跑不重複計）；連續 3 個 UTC 日都讀不到才升格：寫一筆 R2 事件並通知一次，之後不重複通知；只要有一天讀得到就歸零。",
++      "human_action": "需要人判斷：Binance 的 PAXGUSDT 是不是暫停交易、下架，或只是 API／網路問題，以及要不要繼續開著 PAXG。先確認實際持倉（A1 的 audit／state 與交易所帳戶裡還有沒有 PAXG）、最近的成交與狀態檔有沒有待完成目標（pending_target_weights）或安全暫停；讀不到行情的期間策略的目標是全 USDT，但不保證 PAXG 已經賣掉，賣出也可能和估值有價差、不能當成沒有虧損。如果 PAXGUSDT 已經確定不能再用，把 env 的 BTC_COMP_PAXG 改回 off（先問 Claude）。",
++      "resume": "n/a",
++      "lands_in_phase": 8,
++      "rationale": "使用者 2026-10-28 決定（D5）：PAXG 資料抓不到時視為指標為假（保守回 USDT）並通知。單一天讀不到只是一次賣出再買入的手續費與可能的價差，不值得打擾；連續 3 天才表示不是暫時的網路問題，所以是 R2（和機隊其他「自己先試、連續失敗才通知」的規則一致）。策略不暫停，因為保守方向（全 USDT）本身就是安全狀態。通知要人判斷的是行情來源與交易對還能不能用、要不要繼續開著 PAXG，以及確認實際倉位，不是要人立刻下單。",
++      "operator_message": {
++        "what": "競賽策略連續 3 個 UTC 日讀不到 PAXG（黃金代幣）的行情。",
++        "direction": "需要你判斷：PAXG 的行情來源或交易對還能不能用、要不要繼續開著 PAXG。這段期間策略的目標一直是全 USDT，BTC 與勝者的主策略沒有受影響；但不保證手上的 PAXG 已經賣掉，也不保證賣出沒有價差損失，請先確認實際倉位。",
++        "steps": [
++          "先確認實際倉位：到交易所帳戶看還有沒有 PAXG，並看 A1 競賽的狀態檔有沒有待完成目標或安全暫停（沒有把握就貼給 Claude 查）。",
++          "看 Binance 有沒有公告 PAXGUSDT 暫停交易或下架，也看 A1 到 Binance 的網路是否正常。",
++          "如果只是暫時的行情或網路問題：行情恢復後什麼都不用做，下一次每日執行會自動重新判斷 PAXG 指標。",
++          "如果 PAXGUSDT 確定不能再用，或你不想再持有 PAXG：在 A1 把 `/etc/btc-competition/btc-competition.env` 的 `BTC_COMP_PAXG` 改回 `off`（改檔前先問 Claude），下一次每日執行起不再看 PAXG；手上若還有 PAXG，該次執行會把它賣回 USDT。",
++          "想查原因：把下方「給 AI 的追查指令」整段貼給 Claude。"
++        ],
++        "ai_prompt": "請在 btc-bull-market-competition 追查為什麼連續讀不到 PAXG 行情：讀 src/btc_competition/market_data.py 的 fetch_paxg_closes 與 src/btc_competition/runner.py 的 _frame_with_paxg，對照 A1 的日誌（journalctl -u btc-competition-bot）與 Binance 公開 API https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=2 的回應，判斷是網路、交易對暫停、回應格式改變還是程式問題，並提出修正。"
++      }
+     }
+   ],
+   "retired_codes": [
+diff --git a/src/trade_alerts/catalog/fleet-glossary.json b/src/trade_alerts/catalog/fleet-glossary.json
+index 7239958..cdaa905 100644
+--- a/src/trade_alerts/catalog/fleet-glossary.json
++++ b/src/trade_alerts/catalog/fleet-glossary.json
+@@ -1,6 +1,6 @@
+ {
+   "glossary_version": "fleet-glossary/v1",
+-  "updated_at": "2026-10-25",
++  "updated_at": "2026-10-28",
+   "note": "機隊全專案中文用詞對照表。給人看的文字一律用 zh；retired 是不要再用的舊叫法，tests/test_fleet_glossary.py 會掃描 trade-alerts 內給人看的文字，出現就擋。英文代號只如實列出，不在這裡改。",
+   "entries": [
+     {
+@@ -545,6 +545,31 @@
+         "營運"
+       ]
+     },
++    {
++      "id": "asset.paxg",
++      "category": "其他",
++      "zh": "PAXG（黃金代幣）",
++      "en": [
++        "PAXG",
++        "PAXGUSDT"
++      ],
++      "definition": "價格跟黃金掛鉤的代幣。競賽策略（R033，預設關閉）在 BTC 熊市、而且 PAXG 自己通過多頭指標時，持有 50%，其餘放 USDT。只能和 USDT 交易，沒有和 BTC、ETH、BNB、SOL 的深度市場。",
++      "retired": [],
++      "note": "提到持有它時寫『PAXG』；『黃金』只在解釋它是什麼時用。"
++    },
++    {
++      "id": "asset.paxg_gate",
++      "category": "其他",
++      "zh": "PAXG 多頭指標",
++      "en": [
++        "paxg_gate",
++        "compute_paxg_gate",
++        "paxg_on"
++      ],
++      "definition": "PAXG 自己的多頭判斷，規則和 BTC 牛熊相同（收盤 > SMA50 且 > SMA100 進場、收盤 ≤ SMA50 出場）；讀不到 PAXG 行情時一律當成關閉。",
++      "retired": [],
++      "note": "和 BTC 的『牛市／熊市』是兩個獨立的判斷，不要混用。"
++    },
+     {
+       "id": "tier.r0",
+       "category": "風險等級",
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index c57f0f4..49d2b3a 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1,7 +1,7 @@
+ {
+   "registry_version": "fleet-rollout-registry/v1",
+   "catalog_version": "fleet-error-catalog/v2",
+-  "updated_at": "2026-10-24",
++  "updated_at": "2026-10-28",
+   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
+   "projects": {
+     "momentum": "動能策略",
+@@ -35,7 +35,8 @@
+     "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
+     "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
+     "f-64": "f-64：Google 表同步佇列不被編號衝突的開倉列或成交列卡死（共用庫 v0.30.19 停放；各策略改釘後才生效）",
+-    "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）"
++    "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）",
++    "r033-paxg": "R033：競賽策略在 BTC 熊市持有 PAXG（程式已合併到開發主幹、預設關閉；開發機演練通過、經使用者核可後才進正式機分支）"
+   },
+   "sources": {
+     "momentum": {
+@@ -916,6 +917,30 @@
+           "limit": "開關 2026-10-23 台北 21:26 在 A1 打開並手動跑一輪（交易所 BTC、ETH、SOL 都是 0，判斷沒有零頭、沒呼叫轉換），尚未真實轉換過；幣安沒寫金鑰權限、最低金額、冷卻、手續費算法，第一次真實轉換才驗證。"
+         }
+       }
++    },
++    {
++      "id": "bear.paxg_asset",
++      "title": "BTC 熊市時，PAXG 自己通過多頭指標就持有 50%（R033）",
++      "description": "BTC 熊市原本全放 USDT。R033 改成：PAXG（黃金代幣，只能和 USDT 交易）自己通過和 BTC 相同的多頭規則（收盤 > SMA50 且 > SMA100 進場、≤ SMA50 出場）才放 50%，其餘 USDT；進牛市先賣 PAXG 再換倉。由環境變數 BTC_COMP_PAXG 控制，預設關閉；關掉後狀態仍顯示持有時會自動賣回。PAXG 行情讀不到時指標當成關閉（保守全 USDT），連續 3 個 UTC 日讀不到才通知（ERR-070）。",
++      "status": {
++        "seykota": {
++          "state": "n/a",
++          "reason": "這支策略做的是 BTC 永續合約，沒有現貨的熊市資產配置。"
++        },
++        "momentum": {
++          "state": "n/a",
++          "reason": "這支策略做的是合約短線動能，沒有熊市資產配置；它不持有現貨。"
++        },
++        "mycrypto": {
++          "state": "n/a",
++          "reason": "這支策略做的是 Binance 合約，沒有現貨的熊市資產配置。"
++        },
++        "btc-competition": {
++          "state": "pending",
++          "phase": "r033-paxg",
++          "reason": "程式與測試已在開發主幹（策略 repo PR #84、#86、#88、#90），預設關閉；還沒進正式機分支，也還沒在開發機測試網演練。"
++        }
++      }
+     }
+   ],
+   "catalog": [
+@@ -2322,6 +2347,23 @@
+           "limit": "A1 沒遇過更正被拒收；趨勢自己的測試只驗了停放平倉那一條，這個事件由共用庫的測試驗證，趨勢端沒有逐碼測試。"
+         }
+       }
++    },
++    {
++      "code": "BTC.PAXG_DATA_UNAVAILABLE",
++      "behaviour": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "r033-paxg",
++          "reason": "讀不到 PAXG 行情時指標當成關閉的行為已在開發主幹；連續 3 個 UTC 日才通知一次的計數另開策略 repo 的 PR。"
++        }
++      },
++      "emits_event": {
++        "btc-competition": {
++          "state": "pending",
++          "phase": "r033-paxg",
++          "reason": "升格事件要等策略 repo 改用本版共用庫後才會寫；目前讀不到行情只寫一行稽核紀錄（借用 RUNTIME_CYCLE_FAILED，R0）。"
++        }
++      }
+     }
+   ],
+   "recent_changes": [
