@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 69,
+  "error_ids_issued": 70,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -2221,6 +2221,38 @@
           "想確認：到 Google 表對應分頁找這個交易編號，看那一列的成交時間與數量是不是跟帳本一致。",
           "一致就不用處理；不一致才把事件日誌裡的交易編號貼給 Claude 追查。"
         ]
+      }
+    },
+    {
+      "error_id": "ERR-070",
+      "code": "BTC.PAXG_DATA_UNAVAILABLE",
+      "title": "競賽策略連續 3 個 UTC 日讀不到 PAXG 行情",
+      "project": "btc-competition",
+      "sources": [
+        "src/btc_competition/runner.py:768"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "開啟 PAXG（BTC_COMP_PAXG=on）後，每次每日執行會讀 PAXGUSDT 日線；讀不到就把 PAXG 多頭指標當成關閉：熊市維持全 USDT，已持有的 PAXG 這一輪賣回 USDT，BTC 與勝者的主策略照常。每個 UTC 日只算一次（同日重跑不重複計）；連續 3 個 UTC 日都讀不到才升格：寫一筆 R2 事件並通知一次，之後不重複通知；只要有一天讀得到就歸零。",
+      "human_action": "看是不是 Binance 的 PAXGUSDT 暫停交易、下架，或 API／網路問題。讀不到的期間策略一直是全 USDT，不會虧損，只是不持有 PAXG；想繼續持有 PAXG 要等行情恢復。如果 PAXGUSDT 已經確定不能再用，把 env 的 BTC_COMP_PAXG 改回 off。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "使用者 2026-10-28 決定（D5）：PAXG 資料抓不到時視為指標為假（保守回 USDT）並通知。單一天讀不到只是一次賣出再買入的手續費（約 0.2%），不值得打擾；連續 3 天才表示不是暫時的網路問題，所以是 R2（和機隊其他「自己先試、連續失敗才通知」的規則一致）。策略不暫停，因為保守方向（全 USDT）本身就是安全狀態。",
+      "operator_message": {
+        "what": "競賽策略連續 3 個 UTC 日讀不到 PAXG（黃金代幣）的行情。",
+        "direction": "不需要做決定：這段期間策略一直保守地放全 USDT（已持有的 PAXG 已賣回），BTC 與勝者的主策略沒有受影響。",
+        "steps": [
+          "先看 Binance 有沒有公告 PAXGUSDT 暫停交易或下架，也看 A1 到 Binance 的網路是否正常。",
+          "行情恢復後什麼都不用做：下一次每日執行會自動重新判斷 PAXG 指標。",
+          "如果 PAXGUSDT 確定不能再用：在 A1 把 `/etc/btc-competition/btc-competition.env` 的 `BTC_COMP_PAXG` 改回 `off`（改檔前先問 Claude），下一次每日執行起不再看 PAXG。",
+          "想查原因：把下方「給 AI 的追查指令」整段貼給 Claude。"
+        ],
+        "ai_prompt": "請在 btc-bull-market-competition 追查為什麼連續讀不到 PAXG 行情：讀 src/btc_competition/market_data.py 的 fetch_paxg_closes 與 src/btc_competition/runner.py 的 _frame_with_paxg，對照 A1 的日誌（journalctl -u btc-competition-bot）與 Binance 公開 API https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=2 的回應，判斷是網路、交易對暫停、回應格式改變還是程式問題，並提出修正。"
       }
     }
   ],

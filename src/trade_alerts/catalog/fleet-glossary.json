@@ -1,6 +1,6 @@
 {
   "glossary_version": "fleet-glossary/v1",
-  "updated_at": "2026-10-25",
+  "updated_at": "2026-10-28",
   "note": "機隊全專案中文用詞對照表。給人看的文字一律用 zh；retired 是不要再用的舊叫法，tests/test_fleet_glossary.py 會掃描 trade-alerts 內給人看的文字，出現就擋。英文代號只如實列出，不在這裡改。",
   "entries": [
     {
@@ -544,6 +544,31 @@
       "retired": [
         "營運"
       ]
+    },
+    {
+      "id": "asset.paxg",
+      "category": "其他",
+      "zh": "PAXG（黃金代幣）",
+      "en": [
+        "PAXG",
+        "PAXGUSDT"
+      ],
+      "definition": "價格跟黃金掛鉤的代幣。競賽策略（R033，預設關閉）在 BTC 熊市、而且 PAXG 自己通過多頭指標時，持有 50%，其餘放 USDT。只能和 USDT 交易，沒有和 BTC、ETH、BNB、SOL 的深度市場。",
+      "retired": [],
+      "note": "提到持有它時寫『PAXG』；『黃金』只在解釋它是什麼時用。"
+    },
+    {
+      "id": "asset.paxg_gate",
+      "category": "其他",
+      "zh": "PAXG 多頭指標",
+      "en": [
+        "paxg_gate",
+        "compute_paxg_gate",
+        "paxg_on"
+      ],
+      "definition": "PAXG 自己的多頭判斷，規則和 BTC 牛熊相同（收盤 > SMA50 且 > SMA100 進場、收盤 ≤ SMA50 出場）；讀不到 PAXG 行情時一律當成關閉。",
+      "retired": [],
+      "note": "和 BTC 的『牛市／熊市』是兩個獨立的判斷，不要混用。"
     },
     {
       "id": "tier.r0",
