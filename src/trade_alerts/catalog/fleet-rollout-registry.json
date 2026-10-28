@@ -42,7 +42,7 @@
     "momentum": {
       "repo": "AI-for-column5/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "ba822c2f8ed0445751be7ce8e2a6f2b6e182b5c7"
+      "commit": "fcbd71d951b63c75deb6f6b9169aa326d18cbbd5"
     },
     "seykota": {
       "repo": "AI-for-column5/ed-seykota-systematic-trend-following",
@@ -52,7 +52,7 @@
     "mycrypto": {
       "repo": "AI-for-column5/my-crypto-bot",
       "branch": "operations",
-      "commit": "c185c1df1bbacadb18698c3cfcf7b6b02e47063a"
+      "commit": "097fe19ae8e9d036931ce6a1cd52faebda87b528"
     },
     "btc-competition": {
       "repo": "AI-for-column5/btc-bull-market-competition",
@@ -68,7 +68,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "src/strategy.py:1365 build_safe_halt（Phase 4c）"
+          "evidence": "src/strategy.py:1376 build_safe_halt（Phase 4c）"
         },
         "seykota": {
           "state": "done",
@@ -240,7 +240,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:354 run_repair_round（共用修復執行器）每 15 分鐘（deploy/my-crypto-repair-bot.timer:8）找「帳本有開倉、交易所已無部位」的候選，repair_bot.py:136 fetch_evidence 用 Binance 唯讀成交建證據（成交量須剛好等於開倉量、開倉模式缺值或與帳戶不符一律拒絕、整頁成交都滿也拒絕）；非 Binance 時以暫停模式跑只刷新匯出檔（repair_bot.py:349、:354）。",
+          "evidence": "repair_bot.py:374 run_repair_round（共用修復執行器）每 15 分鐘（deploy/my-crypto-repair-bot.timer:8）找「帳本有開倉、交易所已無部位」的候選，repair_bot.py:159 fetch_evidence 用 Binance 唯讀成交建證據（成交量須剛好等於開倉量、開倉模式缺值或與帳戶不符一律拒絕、整頁成交都滿也拒絕）；非 Binance 時以暫停模式跑只刷新匯出檔（repair_bot.py:369、:374）。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（exchange.env 是 binance，目前持倉中），但 Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）到目前沒有被實際跑到（沒有漏記的平倉）；開發機測試網的 x5 也只看到它因為還有持倉而略過，其餘只有單元測試（假客戶端）。"
         },
@@ -269,7 +269,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:354 run_repair_round 照證據補寫：repair_bot.py:189 staging_ledger 用策略自己的 TradeLedger 整批寫入、一輪最多一筆；補寫後 repair_bot.py:192 queue_projection（:202 呼叫 queue_trade_event）把平倉排入 Google 新版投影佇列，與正常平倉同一條路（mexc_futures_bot.py:1113 _queue_close_projection）。",
+          "evidence": "repair_bot.py:374 run_repair_round 照證據補寫：repair_bot.py:209 staging_ledger 用策略自己的 TradeLedger 整批寫入、一輪最多一筆；補寫後 repair_bot.py:212 queue_projection（:222 呼叫 queue_trade_event）把平倉排入 Google 新版投影佇列，與正常平倉同一條路（mexc_futures_bot.py:1113 _queue_close_projection）。",
           "verified_at": "2026-10-16",
           "limit": "A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（exchange.env 是 binance，目前持倉中），但 Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）到目前沒有被實際跑到（沒有漏記的平倉）；開發機測試網的 x5 也只看到它因為還有持倉而略過，其餘只有單元測試（假客戶端）；另 2026-10-28 發現取證據回溯 30 天在 Binance 超過 7 天查不到成交，加密 #119 改成 7 天以內的視窗查詢，台北 10/28 18:20 已部署 A1，修正後同樣沒在真倉上跑過。"
         },
@@ -294,7 +294,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:349 讀 MYCRYPTO_REPAIR_PAUSED（共用庫 repair_paused），為真時 run_repair_round 以暫停模式跑（repair_bot.py:354）、少記成交處理也跳過（repair_bot.py:360）；deploy/my-crypto-bot.env.example:85 預設 false。",
+          "evidence": "repair_bot.py:369 讀 MYCRYPTO_REPAIR_PAUSED（共用庫 repair_paused），為真時 run_repair_round 以暫停模式跑（repair_bot.py:374）、少記成交處理也跳過（repair_bot.py:380）；deploy/my-crypto-bot.env.example:85 預設 false。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（exchange.env 是 binance，目前持倉中），但 Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）到目前沒有被實際跑到（沒有漏記的平倉）；開發機測試網的 x5 也只看到它因為還有持倉而略過，其餘只有單元測試（假客戶端）。"
         },
@@ -511,7 +511,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "src/strategy.py:1906 進場迴圈前就寫 last_processed_candle，src/strategy.py:2035 送單例外時先存檔再往外拋 → 主迴圈 polling_seconds 後重跑同一根 K 線走 src/strategy.py:1565 重複 K 線分支、不再進場；src/strategy.py:1582 每輪開頭先向交易所同步部位、src/strategy.py:1594 認回已成交但未追蹤的單；成交確認不了（entry_unconfirmed）同樣不追蹤、重跑仍是重複 K 線。平倉失敗不存檔：重跑先同步部位，已成交就釋放；沒成交則因原生停損已先取消而 PROTECTION_UNVERIFIED 暫停，不再送；平倉一律 reduce-only（src/binance_client.py:55）。src/binance_client.py:184 _mutate 只在 -1021（交易所拒絕）時重送。固定 client id 本身擋不住重複，保護全在上述呼叫端。2026-09-24 h7 查核＋模擬測試確認；回歸測試與自我檢查行為檢查 mexc-4h-momentum-trailing-stop #100。"
+          "evidence": "src/strategy.py:2029 進場迴圈前就寫 last_processed_candle，src/strategy.py:2158 送單例外時先存檔再往外拋 → 主迴圈 polling_seconds 後重跑同一根 K 線走 src/strategy.py:1679 重複 K 線分支、不再進場；src/strategy.py:1696 每輪開頭先向交易所同步部位、src/strategy.py:1708 認回已成交但未追蹤的單；成交確認不了（entry_unconfirmed）同樣不追蹤、重跑仍是重複 K 線。平倉失敗不存檔：重跑先同步部位，已成交就釋放；沒成交則因原生停損已先取消而 PROTECTION_UNVERIFIED 暫停，不再送；平倉一律 reduce-only（src/binance_client.py:55）。src/binance_client.py:184 _mutate 只在 -1021（交易所拒絕）時重送。固定 client id 本身擋不住重複，保護全在上述呼叫端。2026-09-24 h7 查核＋模擬測試確認；回歸測試與自我檢查行為檢查 mexc-4h-momentum-trailing-stop #100。"
         },
         "seykota": {
           "state": "done",
@@ -567,7 +567,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:360 修復機器人每輪接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；Binance 時 repair_bot.py:327 client_ids=True、repair_bot.py:331 只認 client_ids.py:45 is_own_client_id 的自有編號（mc-o-／mc-c-／mc-t-，停損出場單沿用 mc-t-），確定是自己重複送單且已平倉才自動追加帳本更正，寫入前 repair_bot.py:305、:309 兩道守門核對交易的 execution_mode 與目前帳戶一致；其餘開請求通知、不寫帳本。my-crypto-bot #102（g1-6）。",
+          "evidence": "repair_bot.py:380 修復機器人每輪接著跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關一併擋）；Binance 時 repair_bot.py:347 client_ids=True、repair_bot.py:351 只認 client_ids.py:45 is_own_client_id 的自有編號（mc-o-／mc-c-／mc-t-，停損出場單沿用 mc-t-），確定是自己重複送單且已平倉才自動追加帳本更正，寫入前 repair_bot.py:325、:329 兩道守門核對交易的 execution_mode 與目前帳戶一致；其餘開請求通知、不寫帳本。my-crypto-bot #102（g1-6）。",
           "verified_at": "2026-10-19",
           "limit": "A1 沒有發生過少記成交或重複送單，自動更正只有測試與開發機測試網實測（2026-10-18）；A1 現有這張停損單是舊程式的隨機編號、不算自有編號，新程式移動停損換成 mc-t- 後才可歸因，此路徑沒有案例。"
         },
@@ -596,7 +596,7 @@
         },
         "mycrypto": {
           "state": "done",
-          "evidence": "repair_bot.py:354 經共用修復執行器每輪檢查「7 天內自動補寫達 2 次就通知一次、之後 7 天不重發」（trade-alerts v0.30.7 repair_runner 的 _check_recurring，ERR-065）；加密的 ERR-062～065 規則在錯誤清單 v0.30.7。",
+          "evidence": "repair_bot.py:374 經共用修復執行器每輪檢查「7 天內自動補寫達 2 次就通知一次、之後 7 天不重發」（trade-alerts v0.30.7 repair_runner 的 _check_recurring，ERR-065）；加密的 ERR-062～065 規則在錯誤清單 v0.30.7。",
           "verified_at": "2026-10-14",
           "limit": "A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（exchange.env 是 binance，目前持倉中），但 Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）到目前沒有被實際跑到（沒有漏記的平倉）；開發機測試網的 x5 也只看到它因為還有持倉而略過，其餘只有單元測試（假客戶端）。"
         },
@@ -665,7 +665,7 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "src/strategy.py:947 _append_position_recovered 補寫接管事件；src/strategy.py:1503 _record_position_adoption 接管時留紀錄並通知；src/strategy.py:1625 接管時沿用被中斷那次進場的 trade_id 並先存狀態再寫帳本。PR #108（f-12）、#112（f-16）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ce51083；/opt 內 src、scripts、deploy 與根目錄 .py 共 72 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO 用強制終止模擬被殺（2026-10-02、10-03，三種情形都補寫 position_recovered、開倉列排隊並送到 Google 表）；A1 正式機還沒發生過被中斷的進場，重開機落在空檔，這一格在正式機沒有實際觸發過。"
+          "evidence": "src/strategy.py:947 _append_position_recovered 補寫接管事件；src/strategy.py:1617 _record_position_adoption 接管時留紀錄並通知；src/strategy.py:1739 接管時沿用被中斷那次進場的 trade_id 並先存狀態再寫帳本。PR #108（f-12）、#112（f-16）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ce51083；/opt 內 src、scripts、deploy 與根目錄 .py 共 72 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO 用強制終止模擬被殺（2026-10-02、10-03，三種情形都補寫 position_recovered、開倉列排隊並送到 Google 表）；A1 正式機還沒發生過被中斷的進場，重開機落在空檔，這一格在正式機沒有實際觸發過。"
         },
         "seykota": {
           "state": "done",
