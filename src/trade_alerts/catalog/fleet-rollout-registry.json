@@ -257,17 +257,21 @@
       "status": {
         "momentum": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:178 run_repair_round＋scripts/repair_bot.py:98 staging_ledger（本策略帳本寫入器整批原子寫入）；自動補寫開關已拿掉（v2-W3）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:178 run_repair_round＋scripts/repair_bot.py:98 staging_ledger（本策略帳本寫入器整批原子寫入）；自動補寫開關已拿掉（v2-W3）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+          "verified_at": "2026-10-28",
+          "limit": "2026-10-28 A1 實測：取證據查詢預設回溯 30 天，Binance 超過 7 天就查不到任何成交（0 筆），這條補寫在 Binance 上從沒成功過；已開 PR 修正（動能 #168），進正式機前補寫會失敗、改由人處理。"
         },
         "seykota": {
           "state": "done",
-          "evidence": "scripts/repair_bot.py:234 run_repair_round＋:133 staging_ledger（本策略帳本寫入器整批原子寫入），含加碼與做空（v2-W4）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選"
+          "evidence": "scripts/repair_bot.py:234 run_repair_round＋:133 staging_ledger（本策略帳本寫入器整批原子寫入），含加碼與做空（v2-W4）。2026-09-24 查證：正式機 18:39–18:40 UTC 部署後首輪零候選",
+          "verified_at": "2026-10-28",
+          "limit": "2026-10-28 從正式機分支程式確認有同樣的 30 天回溯、Binance 超過 7 天就查不到成交，尚未在 A1 實測；已開 PR 修正（趨勢 #146），進正式機前補寫在 Binance 上會失敗。"
         },
         "mycrypto": {
           "state": "done",
           "evidence": "repair_bot.py:354 run_repair_round 照證據補寫：repair_bot.py:189 staging_ledger 用策略自己的 TradeLedger 整批寫入、一輪最多一筆；補寫後 repair_bot.py:192 queue_projection（:202 呼叫 queue_trade_event）把平倉排入 Google 新版投影佇列，與正常平倉同一條路（mexc_futures_bot.py:1113 _queue_close_projection）。",
           "verified_at": "2026-10-16",
-          "limit": "A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（exchange.env 是 binance，目前持倉中），但 Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）到目前沒有被實際跑到（沒有漏記的平倉）；開發機測試網的 x5 也只看到它因為還有持倉而略過，其餘只有單元測試（假客戶端）。"
+          "limit": "A1 加密 2026-10-17 台北 17:30 起是 Binance 主網真倉（exchange.env 是 binance，目前持倉中），但 Binance 補寫路徑（成交證據、補寫帳本、排入 Google 投影佇列）到目前沒有被實際跑到（沒有漏記的平倉）；開發機測試網的 x5 也只看到它因為還有持倉而略過，其餘只有單元測試（假客戶端）；另 2026-10-28 發現取證據回溯 30 天在 Binance 超過 7 天查不到成交，已開 PR 修正（加密 #119），進正式機前補寫會失敗。"
         },
         "btc-competition": {
           "state": "n/a",
@@ -2369,24 +2373,24 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "reconcile.funding_fee_sync",
+      "id": "repair_bot.verified_close",
       "project": "momentum",
       "type": "updated",
-      "note": "動能 x8 拔除 MEXC 已上 A1：資金費同步只剩 Binance 版，引用行號搬到新提交、說法改成現況。"
+      "note": "動能：A1 實測修復機器人取證據回溯 30 天、Binance 超過 7 天查不到成交，補上限制說明（修正 PR 動能 #168）。"
     },
     {
       "kind": "cap",
-      "id": "reconcile.funding_fee_sync",
-      "project": "mycrypto",
+      "id": "repair_bot.verified_close",
+      "project": "seykota",
       "type": "updated",
-      "note": "加密 x8 拔除 MEXC 已上 A1：資金費同步只認 binance，MEXC 分支移除，引用行號搬到新提交。"
+      "note": "趨勢：同樣的 30 天回溯問題（程式確認、未在 A1 實測），補上限制說明（修正 PR 趨勢 #146）。"
     },
     {
       "kind": "cap",
-      "id": "orders.single_send",
+      "id": "repair_bot.verified_close",
       "project": "mycrypto",
       "type": "updated",
-      "note": "加密 x8 拔除 MEXC 已上 A1：下單固定帶自訂單號，行號搬到新提交。"
+      "note": "加密：同樣的 30 天回溯問題，補上限制說明（修正 PR 加密 #119）。"
     }
   ]
 }
