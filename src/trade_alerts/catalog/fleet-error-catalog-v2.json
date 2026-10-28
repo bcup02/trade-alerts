@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 69,
+  "error_ids_issued": 70,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -2221,6 +2221,39 @@
           "想確認：到 Google 表對應分頁找這個交易編號，看那一列的成交時間與數量是不是跟帳本一致。",
           "一致就不用處理；不一致才把事件日誌裡的交易編號貼給 Claude 追查。"
         ]
+      }
+    },
+    {
+      "error_id": "ERR-070",
+      "code": "BTC.PAXG_DATA_UNAVAILABLE",
+      "title": "競賽策略連續 3 個 UTC 日讀不到 PAXG 行情",
+      "project": "btc-competition",
+      "sources": [
+        "src/btc_competition/runner.py:768"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "開啟 PAXG（BTC_COMP_PAXG=on）後，每次每日執行會讀 PAXGUSDT 日線；讀不到就把 PAXG 多頭指標當成關閉：目標變成全 USDT，BTC 與勝者的主策略照常。若手上持有 PAXG，賣出 PAXG 的單照一般換倉流程送出——可能成交、被拒、或沒完成而留作待完成目標由下一輪續跑，並不保證這一輪已經賣完，成交價也可能和估值不同。每個 UTC 日只算一次（同日重跑不重複計）；連續 3 個 UTC 日都讀不到才升格：寫一筆 R2 事件並通知一次，之後不重複通知；只要有一天讀得到就歸零。",
+      "human_action": "需要人判斷：Binance 的 PAXGUSDT 是不是暫停交易、下架，或只是 API／網路問題，以及要不要繼續開著 PAXG。先確認實際持倉（A1 的 audit／state 與交易所帳戶裡還有沒有 PAXG）、最近的成交與狀態檔有沒有待完成目標（pending_target_weights）或安全暫停；讀不到行情的期間策略的目標是全 USDT，但不保證 PAXG 已經賣掉，賣出也可能和估值有價差、不能當成沒有虧損。如果 PAXGUSDT 已經確定不能再用，把 env 的 BTC_COMP_PAXG 改回 off（先問 Claude）。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "使用者 2026-10-28 決定（D5）：PAXG 資料抓不到時視為指標為假（保守回 USDT）並通知。單一天讀不到只是一次賣出再買入的手續費與可能的價差，不值得打擾；連續 3 天才表示不是暫時的網路問題，所以是 R2（和機隊其他「自己先試、連續失敗才通知」的規則一致）。策略不暫停，因為保守方向（全 USDT）本身就是安全狀態。通知要人判斷的是行情來源與交易對還能不能用、要不要繼續開著 PAXG，以及確認實際倉位，不是要人立刻下單。",
+      "operator_message": {
+        "what": "競賽策略連續 3 個 UTC 日讀不到 PAXG（黃金代幣）的行情。",
+        "direction": "需要你判斷：PAXG 的行情來源或交易對還能不能用、要不要繼續開著 PAXG。這段期間策略的目標一直是全 USDT，BTC 與勝者的主策略沒有受影響；但不保證手上的 PAXG 已經賣掉，也不保證賣出沒有價差損失，請先確認實際倉位。",
+        "steps": [
+          "先確認實際倉位：到交易所帳戶看還有沒有 PAXG，並看 A1 競賽的狀態檔有沒有待完成目標或安全暫停（沒有把握就貼給 Claude 查）。",
+          "看 Binance 有沒有公告 PAXGUSDT 暫停交易或下架，也看 A1 到 Binance 的網路是否正常。",
+          "如果只是暫時的行情或網路問題：行情恢復後什麼都不用做，下一次每日執行會自動重新判斷 PAXG 指標。",
+          "如果 PAXGUSDT 確定不能再用，或你不想再持有 PAXG：在 A1 把 `/etc/btc-competition/btc-competition.env` 的 `BTC_COMP_PAXG` 改回 `off`（改檔前先問 Claude），下一次每日執行起不再看 PAXG；手上若還有 PAXG，該次執行會把它賣回 USDT。",
+          "想查原因：把下方「給 AI 的追查指令」整段貼給 Claude。"
+        ],
+        "ai_prompt": "請在 btc-bull-market-competition 追查為什麼連續讀不到 PAXG 行情：讀 src/btc_competition/market_data.py 的 fetch_paxg_closes 與 src/btc_competition/runner.py 的 _frame_with_paxg，對照 A1 的日誌（journalctl -u btc-competition-bot）與 Binance 公開 API https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=2 的回應，判斷是網路、交易對暫停、回應格式改變還是程式問題，並提出修正。"
       }
     }
   ],

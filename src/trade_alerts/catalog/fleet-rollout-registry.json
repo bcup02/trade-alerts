@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-24",
+  "updated_at": "2026-10-28",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -35,7 +35,8 @@
     "f-26a": "f-26a：資金費同步寫不進 Google 表的「帳戶餘額總表」分頁時要看得見（錯誤清單 ERR-057／058／059、結束碼 3、事件日誌通知）並把預設專案名改成策略中文名（趨勢、動能、加密各一個 PR；共用庫 v0.29.0；部署 A1 正式機（新）後改已做；加密還要加進維運通知監控清單）",
     "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
     "f-64": "f-64：Google 表同步佇列不被編號衝突的開倉列或成交列卡死（共用庫 v0.30.19 停放；各策略改釘後才生效）",
-    "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）"
+    "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）",
+    "r033-paxg": "R033：競賽策略在 BTC 熊市持有 PAXG（程式已合併到開發主幹、預設關閉；開發機演練通過、經使用者核可後才進正式機分支）"
   },
   "sources": {
     "momentum": {
@@ -914,6 +915,30 @@
           "evidence": "src/btc_competition/dust_convert.py:119 decide：BEAR、無安全暫停、無待完成調倉、狀態檔至少 10 分鐘沒寫、每種風險幣不超過 20 USDT、每策略日一次才放行；:314 第一次轉換呼叫前先記嘗試；:276 _guard 每種幣前確認 bot 服務為 inactive 或 failed（查不到就停）、狀態檔未變、餘額與規劃一致；:151 coin_rows 餘額差須與交易所回應對得上才記 dust_convert_out／dust_convert_in（src/btc_competition/trade_ledger.py:62，不算資金進出）；src/btc_competition/dust_convert.py:357 開關沒開就結束。deploy/btc-competition-dust-convert.timer:7 每天 UTC 01:00。2026-10-23 台北 20:13 隨 A1 部署（operations 9a6b0c9）。",
           "verified_at": "2026-10-23",
           "limit": "開關 2026-10-23 台北 21:26 在 A1 打開並手動跑一輪（交易所 BTC、ETH、SOL 都是 0，判斷沒有零頭、沒呼叫轉換），尚未真實轉換過；幣安沒寫金鑰權限、最低金額、冷卻、手續費算法，第一次真實轉換才驗證。"
+        }
+      }
+    },
+    {
+      "id": "bear.paxg_asset",
+      "title": "BTC 熊市時，PAXG 自己通過多頭指標就持有 50%（R033）",
+      "description": "BTC 熊市原本全放 USDT。R033 改成：PAXG（黃金代幣，只能和 USDT 交易）自己通過和 BTC 相同的多頭規則（收盤 > SMA50 且 > SMA100 進場、≤ SMA50 出場）才放 50%，其餘 USDT；進牛市先賣 PAXG 再換倉。由環境變數 BTC_COMP_PAXG 控制，預設關閉；關掉後狀態仍顯示持有時會自動賣回。PAXG 行情讀不到時指標當成關閉（保守全 USDT），連續 3 個 UTC 日讀不到才通知（ERR-070）。",
+      "status": {
+        "seykota": {
+          "state": "n/a",
+          "reason": "這支策略做的是 BTC 永續合約，沒有現貨的熊市資產配置。"
+        },
+        "momentum": {
+          "state": "n/a",
+          "reason": "這支策略做的是合約短線動能，沒有熊市資產配置；它不持有現貨。"
+        },
+        "mycrypto": {
+          "state": "n/a",
+          "reason": "這支策略做的是 Binance 合約，沒有現貨的熊市資產配置。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "r033-paxg",
+          "reason": "程式與測試已在開發主幹（策略 repo PR #84、#86、#88、#90），預設關閉；還沒進正式機分支，也還沒在開發機測試網演練。"
         }
       }
     }
@@ -2320,6 +2345,23 @@
           "evidence": "src/seykota_bot/google_projection_worker.py:98 把事件日誌路徑與 :99 策略名交給共用庫；更正被接收端以 correction_base_mismatch 拒收時，共用庫 projection_outbox（A1 venv trade-alerts 0.30.19，模組檔 blob 583bc2e 與 tag v0.30.19 同檔）寫 R1 事件 CORRECTION_BASE_MISMATCH（ERR-068，只留紀錄、不通知）。2026-10-23 台北 20:15 隨 A1 部署（operations 1568826）。",
           "verified_at": "2026-10-23",
           "limit": "A1 沒遇過更正被拒收；趨勢自己的測試只驗了停放平倉那一條，這個事件由共用庫的測試驗證，趨勢端沒有逐碼測試。"
+        }
+      }
+    },
+    {
+      "code": "BTC.PAXG_DATA_UNAVAILABLE",
+      "behaviour": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "r033-paxg",
+          "reason": "讀不到 PAXG 行情時指標當成關閉的行為已在開發主幹；連續 3 個 UTC 日才通知一次的計數另開策略 repo 的 PR。"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "r033-paxg",
+          "reason": "升格事件要等策略 repo 改用本版共用庫後才會寫；目前讀不到行情只寫一行稽核紀錄（借用 RUNTIME_CYCLE_FAILED，R0）。"
         }
       }
     }
