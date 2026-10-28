@@ -1218,6 +1218,36 @@ def check_registry_drift(ctx: Context) -> Result:
                   evidence, needs_human=True, key=",".join(f"{p}:{path}:{a1}" for p, path, a1, _, _ in drifted))
 
 
+#: R033 P3 (temporary): the dev-host drill of the competition strategy starts after this moment (2026-10-28 22:30 Taipei).
+_R033_DRILL_START = datetime(2026, 10, 28, 14, 30, tzinfo=timezone.utc)
+
+
+def check_dev_competition_drill(ctx: Context) -> Result:
+    """phase-r033-p3 (temporary, remove when the drill is closed): while the competition strategy is drilled on the dev host
+    (real testnet orders, state and ledger are the dev strategy's own), watch its ledger-vs-exchange and ledger-vs-sheet
+    reconcile and list every strategy event it recorded since the drill began.
+
+    ``failed`` when either reconcile says DIVERGED; otherwise always ``waiting`` (a drill is not an event to wait for, and a
+    PENDING / UNKNOWN verdict right after an order is the normal grace, not a failure).  Never ``closable``: the item is
+    closed by the person running the drill.  A stale or unreadable status raises (an unobservable state is never "fine")."""
+    ledger = load_json(ctx.remote, "dev", audit("btc-competition", "ledger_status.json"))
+    sheet = load_json(ctx.remote, "dev", audit("btc-competition", "google_reconcile_status.json"))
+    for what, status in (("帳本對交易所", ledger), ("帳本對 Google 表", sheet)):
+        if not _fresh(parse_time(status.get("checked_at")), ctx.now, 90):
+            raise RemoteError(f"開發機競賽的{what}對帳狀態太舊，判斷不了演練是否正常（檢查時間 {taipei_text(status.get('checked_at'))}）")
+    events = [e for e in jsonl(ctx.remote.read("dev", audit("btc-competition", "fleet_event_log.jsonl")))
+              if (parse_time(e.get("recorded_at")) or _R033_DRILL_START) > _R033_DRILL_START and not is_test_event(e)]
+    evidence = [f"帳本對交易所：{ledger.get('value')}（{taipei(parse_time(ledger['checked_at']))} 台北）：{ledger.get('note')}",
+                f"帳本對 Google 表：{sheet.get('value')}（{taipei(parse_time(sheet['checked_at']))} 台北）：{sheet.get('note')}"]
+    evidence += [f"策略事件 {e.get('code')}（{e.get('risk_tier')}，{taipei(parse_time(e['recorded_at']))} 台北）" for e in events[-5:]]
+    diverged = [what for what, status in (("帳本對交易所", ledger), ("帳本對 Google 表", sheet)) if status.get("value") == "DIVERGED"]
+    if diverged:
+        return Result(FAILED, "R033 演練期間，開發機競賽的" + "、".join(diverged) + "對帳是 DIVERGED，要查原因（演練動作造成，或演練工具漏記）。",
+                      evidence, key="diverged:" + "|".join(str(st.get("note")) for st in (ledger, sheet)))
+    return Result(WAITING, f"R033 演練期間：帳本對交易所 {ledger.get('value')}、帳本對 Google 表 {sheet.get('value')}，演練開始後的策略事件 {len(events)} 件。",
+                  evidence)
+
+
 CHECKS: tuple[Check, ...] = (
     Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
@@ -1237,6 +1267,7 @@ CHECKS: tuple[Check, ...] = (
     Check("repair-recurring", "自動補寫重複發生通知", ("phase-g2",), check_repair_recurring),
     Check("safe-halt-notice", "A1 第一則真實 R3 策略通知", ("f-35", "f-37"), check_safe_halt_notice),
     Check("registry-awaits", "登記冊等部署的格子：等的提交已上 A1", ("phase-sync1",), check_registry_awaits),
+    Check("dev-competition-drill", "R033 演練期間：開發機競賽對帳與策略事件（臨時）", ("phase-r033-p3",), check_dev_competition_drill),
     Check("registry-drift", "登記冊引用的檔案在 A1 上已和 sources 提交不同", ("phase-sync4",), check_registry_drift),
 )
 
