@@ -632,7 +632,45 @@ def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
     assert len(ids) == len(set(ids))
     assert all(c.covers and c.title for c in ow.CHECKS)
     covered = {i for c in ow.CHECKS for i in c.covers}
-    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x5b"} <= covered
+    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x5b", "phase-r033-p3"} <= covered
+
+
+# --- R033 P3 (temporary): dev competition drill ------------------------------------------------------------------------
+
+def _drill_remote(ledger, sheet, events=()):
+    r = FakeRemote()
+    put(r, "dev", "btc-competition", "ledger_status.json", ledger)
+    put(r, "dev", "btc-competition", "google_reconcile_status.json", sheet)
+    put(r, "dev", "btc-competition", "fleet_event_log.jsonl", list(events), jsonl=True)
+    return r
+
+
+def test_dev_competition_drill_waits_while_reconciled_or_pending_and_lists_events_since_the_start():
+    old = {"code": "OLD", "risk_tier": "R0", "recorded_at": "2026-10-20T00:00:00+00:00"}
+    new = {"code": "BTC.PAXG_DATA_UNAVAILABLE", "risk_tier": "R2", "recorded_at": "2026-10-28T15:00:00+00:00"}
+    test = {"code": "T", "risk_tier": "R0", "recorded_at": "2026-10-28T15:01:00+00:00", "details": {"test": True}}
+    r = _drill_remote(_status_file("PENDING"), _status_file("RECONCILED"), [old, new, test])
+    got = ow.check_dev_competition_drill(ctx(r))
+    assert got.state == ow.WAITING and not got.closable and not got.needs_human
+    assert "事件 1 件" in got.summary and any("BTC.PAXG_DATA_UNAVAILABLE" in e for e in got.evidence)
+    assert not any("OLD" in e for e in got.evidence)
+
+
+def test_dev_competition_drill_fails_on_a_diverged_reconcile_once_per_note():
+    r = _drill_remote(_status_file("DIVERGED", note="1 exchange fill not in ledger"), _status_file("RECONCILED"))
+    got = ow.check_dev_competition_drill(ctx(r))
+    assert got.state == ow.FAILED and "帳本對交易所" in got.summary and "1 exchange fill" in got.key
+    again = ow.check_dev_competition_drill(ctx(r))
+    assert again.key == got.key
+
+
+def test_dev_competition_drill_raises_when_a_status_is_stale_or_missing():
+    with pytest.raises(ow.RemoteError):
+        ow.check_dev_competition_drill(ctx(_drill_remote(_status_file("RECONCILED"), _status_file("RECONCILED", minutes_ago=200))))
+    r = FakeRemote()
+    put(r, "dev", "btc-competition", "ledger_status.json", _status_file("RECONCILED"))
+    with pytest.raises(ow.RemoteError):
+        ow.check_dev_competition_drill(ctx(r))
 
 
 # --- deployment files ----------------------------------------------------------------------------------------------
