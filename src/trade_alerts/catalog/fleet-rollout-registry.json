@@ -573,7 +573,8 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:285 新計時器 btc-competition-unrecorded-fill 每 15 分鐘跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關 BTC_COMPETITION_REPAIR_PAUSED 一併擋）：只有交易所回報的 clientOrderId 與帳本已記訂單相同才把那張單補記成一筆現貨成交；src/btc_competition/trade_ledger.py:385 已被批次持倉快照包含的補記不再重算。PR #37（g1-5），2026-09-25 開發機 DEMO 故意重複送單實測整條通過；2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。"
+          "evidence": "src/btc_competition/unrecorded_fill.py:285 新計時器 btc-competition-unrecorded-fill 每 15 分鐘跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關 BTC_COMPETITION_REPAIR_PAUSED 一併擋）：只有交易所回報的 clientOrderId 與帳本已記訂單相同才把那張單補記成一筆現貨成交；src/btc_competition/trade_ledger.py:385 已被批次持倉快照包含的補記不再重算。PR #37（g1-5），2026-09-25 開發機 DEMO 故意重複送單實測整條通過；2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
+          "limit": "被殺的單在對帳寬限 15 分鐘後（src/btc_competition/reconcile_compare.py:62）就會被當成帳本少記而先發 ERR-043，中斷復原要 30 分鐘後（src/btc_competition/interrupted_orders.py:48）才補記，其間多一則會自己恢復的通知；2026-10-29 開發機測試網演練實測，A1 沒發生過。"
         }
       }
     },
@@ -678,7 +679,8 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/trade_ledger.py:157 order_attempt；src/btc_competition/runner.py:312 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:84 重啟後的補記輪讀沒結清的 order_attempt，依交易所回答補寫成交或標記結清。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO；A1 正式機沒有發生過被中斷的調整。"
+          "evidence": "src/btc_competition/trade_ledger.py:157 order_attempt；src/btc_competition/runner.py:312 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:84 重啟後的補記輪讀沒結清的 order_attempt，依交易所回答補寫成交或標記結清。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO；A1 正式機沒有發生過被中斷的調整。",
+          "limit": "被殺後同一天重跑時，同一自訂編號（btc-日期-腿序號）只查最新一次嘗試（src/btc_competition/interrupted_orders.py:86），舊單的成交會被當成來源不明發 R3、要人工補記；2026-10-29 開發機測試網演練實測，A1 沒發生過。"
         }
       }
     },
@@ -942,7 +944,7 @@
         "btc-competition": {
           "state": "pending",
           "phase": "r033-paxg",
-          "reason": "程式與測試已在開發主幹（策略 repo PR #84、#86、#88、#90），預設關閉；還沒進正式機分支，也還沒在開發機測試網演練。"
+          "reason": "程式與測試在開發主幹（策略 repo PR #84、#86、#88、#90、#92、#94、#96），預設關閉；2026-10-29 開發機測試網演練與重測完成，還沒進正式機分支。已知未做：缺 PAXGUSDT 規則時沒有專屬稽核事件；賣出後殘額名目低於最小名目的情形沒有測試。"
         }
       }
     }
@@ -2373,24 +2375,24 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "repair_bot.verified_close",
-      "project": "momentum",
+      "id": "recovery.interrupted_order",
+      "project": "btc-competition",
       "type": "updated",
-      "note": "動能：A1 實測修復機器人取證據回溯 30 天、Binance 超過 7 天查不到成交，補上限制說明（修正 PR 動能 #168）。"
+      "note": "競賽：補上限制說明——被殺後同一天重跑，同一自訂編號查不到舊單（2026-10-29 開發機演練發現，A1 沒發生過）。"
     },
     {
       "kind": "cap",
-      "id": "repair_bot.verified_close",
-      "project": "seykota",
+      "id": "reconcile.unrecorded_fill_handling",
+      "project": "btc-competition",
       "type": "updated",
-      "note": "趨勢：同樣的 30 天回溯問題（程式確認、未在 A1 實測），補上限制說明（修正 PR 趨勢 #146）。"
+      "note": "競賽：補上限制說明——對帳寬限 15 分鐘、中斷復原 30 分鐘，中間會先發一則自己恢復的 ERR-043（2026-10-29 開發機演練發現）。"
     },
     {
       "kind": "cap",
-      "id": "repair_bot.verified_close",
-      "project": "mycrypto",
+      "id": "bear.paxg_asset",
+      "project": "btc-competition",
       "type": "updated",
-      "note": "加密：同樣的 30 天回溯問題，補上限制說明（修正 PR 加密 #119）。"
+      "note": "競賽（R033）：開發機演練與重測完成，更新現況與已知未做；仍是未做，要等正式機分支。"
     }
   ]
 }
