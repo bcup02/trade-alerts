@@ -712,8 +712,15 @@ def check_a1_stable(ctx: Context) -> Result:
     after any stretch no run could see.  This is only what ops-notify watches: that the funding-fee sync exits 0 every 4 hours
     and that no stop price or stop order changed are NOT read here -- say so when closing the items."""
     readings = _ops_readings(ctx)
-    bad = sorted(k for k, v in readings.items() if v.get("severity") != "ok" or v.get("value") not in _HEALTHY_VALUES)
+    # ops-notify reads a strategy whose main unit the operator disabled and stopped as runtime PAUSED (severity ok).  That is
+    # not unhealthy -- it must not restart the streak -- but it is no evidence of stability either, so it is named below.
+    paused = sorted(k for k, v in readings.items()
+                    if k.endswith(":runtime") and v.get("value") == "PAUSED" and v.get("severity") == "ok")
+    bad = sorted(k for k, v in readings.items()
+                 if v.get("severity") != "ok" or (v.get("value") not in _HEALTHY_VALUES and k not in paused))
     evidence = [f"{len(readings)} 個必要讀數（四支策略各 5 項＋主機時鐘）全部讀到且新鮮"]
+    if paused:
+        evidence.append("暫停中的策略（運行狀態 PAUSED，不算穩定證據）：" + "、".join(k.partition(":")[0] for k in paused))
     if bad:
         return Result(WAITING, "A1 現在有讀數不正常，穩定時間重新算：" + "、".join(f"{k}={readings[k].get('value')}" for k in bad[:5]) + "。", evidence)
     since, held, extra = _streak(ctx)

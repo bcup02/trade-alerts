@@ -1857,6 +1857,24 @@ def test_a1_stable_any_unhealthy_reading_restarts_the_streak(override):
     assert result.state == ow.WAITING and not result.closable and "healthy_since" not in result.extra
 
 
+def test_a1_stable_a_paused_strategy_does_not_restart_the_streak_but_is_named():
+    prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
+    result = ow.check_a1_stable(b2_ctx(ops_remote(seykota__runtime={"severity": "ok", "value": "PAUSED"}), prev))
+    assert result.state == ow.OBSERVED and result.closable and result.extra["healthy_since"] == prev["healthy_since"]
+    assert any("暫停中" in line and "seykota" in line and "不算穩定證據" in line for line in result.evidence)
+
+
+@pytest.mark.parametrize("override", [
+    {"seykota__runtime": {"severity": "warn", "value": "PAUSED"}},          # PAUSED is only fine at severity ok
+    {"seykota__ledger": {"severity": "ok", "value": "PAUSED"}},             # and only on the runtime axis
+    {"seykota__runtime": {"severity": "ok", "value": "STALE"}},
+])
+def test_a1_stable_paused_is_accepted_only_as_runtime_with_severity_ok(override):
+    prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
+    result = ow.check_a1_stable(b2_ctx(ops_remote(**override), prev))
+    assert result.state == ow.WAITING and not result.closable and "healthy_since" not in result.extra
+
+
 def test_a1_stable_a_stale_reading_or_a_missing_target_is_an_error_not_a_pass():
     stale = ops_remote(**{"mycrypto__export": {"checked_at": iso(B2_NOW - timedelta(hours=3))}})
     with pytest.raises(ow.RemoteError):
