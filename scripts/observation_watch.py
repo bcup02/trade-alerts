@@ -719,17 +719,21 @@ def check_a1_stable(ctx: Context) -> Result:
     bad = sorted(k for k, v in readings.items()
                  if v.get("severity") != "ok" or (v.get("value") not in _HEALTHY_VALUES and k not in paused))
     evidence = [f"{len(readings)} 個必要讀數（四支策略各 5 項＋主機時鐘）全部讀到且新鮮"]
+    paused_names = "、".join(k.partition(":")[0] for k in paused)
     if paused:
-        evidence.append("暫停中的策略（運行狀態 PAUSED，不算穩定證據）：" + "、".join(k.partition(":")[0] for k in paused))
+        evidence.append(f"暫停中的策略（運行狀態 PAUSED，不算穩定證據）：{paused_names}")
+    # Who the wording below speaks for: with a strategy paused on purpose, only the running ones are vouched for.
+    scope = f"A1 運行中的策略與主機（不含暫停中的 {paused_names}）" if paused else "A1 四支策略與主機"
+    scope_note = f"；暫停中的 {paused_names} 沒有被驗證，結案只對運行中的策略有效" if paused else ""
     if bad:
         return Result(WAITING, "A1 現在有讀數不正常，穩定時間重新算：" + "、".join(f"{k}={readings[k].get('value')}" for k in bad[:5]) + "。", evidence)
     since, held, extra = _streak(ctx)
     hours = int(held.total_seconds() // 3600)
     if held >= STABLE_STREAK:
-        return Result(OBSERVED, f"A1 四支策略與主機的讀數已連續正常 {hours} 小時。這只涵蓋維運通知看的項目；資金費同步每 4 小時 exit 0、"
+        return Result(OBSERVED, f"{scope}的讀數已連續正常 {hours} 小時{scope_note}。這只涵蓋維運通知看的項目；資金費同步每 4 小時 exit 0、"
                       "停損價與停損單不變，我結案前會另外到主機查。",
                       evidence + [f"從 {taipei(since)}（台北）起每一輪偵測都看到全部正常"], closable=True, key="stable", extra=extra)
-    return Result(WAITING, f"A1 讀數全部正常，已連續 {hours} 小時（滿 {int(STABLE_STREAK.total_seconds() // 3600)} 小時通知）。", evidence, extra=extra)
+    return Result(WAITING, f"{scope}的讀數全部正常，已連續 {hours} 小時（滿 {int(STABLE_STREAK.total_seconds() // 3600)} 小時通知）{scope_note}。", evidence, extra=extra)
 
 
 def _live_crypto_entries(events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
