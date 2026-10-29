@@ -36,7 +36,7 @@
     "btc-competition": "btc-bull-market-competition",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 70,
+  "error_ids_issued": 71,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -2254,6 +2254,39 @@
           "想查原因：把下方「給 AI 的追查指令」整段貼給 Claude。"
         ],
         "ai_prompt": "請在 btc-bull-market-competition 追查為什麼連續讀不到 PAXG 行情：讀 src/btc_competition/market_data.py 的 fetch_paxg_closes 與 src/btc_competition/runner.py 的 _frame_with_paxg，對照 A1 的日誌（journalctl -u btc-competition-bot）與 Binance 公開 API https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=2 的回應，判斷是網路、交易對暫停、回應格式改變還是程式問題，並提出修正。"
+      }
+    },
+    {
+      "error_id": "ERR-071",
+      "code": "BTC.PAXG_RULE_MISSING",
+      "title": "競賽策略持有 PAXG，卻找不到 PAXGUSDT 的交易規則（賣單送不出去）",
+      "project": "btc-competition",
+      "sources": [
+        "src/btc_competition/runner.py:766"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "開啟 PAXG（BTC_COMP_PAXG=on）且帳戶裡有 PAXG 時，每次每日執行都會向交易所取 PAXGUSDT 的交易規則（最小數量、數量間距、最小金額）。取不到或規則不可用，就沒有任何依據能判斷這筆 PAXG 賣得出去：賣出 PAXG 的單被略過（不會亂猜數量硬送），PAXG 繼續留在帳戶裡，BTC 與勝者的主策略照常。第一次發現就寫一筆 R2 事件並通知一次；之後同一段缺失期間不重複通知；規則取得到了、或帳戶裡已經沒有 PAXG，就歸零，下次再發生會重新通知。",
+      "human_action": "需要人判斷：Binance 的 PAXGUSDT 是不是暫停交易、下架，或交易所規則查詢暫時異常，以及手上的 PAXG 要怎麼處理。先到交易所帳戶確認實際還有多少 PAXG、看 Binance 公告與 PAXGUSDT 的交易狀態。這段期間 PAXG 一直留在帳戶裡，價格可能繼續波動，不能當成已經回到 USDT。若交易對已經確定不能交易，要用人工方式處理這筆 PAXG（先問 Claude），並把 env 的 BTC_COMP_PAXG 改回 off（先問 Claude）。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "2026-10-29 開發機演練發現（P3c.1）：缺 PAXGUSDT 規則時，持有的 PAXG 不會被賣、也沒人被通知，只是默默繼續持有。這是確定性的狀況（不像網路偶發），代表一筆真錢持倉賣不掉，所以第一次發現就通知（使用者 2026-10-29 決定），風險等級 R2：策略不用暫停（BTC 與勝者的主策略不受影響，暫停反而讓它們也停擺），但需要人判斷這筆 PAXG 怎麼處理。與 ERR-070（連續 3 天才通知）不同，因為讀不到行情可能只是暫時的網路問題，而缺規則時 PAXG 已經卡在帳戶裡。",
+      "operator_message": {
+        "what": "競賽策略持有 PAXG（黃金代幣），但找不到 PAXGUSDT 的交易規則，賣單送不出去。",
+        "direction": "需要你判斷：PAXG 這筆持倉怎麼處理。策略沒有暫停，BTC 與勝者的主策略沒有受影響；但這筆 PAXG 還留在帳戶裡、價格會繼續波動，請先確認實際持倉，不要當成已經賣回 USDT。",
+        "steps": [
+          "先確認實際倉位：到交易所帳戶看還有多少 PAXG，並看 A1 競賽的狀態檔（沒有把握就貼給 Claude 查）。",
+          "看 Binance 有沒有公告 PAXGUSDT 暫停交易或下架，也看 A1 到 Binance 的網路是否正常。",
+          "如果只是暫時的規則查詢異常：交易所規則恢復後什麼都不用做，下一次每日執行會自動重新判斷，指標關閉時會嘗試把 PAXG 賣回 USDT，不保證一次賣完。",
+          "如果 PAXGUSDT 確定不能交易：不要自己手動下單，先把事件日誌貼給 Claude 討論怎麼處理這筆 PAXG，並一併討論是否把 `/etc/btc-competition/btc-competition.env` 的 `BTC_COMP_PAXG` 改回 `off`。",
+          "想查原因：把下方「給 AI 的追查指令」整段貼給 Claude。"
+        ],
+        "ai_prompt": "請在 btc-bull-market-competition 追查為什麼持有 PAXG 卻找不到 PAXGUSDT 的交易規則：讀 src/btc_competition/runner.py 的 _paxg_orphan 與規則合併處（rebalance.parse_exchange_info 與 paxg_exchange_info_fn），對照 A1 的日誌（journalctl -u btc-competition-bot）與 Binance 公開 API https://api.binance.com/api/v3/exchangeInfo?symbol=PAXGUSDT 的回應，判斷是交易對暫停、下架、規則格式改變、查詢失敗還是程式問題，並提出修正。"
       }
     }
   ],

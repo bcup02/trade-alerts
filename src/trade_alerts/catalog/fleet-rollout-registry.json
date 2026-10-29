@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-28",
+  "updated_at": "2026-10-29",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -2370,6 +2370,23 @@
           "reason": "升格事件要等策略 repo 改用本版共用庫後才會寫；目前讀不到行情只寫一行稽核紀錄（借用 RUNTIME_CYCLE_FAILED，R0）。"
         }
       }
+    },
+    {
+      "code": "BTC.PAXG_RULE_MISSING",
+      "behaviour": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "r033-paxg",
+          "reason": "持有 PAXG 卻找不到 PAXGUSDT 規則時，賣單被略過、PAXG 留在帳戶的行為已在開發主幹；第一次發現就通知一次的偵測另開策略 repo 的 PR（P3c.1）。"
+        }
+      },
+      "emits_event": {
+        "btc-competition": {
+          "state": "pending",
+          "phase": "r033-paxg",
+          "reason": "事件要等策略 repo 改用本版共用庫並合併偵測後才會寫；目前缺規則時沒有任何稽核紀錄。"
+        }
+      }
     }
   ],
   "recent_changes": [
@@ -2393,6 +2410,13 @@
       "project": "btc-competition",
       "type": "updated",
       "note": "競賽（R033）：開發機演練與重測完成，更新現況與已知未做；仍是未做，要等正式機分支。"
+    },
+    {
+      "kind": "rule",
+      "id": "BTC.PAXG_RULE_MISSING",
+      "project": "btc-competition",
+      "type": "added",
+      "note": "競賽（R033）：新增 ERR-071，持有 PAXG 卻找不到 PAXGUSDT 規則時第一次發現就通知（2026-10-29 使用者決定，P3c.1）。"
     }
   ]
 }
