@@ -1,0 +1,81 @@
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index 124243f..442098e 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -712,17 +712,28 @@ def check_a1_stable(ctx: Context) -> Result:
+     after any stretch no run could see.  This is only what ops-notify watches: that the funding-fee sync exits 0 every 4 hours
+     and that no stop price or stop order changed are NOT read here -- say so when closing the items."""
+     readings = _ops_readings(ctx)
+-    bad = sorted(k for k, v in readings.items() if v.get("severity") != "ok" or v.get("value") not in _HEALTHY_VALUES)
++    # ops-notify reads a strategy whose main unit the operator disabled and stopped as runtime PAUSED (severity ok).  That is
++    # not unhealthy -- it must not restart the streak -- but it is no evidence of stability either, so it is named below.
++    paused = sorted(k for k, v in readings.items()
++                    if k.endswith(":runtime") and v.get("value") == "PAUSED" and v.get("severity") == "ok")
++    bad = sorted(k for k, v in readings.items()
++                 if v.get("severity") != "ok" or (v.get("value") not in _HEALTHY_VALUES and k not in paused))
+     evidence = [f"{len(readings)} 個必要讀數（四支策略各 5 項＋主機時鐘）全部讀到且新鮮"]
++    paused_names = "、".join(k.partition(":")[0] for k in paused)
++    if paused:
++        evidence.append(f"暫停中的策略（運行狀態 PAUSED，不算穩定證據）：{paused_names}")
++    # Who the wording below speaks for: with a strategy paused on purpose, only the running ones are vouched for.
++    scope = f"A1 運行中的策略與主機（不含暫停中的 {paused_names}）" if paused else "A1 四支策略與主機"
++    scope_note = f"；暫停中的 {paused_names} 沒有被驗證，結案只對運行中的策略有效" if paused else ""
+     if bad:
+         return Result(WAITING, "A1 現在有讀數不正常，穩定時間重新算：" + "、".join(f"{k}={readings[k].get('value')}" for k in bad[:5]) + "。", evidence)
+     since, held, extra = _streak(ctx)
+     hours = int(held.total_seconds() // 3600)
+     if held >= STABLE_STREAK:
+-        return Result(OBSERVED, f"A1 四支策略與主機的讀數已連續正常 {hours} 小時。這只涵蓋維運通知看的項目；資金費同步每 4 小時 exit 0、"
++        return Result(OBSERVED, f"{scope}的讀數已連續正常 {hours} 小時{scope_note}。這只涵蓋維運通知看的項目；資金費同步每 4 小時 exit 0、"
+                       "停損價與停損單不變，我結案前會另外到主機查。",
+                       evidence + [f"從 {taipei(since)}（台北）起每一輪偵測都看到全部正常"], closable=True, key="stable", extra=extra)
+-    return Result(WAITING, f"A1 讀數全部正常，已連續 {hours} 小時（滿 {int(STABLE_STREAK.total_seconds() // 3600)} 小時通知）。", evidence, extra=extra)
++    return Result(WAITING, f"{scope}的讀數全部正常，已連續 {hours} 小時（滿 {int(STABLE_STREAK.total_seconds() // 3600)} 小時通知）{scope_note}。", evidence, extra=extra)
+ 
+ 
+ def _live_crypto_entries(events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index a7a199c..05cf735 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -1857,6 +1857,40 @@ def test_a1_stable_any_unhealthy_reading_restarts_the_streak(override):
+     assert result.state == ow.WAITING and not result.closable and "healthy_since" not in result.extra
+ 
+ 
++def test_a1_stable_a_paused_strategy_does_not_restart_the_streak_but_is_named():
++    prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
++    result = ow.check_a1_stable(b2_ctx(ops_remote(seykota__runtime={"severity": "ok", "value": "PAUSED"}), prev))
++    assert result.state == ow.OBSERVED and result.closable and result.extra["healthy_since"] == prev["healthy_since"]
++    assert any("暫停中" in line and "seykota" in line and "不算穩定證據" in line for line in result.evidence)
++    # the headline must not claim four strategies: it names who it speaks for and who it does not
++    assert "四支策略" not in result.summary and "不含暫停中的 seykota" in result.summary and "沒有被驗證" in result.summary
++    assert "A1 四支策略與主機的讀數已連續正常" not in result.summary
++
++
++def test_a1_stable_a_paused_strategy_under_72_hours_is_also_worded_honestly():
++    prev = {"healthy_since": iso(B2_NOW - timedelta(hours=10)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
++    result = ow.check_a1_stable(b2_ctx(ops_remote(seykota__runtime={"severity": "ok", "value": "PAUSED"}), prev))
++    assert result.state == ow.WAITING and not result.closable
++    assert "不含暫停中的 seykota" in result.summary and "A1 讀數全部正常" not in result.summary
++
++
++def test_a1_stable_without_a_pause_keeps_the_original_wording():
++    prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
++    done = ow.check_a1_stable(b2_ctx(ops_remote(), prev))
++    assert done.summary.startswith("A1 四支策略與主機的讀數已連續正常 100 小時。") and "暫停" not in done.summary
++
++
++@pytest.mark.parametrize("override", [
++    {"seykota__runtime": {"severity": "warn", "value": "PAUSED"}},          # PAUSED is only fine at severity ok
++    {"seykota__ledger": {"severity": "ok", "value": "PAUSED"}},             # and only on the runtime axis
++    {"seykota__runtime": {"severity": "ok", "value": "STALE"}},
++])
++def test_a1_stable_paused_is_accepted_only_as_runtime_with_severity_ok(override):
++    prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
++    result = ow.check_a1_stable(b2_ctx(ops_remote(**override), prev))
++    assert result.state == ow.WAITING and not result.closable and "healthy_since" not in result.extra
++
++
+ def test_a1_stable_a_stale_reading_or_a_missing_target_is_an_error_not_a_pass():
+     stale = ops_remote(**{"mycrypto__export": {"checked_at": iso(B2_NOW - timedelta(hours=3))}})
+     with pytest.raises(ow.RemoteError):
