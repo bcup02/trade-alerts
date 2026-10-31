@@ -2229,7 +2229,7 @@
       "title": "競賽策略連續 3 個 UTC 日讀不到 PAXG 行情",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/runner.py:768"
+        "src/btc_competition/runner.py:591"
       ],
       "current": {
         "latch": null,
@@ -2262,7 +2262,7 @@
       "title": "競賽策略持有 PAXG，卻找不到 PAXGUSDT 的交易規則（賣單送不出去）",
       "project": "btc-competition",
       "sources": [
-        "src/btc_competition/runner.py:766"
+        "src/btc_competition/runner.py:577"
       ],
       "current": {
         "latch": null,
