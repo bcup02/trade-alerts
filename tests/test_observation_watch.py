@@ -592,6 +592,56 @@ def test_dust_convert_first_real_conversion_is_observed_but_still_needs_the_oper
     assert ow.check_dust_convert(ctx(_dust_remote(_dust_rows(), done, ledger="DIVERGED"))).state == ow.FAILED
 
 
+def _paxg_fill(hours=3, side="BUY", symbol="PAXGUSDT", mode="LIVE", test=False, event_id="p1"):
+    row = {"event_type": "spot_fill", "event_id": event_id, "event_time": hours_ago(hours), "symbol": symbol, "side": side,
+           "execution_mode": mode}
+    return {**row, "details": {"test": True}} if test else row
+
+
+def _paxg_remote(fills=(), sheet="RECONCILED", minutes=20, note="n"):
+    r = FakeRemote()
+    put(r, "a1", "btc-competition", "trading_ledger.jsonl", list(fills), jsonl=True)
+    put(r, "a1", "btc-competition", "google_reconcile_status.json", _status_file(sheet, minutes, note))
+    return r
+
+
+def test_competition_paxg_waits_without_a_real_paxg_fill_and_ignores_other_symbols_demo_test_and_old_rows(monkeypatch):
+    monkeypatch.setattr(ow, "PAXG_DEPLOYED", NOW - timedelta(days=1))      # the fixed test clock predates the real deployment
+    assert ow.check_competition_paxg(ctx(_paxg_remote())).state == ow.WAITING
+    no_mode = {k: v for k, v in _paxg_fill().items() if k != "execution_mode"}     # no mode evidence is not LIVE
+    for fill in (_paxg_fill(symbol="BTCUSDT"), _paxg_fill(mode="DEMO"), _paxg_fill(test=True), no_mode,
+                 {**_paxg_fill(), "event_time": iso(ow.PAXG_DEPLOYED - timedelta(hours=1))}):
+        assert ow.check_competition_paxg(ctx(_paxg_remote([fill]))).state == ow.WAITING
+
+
+def test_competition_paxg_good_result_needs_the_operator_to_look_at_the_sheet_and_the_app_and_is_never_closable(monkeypatch):
+    monkeypatch.setattr(ow, "PAXG_DEPLOYED", NOW - timedelta(days=1))
+    result = ow.check_competition_paxg(ctx(_paxg_remote([_paxg_fill(5), _paxg_fill(3, "SELL", event_id="p2")])))
+    assert result.state == ow.OBSERVED and result.needs_human and not result.closable
+    text = "\n".join([result.summary, *result.evidence])
+    assert "2 筆 PAXGUSDT 成交（買 1、賣 1）" in text and "競賽策略」分頁" in text and "幣安 App" in text and "LINE 查詢" in text
+    again = ow.check_competition_paxg(ctx(_paxg_remote([_paxg_fill(5), _paxg_fill(3, "SELL", event_id="p2"), _paxg_fill(2, event_id="p3")])))
+    assert again.key == result.key                                  # a later fill does not announce the first-fill check again
+
+
+def test_competition_paxg_diverged_is_failed_and_an_unreconciled_new_fill_waits(monkeypatch):
+    monkeypatch.setattr(ow, "PAXG_DEPLOYED", NOW - timedelta(days=1))
+    failed = ow.check_competition_paxg(ctx(_paxg_remote([_paxg_fill()], sheet="DIVERGED", note="x")))
+    assert failed.state == ow.FAILED and "接收端" in failed.summary
+    assert ow.check_competition_paxg(ctx(_paxg_remote([_paxg_fill()], minutes=170))).state == ow.WAITING     # not reconciled after the grace yet
+    assert ow.check_competition_paxg(ctx(_paxg_remote([_paxg_fill(hours=0)]))).state == ow.WAITING            # inside the 60-minute grace
+
+
+def test_dust_convert_tells_when_paxg_was_among_the_converted_coins():
+    rows = _dust_rows()
+    rows[0] = {**rows[0], "asset": "PAXG"}
+    done = {"day": "2026-10-25", "status": "done", "detail": "x", "at": iso(NOW - timedelta(hours=3))}
+    result = ow.check_dust_convert(ctx(_dust_remote(rows, done)))
+    assert result.state == ow.OBSERVED and any("PAXG" in e and "f-81" in e for e in result.evidence)
+    plain = ow.check_dust_convert(ctx(_dust_remote(_dust_rows(), done)))
+    assert not any("f-81" in e for e in plain.evidence)
+
+
 def test_f70_batch1_checks_are_registered_and_read_only_whitelisted():
     ids = {c.id: c for c in ow.CHECKS}
     assert ids["dev-trend-reconcile"].covers == ("f-7",) and ids["health-publish"].covers == ("f-45",) and ids["dust-convert"].covers == ("f-66",)
@@ -632,7 +682,7 @@ def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
     assert len(ids) == len(set(ids))
     assert all(c.covers and c.title for c in ow.CHECKS)
     covered = {i for c in ow.CHECKS for i in c.covers}
-    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x5b"} <= covered
+    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x5b", "phase-r033-p4"} <= covered
 
 
 # --- deployment files ----------------------------------------------------------------------------------------------
