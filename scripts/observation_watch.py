@@ -668,8 +668,48 @@ def check_dust_convert(ctx: Context) -> Result:
         return Result(FAILED, "競賽策略粉塵轉換後帳本對交易所對帳對不上。", evidence, key=f"diverged-{len(rows)}")
     if verdict != "covered" or status != "done" or not outs or not ins:
         return Result(WAITING, "競賽策略有粉塵轉換的帳本列，等狀態變 done 與轉換後的對帳。", evidence)
+    if "PAXG" in {str(e.get("asset")) for e in outs}:
+        evidence.append("轉出含 PAXG：代表幣安的小額轉換收 PAXG（f-81 的未解項可結案）")
     return Result(OBSERVED, "競賽策略完成第一次真實的粉塵轉換：機器查到帳本列、狀態 done、對帳一致；請對照幣安 App 的小額資產轉換紀錄與備註裡的 tranId。",
                   evidence, needs_human=True, key=f"{len(outs)}-{len(ins)}")
+
+
+#: R033 was deployed on A1 with its switch off (2026-10-31 16:23 Taipei); no PAXG fill can predate it.
+PAXG_DEPLOYED = datetime(2026, 10, 31, 8, 0, tzinfo=timezone.utc)
+
+
+def check_competition_paxg(ctx: Context) -> Result:
+    """R033 P4: the first real PAXGUSDT fills of the competition strategy on A1, and whether the Google sheet took them.
+
+    Reads the competition ledger (LIVE ``spot_fill`` rows of ``PAXGUSDT``) and the ledger-vs-sheet reconcile.  The machine can say
+    that the fills are in the ledger and that the sheet agrees with the ledger; whether the sheet receiver wrote the PAXGUSDT row
+    the way a human expects (symbol, amount, price against the Binance app) and whether the app's PAXG balance matches is
+    something only the operator can look at, so a good result is ``observed`` with ``needs_human`` (never closable).  A reconcile
+    that stays DIVERGED after the grace is ``failed``: the sheet receiver may not accept the PAXGUSDT symbol."""
+    events = jsonl(ctx.remote.read("a1", audit("btc-competition", "trading_ledger.jsonl")))
+    fills = [e for e in _trades_after(events, PAXG_DEPLOYED, ("spot_fill",))
+             if e.get("symbol") == "PAXGUSDT" and not is_test_event(e)]
+    if not fills:
+        return Result(WAITING, "競賽策略（A1）還沒有 PAXG 成交（R033 開關還沒啟用，或 PAXG 指標還沒開）。")
+    status = load_json(ctx.remote, "a1", audit("btc-competition", "google_reconcile_status.json"))
+    times = [parse_time(f["event_time"]) for f in fills]
+    first, last = min(times), max(times)
+    verdict = reconcile_covers(status, last, ctx.now)
+    buys = sum(1 for f in fills if f.get("side") == "BUY")
+    facts = f"{len(fills)} 筆 PAXGUSDT 成交（買 {buys}、賣 {len(fills) - buys}），第一筆 {taipei(first)}、最近 {taipei(last)}（台北）"
+    if verdict == "diverged":
+        return Result(FAILED, "A1 競賽策略有 PAXG 成交，過了寬限之後 Google 表對帳仍對不上：Google 表接收端可能沒收下 PAXGUSDT。",
+                      [facts, f"對帳（{taipei_text(status.get('checked_at'))}）：{status.get('note')}"], key=f"diverged-{len(fills)}")
+    if verdict != "covered":
+        return Result(WAITING, "A1 競賽策略有 PAXG 成交，等成交寬限期過後的 Google 表對帳。",
+                      [facts, f"對帳={status.get('value')}，檢查時間 {taipei_text(status.get('checked_at'))}"])
+    return Result(OBSERVED, "A1 競賽策略出現第一批 PAXG 成交（R033）：機器查到帳本有 PAXGUSDT 成交、Google 表對帳一致；"
+                  "Google 表接收端有沒有把 PAXGUSDT 寫對，只有你能看。",
+                  [f"機器查到：{facts}；Google 表對帳 RECONCILED",
+                   "請你確認①：打開 Google 表「AI自動程式交易紀錄」的「競賽策略」分頁，找 PAXGUSDT 的列，數量與價格要和幣安 App 的成交紀錄一致",
+                   "請你確認②：幣安 App 現貨的 PAXG 數量，要和 LINE 查詢顯示的持倉一致",
+                   "兩項都對就告訴我；有不對的請說哪一項，我先查原因，需要關閉開關（BTC_COMP_PAXG）會再問你"],
+                  needs_human=True, key=taipei(first))
 
 
 # --- f-70 batch 2: A1 stability, f-63 one entry a day, x5 stop, f-38 -----------------------------------------------------
@@ -1238,6 +1278,7 @@ CHECKS: tuple[Check, ...] = (
     Check("dev-trend-reconcile", "開發機趨勢策略對帳回到 RECONCILED（f-7 後半）", ("f-7",), check_dev_trend_reconcile),
     Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
     Check("dust-convert", "競賽策略第一次真實粉塵轉換", ("f-66",), check_dust_convert),
+    Check("competition-paxg", "A1 競賽策略第一批 PAXG 成交：帳本、Google 表對帳，請人工看表與幣安 App", ("phase-r033-p4",), check_competition_paxg),
     Check("a1-stable", "A1 四支策略與主機讀數連續正常（x8、f-63、x5 的穩定天數）", ("phase-x8", "f-63", "phase-x5"), check_a1_stable),
     Check("crypto-one-entry-a-day", "A1 加密策略同一個 UTC 日只進場一次", ("f-63",), check_crypto_one_entry_a_day),
     Check("crypto-stop", "A1 加密策略停損觸發與移動停損", ("phase-x5",), check_crypto_stop),
