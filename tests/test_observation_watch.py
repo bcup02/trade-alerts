@@ -608,7 +608,8 @@ def _paxg_remote(fills=(), sheet="RECONCILED", minutes=20, note="n"):
 def test_competition_paxg_waits_without_a_real_paxg_fill_and_ignores_other_symbols_demo_test_and_old_rows(monkeypatch):
     monkeypatch.setattr(ow, "PAXG_DEPLOYED", NOW - timedelta(days=1))      # the fixed test clock predates the real deployment
     assert ow.check_competition_paxg(ctx(_paxg_remote())).state == ow.WAITING
-    for fill in (_paxg_fill(symbol="BTCUSDT"), _paxg_fill(mode="DEMO"), _paxg_fill(test=True),
+    no_mode = {k: v for k, v in _paxg_fill().items() if k != "execution_mode"}     # no mode evidence is not LIVE
+    for fill in (_paxg_fill(symbol="BTCUSDT"), _paxg_fill(mode="DEMO"), _paxg_fill(test=True), no_mode,
                  {**_paxg_fill(), "event_time": iso(ow.PAXG_DEPLOYED - timedelta(hours=1))}):
         assert ow.check_competition_paxg(ctx(_paxg_remote([fill]))).state == ow.WAITING
 

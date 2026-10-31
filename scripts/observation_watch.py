@@ -688,7 +688,7 @@ def check_competition_paxg(ctx: Context) -> Result:
     that stays DIVERGED after the grace is ``failed``: the sheet receiver may not accept the PAXGUSDT symbol."""
     events = jsonl(ctx.remote.read("a1", audit("btc-competition", "trading_ledger.jsonl")))
     fills = [e for e in _trades_after(events, PAXG_DEPLOYED, ("spot_fill",))
-             if e.get("symbol") == "PAXGUSDT" and not is_test_event(e)]
+             if e.get("symbol") == "PAXGUSDT" and e.get("execution_mode") == "LIVE" and not is_test_event(e)]
     if not fills:
         return Result(WAITING, "競賽策略（A1）還沒有 PAXG 成交（R033 開關還沒啟用，或 PAXG 指標還沒開）。")
     status = load_json(ctx.remote, "a1", audit("btc-competition", "google_reconcile_status.json"))
