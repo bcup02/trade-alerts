@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-29",
+  "updated_at": "2026-10-31",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -36,7 +36,7 @@
     "f-28b": "f-28b：動能的「未結清標記」對帳沒有時間上限（共用庫加上限、動能改釘、上 A1 正式機（新）後改已做；競賽那一半 f-28 已在 A1）",
     "f-64": "f-64：Google 表同步佇列不被編號衝突的開倉列或成交列卡死（共用庫 v0.30.19 停放；各策略改釘後才生效）",
     "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）",
-    "r033-paxg": "R033：競賽策略在 BTC 熊市持有 PAXG（程式已合併到開發主幹、預設關閉；開發機演練通過、經使用者核可後才進正式機分支）"
+    "r033-paxg": "R033：競賽策略在 BTC 熊市持有 PAXG（程式已部署 A1 正式機、開關預設關閉未打開；打開需使用者核可）"
   },
   "sources": {
     "momentum": {
@@ -57,7 +57,7 @@
     "btc-competition": {
       "repo": "AI-for-column5/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "9a6b0c9a3c11c99d7aed4566c6497c6c91318b9b"
+      "commit": "831bb96c89a8b30c81e162e20fc6de406395b448"
     }
   },
   "capabilities": [
@@ -80,7 +80,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:515 build_safe_halt（Phase 4c）"
+          "evidence": "src/btc_competition/runner.py:553 build_safe_halt（Phase 4c）"
         }
       }
     },
@@ -323,7 +323,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:219 每輪（含跳過）重寫 audit/ops_export.json（g1-5，2026-09-26 01:16 UTC 上正式機）；策略自己的安全暫停與狀態事件也寫進事件日誌，由同一個作業轉成匯出檔：src/btc_competition/runner.py:662 _record_halt（下單結果不明、帳本持倉出現負數、連續 3 天零成交、狀態檔損毀，等級表 :571）、src/btc_competition/interrupted_orders.py:181（被中斷的單補記）。PR #41（f-12）。",
+          "evidence": "src/btc_competition/unrecorded_fill.py:219 每輪（含跳過）重寫 audit/ops_export.json（g1-5，2026-09-26 01:16 UTC 上正式機）；策略自己的安全暫停與狀態事件也寫進事件日誌，由同一個作業轉成匯出檔：src/btc_competition/runner.py:727 _record_halt（下單結果不明、帳本持倉出現負數、連續 3 天零成交、狀態檔損毀，等級表 :636）、src/btc_competition/interrupted_orders.py:159（被中斷的單補記）。PR #41（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 的競賽沒有自己偵測到過這些暫停；2026-10-11 台北的受控測試（見 notify.line_first_notice）用人工寫的測試事件驗過匯出檔→維運通知→手機這條路。"
         }
@@ -523,7 +523,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/executor.py:226 market_order：只有交易所明確拒絕（:108 _is_definite_rejection）才丟 OrderRejected 讓收斂迴圈重新規劃；結果不明（逾時、網路錯誤、OrderNotFound）改用同一個 client id 查單，:38 _ORDER_VISIBILITY_SECONDS 60 秒仍查不到就丟 :87 OrderOutcomeUnknown。src/btc_competition/runner.py:324 收到後本輪立刻停止送單，:423 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
+          "evidence": "src/btc_competition/executor.py:234 market_order：只有交易所明確拒絕（:108 _is_definite_rejection）才丟 OrderRejected 讓收斂迴圈重新規劃；結果不明（逾時、網路錯誤、OrderNotFound）改用同一個 client id 查單，:38 _ORDER_VISIBILITY_SECONDS 60 秒仍查不到就丟 :87 OrderOutcomeUnknown。src/btc_competition/runner.py:360 收到後本輪立刻停止送單，:460 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
         }
       }
     },
@@ -574,7 +574,7 @@
         "btc-competition": {
           "state": "done",
           "evidence": "src/btc_competition/unrecorded_fill.py:285 新計時器 btc-competition-unrecorded-fill 每 15 分鐘跑共用處理程式 trade_alerts.unrecorded_fill 的 run_unrecorded_fill_round（暫停開關 BTC_COMPETITION_REPAIR_PAUSED 一併擋）：只有交易所回報的 clientOrderId 與帳本已記訂單相同才把那張單補記成一筆現貨成交；src/btc_competition/trade_ledger.py:385 已被批次持倉快照包含的補記不再重算。PR #37（g1-5），2026-09-25 開發機 DEMO 故意重複送單實測整條通過；2026-09-26 01:16 UTC 上正式機（operations 9559897），手動第一輪 0 筆、無錯誤。",
-          "limit": "被殺的單在對帳寬限 15 分鐘後（src/btc_competition/reconcile_compare.py:62）就會被當成帳本少記而先發 ERR-043，中斷復原要 30 分鐘後（src/btc_competition/interrupted_orders.py:48）才補記，其間多一則會自己恢復的通知；2026-10-29 開發機測試網演練實測，A1 沒發生過。"
+          "limit": "自己送出、尚未被中斷復原結清的成交對帳視為收斂中（src/btc_competition/reconcile_compare.py:255），最多等 60 分鐘（:75）才算缺口，不再先發 ERR-043；其他來源不明成交超過 15 分鐘（:70）算缺口；2026-10-31 隨 A1 部署，A1 沒發生過。"
         }
       }
     },
@@ -654,7 +654,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/graceful_stop.py:54 install_signal_handlers；src/btc_competition/runner.py:859 每日調整啟動時安裝；deploy/btc-competition-bot.service:18 TimeoutStopSec=600。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。",
+          "evidence": "src/btc_competition/graceful_stop.py:54 install_signal_handlers；src/btc_competition/runner.py:1066 每日調整啟動時安裝；deploy/btc-competition-bot.service:18 TimeoutStopSec=600。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。",
           "limit": "競賽沒有常駐程序，A1 上還沒有在每日調整進行中被停止過，「送完手上那張單再停」只在開發機 DEMO 驗證，正式機沒有實測。"
         }
       }
@@ -679,8 +679,8 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/trade_ledger.py:157 order_attempt；src/btc_competition/runner.py:312 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:84 重啟後的補記輪讀沒結清的 order_attempt，依交易所回答補寫成交或標記結清。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO；A1 正式機沒有發生過被中斷的調整。",
-          "limit": "被殺後同一天重跑時，同一自訂編號（btc-日期-腿序號）只查最新一次嘗試（src/btc_competition/interrupted_orders.py:86），舊單的成交會被當成來源不明發 R3、要人工補記；2026-10-29 開發機測試網演練實測，A1 沒發生過。"
+          "evidence": "src/btc_competition/trade_ledger.py:157 order_attempt；src/btc_competition/runner.py:348 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:101 重啟後的補記輪讀沒結清的 order_attempt，依交易所回答補寫成交或標記結清。PR #41（f-12）。2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署並啟動（operations ac99132；/opt 內 src、scripts、deploy 與根目錄 .py 共 46 檔與該 commit 逐檔雜湊相同）。驗證：開發機 DEMO；A1 正式機沒有發生過被中斷的調整。",
+          "limit": "同日重跑被遮住的舊單改用帳戶成交補記（src/btc_competition/interrupted_orders.py:256），完整清單 0 候選且滿 24 小時（:58）才結清，結清不等於交易所確證未成交，成交落在窗口外要人工處理；2026-10-31 隨 A1 部署，A1 沒發生過。"
         }
       }
     },
@@ -840,7 +840,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/reconcile_compare.py:65 _PENDING_MAX_SECONDS（24 小時）；:219 回 PENDING 只在「剛到的交易所成交還沒進帳本」或「未收尾的批次／快照後成交還沒過期」；:188 起算與過期判定（時間讀不出，或比現在晚超過 :278 _CLOCK_SKEW_SECONDS 的 300 秒，視為已過期、不再等）；:314 環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS；過期後比對餘額，證據帶 pending_expired（:197 reason：waited_over_limit／time_unreadable／time_in_future）。",
+          "evidence": "src/btc_competition/reconcile_compare.py:80 _PENDING_MAX_SECONDS（24 小時）；:255 回 PENDING 只在「剛到的交易所成交還沒進帳本」或「未收尾的批次／快照後成交還沒過期」；:224 起算與過期判定（時間讀不出，或比現在晚超過 :360 _CLOCK_SKEW_SECONDS 的 300 秒，視為已過期、不再等）；:396 環境變數 BTC_COMP_RECONCILE_PENDING_MAX_SECONDS；過期後比對餘額，證據帶 pending_expired（:233 reason：waited_over_limit／time_unreadable／time_in_future）。",
           "limit": "A1 的競賽目前沒有未收尾的項目，超過 24 小時的行為在 A1 沒有實際被觸發過；只在測試與開發機實測（開發機 8 天的 PENDING 在 2026-10-10 台北 20:35 部署後恢復為 RECONCILED，證據記的是等了 197.6 小時）。"
         }
       }
@@ -870,7 +870,7 @@
         },
         "btc-competition": {
           "state": "n/a",
-          "reason": "競賽策略不用 binance-trading-toolkit，自己在 src/btc_competition/rebalance.py:126 取整（floor(value / step + 1e-10) * step，已加誤差補丁）。2026-10-18 查證：送單前 ccxt 4.5.71 會再依交易所精度格式化數量（Binance 公開資料：BTC/USDT 1e-5、ETH/BTC 與 ETH/USDT 1e-4、BNB/BTC 與 SOL/BTC 1e-3）；四種步長各 40 萬筆對照十進位精確值，沒有少捨或多進一手。"
+          "reason": "競賽策略不用 binance-trading-toolkit，自己在 src/btc_competition/rebalance.py:132 取整（floor(value / step + 1e-10) * step，已加誤差補丁）。2026-10-18 查證：送單前 ccxt 4.5.71 會再依交易所精度格式化數量（Binance 公開資料：BTC/USDT 1e-5、ETH/BTC 與 ETH/USDT 1e-4、BNB/BTC 與 SOL/BTC 1e-3）；四種步長各 40 萬筆對照十進位精確值，沒有少捨或多進一手。"
         }
       }
     },
@@ -893,7 +893,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/trade_ledger.py:250 capital_flow 追加資金進出列；src/btc_competition/trade_ledger.py:498 folded_holdings 把快照之後、未被快照吸收的資金進出折進推算餘額（:415 排除已被快照吸收的列，僅有效列參與同編號去重；無效列在折算時由 capital_flow_delta 跳過）；src/btc_competition/capital_flow.py:175 _record 在 :151 檔案鎖內重讀帳本、驗確認碼、查重、追加；src/btc_competition/reconcile_compare.py:152 證據帶 capital_flows_in_fold。競賽 #77。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a；A1 上這三個程式檔的 blob 與該 commit 相同，單元清單與環境檔雜湊不變、0 個失敗單元），12:56 補登 95.2329309 轉入與 0.2984512 理財收益，對帳仍 RECONCILED。",
+          "evidence": "src/btc_competition/trade_ledger.py:250 capital_flow 追加資金進出列；src/btc_competition/trade_ledger.py:498 folded_holdings 把快照之後、未被快照吸收的資金進出折進推算餘額（:415 排除已被快照吸收的列，僅有效列參與同編號去重；無效列在折算時由 capital_flow_delta 跳過）；src/btc_competition/capital_flow.py:175 _record 在 :151 檔案鎖內重讀帳本、驗確認碼、查重、追加；src/btc_competition/reconcile_compare.py:178 證據帶 capital_flows_in_fold。競賽 #77。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a；A1 上這三個程式檔的 blob 與該 commit 相同，單元清單與環境檔雜湊不變、0 個失敗單元），12:56 補登 95.2329309 轉入與 0.2984512 理財收益，對帳仍 RECONCILED。",
           "verified_at": "2026-10-23",
           "limit": "A1 只登記過這兩筆（都早於人工更正快照，帳本推算餘額沒變）；快照之後才發生的資金進出被折進推算餘額這條路徑，只有測試與開發機帳本複本驗證，A1 沒實際遇過。"
         }
@@ -944,7 +944,7 @@
         "btc-competition": {
           "state": "pending",
           "phase": "r033-paxg",
-          "reason": "程式與測試在開發主幹（策略 repo PR #84、#86、#88、#90、#92、#94、#96），預設關閉；2026-10-29 開發機測試網演練與重測完成，還沒進正式機分支。已知未做：缺 PAXGUSDT 規則時沒有專屬稽核事件；賣出後殘額名目低於最小名目的情形沒有測試。"
+          "reason": "程式與測試已隨 A1 部署（operations 831bb96，2026-10-31 台北 16:23），但開關 BTC_COMP_PAXG 預設關閉、A1 環境檔沒有設定，所以還沒生效；要打開需使用者核可。2026-10-29 開發機測試網演練與重測完成。原先列的已知未做已補：缺 PAXGUSDT 規則的專屬通知（ERR-071，共用庫 v0.30.23）、賣出後殘額低於最小名目的處理與測試（P3b、P3c.4）。"
         }
       }
     }
@@ -1295,13 +1295,13 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:515 暫停並等人以 btc-competition-resume 解除"
+          "evidence": "src/btc_competition/runner.py:553 暫停並等人以 btc-competition-resume 解除"
         }
       },
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:521 呼叫 :662 _record_halt，把安全暫停寫進事件日誌（等級表 :571：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
+          "evidence": "src/btc_competition/runner.py:559 呼叫 :727 _record_halt，把安全暫停寫進事件日誌（等級表 :636：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
@@ -1312,7 +1312,7 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:61 _ZERO_FILL_RETRIES_PER_DAY：送了單卻零成交的調整，當天由同一程序重新取價重跑（src/btc_competition/runner.py:447 設 retry_zero_fill、:904 main 等待後再跑，一天最多 3 次，換新的 client order id），重跑時 src/btc_competition/runner.py:451 寫 R2 事件；只有當天最後一次才讓 zero_fill_days 加一，連 3 天才在 :461 安全暫停；deploy/btc-competition-bot.service:22 TimeoutStartSec=3600 守住上限。競賽 #69。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a，A1 上該程式檔的 blob 與該 commit 相同）。",
+          "evidence": "src/btc_competition/runner.py:61 _ZERO_FILL_RETRIES_PER_DAY：送了單卻零成交的調整，當天由同一程序重新取價重跑（src/btc_competition/runner.py:484 設 retry_zero_fill、:1112 main 等待後再跑，一天最多 3 次，換新的 client order id），重跑時 src/btc_competition/runner.py:488 寫 R2 事件；只有當天最後一次才讓 zero_fill_days 加一，連 3 天才在 :498 安全暫停；deploy/btc-competition-bot.service:22 TimeoutStartSec=3600 守住上限。競賽 #69。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a，A1 上該程式檔的 blob 與該 commit 相同）。",
           "verified_at": "2026-10-23",
           "limit": "A1 沒遇過零成交的調整，這條路徑只有測試與開發機模擬倉驗證。"
         }
@@ -1320,7 +1320,7 @@
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:521 呼叫 :662 _record_halt，把安全暫停寫進事件日誌（等級表 :571：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
+          "evidence": "src/btc_competition/runner.py:559 呼叫 :727 _record_halt，把安全暫停寫進事件日誌（等級表 :636：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
@@ -1331,13 +1331,13 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/executor.py:307 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:324 收到後本輪停止送單，src/btc_competition/runner.py:423 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:502 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
+          "evidence": "src/btc_competition/executor.py:315 單腿結果不明（60 秒內查單仍查不到）時丟 OrderOutcomeUnknown；src/btc_competition/runner.py:360 收到後本輪停止送單，src/btc_competition/runner.py:460 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights，src/btc_competition/runner.py:540 寫入暫停代碼。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
         }
       },
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:521 呼叫 :662 _record_halt，把安全暫停寫進事件日誌（等級表 :571：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
+          "evidence": "src/btc_competition/runner.py:559 呼叫 :727 _record_halt，把安全暫停寫進事件日誌（等級表 :636：下單結果不明與帳本持倉出現負數 R3、連續 3 天零成交 R2 且已升格），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
@@ -1354,7 +1354,7 @@
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:525 部分成交、目標權重沒達成時寫 R0 事件 REBALANCE_PENDING（只記錄、不通知），下一輪續做。PR #41（f-12）。",
+          "evidence": "src/btc_competition/runner.py:563 部分成交、目標權重沒達成時寫 R0 事件 REBALANCE_PENDING（只記錄、不通知），下一輪續做。PR #41（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "R0 本來就不通知；A1 沒有發生過部分成交的調整。"
         }
@@ -1365,13 +1365,13 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:590 _record_run_failure：送單前失敗當天重試（最多 3 次，次數存狀態檔）、第 3 次或已送單才升格；src/btc_competition/runner.py:914 同一程序內等 15 分鐘後重跑；src/btc_competition/runner.py:317 第一筆單送出前才設 orders_attempted；deploy/btc-competition-bot.service:22 TimeoutStartSec=3600（無 Restart=）"
+          "evidence": "src/btc_competition/runner.py:655 _record_run_failure：送單前失敗當天重試（最多 3 次，次數存狀態檔）、第 3 次或已送單才升格；src/btc_competition/runner.py:1122 同一程序內等 15 分鐘後重跑；src/btc_competition/runner.py:353 第一筆單送出前才設 orders_attempted；deploy/btc-competition-bot.service:22 TimeoutStartSec=3600（無 Restart=）"
         }
       },
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:646 第 3 次失敗、已送單或次數無法保存時寫 R2 RUNTIME_CYCLE_FAILED（escalated），由 unrecorded-fill 作業匯出給維運通知；前兩次 src/btc_competition/runner.py:630 只寫 R0"
+          "evidence": "src/btc_competition/runner.py:711 第 3 次失敗、已送單或次數無法保存時寫 R2 RUNTIME_CYCLE_FAILED（escalated），由 unrecorded-fill 作業匯出給維運通知；前兩次 src/btc_competition/runner.py:695 只寫 R0"
         }
       }
     },
@@ -1980,7 +1980,7 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:312 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:100 recover 讀沒結清的 order_attempt，依交易所對該自訂編號的回答把已成交的補記成現貨成交（reason interrupted_order_recovered，:51；以交易所 order_id 去重），由 src/btc_competition/unrecorded_fill.py:275 的計時器作業每輪先跑。PR #41（f-12）。",
+          "evidence": "src/btc_competition/runner.py:348 每張單送出前先寫 order_attempt；src/btc_competition/interrupted_orders.py:170 recover 讀沒結清的 order_attempt，依交易所對該自訂編號的回答把已成交的補記成現貨成交（reason interrupted_order_recovered，:61；以交易所 order_id 去重），由 src/btc_competition/unrecorded_fill.py:275 的計時器作業每輪先跑。PR #41（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
@@ -1988,7 +1988,7 @@
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/interrupted_orders.py:181 補記一張被中斷的單時寫 R3 事件 ORDER_RECOVERED_AFTER_INTERRUPTION（src/btc_competition/fleet_events.py:30），同一個作業（src/btc_competition/unrecorded_fill.py:219）刷新匯出檔交給維運通知。PR #41（f-12）。",
+          "evidence": "src/btc_competition/interrupted_orders.py:159 補記一張被中斷的單時寫 R3 事件 ORDER_RECOVERED_AFTER_INTERRUPTION（src/btc_competition/fleet_events.py:30），同一個作業（src/btc_competition/unrecorded_fill.py:219）刷新匯出檔交給維運通知。PR #41（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
@@ -1999,7 +1999,7 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:675 _halt_on_unreadable_state：狀態檔存在但讀不出來時鎖安全暫停 STATE_FILE_CORRUPT、另存損毀備份（evidence.damaged_copy）、這輪不送單，不再把它當成第一次執行而整本重新調倉；src/btc_competition/safe_halt_resume.py:121 解除工具對這個代碼多印提醒（解除後從全新狀態開始，要先決定是否還原備份）。PR #41（f-12）。",
+          "evidence": "src/btc_competition/runner.py:740 _halt_on_unreadable_state：狀態檔存在但讀不出來時鎖安全暫停 STATE_FILE_CORRUPT、另存損毀備份（evidence.damaged_copy）、這輪不送單，不再把它當成第一次執行而整本重新調倉；src/btc_competition/safe_halt_resume.py:121 解除工具對這個代碼多印提醒（解除後從全新狀態開始，要先決定是否還原備份）。PR #41（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
@@ -2007,7 +2007,7 @@
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:695 呼叫 :662 _record_halt 寫 R3 事件（等級表 :571），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
+          "evidence": "src/btc_competition/runner.py:760 呼叫 :727 _record_halt 寫 R3 事件（等級表 :636），由 src/btc_competition/unrecorded_fill.py:219 的作業刷新匯出檔交給維運通知。PR #41（f-12）。",
           "verified_at": "2026-10-15",
           "limit": "A1 正式機沒有發生過這個情形，沒有實際觸發過；2026-10-11 台北的受控測試（ERR-023 測試事件）驗過匯出檔→維運通知→手機這條路，不是這個事件。"
         }
@@ -2226,7 +2226,7 @@
       "behaviour": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/unrecorded_fill.py:234 announce_batch_expired（共用庫 v0.30.1 pending_expired_notice）在 :226 announce_pending_expired 內被呼叫，:244 起 run 每輪先通知（:246）再跑 _run_round（:247）；只在對帳為 RECONCILED 且證據帶 pending_expired 時，每一段卡住的期間寫一筆 LEDGER_PENDING_EXPIRED（R3，ERR-061），期間身分用開始等的時間 since，時間讀不出時用 src/btc_competition/reconcile_compare.py:206 的 episode_ids（等待中帳本列的 event_id）；寫入或讀取失敗只記警告、回傳 error，不中斷這一輪（審閱 bcup02/trade-alerts#164 兩輪、競賽 #55）。",
+          "evidence": "src/btc_competition/unrecorded_fill.py:234 announce_batch_expired（共用庫 v0.30.1 pending_expired_notice）在 :226 announce_pending_expired 內被呼叫，:244 起 run 每輪先通知（:246）再跑 _run_round（:247）；只在對帳為 RECONCILED 且證據帶 pending_expired 時，每一段卡住的期間寫一筆 LEDGER_PENDING_EXPIRED（R3，ERR-061），期間身分用開始等的時間 since，時間讀不出時用 src/btc_competition/reconcile_compare.py:242 的 episode_ids（等待中帳本列的 event_id）；寫入或讀取失敗只記警告、回傳 error，不中斷這一輪（審閱 bcup02/trade-alerts#164 兩輪、競賽 #55）。",
           "verified_at": "2026-10-11",
           "limit": "A1 的競賽目前沒有超過 24 小時未結算的批次，ERR-061 通知在 A1 沒有實際被觸發過，只在測試驗證（競賽 tests/test_unrecorded_fill_pending_expired.py、tests/test_reconcile_compare.py 的 f-30 測試）；開發機同樣沒有逾時案例。競賽沒有結清工具，通知的步驟是追查為什麼沒收尾。"
         }
@@ -2392,31 +2392,24 @@
   "recent_changes": [
     {
       "kind": "cap",
+      "id": "bear.paxg_asset",
+      "project": "btc-competition",
+      "type": "updated",
+      "note": "競賽（R033）：程式隨 A1 部署（operations 831bb96），開關預設關閉、A1 沒打開，仍是未做；已知未做兩項已補。"
+    },
+    {
+      "kind": "cap",
       "id": "recovery.interrupted_order",
       "project": "btc-competition",
       "type": "updated",
-      "note": "競賽：補上限制說明——被殺後同一天重跑，同一自訂編號查不到舊單（2026-10-29 開發機演練發現，A1 沒發生過）。"
+      "note": "競賽：限制說明改寫——同日重跑被遮住的舊單現在用帳戶成交補記，滿 24 小時 0 候選才結清（P3c.3、f-80），隨 A1 部署。"
     },
     {
       "kind": "cap",
       "id": "reconcile.unrecorded_fill_handling",
       "project": "btc-competition",
       "type": "updated",
-      "note": "競賽：補上限制說明——對帳寬限 15 分鐘、中斷復原 30 分鐘，中間會先發一則自己恢復的 ERR-043（2026-10-29 開發機演練發現）。"
-    },
-    {
-      "kind": "cap",
-      "id": "bear.paxg_asset",
-      "project": "btc-competition",
-      "type": "updated",
-      "note": "競賽（R033）：開發機演練與重測完成，更新現況與已知未做；仍是未做，要等正式機分支。"
-    },
-    {
-      "kind": "rule",
-      "id": "BTC.PAXG_RULE_MISSING",
-      "project": "btc-competition",
-      "type": "added",
-      "note": "競賽（R033）：新增 ERR-071，持有 PAXG 卻找不到 PAXGUSDT 規則時第一次發現就通知（2026-10-29 使用者決定，P3c.1）。"
+      "note": "競賽：限制說明改寫——尚未被中斷復原結清的成交對帳視為收斂中（最多 60 分鐘），不再先發 ERR-043（P3c.2），隨 A1 部署。"
     }
   ]
 }
