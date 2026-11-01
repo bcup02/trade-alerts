@@ -282,6 +282,9 @@
     },
     "rule:FLEET.PROJECTION_ORPHAN_CLOSE_PARKED:emits_event|seykota": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-24 台北 10:35）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/google_projection_worker.py（c0d1de8）、src/seykota_bot/fleet_events.py（1896da8）與該 commit 同檔相同；venv trade-alerts 0.30.19，projection_outbox 模組檔 blob 583bc2e 與 tag v0.30.19 同檔，內有 ORPHAN_CLOSE_PARKED_EVENT（第 68 行）與 record_projection_park_event；seykota-bot active、NRestarts=0、seykota-google-projection.timer active、0 個失敗單元；A1 audit/fleet_event_log.jsonl 至今事件：VERIFIED_CLOSE_REPAIR_BLOCKED、UNRECORDED_FILL_UNRESOLVED、TRADE_EXIT 各 1 筆（沒有停放過平倉）。"
+    },
+    "cap:bear.paxg_asset|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-11-01 台北）：operations 831bb96 於 2026-10-31 台北 16:23 部署；/etc/btc-competition/btc-competition.env 有 BTC_COMP_PAXG=on（2026-10-31 台北 22:38 使用者同意後加入，原檔備份 A1 ~/btc-competition.env.bak-20261031-2338-pre-paxg-on）；2026-11-01 台北 08:10（A1 日誌 JST 09:10）每日執行 outcome=noop mode=LIVE orders=0 equity=1078.05；台北 08:15 交易所對帳與 Google 表對帳都 RECONCILED，08:20 沒有帳本漏記的成交；台北 09:00 粉塵轉換略過（沒有剩餘幣）；A1 與開發機都是 0 個失敗單元。沒有逐檔雜湊比對 /opt 部署複本（/opt 沒有 .git）；PAXG 指標關、尚無 PAXG 成交，買進路徑沒有在 A1 跑過。"
     }
   }
 }
