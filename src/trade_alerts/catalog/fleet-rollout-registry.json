@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-10-31",
+  "updated_at": "2026-11-01",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -942,9 +942,10 @@
           "reason": "這支策略做的是 Binance 合約，沒有現貨的熊市資產配置。"
         },
         "btc-competition": {
-          "state": "pending",
-          "phase": "r033-paxg",
-          "reason": "程式與測試已隨 A1 部署（operations 831bb96，2026-10-31 台北 16:23），但開關 BTC_COMP_PAXG 預設關閉、A1 環境檔沒有設定，所以還沒生效；要打開需使用者核可。2026-10-29 開發機測試網演練與重測完成。原先列的已知未做已補：缺 PAXGUSDT 規則的專屬通知（ERR-071，共用庫 v0.30.23）、賣出後殘額低於最小名目的處理與測試（P3b、P3c.4）。"
+          "state": "done",
+          "evidence": "src/btc_competition/runner.py:1079 paxg_enabled 讀環境變數 BTC_COMP_PAXG（只有剛好 on 才開）；src/btc_competition/signals.py:83 compute_paxg_gate（PAXG 自己的 SMA50／SMA100 遲滯指標）；A1 /etc/btc-competition/btc-competition.env 已設 BTC_COMP_PAXG=on（2026-10-31 台北 22:38，使用者同意），程式是 operations 831bb96。2026-11-01 台北 08:10 首次每日執行：noop、LIVE、0 張單、權益 1078.05；08:15 交易所對帳與 Google 表對帳都是 RECONCILED；0 個失敗單元。開發機 2026-10-31 台北 21:30 起同開關演練。",
+          "verified_at": "2026-11-01",
+          "limit": "A1 的 PAXG 指標目前是關的（PAXG 收盤 3,899 < SMA50 4,178），所以 PAXG 實際買進、持有、賣回這條路徑在 A1 還沒被實際跑到；只有測試與開發機測試網演練驗證。A1 的 Google 表接收端收不收得下 PAXGUSDT 成交沒有測過（開發機接收端已測過）。程式仍是 831bb96，沒有 f-81 的粉塵轉換擴充。"
         }
       }
     }
@@ -2394,8 +2395,8 @@
       "kind": "cap",
       "id": "bear.paxg_asset",
       "project": "btc-competition",
-      "type": "updated",
-      "note": "競賽（R033）：程式隨 A1 部署（operations 831bb96），開關預設關閉、A1 沒打開，仍是未做；已知未做兩項已補。"
+      "type": "completed",
+      "note": "競賽（R033）：A1 開關 BTC_COMP_PAXG 2026-10-31 台北 22:38 已打開，2026-11-01 台北 08:10 首次每日執行 noop、對帳 RECONCILED，改為已做；PAXG 指標目前是關的，實際買進路徑在 A1 還沒跑到（見格子限制）。"
     },
     {
       "kind": "cap",
