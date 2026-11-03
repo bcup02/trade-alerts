@@ -1,6 +1,6 @@
 {
   "glossary_version": "fleet-glossary/v1",
-  "updated_at": "2026-10-28",
+  "updated_at": "2026-11-04",
   "note": "機隊全專案中文用詞對照表。給人看的文字一律用 zh；retired 是不要再用的舊叫法，tests/test_fleet_glossary.py 會掃描 trade-alerts 內給人看的文字，出現就擋。英文代號只如實列出，不在這裡改。",
   "entries": [
     {
@@ -62,6 +62,22 @@
         "BTC 牛市競賽",
         "BTC 競賽"
       ]
+    },
+    {
+      "id": "strategy.meteor",
+      "category": "策略",
+      "zh": "流星",
+      "en": [
+        "meteor",
+        "流星池",
+        "MET."
+      ],
+      "definition": "競賽策略裡「正在閃閃發光、之後常常墜地」的賽道領先幣：從目前最熱的賽道挑出主要暴漲幣。流星池＝每月重選的流星名單（取代勝者池的『競賽策略・流星池版』）；流星占比上限＝流星最多占組合的比例（核心＋流星的 25% 設計）。",
+      "retired": [
+        "衛星",
+        "賽道衛星"
+      ],
+      "note": "2026-11-03 使用者更正：原本寫成「衛星」是用錯詞，機制叫流星。獨立的策略版本叫「競賽策略・流星池版」（策略代號 meteor、報告編號 MET）；賽道是指 CoinGecko 的賽道分類。"
     },
     {
       "id": "strategy.fleet",
