@@ -285,6 +285,9 @@
     },
     "cap:bear.paxg_asset|btc-competition": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-11-01 台北）：operations 831bb96 於 2026-10-31 台北 16:23 部署；/etc/btc-competition/btc-competition.env 有 BTC_COMP_PAXG=on（2026-10-31 台北 22:38 使用者同意後加入，原檔備份 A1 ~/btc-competition.env.bak-20261031-2338-pre-paxg-on）；2026-11-01 台北 08:10（A1 日誌 JST 09:10）每日執行 outcome=noop mode=LIVE orders=0 equity=1078.05；台北 08:15 交易所對帳與 Google 表對帳都 RECONCILED，08:20 沒有帳本漏記的成交；台北 09:00 粉塵轉換略過（沒有剩餘幣）；A1 與開發機都是 0 個失敗單元。沒有逐檔雜湊比對 /opt 部署複本（/opt 沒有 .git）；PAXG 指標關、尚無 PAXG 成交，買進路徑沒有在 A1 跑過。"
+    },
+    "cap:ledger.dust_convert|btc-competition": {
+      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-11-03 台北）：operations 831bb96 升到 cba8efb（台北 17:09＝A1 日誌 JST 18:09，git merge --ff-only 後 install_systemd.sh；改動只有 dust_convert.py、capital_flow.py、symbols.py 與測試、文件）；/etc/btc-competition/btc-competition.env 有 BTC_COMP_DUST_CONVERT=on 與 BTC_COMP_PAXG=on（本次未動）；部署前 11/01、11/02、11/03 台北 09:00（A1 日誌 JST 10:00）每日執行都是 skipped: no leftover coins；部署後手動跑一輪同樣略過；/opt 內 symbols.NON_USDT_ASSETS 實測 BNB、BTC、ETH、PAXG、SOL；手動跑交易所對帳 RECONCILED；A1 與開發機都是 0 個失敗單元。開發機因 Demo 沒有 /sapi，轉換開關一直關；A1 每日都沒有零頭，目前可查紀錄沒有真實轉換；沒有逐檔雜湊比對 /opt 複本（/opt 沒有 .git）。"
     }
   }
 }

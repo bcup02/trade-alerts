@@ -57,7 +57,7 @@
     "btc-competition": {
       "repo": "AI-for-column5/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "831bb96c89a8b30c81e162e20fc6de406395b448"
+      "commit": "cba8efb4f42736c8469f7322cd8f0118955508bf"
     }
   },
   "capabilities": [
@@ -893,7 +893,7 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/trade_ledger.py:250 capital_flow 追加資金進出列；src/btc_competition/trade_ledger.py:498 folded_holdings 把快照之後、未被快照吸收的資金進出折進推算餘額（:415 排除已被快照吸收的列，僅有效列參與同編號去重；無效列在折算時由 capital_flow_delta 跳過）；src/btc_competition/capital_flow.py:175 _record 在 :151 檔案鎖內重讀帳本、驗確認碼、查重、追加；src/btc_competition/reconcile_compare.py:178 證據帶 capital_flows_in_fold。競賽 #77。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a；A1 上這三個程式檔的 blob 與該 commit 相同，單元清單與環境檔雜湊不變、0 個失敗單元），12:56 補登 95.2329309 轉入與 0.2984512 理財收益，對帳仍 RECONCILED。",
+          "evidence": "src/btc_competition/trade_ledger.py:250 capital_flow 追加資金進出列；src/btc_competition/trade_ledger.py:498 folded_holdings 把快照之後、未被快照吸收的資金進出折進推算餘額（:415 排除已被快照吸收的列，僅有效列參與同編號去重；無效列在折算時由 capital_flow_delta 跳過）；src/btc_competition/capital_flow.py:176 _record 在 :152 檔案鎖內重讀帳本、驗確認碼、查重、追加；src/btc_competition/reconcile_compare.py:178 證據帶 capital_flows_in_fold。競賽 #77。2026-10-23 台北 12:55 隨 A1 正式機（新）部署（operations 6f7457a；A1 上這三個程式檔的 blob 與該 commit 相同，單元清單與環境檔雜湊不變、0 個失敗單元），12:56 補登 95.2329309 轉入與 0.2984512 理財收益，對帳仍 RECONCILED。",
           "verified_at": "2026-10-23",
           "limit": "A1 只登記過這兩筆（都早於人工更正快照，帳本推算餘額沒變）；快照之後才發生的資金進出被折進推算餘額這條路徑，只有測試與開發機帳本複本驗證，A1 沒實際遇過。"
         }
@@ -918,9 +918,9 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/dust_convert.py:119 decide：BEAR、無安全暫停、無待完成調倉、狀態檔至少 10 分鐘沒寫、每種風險幣不超過 20 USDT、每策略日一次才放行；:314 第一次轉換呼叫前先記嘗試；:276 _guard 每種幣前確認 bot 服務為 inactive 或 failed（查不到就停）、狀態檔未變、餘額與規劃一致；:151 coin_rows 餘額差須與交易所回應對得上才記 dust_convert_out／dust_convert_in（src/btc_competition/trade_ledger.py:62，不算資金進出）；src/btc_competition/dust_convert.py:357 開關沒開就結束。deploy/btc-competition-dust-convert.timer:7 每天 UTC 01:00。2026-10-23 台北 20:13 隨 A1 部署（operations 9a6b0c9）。",
-          "verified_at": "2026-10-23",
-          "limit": "開關 2026-10-23 台北 21:26 在 A1 打開並手動跑一輪（交易所 BTC、ETH、SOL 都是 0，判斷沒有零頭、沒呼叫轉換），尚未真實轉換過；幣安沒寫金鑰權限、最低金額、冷卻、手續費算法，第一次真實轉換才驗證。"
+          "evidence": "src/btc_competition/dust_convert.py:127 decide：BEAR、無安全暫停、無待完成調倉、狀態檔至少 10 分鐘沒寫、每種風險幣不超過 20 USDT、每策略日一次才放行；:363 第一次轉換呼叫前先記嘗試；:310 _guard 每種幣前確認 bot 服務為 inactive 或 failed（查不到就停）、狀態檔未變、餘額與規劃一致；:169 coin_rows 餘額差須與交易所回應對得上才記 dust_convert_out／dust_convert_in（src/btc_competition/trade_ledger.py:62，不算資金進出）；src/btc_competition/dust_convert.py:406 開關沒開就結束。f-81（競賽 #110）：src/btc_competition/symbols.py:58 NON_USDT_ASSETS 由幣種表推出轉換名單；src/btc_competition/dust_convert.py:150 paxg_on 持有 PAXG 時放進 kept 不轉換；:350 轉換前交易所對每種幣回的 USDT 估值超過上限就整批不轉、記 needs_review、單元失敗。deploy/btc-competition-dust-convert.timer:7 每天 UTC 01:00。2026-10-23 台北 20:13 隨 A1 部署（operations 9a6b0c9）；2026-11-03 台北 17:09 升到 operations cba8efb。",
+          "verified_at": "2026-11-03",
+          "limit": "開關 2026-10-23 在 A1 打開，至今每日執行都是沒有零頭、沒呼叫轉換；目前可查的紀錄裡轉換沒有真實執行過（開發機 Demo 沒有 /sapi、A1 每日都沒有零頭）。幣安沒寫權限、最低金額、冷卻、手續費、PAXG 收不收，第一次真實轉換才驗證。"
         }
       }
     },
@@ -943,9 +943,9 @@
         },
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:1079 paxg_enabled 讀環境變數 BTC_COMP_PAXG（只有剛好 on 才開）；src/btc_competition/signals.py:83 compute_paxg_gate（PAXG 自己的 SMA50／SMA100 遲滯指標）；A1 /etc/btc-competition/btc-competition.env 已設 BTC_COMP_PAXG=on（2026-10-31 台北 22:38，使用者同意），程式是 operations 831bb96。2026-11-01 台北 08:10 首次每日執行：noop、LIVE、0 張單、權益 1078.05；08:15 交易所對帳與 Google 表對帳都是 RECONCILED；0 個失敗單元。開發機 2026-10-31 台北 21:30 起同開關演練。",
+          "evidence": "src/btc_competition/runner.py:1079 paxg_enabled 讀環境變數 BTC_COMP_PAXG（只有剛好 on 才開）；src/btc_competition/signals.py:83 compute_paxg_gate（PAXG 自己的 SMA50／SMA100 遲滯指標）；A1 /etc/btc-competition/btc-competition.env 已設 BTC_COMP_PAXG=on（2026-10-31 台北 22:38，使用者同意），當時程式是 operations 831bb96（2026-11-03 已升 cba8efb）。2026-11-01 台北 08:10 首次每日執行：noop、LIVE、0 張單、權益 1078.05；08:15 交易所對帳與 Google 表對帳都是 RECONCILED；0 個失敗單元。開發機 2026-10-31 台北 21:30 起同開關演練。",
           "verified_at": "2026-11-01",
-          "limit": "A1 的 PAXG 指標目前是關的（PAXG 收盤 3,899 < SMA50 4,178），所以 PAXG 實際買進、持有、賣回這條路徑在 A1 還沒被實際跑到；只有測試與開發機測試網演練驗證。A1 的 Google 表接收端收不收得下 PAXGUSDT 成交沒有測過（開發機接收端已測過）。程式仍是 831bb96，沒有 f-81 的粉塵轉換擴充。"
+          "limit": "A1 的 PAXG 指標目前是關的（PAXG 收盤 3,899 < SMA50 4,178），所以 PAXG 實際買進、持有、賣回這條路徑在 A1 還沒被實際跑到；只有測試與開發機測試網演練驗證。A1 的 Google 表接收端收不收得下 PAXGUSDT 成交沒有測過（開發機接收端已測過）。程式已是 cba8efb（2026-11-03 台北 17:09 部署，含 f-81 粉塵轉換擴充：PAXG 零頭列入轉換名單，持有時不轉換）。"
         }
       }
     }
@@ -2391,6 +2391,20 @@
     }
   ],
   "recent_changes": [
+    {
+      "kind": "cap",
+      "id": "ledger.dust_convert",
+      "project": "btc-competition",
+      "type": "updated",
+      "note": "競賽（f-81）：粉塵轉換名單擴到所有非 USDT 幣（含 PAXG），2026-11-03 台北 17:09 隨 A1 升到 cba8efb；格子狀態仍是已做，行號與限制句改寫，PAXG 收不收仍待第一次真實轉換。"
+    },
+    {
+      "kind": "cap",
+      "id": "bear.paxg_asset",
+      "project": "btc-competition",
+      "type": "updated",
+      "note": "競賽（f-81）：限制句的程式版本改為 A1 已是 cba8efb（含粉塵轉換擴充）；格子狀態仍是已做。"
+    },
     {
       "kind": "cap",
       "id": "bear.paxg_asset",
