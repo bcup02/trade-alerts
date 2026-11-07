@@ -275,3 +275,53 @@ def test_the_ai_message_is_absent_when_the_catalog_has_no_prompt():
     entry = {"error_id": "ERR-999", "title": "x", "operator_message": {"what": "a", "direction": "b", "steps": ["c"]}}
     assert render_ai_text({"code": "X", "project": "momentum", "event_id": "e"}, entry, "X") is None
     assert render_ai_text({"code": "X", "project": "momentum", "event_id": "e"}, None, "X") is None
+
+
+# --------------------------------------------------------------------------- #
+# trend-meteor（v0.30.24）：合法的流星池事件與請求必須能通過匯出契約（審閱 BLOCK-339-01）
+def _meteor_export(paths):
+    log, queue = paths
+    _event(log, project="trend-meteor", code="LEDGER_DATA_QUALITY", risk_tier="R2", details=_escalated(), summary="壞列")
+    open_error_request(queue, project="trend-meteor", code="LEDGER_DATA_QUALITY", risk_tier="R3", evidence={"x": 1}, summary="壞列")
+    return build_ops_export(log, queue, project="trend-meteor", catalog=CATALOG, now=NOW)
+
+
+def test_trend_meteor_events_and_requests_appear_in_its_ops_export_under_the_met_prefix(paths):
+    export = _meteor_export(paths)
+    assert export["project"] == "trend-meteor"
+    assert [n["code"] for n in export["notices"]] == ["MET.LEDGER_DATA_QUALITY"] and export["notices"][0]["risk_tier"] == "R2"
+    assert [r["code"] for r in export["open_requests"]] == ["MET.LEDGER_DATA_QUALITY"]
+    assert export["notices"][0]["text"].startswith("【未編號】LEDGER_DATA_QUALITY")                          # 目錄還沒有 MET 條目：標未編號、不丟棄
+
+
+def test_trend_meteor_ops_export_matches_its_json_schema(paths):
+    jsonschema = pytest.importorskip("jsonschema")
+    export = _meteor_export(paths)
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    errors = list(jsonschema.Draft7Validator(schema).iter_errors(export))
+    assert not errors, [f"{list(e.path)}: {e.message}" for e in errors]
+
+
+def test_every_schema_code_pattern_accepts_every_registered_project_prefix():
+    """專案多了，每個含前綴列舉的正規表示式都要跟著認得；漏一個就是合法事件過不了自己發布的契約。"""
+    import re
+    from trade_alerts.fleet_event_log import PROJECT_CODE_PREFIXES
+    seen = 0
+    for name in ("fleet-ops-export-v2.schema.json", "fleet-error-catalog-v2.schema.json"):
+        text = (REPO_ROOT / "schemas" / name).read_text(encoding="utf-8")
+
+        def walk(node):
+            nonlocal seen
+            if isinstance(node, dict):
+                pat = node.get("pattern")
+                if isinstance(pat, str) and "SEY" in pat:
+                    seen += 1
+                    for prefix in PROJECT_CODE_PREFIXES.values():
+                        assert re.match(pat, f"{prefix}.SOME_CODE"), (name, pat, prefix)
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for v in node:
+                    walk(v)
+        walk(json.loads(text))
+    assert seen >= 4

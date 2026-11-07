@@ -847,3 +847,15 @@ def test_every_verified_at_in_the_registry_is_the_check_date_its_archived_paragr
     for key, status in m.cells(registry):
         if status["state"] == "done" and key in archive:
             assert status.get("verified_at") == m.check_date(archive[key]["a1_check"]), key
+
+
+def test_trend_meteor_has_no_registry_column_yet_and_cannot_be_catalogued_before_it_does(registry, catalog):
+    """v0.30.24：trend-meteor 先註冊事件專案；登記冊欄位與目錄條目一起在 V11 登記冊工作（進度頁 1.6）補。"""
+    from trade_alerts.rollout_registry import REGISTRY_PENDING_PROJECTS
+    assert REGISTRY_PENDING_PROJECTS == ("trend-meteor",)
+    assert "trend-meteor" not in STRATEGY_PROJECTS and set(STRATEGY_PROJECTS) == {"seykota", "momentum", "mycrypto", "btc-competition"}
+    assert owners("FLEET.ANYTHING") == STRATEGY_PROJECTS                                  # 跨 repo 的條件目前不含流星池（欄位建好才含）
+    assert owners("MET.LEDGER_DATA_QUALITY") == ("trend-meteor",)
+    bad = json.loads(json.dumps(catalog))
+    bad["entries"].append({**bad["entries"][0], "code": "MET.SOMETHING", "project": "trend-meteor"})
+    assert any("no registry column yet" in p for p in registry_problems(registry, bad))

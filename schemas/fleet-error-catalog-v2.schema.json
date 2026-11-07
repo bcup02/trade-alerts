@@ -101,7 +101,7 @@
         "properties": {
           "code": {
             "type": "string",
-            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
+            "pattern": "^(SEY|MOM|MYC|BTC|MET|FLEET)\\.[A-Z][A-Z0-9_]*$"
           },
           "retired_in": {
             "type": "string"
@@ -147,7 +147,7 @@
         },
         "code": {
           "type": "string",
-          "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$",
+          "pattern": "^(SEY|MOM|MYC|BTC|MET|FLEET)\\.[A-Z][A-Z0-9_]*$",
           "description": "Stable fleet-wide identifier: <project prefix>.<CONDITION>. Never reused for a different condition once published."
         },
         "title": {

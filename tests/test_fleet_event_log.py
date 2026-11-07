@@ -135,3 +135,40 @@ def test_load_error_catalog_rejects_a_document_that_is_not_a_catalog(tmp_path):
     path.write_text(json.dumps({"entries": "nope"}), encoding="utf-8")
     with pytest.raises(FleetEventLogError, match="not a fleet error catalog"):
         load_error_catalog(path)
+
+
+def test_trend_meteor_is_a_registered_event_project(tmp_path):
+    """v0.30.24：流星池（趨勢策略・流星池版 V11）註冊前，它寫的每一則事件都被 FleetEventLogError 吞掉。"""
+    assert PROJECT_CODE_PREFIXES["trend-meteor"] == "MET"
+    path = tmp_path / "log.jsonl"
+    record = append_fleet_event(path, project="trend-meteor", code="LEDGER_DATA_QUALITY", risk_tier="R2", summary="x")
+    assert record["code"] == "LEDGER_DATA_QUALITY" and record["project"] == "trend-meteor"                # 日誌存的是裸名，目錄代碼由專案前綴組出來
+    assert read_fleet_events(path)[0]["project"] == "trend-meteor"
+    assert catalog_code("trend-meteor", "LEDGER_DATA_QUALITY") == "MET.LEDGER_DATA_QUALITY"
+    assert catalog_code("trend-meteor", "FUNDING_SHEET_WRITE_FAILED") == "MET.FUNDING_SHEET_WRITE_FAILED"
+    with pytest.raises(FleetEventLogError, match="unknown project"):
+        append_fleet_event(path, project="trend_meteor", code="X")                    # 拼法不同仍然拒絕
+
+
+def test_trend_meteor_is_accepted_by_the_json_schemas(tmp_path):
+    jsonschema = pytest.importorskip("jsonschema")
+    root = Path(__file__).resolve().parents[1] / "schemas"
+    path = tmp_path / "log.jsonl"
+    record = append_fleet_event(path, project="trend-meteor", code="LEDGER_ITEM_DROPPED", risk_tier="R2")
+    for name in ("fleet-event-log-v1.schema.json", "error-request-queue-v1.schema.json", "fleet-ops-export-v2.schema.json"):
+        schema = json.loads((root / name).read_text(encoding="utf-8"))
+        enum = []
+        def walk(node):
+            if isinstance(node, dict):
+                if "project" in node and isinstance(node["project"], dict):
+                    enum.extend(node["project"].get("enum") or [])
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for v in node:
+                    walk(v)
+        walk(schema)
+        assert enum and "trend-meteor" in enum and set(enum) >= set(PROJECT_CODE_PREFIXES), name
+    schema = json.loads((root / "fleet-event-log-v1.schema.json").read_text(encoding="utf-8"))
+    errors = list(jsonschema.Draft7Validator(schema).iter_errors(record))
+    assert not errors, [e.message for e in errors]
