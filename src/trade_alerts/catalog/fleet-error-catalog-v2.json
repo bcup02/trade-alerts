@@ -34,6 +34,7 @@
     "momentum": "mexc-4h-momentum-trailing-stop",
     "mycrypto": "my-crypto-bot",
     "btc-competition": "btc-bull-market-competition",
+    "trend-meteor": "ed-seykota-systematic-trend-following (趨勢策略・流星池版 V11，src/trend_meteor)",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
   "error_ids_issued": 71,

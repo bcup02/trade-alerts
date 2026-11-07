@@ -45,7 +45,7 @@ def test_every_entry_names_a_known_project(catalog):
 def test_code_prefix_agrees_with_project(catalog):
     prefix_for = {
         "seykota": "SEY", "momentum": "MOM", "mycrypto": "MYC",
-        "btc-competition": "BTC", "fleet": "FLEET",
+        "btc-competition": "BTC", "trend-meteor": "MET", "fleet": "FLEET",
     }
     for entry in catalog["entries"]:
         assert entry["code"].split(".", 1)[0] == prefix_for[entry["project"]], entry["code"]

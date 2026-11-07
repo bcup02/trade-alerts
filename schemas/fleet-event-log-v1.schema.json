@@ -13,7 +13,7 @@
     "project": {
       "type": "string",
       "description": "Catalog/ops-notify project key.",
-      "enum": ["seykota", "momentum", "mycrypto", "btc-competition", "fleet"]
+      "enum": ["seykota", "momentum", "mycrypto", "btc-competition", "trend-meteor", "fleet"]
     },
     "code": {
       "type": "string",

@@ -31,7 +31,7 @@
       "properties": {
         "request_id": {"type": "string", "minLength": 1},
         "opened_at": {"type": "string", "format": "date-time"},
-        "project": {"enum": ["seykota", "momentum", "mycrypto", "btc-competition", "fleet"]},
+        "project": {"enum": ["seykota", "momentum", "mycrypto", "btc-competition", "trend-meteor", "fleet"]},
         "code": {
           "type": "string",
           "minLength": 1,

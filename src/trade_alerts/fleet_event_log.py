@@ -43,6 +43,7 @@ PROJECT_CODE_PREFIXES: Mapping[str, str] = {
     "momentum": "MOM",
     "mycrypto": "MYC",
     "btc-competition": "BTC",
+    "trend-meteor": "MET",
     "fleet": "FLEET",
 }
 

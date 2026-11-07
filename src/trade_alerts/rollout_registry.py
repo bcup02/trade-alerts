@@ -33,9 +33,14 @@ from .fleet_event_log import PROJECT_CODE_PREFIXES
 
 REGISTRY_VERSION = "fleet-rollout-registry/v1"
 PACKAGED_REGISTRY_NAME = "fleet-rollout-registry.json"
+#: Projects that already write fleet events (so ``PROJECT_CODE_PREFIXES`` knows them) but have no column in the rollout
+#: registry yet.  ``trend-meteor`` (趨勢策略・流星池版 V11) is registered for events first (v0.30.24: without it every event
+#: it wrote was silently dropped); its 35-capability column, its ``sources`` entry and its catalog entries land with the V11
+#: registry work (progress item 1.6) -- until then no catalog entry may use the ``MET.`` prefix (``registry_problems`` reports it).
+REGISTRY_PENDING_PROJECTS = ("trend-meteor",)
 #: The four strategies; ``fleet`` is a catalog prefix for cross-repo
 #: conditions, not a strategy that can have a capability.
-STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet")
+STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet" and project not in REGISTRY_PENDING_PROJECTS)
 STATES = ("done", "pending", "n/a")
 #: ``done`` means present where the live host deploys from -- not merely
 #: merged to development or running on the dev host.
@@ -178,6 +183,10 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
             problems += _status_problems(f"capability {cid} / {project}", value, phases)
 
     entries = {entry["code"]: entry for entry in catalog.get("entries") or []}
+    for code, entry in sorted(entries.items()):
+        if entry.get("project") in REGISTRY_PENDING_PROJECTS:
+            problems.append(f"catalog entry {code}: project {entry['project']!r} has no registry column yet "
+                            "(REGISTRY_PENDING_PROJECTS) -- add its column and sources before cataloguing its codes")
     rows = {row.get("code"): row for row in registry.get("catalog") or []}
     for code in sorted(entries.keys() - rows.keys()):
         problems.append(f"catalog entry {code} has no registry row")
