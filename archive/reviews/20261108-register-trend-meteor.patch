@@ -1,0 +1,282 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index aa1571c..ac6ef5b 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.23"
++version = "0.30.24"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/schemas/error-request-queue-v1.schema.json b/schemas/error-request-queue-v1.schema.json
+index 7927769..88f09c1 100644
+--- a/schemas/error-request-queue-v1.schema.json
++++ b/schemas/error-request-queue-v1.schema.json
+@@ -31,7 +31,7 @@
+       "properties": {
+         "request_id": {"type": "string", "minLength": 1},
+         "opened_at": {"type": "string", "format": "date-time"},
+-        "project": {"enum": ["seykota", "momentum", "mycrypto", "btc-competition", "fleet"]},
++        "project": {"enum": ["seykota", "momentum", "mycrypto", "btc-competition", "trend-meteor", "fleet"]},
+         "code": {
+           "type": "string",
+           "minLength": 1,
+diff --git a/schemas/fleet-error-catalog-v2.schema.json b/schemas/fleet-error-catalog-v2.schema.json
+index d8dcb69..27bc4a7 100644
+--- a/schemas/fleet-error-catalog-v2.schema.json
++++ b/schemas/fleet-error-catalog-v2.schema.json
+@@ -101,7 +101,7 @@
+         "properties": {
+           "code": {
+             "type": "string",
+-            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
++            "pattern": "^(SEY|MOM|MYC|BTC|MET|FLEET)\\.[A-Z][A-Z0-9_]*$"
+           },
+           "retired_in": {
+             "type": "string"
+@@ -147,7 +147,7 @@
+         },
+         "code": {
+           "type": "string",
+-          "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$",
++          "pattern": "^(SEY|MOM|MYC|BTC|MET|FLEET)\\.[A-Z][A-Z0-9_]*$",
+           "description": "Stable fleet-wide identifier: <project prefix>.<CONDITION>. Never reused for a different condition once published."
+         },
+         "title": {
+diff --git a/schemas/fleet-event-log-v1.schema.json b/schemas/fleet-event-log-v1.schema.json
+index 9edf56e..defeb97 100644
+--- a/schemas/fleet-event-log-v1.schema.json
++++ b/schemas/fleet-event-log-v1.schema.json
+@@ -13,7 +13,7 @@
+     "project": {
+       "type": "string",
+       "description": "Catalog/ops-notify project key.",
+-      "enum": ["seykota", "momentum", "mycrypto", "btc-competition", "fleet"]
++      "enum": ["seykota", "momentum", "mycrypto", "btc-competition", "trend-meteor", "fleet"]
+     },
+     "code": {
+       "type": "string",
+diff --git a/schemas/fleet-ops-export-v2.schema.json b/schemas/fleet-ops-export-v2.schema.json
+index ae6daf2..86ef303 100644
+--- a/schemas/fleet-ops-export-v2.schema.json
++++ b/schemas/fleet-ops-export-v2.schema.json
+@@ -24,6 +24,7 @@
+         "momentum",
+         "mycrypto",
+         "btc-competition",
++        "trend-meteor",
+         "fleet"
+       ]
+     },
+@@ -62,7 +63,7 @@
+           },
+           "code": {
+             "type": "string",
+-            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
++            "pattern": "^(SEY|MOM|MYC|BTC|MET|FLEET)\\.[A-Z][A-Z0-9_]*$"
+           },
+           "risk_tier": {
+             "enum": [
+@@ -116,7 +117,7 @@
+           },
+           "code": {
+             "type": "string",
+-            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
++            "pattern": "^(SEY|MOM|MYC|BTC|MET|FLEET)\\.[A-Z][A-Z0-9_]*$"
+           },
+           "risk_tier": {
+             "enum": [
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 23f80a4..742383a 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -34,6 +34,7 @@
+     "momentum": "mexc-4h-momentum-trailing-stop",
+     "mycrypto": "my-crypto-bot",
+     "btc-competition": "btc-bull-market-competition",
++    "trend-meteor": "ed-seykota-systematic-trend-following (趨勢策略・流星池版 V11，src/trend_meteor)",
+     "fleet": "(cross-repo: same condition implemented in every strategy)"
+   },
+   "error_ids_issued": 71,
+diff --git a/src/trade_alerts/fleet_event_log.py b/src/trade_alerts/fleet_event_log.py
+index 316c3d2..44884b9 100644
+--- a/src/trade_alerts/fleet_event_log.py
++++ b/src/trade_alerts/fleet_event_log.py
+@@ -43,6 +43,7 @@ PROJECT_CODE_PREFIXES: Mapping[str, str] = {
+     "momentum": "MOM",
+     "mycrypto": "MYC",
+     "btc-competition": "BTC",
++    "trend-meteor": "MET",
+     "fleet": "FLEET",
+ }
+ 
+diff --git a/src/trade_alerts/rollout_registry.py b/src/trade_alerts/rollout_registry.py
+index 1da2b34..075f19e 100644
+--- a/src/trade_alerts/rollout_registry.py
++++ b/src/trade_alerts/rollout_registry.py
+@@ -33,9 +33,14 @@ from .fleet_event_log import PROJECT_CODE_PREFIXES
+ 
+ REGISTRY_VERSION = "fleet-rollout-registry/v1"
+ PACKAGED_REGISTRY_NAME = "fleet-rollout-registry.json"
++#: Projects that already write fleet events (so ``PROJECT_CODE_PREFIXES`` knows them) but have no column in the rollout
++#: registry yet.  ``trend-meteor`` (趨勢策略・流星池版 V11) is registered for events first (v0.30.24: without it every event
++#: it wrote was silently dropped); its 35-capability column, its ``sources`` entry and its catalog entries land with the V11
++#: registry work (progress item 1.6) -- until then no catalog entry may use the ``MET.`` prefix (``registry_problems`` reports it).
++REGISTRY_PENDING_PROJECTS = ("trend-meteor",)
+ #: The four strategies; ``fleet`` is a catalog prefix for cross-repo
+ #: conditions, not a strategy that can have a capability.
+-STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet")
++STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet" and project not in REGISTRY_PENDING_PROJECTS)
+ STATES = ("done", "pending", "n/a")
+ #: ``done`` means present where the live host deploys from -- not merely
+ #: merged to development or running on the dev host.
+@@ -178,6 +183,10 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
+             problems += _status_problems(f"capability {cid} / {project}", value, phases)
+ 
+     entries = {entry["code"]: entry for entry in catalog.get("entries") or []}
++    for code, entry in sorted(entries.items()):
++        if entry.get("project") in REGISTRY_PENDING_PROJECTS:
++            problems.append(f"catalog entry {code}: project {entry['project']!r} has no registry column yet "
++                            "(REGISTRY_PENDING_PROJECTS) -- add its column and sources before cataloguing its codes")
+     rows = {row.get("code"): row for row in registry.get("catalog") or []}
+     for code in sorted(entries.keys() - rows.keys()):
+         problems.append(f"catalog entry {code} has no registry row")
+diff --git a/tests/test_fleet_error_catalog.py b/tests/test_fleet_error_catalog.py
+index f085bd8..9fa2c02 100644
+--- a/tests/test_fleet_error_catalog.py
++++ b/tests/test_fleet_error_catalog.py
+@@ -45,7 +45,7 @@ def test_every_entry_names_a_known_project(catalog):
+ def test_code_prefix_agrees_with_project(catalog):
+     prefix_for = {
+         "seykota": "SEY", "momentum": "MOM", "mycrypto": "MYC",
+-        "btc-competition": "BTC", "fleet": "FLEET",
++        "btc-competition": "BTC", "trend-meteor": "MET", "fleet": "FLEET",
+     }
+     for entry in catalog["entries"]:
+         assert entry["code"].split(".", 1)[0] == prefix_for[entry["project"]], entry["code"]
+diff --git a/tests/test_fleet_event_log.py b/tests/test_fleet_event_log.py
+index 0ca4651..ba2aa05 100644
+--- a/tests/test_fleet_event_log.py
++++ b/tests/test_fleet_event_log.py
+@@ -135,3 +135,40 @@ def test_load_error_catalog_rejects_a_document_that_is_not_a_catalog(tmp_path):
+     path.write_text(json.dumps({"entries": "nope"}), encoding="utf-8")
+     with pytest.raises(FleetEventLogError, match="not a fleet error catalog"):
+         load_error_catalog(path)
++
++
++def test_trend_meteor_is_a_registered_event_project(tmp_path):
++    """v0.30.24：流星池（趨勢策略・流星池版 V11）註冊前，它寫的每一則事件都被 FleetEventLogError 吞掉。"""
++    assert PROJECT_CODE_PREFIXES["trend-meteor"] == "MET"
++    path = tmp_path / "log.jsonl"
++    record = append_fleet_event(path, project="trend-meteor", code="LEDGER_DATA_QUALITY", risk_tier="R2", summary="x")
++    assert record["code"] == "LEDGER_DATA_QUALITY" and record["project"] == "trend-meteor"                # 日誌存的是裸名，目錄代碼由專案前綴組出來
++    assert read_fleet_events(path)[0]["project"] == "trend-meteor"
++    assert catalog_code("trend-meteor", "LEDGER_DATA_QUALITY") == "MET.LEDGER_DATA_QUALITY"
++    assert catalog_code("trend-meteor", "FUNDING_SHEET_WRITE_FAILED") == "MET.FUNDING_SHEET_WRITE_FAILED"
++    with pytest.raises(FleetEventLogError, match="unknown project"):
++        append_fleet_event(path, project="trend_meteor", code="X")                    # 拼法不同仍然拒絕
++
++
++def test_trend_meteor_is_accepted_by_the_json_schemas(tmp_path):
++    jsonschema = pytest.importorskip("jsonschema")
++    root = Path(__file__).resolve().parents[1] / "schemas"
++    path = tmp_path / "log.jsonl"
++    record = append_fleet_event(path, project="trend-meteor", code="LEDGER_ITEM_DROPPED", risk_tier="R2")
++    for name in ("fleet-event-log-v1.schema.json", "error-request-queue-v1.schema.json", "fleet-ops-export-v2.schema.json"):
++        schema = json.loads((root / name).read_text(encoding="utf-8"))
++        enum = []
++        def walk(node):
++            if isinstance(node, dict):
++                if "project" in node and isinstance(node["project"], dict):
++                    enum.extend(node["project"].get("enum") or [])
++                for v in node.values():
++                    walk(v)
++            elif isinstance(node, list):
++                for v in node:
++                    walk(v)
++        walk(schema)
++        assert enum and "trend-meteor" in enum and set(enum) >= set(PROJECT_CODE_PREFIXES), name
++    schema = json.loads((root / "fleet-event-log-v1.schema.json").read_text(encoding="utf-8"))
++    errors = list(jsonschema.Draft7Validator(schema).iter_errors(record))
++    assert not errors, [e.message for e in errors]
+diff --git a/tests/test_ops_export.py b/tests/test_ops_export.py
+index 342255c..ee20ca5 100644
+--- a/tests/test_ops_export.py
++++ b/tests/test_ops_export.py
+@@ -275,3 +275,53 @@ def test_the_ai_message_is_absent_when_the_catalog_has_no_prompt():
+     entry = {"error_id": "ERR-999", "title": "x", "operator_message": {"what": "a", "direction": "b", "steps": ["c"]}}
+     assert render_ai_text({"code": "X", "project": "momentum", "event_id": "e"}, entry, "X") is None
+     assert render_ai_text({"code": "X", "project": "momentum", "event_id": "e"}, None, "X") is None
++
++
++# --------------------------------------------------------------------------- #
++# trend-meteor（v0.30.24）：合法的流星池事件與請求必須能通過匯出契約（審閱 BLOCK-339-01）
++def _meteor_export(paths):
++    log, queue = paths
++    _event(log, project="trend-meteor", code="LEDGER_DATA_QUALITY", risk_tier="R2", details=_escalated(), summary="壞列")
++    open_error_request(queue, project="trend-meteor", code="LEDGER_DATA_QUALITY", risk_tier="R3", evidence={"x": 1}, summary="壞列")
++    return build_ops_export(log, queue, project="trend-meteor", catalog=CATALOG, now=NOW)
++
++
++def test_trend_meteor_events_and_requests_appear_in_its_ops_export_under_the_met_prefix(paths):
++    export = _meteor_export(paths)
++    assert export["project"] == "trend-meteor"
++    assert [n["code"] for n in export["notices"]] == ["MET.LEDGER_DATA_QUALITY"] and export["notices"][0]["risk_tier"] == "R2"
++    assert [r["code"] for r in export["open_requests"]] == ["MET.LEDGER_DATA_QUALITY"]
++    assert export["notices"][0]["text"].startswith("【未編號】LEDGER_DATA_QUALITY")                          # 目錄還沒有 MET 條目：標未編號、不丟棄
++
++
++def test_trend_meteor_ops_export_matches_its_json_schema(paths):
++    jsonschema = pytest.importorskip("jsonschema")
++    export = _meteor_export(paths)
++    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
++    errors = list(jsonschema.Draft7Validator(schema).iter_errors(export))
++    assert not errors, [f"{list(e.path)}: {e.message}" for e in errors]
++
++
++def test_every_schema_code_pattern_accepts_every_registered_project_prefix():
++    """專案多了，每個含前綴列舉的正規表示式都要跟著認得；漏一個就是合法事件過不了自己發布的契約。"""
++    import re
++    from trade_alerts.fleet_event_log import PROJECT_CODE_PREFIXES
++    seen = 0
++    for name in ("fleet-ops-export-v2.schema.json", "fleet-error-catalog-v2.schema.json"):
++        text = (REPO_ROOT / "schemas" / name).read_text(encoding="utf-8")
++
++        def walk(node):
++            nonlocal seen
++            if isinstance(node, dict):
++                pat = node.get("pattern")
++                if isinstance(pat, str) and "SEY" in pat:
++                    seen += 1
++                    for prefix in PROJECT_CODE_PREFIXES.values():
++                        assert re.match(pat, f"{prefix}.SOME_CODE"), (name, pat, prefix)
++                for v in node.values():
++                    walk(v)
++            elif isinstance(node, list):
++                for v in node:
++                    walk(v)
++        walk(json.loads(text))
++    assert seen >= 4
+diff --git a/tests/test_rollout_registry.py b/tests/test_rollout_registry.py
+index 9bba056..07001cf 100644
+--- a/tests/test_rollout_registry.py
++++ b/tests/test_rollout_registry.py
+@@ -847,3 +847,15 @@ def test_every_verified_at_in_the_registry_is_the_check_date_its_archived_paragr
+     for key, status in m.cells(registry):
+         if status["state"] == "done" and key in archive:
+             assert status.get("verified_at") == m.check_date(archive[key]["a1_check"]), key
++
++
++def test_trend_meteor_has_no_registry_column_yet_and_cannot_be_catalogued_before_it_does(registry, catalog):
++    """v0.30.24：trend-meteor 先註冊事件專案；登記冊欄位與目錄條目一起在 V11 登記冊工作（進度頁 1.6）補。"""
++    from trade_alerts.rollout_registry import REGISTRY_PENDING_PROJECTS
++    assert REGISTRY_PENDING_PROJECTS == ("trend-meteor",)
++    assert "trend-meteor" not in STRATEGY_PROJECTS and set(STRATEGY_PROJECTS) == {"seykota", "momentum", "mycrypto", "btc-competition"}
++    assert owners("FLEET.ANYTHING") == STRATEGY_PROJECTS                                  # 跨 repo 的條件目前不含流星池（欄位建好才含）
++    assert owners("MET.LEDGER_DATA_QUALITY") == ("trend-meteor",)
++    bad = json.loads(json.dumps(catalog))
++    bad["entries"].append({**bad["entries"][0], "code": "MET.SOMETHING", "project": "trend-meteor"})
++    assert any("no registry column yet" in p for p in registry_problems(registry, bad))
