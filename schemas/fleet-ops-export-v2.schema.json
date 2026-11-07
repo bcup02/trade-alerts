@@ -63,7 +63,7 @@
           },
           "code": {
             "type": "string",
-            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
+            "pattern": "^(SEY|MOM|MYC|BTC|MET|FLEET)\\.[A-Z][A-Z0-9_]*$"
           },
           "risk_tier": {
             "enum": [
@@ -117,7 +117,7 @@
           },
           "code": {
             "type": "string",
-            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
+            "pattern": "^(SEY|MOM|MYC|BTC|MET|FLEET)\\.[A-Z][A-Z0-9_]*$"
           },
           "risk_tier": {
             "enum": [
