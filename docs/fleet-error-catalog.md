@@ -220,7 +220,7 @@ LINE 以外的任何決策，而且紅 unit 會在下次部署的健康檢查裡
 **2026-09-30 退役（進度頁 f-8）：** Phase 4b 已把四支的退出碼全部改回 0 並上正式機，這兩條描述的情況已不存在，
 從 JSON 條目移除、代碼移入 `retired_codes`（永不重用）。帳本／Google 表不一致仍由 ops-notify 的 `ledger`／`google` 兩軸偵測與通知。
 
-### 3.6 趨勢策略・流星池版（V11，7 條，v0.30.25 起）
+### 3.6 趨勢策略・流星池版（V11，36 條：v0.30.25 起 7 條、v0.30.26 起再加 29 條）
 
 趨勢策略的全合約新版本（程式在趨勢策略 repo 的 `src/trend_meteor`，專案代號 `trend-meteor`、代碼前綴 `MET.`）。v0.30.24 先把它註冊成事件專案（否則它寫的事件會被丟掉）；v0.30.25 起有登記冊欄位（35 項能力與 `FLEET.*` 條目逐格填未做／不適用，V11 還沒上線所以沒有「已做」），並補上共用處理器一啟動就需要的條目——缺了它們，修復機器人與未記帳處理器會在最開頭整輪擋下、什麼都不碰。V11 自己發出的其他事件與暫停原因碼留到下一塊（進度頁 1.6b）。
 
@@ -233,6 +233,40 @@ LINE 以外的任何決策，而且紅 unit 會在下次部署的健康檢查裡
 | ERR-076 | `MET.UNRECORDED_FILL_CORRECTED` | JUDGEMENT | R3 | 確定是重複送單才更正；只重述恰好一筆整筆平倉列的交易 |
 | ERR-077 | `MET.UNRECORDED_FILL_UNRESOLVED` | JUDGEMENT | R3 | 不能確定來源或不能重述（含有部分減碼的交易）一律不寫、開請求 |
 | ERR-078 | `MET.LEDGER_DATA_QUALITY` | JUDGEMENT | R3 | 帳本稽核發現資料不完整或對不起來的列；V11 程式目前把事件記成 R2，改釘新版時一併改 R3 |
+
+**v0.30.26（進度頁 1.6b）補上 V11 自己發的事件與暫停原因碼，共 29 條（ERR-079～107）**——六個事件（`DATA_UNAVAILABLE`、`RUNTIME_CYCLE_FAILED`、`LEDGER_ITEM_DROPPED`、`STOP_FILL_UNKNOWN`、`WINNER_NO_PERP`、`FUNDING_SHEET_WRITE_FAILED`）與 23 個執行器／主迴圈的安全暫停原因碼。分級依據：不暫停的事件，R3＝事件通知一次、R2＝重試用盡（或連續幾次）才升格通知、R0＝只記錄；所有安全暫停原因碼都是 R3（策略對部位、保護單或自己的記錄失去把握，停下來等人看交易所）。V11 程式原本把 `LEDGER_ITEM_DROPPED`、`STOP_FILL_UNKNOWN`（R2，沒有升格旗標＝不會通知）、`WINNER_NO_PERP`（R1，維運通知不通知 R1）、`EXECUTION_FAILED`（R2 附 escalated，實際一次就暫停＝R3）的記錄等級與目錄不同，V11 程式在改釘本版時一併改成目錄的等級，並有守門測試比對。不登記的：執行器只記錄的 R0 事件（`stale_stop_cancelled`、`entry_reconstructed`、`recovered_*`、`skipped:*` 等動態代碼），它們不通知、人也沒有決定可做。解除暫停用的解除工具還沒做（5d），條目只說「兩段式解除工具（5d 建）」，不寫指令。
+
+| 編號 | 錯誤碼 | 等級 | 種類 | 標題 |
+|---|---|---|---|---|
+| ERR-079 | `MET.STATE_FILE_CORRUPT` | R3 | 暫停（latch） | 狀態檔讀不出來，策略安全暫停 |
+| ERR-080 | `MET.MISSED_DAYS` | R3 | 暫停（latch） | 好幾個收盤日沒處理，超過允許補做的上限 |
+| ERR-081 | `MET.HEDGE_MODE` | R3 | 暫停（latch） | 交易所帳戶是雙向持倉模式 |
+| ERR-082 | `MET.NOT_ISOLATED` | R3 | 暫停（latch） | 某個交易對不是逐倉保證金 |
+| ERR-083 | `MET.LEVERAGE_NOT_1` | R3 | 暫停（latch） | 某個交易對的槓桿不是 1 倍 |
+| ERR-084 | `MET.UNEXPECTED_POSITION` | R3 | 暫停（latch） | 交易所出現策略不會開的持倉 |
+| ERR-085 | `MET.BAD_EXCHANGE_DATA` | R3 | 暫停（latch） | 交易所回傳的數字欄位無法使用 |
+| ERR-086 | `MET.ORDER_OUTCOME_UNKNOWN` | R3 | 暫停（latch） | 送出的市價單查不到有沒有成交 |
+| ERR-087 | `MET.ORDER_NOT_TERMINAL` | R3 | 暫停（latch） | 市價單多次查詢後仍不是終態 |
+| ERR-088 | `MET.PENDING_UNRESOLVED` | R3 | 暫停（latch） | 腿簿還有未結清的送單 |
+| ERR-089 | `MET.STEP_OUTCOME_UNKNOWN` | R3 | 暫停（latch） | 某個執行步驟結果不明 |
+| ERR-090 | `MET.STOP_OUTCOME_UNKNOWN` | R3 | 暫停（latch） | 送出強平條件單後結果不明 |
+| ERR-091 | `MET.PROTECTION_UNVERIFIED` | R3 | 暫停（latch） | 有持倉的腿沒有強平條件單 |
+| ERR-092 | `MET.STALE_STOP_CANCEL_FAILED` | R3 | 暫停（latch） | 舊的強平條件單取消失敗 |
+| ERR-093 | `MET.STOP_STATE_UNKNOWN` | R3 | 暫停（latch） | 持倉消失、查不到它的強平條件單 |
+| ERR-094 | `MET.STOP_STATUS_UNRECOGNIZED` | R3 | 暫停（latch） | 強平條件單回報了不認得的狀態 |
+| ERR-095 | `MET.POSITION_GONE_STOP_NOT_TRIGGERED` | R3 | 暫停（latch） | 持倉消失，但強平條件單沒有觸發 |
+| ERR-096 | `MET.STOP_TRIGGERED_UNREPORTED` | R3 | 暫停（latch） | 強平條件單已觸發，但還沒交給決策核心處理 |
+| ERR-097 | `MET.MARGIN_BELOW_FLOOR` | R3 | 暫停（latch） | 逐倉保證金低於安全下限且補不起 |
+| ERR-098 | `MET.RECOVERY_LOOKUP_FAILED` | R3 | 暫停（latch） | 重啟後結清中斷的單時查詢失敗 |
+| ERR-099 | `MET.RECOVERY_STOP_STATE` | R3 | 暫停（latch） | 重啟後結清時，條件單狀態無法判定有沒有保護 |
+| ERR-100 | `MET.UNKNOWN_STEP` | R3 | 暫停（latch） | 執行計畫裡出現程式不認得的步驟 |
+| ERR-101 | `MET.EXECUTION_FAILED` | R3 | 暫停（latch） | 這一輪的下單步驟失敗，重試後仍未全部完成 |
+| ERR-102 | `MET.DATA_UNAVAILABLE` | R2 | 暫停（latch） | 必要的輸入資料連續 3 個 UTC 日抓不到，策略安全暫停 |
+| ERR-103 | `MET.RUNTIME_CYCLE_FAILED` | R0 | 事件 | 每日單元的未分類例外 |
+| ERR-104 | `MET.LEDGER_ITEM_DROPPED` | R3 | 事件 | 有待記帳項目被丟棄，帳本會少記 |
+| ERR-105 | `MET.STOP_FILL_UNKNOWN` | R3 | 事件 | 強平條件單已觸發，但查不到成交明細 |
+| ERR-106 | `MET.WINNER_NO_PERP` | R3 | 事件 | 勝者幣在下單交易所沒有永續，維持原持倉（區段開始與結束各通知一次） |
+| ERR-107 | `MET.FUNDING_SHEET_WRITE_FAILED` | R2 | 事件 | 資金費同步寫不進 Google 表的『帳戶餘額總表』分頁（重試用盡才通知） |
 
 與其他策略的差異：V11 的修復與更正轉接對交易所回傳的每個必要欄位明確驗證（缺失或讀不懂就拒絕，不靠共用庫預設值補洞）；未記帳更正只處理恰好一筆整筆平倉列的交易（共用庫的更正只替換第一筆平倉列，部分減碼會重複計算）；寫入前先試算且重讀、試算、追加在同一把帳本鎖內。啟用單元前還必須證明修復機器人與未記帳處理器不會並行改同一帳本（5d）。
 

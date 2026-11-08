@@ -865,14 +865,47 @@ def test_trend_meteor_has_its_column_and_the_pending_mechanism_still_guards_the_
 def test_trend_meteor_has_no_done_cell_until_it_runs_on_the_live_branch(registry):
     """『已做』只算正式機分支（operations）上的；V11 還沒上線，所有格子都只能是未做或不適用。有一格寫已做就要先確認 sources 的 commit 真的含 V11 程式。"""
     rows = project_rows(registry, "trend-meteor")
-    assert len(rows) == 35 + 2 * (9 + 7)                                                      # 35 項能力＋（9 條 FLEET＋7 條 MET）×（行為、事件）
+    assert len(rows) == 35 + 2 * (9 + 36)                                                     # 35 項能力＋（9 條 FLEET＋36 條 MET）×（行為、事件）
     assert {r["state"] for r in rows.values()} <= {"pending", "n/a"}, [k for k, r in rows.items() if r["state"] == "done"]
 
 
-def test_trend_meteor_catalog_entries_are_the_seven_v11_ones_with_the_tiers_the_runners_need(catalog):
+V11_TIERS = {
+    # 1.6a：共用處理器要的 7 條
+    "MET.VERIFIED_CLOSE_AUTO_REPAIRED": ("R1", "MECHANICAL"), "MET.VERIFIED_CLOSE_REPAIR_FAILED": ("R2", "JUDGEMENT"),
+    "MET.VERIFIED_CLOSE_REPAIR_BLOCKED": ("R3", "JUDGEMENT"), "MET.VERIFIED_CLOSE_REPAIR_RECURRING": ("R3", "JUDGEMENT"),
+    "MET.UNRECORDED_FILL_CORRECTED": ("R3", "JUDGEMENT"), "MET.UNRECORDED_FILL_UNRESOLVED": ("R3", "JUDGEMENT"),
+    "MET.LEDGER_DATA_QUALITY": ("R3", "JUDGEMENT"),
+    # 1.6b：V11 自己發的事件
+    "MET.DATA_UNAVAILABLE": ("R2", "JUDGEMENT"), "MET.RUNTIME_CYCLE_FAILED": ("R0", "MECHANICAL"), "MET.LEDGER_ITEM_DROPPED": ("R3", "JUDGEMENT"),
+    "MET.STOP_FILL_UNKNOWN": ("R3", "JUDGEMENT"), "MET.WINNER_NO_PERP": ("R3", "JUDGEMENT"), "MET.FUNDING_SHEET_WRITE_FAILED": ("R2", "JUDGEMENT"),
+    # 1.6b：V11 的安全暫停原因碼（全部 R3：策略對部位、保護單或自己的記錄失去把握，停下來等人看交易所）
+    **{f"MET.{c}": ("R3", "JUDGEMENT") for c in (
+        "STATE_FILE_CORRUPT", "MISSED_DAYS", "HEDGE_MODE", "NOT_ISOLATED", "LEVERAGE_NOT_1", "UNEXPECTED_POSITION", "BAD_EXCHANGE_DATA",
+        "ORDER_OUTCOME_UNKNOWN", "ORDER_NOT_TERMINAL", "PENDING_UNRESOLVED", "STEP_OUTCOME_UNKNOWN", "STOP_OUTCOME_UNKNOWN", "PROTECTION_UNVERIFIED",
+        "STALE_STOP_CANCEL_FAILED", "STOP_STATE_UNKNOWN", "STOP_STATUS_UNRECOGNIZED", "POSITION_GONE_STOP_NOT_TRIGGERED", "STOP_TRIGGERED_UNREPORTED",
+        "MARGIN_BELOW_FLOOR", "RECOVERY_LOOKUP_FAILED", "RECOVERY_STOP_STATE", "UNKNOWN_STEP", "EXECUTION_FAILED")},
+}
+
+
+def test_trend_meteor_catalog_entries_are_the_v11_ones_with_the_tiers_the_code_and_runners_need(catalog):
     entries = {e["code"]: e for e in catalog["entries"] if e["project"] == "trend-meteor"}
-    assert {c: (e["risk_tier"], e["verdict"]) for c, e in entries.items()} == {
-        "MET.VERIFIED_CLOSE_AUTO_REPAIRED": ("R1", "MECHANICAL"), "MET.VERIFIED_CLOSE_REPAIR_FAILED": ("R2", "JUDGEMENT"),
-        "MET.VERIFIED_CLOSE_REPAIR_BLOCKED": ("R3", "JUDGEMENT"), "MET.VERIFIED_CLOSE_REPAIR_RECURRING": ("R3", "JUDGEMENT"),
-        "MET.UNRECORDED_FILL_CORRECTED": ("R3", "JUDGEMENT"), "MET.UNRECORDED_FILL_UNRESOLVED": ("R3", "JUDGEMENT"),
-        "MET.LEDGER_DATA_QUALITY": ("R3", "JUDGEMENT")}
+    assert {c: (e["risk_tier"], e["verdict"]) for c, e in entries.items()} == V11_TIERS and len(V11_TIERS) == 36
+
+
+def test_trend_meteor_halt_entries_latch_and_say_the_resume_tool_is_a_5d_job(catalog):
+    """暫停原因碼：latch 碼＝代碼名、解除路徑是兩段式；解除工具還沒做，條目不能把它寫成現成的（也不能出現要貼的指令）。"""
+    import re
+    halts = [e for e in catalog["entries"] if e["project"] == "trend-meteor" and e["current"]["latch"]]
+    assert len(halts) == 24                                                                  # 23 個暫停原因碼＋DATA_UNAVAILABLE（連續 3 天升格後暫停）
+    for e in halts:
+        assert e["current"]["latch"] == e["code"].split(".", 1)[1] and e["resume"] == "two_stage_fingerprint", e["code"]
+        assert "5d" in e["auto_action"], e["code"]
+        assert not [sp for st in e["operator_message"]["steps"] for sp in re.findall(r"`[^`]+`", st)], e["code"]
+
+
+def test_the_events_the_meteor_code_records_as_non_latching_say_how_they_reach_a_person(catalog):
+    """不暫停的事件：R3 事件通知一次、R2 要升格才通知；R0 只記錄。V11 程式的記錄等級必須和這裡一致（V11 repo 的守門測試以真目錄逐一檢查）。"""
+    by = {e["code"]: e for e in catalog["entries"] if e["project"] == "trend-meteor"}
+    assert by["MET.WINNER_NO_PERP"]["risk_tier"] == "R3" and "各通知一次" in by["MET.WINNER_NO_PERP"]["auto_action"]
+    assert by["MET.RUNTIME_CYCLE_FAILED"]["risk_tier"] == "R0" and by["MET.RUNTIME_CYCLE_FAILED"]["current"]["unit_exit"] == 1
+    assert by["MET.FUNDING_SHEET_WRITE_FAILED"]["current"]["unit_exit"] == 3
