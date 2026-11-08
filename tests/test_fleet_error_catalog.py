@@ -516,3 +516,33 @@ def test_the_read_only_whitelist_matches_the_whole_span_not_a_prefix_with_a_trai
     assert _read_only_match(good)
     assert not _read_only_match(good + "\n")
     assert not _read_only_match(good + " ; rm -rf /")
+
+
+# --- PR #341 審閱 BLOCK-341-01～03：條目文字不能把「入隊」「沒實作的檢查」「降級」寫成確定的事 ----------------
+def _met(catalog, code):
+    return next(e for e in catalog["entries"] if e["code"] == code)
+
+
+def test_the_unrecorded_fill_notice_says_the_google_correction_is_only_queued(catalog):
+    """V11 的 after_trade_correction 只把 Google 更正排進投影佇列（queue_from_ledger），派送與接收端確認另外做、也可能入隊失敗；通知不能說 Google 表已一致。"""
+    message = _met(catalog, "MET.UNRECORDED_FILL_CORRECTED")["operator_message"]
+    text = json.dumps(message, ensure_ascii=False)
+    assert "Google 表的數字已" not in text and "與 Google 表的數字" not in text
+    assert "待派送佇列" in message["what"] and "details.post" in " ".join(message["steps"])
+
+
+def test_the_ledger_data_quality_entry_lists_only_checks_the_audit_really_runs(catalog):
+    """V11 的 ledger_audit 目前偵測：讀不了、尾行沒換行、讀不懂的行、成交列沒通過契約、持倉量兩種算法不一致；沒有重複成交編號或逐筆交易平衡的檢查。"""
+    entry = _met(catalog, "MET.LEDGER_DATA_QUALITY")
+    shown = json.dumps(entry["operator_message"], ensure_ascii=False)
+    assert "重複" not in shown and "進出場數量不一致" not in shown
+    assert "目前不檢查" in entry["auto_action"] and "重複成交編號偵測是後續工作" in entry["auto_action"]
+
+
+def test_the_auto_repair_entry_keeps_the_missing_realized_pnl_exception(catalog):
+    """V11 的 validate_closing_fill：已實現損益 None（缺失）降級為本地毛損益、有值但讀不懂才拒絕——條目不能說缺失一律拒絕（PR #197 的區分）。"""
+    entry = _met(catalog, "MET.VERIFIED_CLOSE_AUTO_REPAIRED")
+    text = entry["rationale"] + entry["auto_action"]
+    assert "已實現損益是明確區分的例外" in entry["rationale"] and "本地算的毛損益" in entry["rationale"]
+    assert "exchange_profit_reported=False" in text and "pnl_source" in text
+    assert "已實現損益缺失就拒絕" not in text and "已實現損益也一樣缺失就拒絕" not in text
