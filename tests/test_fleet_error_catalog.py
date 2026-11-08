@@ -532,11 +532,32 @@ def test_the_unrecorded_fill_notice_says_the_google_correction_is_only_queued(ca
 
 
 def test_the_ledger_data_quality_entry_lists_only_checks_the_audit_really_runs(catalog):
-    """V11 的 ledger_audit 目前偵測：讀不了、尾行沒換行、讀不懂的行、成交列沒通過契約、持倉量兩種算法不一致；沒有重複成交編號或逐筆交易平衡的檢查。"""
+    """V11 的 ledger_audit（v0.30.27 起）偵測七類：讀不了、尾行沒換行、讀不懂的行、成交列沒通過契約、持倉量兩種算法不一致、重複成交（同交易對同訂單編號兩列以上）、
+    逐筆進出場不平衡（平倉量超過進場量、整筆平倉後進場量較多；找不到對應進場的平倉自己的量不算；沒平倉的交易不查）。不查：整筆平倉後同一交易編號被重用再建立平衡進出場。"""
     entry = _met(catalog, "MET.LEDGER_DATA_QUALITY")
-    shown = json.dumps(entry["operator_message"], ensure_ascii=False)
-    assert "重複" not in shown and "進出場數量不一致" not in shown
-    assert "目前不檢查" in entry["auto_action"] and "重複成交編號偵測是後續工作" in entry["auto_action"]
+    text = entry["auto_action"]
+    assert "目前偵測七類" in text and "重複成交" in text and "進場量合計與平倉量合計對不上" in text
+    assert "orphan_close）自己的量不算" in text and "還沒平倉的交易不檢查" in text and "整筆平倉之後又被重用" in text
+    assert "重複成交編號偵測是後續工作" not in text and "目前不檢查：同一個成交編號" not in text and "目前偵測五類" not in text
+    shown = json.dumps(entry["operator_message"], ensure_ascii=False) + entry["human_action"]
+    assert "同一張訂單被記了不只一列" in shown and "進場量與平倉量對不上" in shown
+    # 對外文字不預設另一個檢查的結果（PR #205 BLOCK-205-03／04）：重複與進出場對不上的列不會被略過，所以不能說它們會被略過或擋住
+    assert "持倉總量一定有差" not in shown and "不會被略過" not in shown and "會讓 Google 表投影與對帳擋住" not in shown
+    # PR #345 審閱 BLOCK-345-01～03：容差、契約不過的下游效果、重複成交的下游效果都要寫成實際行為
+    assert "1e-6 × max(1, 進場量, 平倉量) 以內不算" in text and "相對誤差 1e-6 內不算" not in text           # ledger_audit 的容差是 1e-6 × max(1, 進場量, 平倉量)
+    assert "共用庫對帳讀的是原始帳本列，仍可能把它算進持倉" in entry["human_action"] and "Google 表投影會封鎖該筆交易" in entry["human_action"]     # 契約不過：只有投影封鎖，對帳仍可能計入
+    # PR #345 第二輪 BLOCK-345-04／05：rationale 也要一致；契約不過的列依能不能歸屬到交易編號，Google 表投影的結果不同（封鎖該筆交易 vs 只計入無歸屬列）
+    why = entry["rationale"]
+    assert "都會跳過或擋住" not in why and "卻不會自己報錯" not in why and "共用庫對帳仍可能把它算進持倉" in why and "無法歸屬的列只記數量" in why
+    for field in (entry["human_action"], entry["operator_message"]["what"]):
+        assert "能歸屬到某筆交易的，Google 表投影會封鎖該筆交易" in field and "只把它算進無歸屬列的數量，不會封鎖某一筆交易" in field
+        assert "重播一律略過" in field and "共用庫對帳讀的是原始帳本列，仍可能把它算進持倉" in field
+    # PR #345 第三輪 BLOCK-345-06：讀不了／讀不懂／尾行被打斷與『JSON 讀得懂但契約不過』是兩種情境，Google 表投影前者整份讀不了（read_ledger_events 直接丟例外），不是逐列分類
+    for field in (entry["human_action"], entry["operator_message"]["what"]):
+        assert "Google 表投影整份帳本讀不了，不會逐列分類" in field and "JSON 能讀懂、但沒通過契約的列" in field
+    assert "整份帳本讀不了、不逐列分類" in why and "JSON 讀得懂但沒通過契約的列" in why
+    assert "各自處理" in entry["human_action"] and "不會被稽核自動移除" in entry["human_action"] and "不會被稽核自動移除" in entry["operator_message"]["what"]       # 重複成交：各下游結果不同，不寫成一致的保證
+    assert entry["sources"] == ["src/trend_meteor/ledger_audit.py:233"]                                    # V11 development 9fad2bd 的 events.record 行
 
 
 def test_the_auto_repair_entry_keeps_the_missing_realized_pnl_exception(catalog):
