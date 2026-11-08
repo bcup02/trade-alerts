@@ -38,8 +38,7 @@
     "f-64": "f-64：Google 表同步佇列不被編號衝突的開倉列或成交列卡死（共用庫 v0.30.19 停放；各策略改釘後才生效）",
     "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）",
     "r033-paxg": "R033：競賽策略在 BTC 熊市持有 PAXG（歷史狀態：程式 2026-10-31 台北 16:23 部署 A1、開關同日台北 22:38 打開，見已做的 bear.paxg_asset；這個階段現在只留給下列還沒做完的 PAXG 錯誤規則格子）",
-    "v11-5d": "V11 維運包裝（進度頁 5d）：單元入口、systemd 與計時器、解除暫停工具、維運通知設定；啟用前必驗修復機器人與未記帳處理器不並行改同一帳本",
-    "v11-1.6b": "V11 自己的錯誤條件登記（進度頁 1.6 的下一塊）：流星池版發出的其他事件與暫停原因碼補進錯誤目錄"
+    "v11-5d": "V11 維運包裝（進度頁 5d）：單元入口、systemd 與計時器、解除暫停工具、維運通知設定；啟用前必驗修復機器人與未記帳處理器不並行改同一帳本"
   },
   "sources": {
     "momentum": {
@@ -2774,99 +2773,704 @@
           "reason": "事件由 V11 的帳本稽核寫（src/trend_meteor/ledger_audit.py）；呼叫它的單元在 5d。"
         }
       }
+    },
+    {
+      "code": "MET.STATE_FILE_CORRUPT",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.MISSED_DAYS",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.HEDGE_MODE",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.NOT_ISOLATED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.LEVERAGE_NOT_1",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.UNEXPECTED_POSITION",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.BAD_EXCHANGE_DATA",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.ORDER_OUTCOME_UNKNOWN",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.ORDER_NOT_TERMINAL",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.PENDING_UNRESOLVED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.STEP_OUTCOME_UNKNOWN",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.STOP_OUTCOME_UNKNOWN",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.PROTECTION_UNVERIFIED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.STALE_STOP_CANCEL_FAILED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.STOP_STATE_UNKNOWN",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.STOP_STATUS_UNRECOGNIZED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.POSITION_GONE_STOP_NOT_TRIGGERED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.STOP_TRIGGERED_UNREPORTED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.MARGIN_BELOW_FLOOR",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.RECOVERY_LOOKUP_FAILED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.RECOVERY_STOP_STATE",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.UNKNOWN_STEP",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.EXECUTION_FAILED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。 V11 程式目前記的等級與目錄不同（目錄 R3），改釘本版時一併改。"
+        }
+      }
+    },
+    {
+      "code": "MET.DATA_UNAVAILABLE",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具與單元入口在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.RUNTIME_CYCLE_FAILED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "行為在開發分支（src/trend_meteor/runner.py）；單元入口與通知設定在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口在 5d。"
+        }
+      }
+    },
+    {
+      "code": "MET.LEDGER_ITEM_DROPPED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "行為在開發分支（src/trend_meteor/runner.py）；單元入口與通知設定在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口在 5d。 V11 程式目前記的等級與目錄不同（目錄 R3），改釘本版時一併改。"
+        }
+      }
+    },
+    {
+      "code": "MET.STOP_FILL_UNKNOWN",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "行為在開發分支（src/trend_meteor/ledger_sink.py）；單元入口與通知設定在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由 V11 程式寫（src/trend_meteor/ledger_sink.py）；單元入口在 5d。 V11 程式目前記的等級與目錄不同（目錄 R3），改釘本版時一併改。"
+        }
+      }
+    },
+    {
+      "code": "MET.WINNER_NO_PERP",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "行為在開發分支（src/trend_meteor/runner.py）；單元入口與通知設定在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口在 5d。 V11 程式目前記的等級與目錄不同（目錄 R3），改釘本版時一併改。"
+        }
+      }
+    },
+    {
+      "code": "MET.FUNDING_SHEET_WRITE_FAILED",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "行為在開發分支（src/trend_meteor/funding_sheet.py）；單元入口與通知設定在 5d。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-5d",
+          "reason": "事件由 V11 程式寫（src/trend_meteor/funding_sheet.py）；單元入口在 5d。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "ledger.dust_convert",
-      "project": "btc-competition",
-      "type": "updated",
-      "note": "競賽（f-81）：粉塵轉換名單擴到所有非 USDT 幣（含 PAXG），2026-11-03 台北 17:09 隨 A1 升到 cba8efb；格子狀態仍是已做，行號與限制句改寫，PAXG 收不收仍待第一次真實轉換。"
-    },
-    {
-      "kind": "cap",
-      "id": "bear.paxg_asset",
-      "project": "btc-competition",
-      "type": "updated",
-      "note": "競賽（f-81）：限制句的程式版本改為 A1 已是 cba8efb（含粉塵轉換擴充）；格子狀態仍是已做。"
-    },
-    {
-      "kind": "cap",
-      "id": "bear.paxg_asset",
-      "project": "btc-competition",
-      "type": "updated",
-      "note": "競賽（R033）：補上這格的 A1 查證長文（開關已開、首次每日執行 noop、對帳 RECONCILED），並註明 r033-paxg 階段說明是歷史狀態；格子狀態仍是已做、沒有改。"
-    },
-    {
-      "kind": "cap",
-      "id": "bear.paxg_asset",
-      "project": "btc-competition",
-      "type": "completed",
-      "note": "競賽（R033）：A1 開關 BTC_COMP_PAXG 2026-10-31 台北 22:38 已打開，2026-11-01 台北 08:10 首次每日執行 noop、對帳 RECONCILED，改為已做；PAXG 指標目前是關的，實際買進路徑在 A1 還沒跑到（見格子限制）。"
-    },
-    {
-      "kind": "cap",
-      "id": "recovery.interrupted_order",
-      "project": "btc-competition",
-      "type": "updated",
-      "note": "競賽：限制說明改寫——同日重跑被遮住的舊單現在用帳戶成交補記，滿 24 小時 0 候選才結清（P3c.3、f-80），隨 A1 部署。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.unrecorded_fill_handling",
-      "project": "btc-competition",
-      "type": "updated",
-      "note": "競賽：限制說明改寫——尚未被中斷復原結清的成交對帳視為收斂中（最多 60 分鐘），不再先發 ERR-043（P3c.2），隨 A1 部署。"
+      "kind": "rule",
+      "id": "MET.STATE_FILE_CORRUPT",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-079，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
     },
     {
       "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "id": "MET.MISSED_DAYS",
       "project": "trend-meteor",
       "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-072，登記冊新增 V11 專案欄（35 項能力與 FLEET 條目逐格填未做／不適用）。"
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-080，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
     },
     {
       "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_FAILED",
+      "id": "MET.HEDGE_MODE",
       "project": "trend-meteor",
       "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-073，登記冊新增 V11 專案欄（35 項能力與 FLEET 條目逐格填未做／不適用）。"
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-081，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
     },
     {
       "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "id": "MET.NOT_ISOLATED",
       "project": "trend-meteor",
       "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-074，登記冊新增 V11 專案欄（35 項能力與 FLEET 條目逐格填未做／不適用）。"
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-082，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
     },
     {
       "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "id": "MET.LEVERAGE_NOT_1",
       "project": "trend-meteor",
       "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-075，登記冊新增 V11 專案欄（35 項能力與 FLEET 條目逐格填未做／不適用）。"
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-083，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
     },
     {
       "kind": "rule",
-      "id": "MET.UNRECORDED_FILL_CORRECTED",
+      "id": "MET.UNEXPECTED_POSITION",
       "project": "trend-meteor",
       "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-076，登記冊新增 V11 專案欄（35 項能力與 FLEET 條目逐格填未做／不適用）。"
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-084，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
     },
     {
       "kind": "rule",
-      "id": "MET.UNRECORDED_FILL_UNRESOLVED",
+      "id": "MET.BAD_EXCHANGE_DATA",
       "project": "trend-meteor",
       "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-077，登記冊新增 V11 專案欄（35 項能力與 FLEET 條目逐格填未做／不適用）。"
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-085，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
     },
     {
       "kind": "rule",
-      "id": "MET.LEDGER_DATA_QUALITY",
+      "id": "MET.ORDER_OUTCOME_UNKNOWN",
       "project": "trend-meteor",
       "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-078，登記冊新增 V11 專案欄（35 項能力與 FLEET 條目逐格填未做／不適用）。"
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-086，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.ORDER_NOT_TERMINAL",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-087，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.PENDING_UNRESOLVED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-088，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.STEP_OUTCOME_UNKNOWN",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-089，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.STOP_OUTCOME_UNKNOWN",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-090，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.PROTECTION_UNVERIFIED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-091，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.STALE_STOP_CANCEL_FAILED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-092，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.STOP_STATE_UNKNOWN",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-093，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.STOP_STATUS_UNRECOGNIZED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-094，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.POSITION_GONE_STOP_NOT_TRIGGERED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-095，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.STOP_TRIGGERED_UNREPORTED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-096，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.MARGIN_BELOW_FLOOR",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-097，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.RECOVERY_LOOKUP_FAILED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-098，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.RECOVERY_STOP_STATE",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-099，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.UNKNOWN_STEP",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-100，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.EXECUTION_FAILED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-101，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.DATA_UNAVAILABLE",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-102，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.RUNTIME_CYCLE_FAILED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-103，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.LEDGER_ITEM_DROPPED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-104，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.STOP_FILL_UNKNOWN",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-105，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.WINNER_NO_PERP",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-106，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.FUNDING_SHEET_WRITE_FAILED",
+      "project": "trend-meteor",
+      "type": "added",
+      "note": "趨勢策略・流星池版（V11）：新增 ERR-107，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
     }
   ]
 }

@@ -865,14 +865,102 @@ def test_trend_meteor_has_its_column_and_the_pending_mechanism_still_guards_the_
 def test_trend_meteor_has_no_done_cell_until_it_runs_on_the_live_branch(registry):
     """『已做』只算正式機分支（operations）上的；V11 還沒上線，所有格子都只能是未做或不適用。有一格寫已做就要先確認 sources 的 commit 真的含 V11 程式。"""
     rows = project_rows(registry, "trend-meteor")
-    assert len(rows) == 35 + 2 * (9 + 7)                                                      # 35 項能力＋（9 條 FLEET＋7 條 MET）×（行為、事件）
+    assert len(rows) == 35 + 2 * (9 + 36)                                                     # 35 項能力＋（9 條 FLEET＋36 條 MET）×（行為、事件）
     assert {r["state"] for r in rows.values()} <= {"pending", "n/a"}, [k for k, r in rows.items() if r["state"] == "done"]
 
 
-def test_trend_meteor_catalog_entries_are_the_seven_v11_ones_with_the_tiers_the_runners_need(catalog):
+V11_TIERS = {
+    # 1.6a：共用處理器要的 7 條
+    "MET.VERIFIED_CLOSE_AUTO_REPAIRED": ("R1", "MECHANICAL"), "MET.VERIFIED_CLOSE_REPAIR_FAILED": ("R2", "JUDGEMENT"),
+    "MET.VERIFIED_CLOSE_REPAIR_BLOCKED": ("R3", "JUDGEMENT"), "MET.VERIFIED_CLOSE_REPAIR_RECURRING": ("R3", "JUDGEMENT"),
+    "MET.UNRECORDED_FILL_CORRECTED": ("R3", "JUDGEMENT"), "MET.UNRECORDED_FILL_UNRESOLVED": ("R3", "JUDGEMENT"),
+    "MET.LEDGER_DATA_QUALITY": ("R3", "JUDGEMENT"),
+    # 1.6b：V11 自己發的事件
+    "MET.DATA_UNAVAILABLE": ("R2", "JUDGEMENT"), "MET.RUNTIME_CYCLE_FAILED": ("R0", "MECHANICAL"), "MET.LEDGER_ITEM_DROPPED": ("R3", "JUDGEMENT"),
+    "MET.STOP_FILL_UNKNOWN": ("R3", "JUDGEMENT"), "MET.WINNER_NO_PERP": ("R3", "JUDGEMENT"), "MET.FUNDING_SHEET_WRITE_FAILED": ("R2", "JUDGEMENT"),
+    # 1.6b：V11 的安全暫停原因碼（全部 R3：策略對部位、保護單或自己的記錄失去把握，停下來等人看交易所）
+    **{f"MET.{c}": ("R3", "JUDGEMENT") for c in (
+        "STATE_FILE_CORRUPT", "MISSED_DAYS", "HEDGE_MODE", "NOT_ISOLATED", "LEVERAGE_NOT_1", "UNEXPECTED_POSITION", "BAD_EXCHANGE_DATA",
+        "ORDER_OUTCOME_UNKNOWN", "ORDER_NOT_TERMINAL", "PENDING_UNRESOLVED", "STEP_OUTCOME_UNKNOWN", "STOP_OUTCOME_UNKNOWN", "PROTECTION_UNVERIFIED",
+        "STALE_STOP_CANCEL_FAILED", "STOP_STATE_UNKNOWN", "STOP_STATUS_UNRECOGNIZED", "POSITION_GONE_STOP_NOT_TRIGGERED", "STOP_TRIGGERED_UNREPORTED",
+        "MARGIN_BELOW_FLOOR", "RECOVERY_LOOKUP_FAILED", "RECOVERY_STOP_STATE", "UNKNOWN_STEP", "EXECUTION_FAILED")},
+}
+
+
+def test_trend_meteor_catalog_entries_are_the_v11_ones_with_the_tiers_the_code_and_runners_need(catalog):
     entries = {e["code"]: e for e in catalog["entries"] if e["project"] == "trend-meteor"}
-    assert {c: (e["risk_tier"], e["verdict"]) for c, e in entries.items()} == {
-        "MET.VERIFIED_CLOSE_AUTO_REPAIRED": ("R1", "MECHANICAL"), "MET.VERIFIED_CLOSE_REPAIR_FAILED": ("R2", "JUDGEMENT"),
-        "MET.VERIFIED_CLOSE_REPAIR_BLOCKED": ("R3", "JUDGEMENT"), "MET.VERIFIED_CLOSE_REPAIR_RECURRING": ("R3", "JUDGEMENT"),
-        "MET.UNRECORDED_FILL_CORRECTED": ("R3", "JUDGEMENT"), "MET.UNRECORDED_FILL_UNRESOLVED": ("R3", "JUDGEMENT"),
-        "MET.LEDGER_DATA_QUALITY": ("R3", "JUDGEMENT")}
+    assert {c: (e["risk_tier"], e["verdict"]) for c, e in entries.items()} == V11_TIERS and len(V11_TIERS) == 36
+
+
+def test_trend_meteor_halt_entries_latch_and_say_the_resume_tool_is_a_5d_job(catalog):
+    """暫停原因碼：latch 碼＝代碼名、解除路徑是兩段式；解除工具還沒做，條目不能把它寫成現成的（也不能出現要貼的指令）。"""
+    import re
+    halts = [e for e in catalog["entries"] if e["project"] == "trend-meteor" and e["current"]["latch"]]
+    assert len(halts) == 24                                                                  # 23 個暫停原因碼＋DATA_UNAVAILABLE（連續 3 天升格後暫停）
+    for e in halts:
+        assert e["current"]["latch"] == e["code"].split(".", 1)[1] and e["resume"] == "two_stage_fingerprint", e["code"]
+        assert "5d" in e["auto_action"], e["code"]
+        assert not [sp for st in e["operator_message"]["steps"] for sp in re.findall(r"`[^`]+`", st)], e["code"]
+
+
+def test_the_events_the_meteor_code_records_as_non_latching_say_how_they_reach_a_person(catalog):
+    """不暫停的事件：R3 事件通知一次、R2 要升格才通知；R0 只記錄。V11 程式的記錄等級必須和這裡一致（V11 repo 的守門測試以真目錄逐一檢查）。"""
+    by = {e["code"]: e for e in catalog["entries"] if e["project"] == "trend-meteor"}
+    assert by["MET.WINNER_NO_PERP"]["risk_tier"] == "R3" and "各通知一次" in by["MET.WINNER_NO_PERP"]["auto_action"]
+    assert by["MET.RUNTIME_CYCLE_FAILED"]["risk_tier"] == "R0" and by["MET.RUNTIME_CYCLE_FAILED"]["current"]["unit_exit"] == 1
+    assert by["MET.FUNDING_SHEET_WRITE_FAILED"]["current"]["unit_exit"] == 3
+
+
+# --- PR #343 審閱 BLOCK-343-01～08：條目文字只寫程式實際做的事 ----------------------------------------
+def _met(catalog, code):
+    return next(e for e in catalog["entries"] if e["code"] == f"MET.{code}")
+
+
+def _all_text(entry):
+    return json.dumps(entry, ensure_ascii=False)
+
+
+def test_met_entry_texts_do_not_claim_what_the_v11_code_does_not_do(catalog):
+    # 01 狀態檔備份只是嘗試，另存失敗時路徑仍會寫進 evidence、檔案不在
+    e = _met(catalog, "STATE_FILE_CORRUPT")
+    assert "嘗試" in e["operator_message"]["what"] and "另存失敗" in e["operator_message"]["what"]
+    assert "真的存在" in " ".join(e["operator_message"]["steps"])
+    # 02 執行器內部的 stop_missing 事件不會寫進事件日誌（halt 路徑只發布暫停事件）
+    assert "stop_missing" not in _all_text(_met(catalog, "PROTECTION_UNVERIFIED"))
+    # 03 資料抓不到的天數是「不同 UTC 日的累計」，不檢查連續日曆日；解除後補做有上限
+    e = _met(catalog, "DATA_UNAVAILABLE")
+    assert "累計 3 個" in e["operator_message"]["what"] and "不檢查" in e["auto_action"] and "連續 3 個 UTC 日" not in _all_text(e)
+    assert "MET.MISSED_DAYS" in e["human_action"] and "最多補 3 個收盤日" in e["human_action"]
+    # 04 單元非零結束只在重試用盡或不能重試時
+    e = _met(catalog, "RUNTIME_CYCLE_FAILED")
+    assert "重試" in e["auto_action"] and "最多 3 次" in e["auto_action"] and "重試用盡" in e["auto_action"] and e["current"]["unit_exit"] == 1
+    # 05 兩種觸發的 evidence 欄位不同；積壓超限不證明帳本持續寫入失敗
+    e = _met(catalog, "LEDGER_ITEM_DROPPED")
+    assert "只有 dropped" in e["auto_action"] and "不驗證失敗持續了多久" in e["auto_action"] and "只有 dropped" in " ".join(e["operator_message"]["steps"])
+    # 06 修復機器人只補「整筆交易沒有任何平倉列」的；部分減碼要人處理
+    e = _met(catalog, "STOP_FILL_UNKNOWN")
+    assert "整筆沒有任何平倉列" in e["auto_action"] or "整筆交易沒有任何平倉列" in e["auto_action"]
+    assert "部分減碼" in e["auto_action"] and "部分減碼" in e["operator_message"]["direction"]
+    # 07 開始與結束兩種事件的意義與 evidence 欄位不同，同一份文字要兩種都講
+    e = _met(catalog, "WINNER_NO_PERP")
+    assert "【開始】" in e["operator_message"]["what"] and "【結束】" in e["operator_message"]["what"]
+    assert "streak_days" in " ".join(e["operator_message"]["steps"]) and "沒有 coin 與 held" in " ".join(e["operator_message"]["steps"])
+    # 08 Google 寫入結果可能不明：不能說 G 欄確定沒更新
+    e = _met(catalog, "FUNDING_SHEET_WRITE_FAILED")
+    assert "尚未確認更新成功" in e["operator_message"]["what"] and "結果不明" in " ".join(e["operator_message"]["steps"])
+    assert "沒有更新。" not in e["operator_message"]["what"]
+
+
+def test_met_entry_texts_keep_the_conditions_the_v11_code_really_has(catalog):
+    """PR #343 第二輪審閱 BLOCK-343-09～13：計數重置點、重試條件、無法識別被丟項目、強平成交沒記的範圍、表上是否被動過——都不能寫得比程式保證的更確定。"""
+    e = _met(catalog, "DATA_UNAVAILABLE")                                                      # 09 歸零在每日決策完成後（下單之前），不是「成功跑完一輪」
+    assert "決策階段完成後就歸零" in e["auto_action"] and "成功跑完一輪才歸零" not in _all_text(e) and "同一個 UTC 日只算一天" in e["auto_action"]
+    e = _met(catalog, "RUNTIME_CYCLE_FAILED")                                                  # 10 只有程式標記可重試的例外才重試；連線檢查通過後就算進入可能改動交易所的階段
+    assert "標記為可重試" in e["auto_action"] and "連線檢查通過後" in e["auto_action"] and "還沒碰交易所狀態之前失敗的" not in _all_text(e)
+    e = _met(catalog, "LEDGER_ITEM_DROPPED")                                                   # 11 積壓超限時沒有逐筆記下被丟的項目
+    steps = " ".join(e["operator_message"]["steps"])
+    assert "無法直接識別" in steps and "找出被丟的是哪幾筆" not in steps
+    e = _met(catalog, "STOP_FILL_UNKNOWN")                                                     # 12 不是所有情況都「沒有平倉」
+    assert "帳本裡有進場、沒有平倉" not in e["rationale"] and "先前已有部分減碼的平倉列" in e["rationale"]
+    e = _met(catalog, "FUNDING_SHEET_WRITE_FAILED")                                            # 13 接收端回報未成功也不保證表沒被動過
+    assert "表一定沒有更新" not in _all_text(e) and "明確回報未成功" in " ".join(e["operator_message"]["steps"]) and "不論是哪一種原因" in " ".join(e["operator_message"]["steps"])
