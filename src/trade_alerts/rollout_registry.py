@@ -34,10 +34,11 @@ from .fleet_event_log import PROJECT_CODE_PREFIXES
 REGISTRY_VERSION = "fleet-rollout-registry/v1"
 PACKAGED_REGISTRY_NAME = "fleet-rollout-registry.json"
 #: Projects that already write fleet events (so ``PROJECT_CODE_PREFIXES`` knows them) but have no column in the rollout
-#: registry yet.  ``trend-meteor`` (趨勢策略・流星池版 V11) is registered for events first (v0.30.24: without it every event
-#: it wrote was silently dropped); its 35-capability column, its ``sources`` entry and its catalog entries land with the V11
-#: registry work (progress item 1.6) -- until then no catalog entry may use the ``MET.`` prefix (``registry_problems`` reports it).
-REGISTRY_PENDING_PROJECTS = ("trend-meteor",)
+#: registry yet.  Empty since v0.30.25: ``trend-meteor`` (趨勢策略・流星池版 V11) was registered for events first (v0.30.24: without
+#: it every event it wrote was silently dropped); its 35-capability column, its ``sources`` entry and its first catalog entries
+#: (MET.*) landed with the V11 registry work (progress item 1.6a).  The mechanism stays for the next project that starts writing
+#: events before it has a column: while it is listed here no catalog entry may use its prefix (``registry_problems`` reports it).
+REGISTRY_PENDING_PROJECTS: tuple[str, ...] = ()
 #: The four strategies; ``fleet`` is a catalog prefix for cross-repo
 #: conditions, not a strategy that can have a capability.
 STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet" and project not in REGISTRY_PENDING_PROJECTS)

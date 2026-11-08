@@ -37,7 +37,7 @@
     "trend-meteor": "ed-seykota-systematic-trend-following (趨勢策略・流星池版 V11，src/trend_meteor)",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
-  "error_ids_issued": 71,
+  "error_ids_issued": 78,
   "entries": [
     {
       "error_id": "ERR-001",
@@ -2288,6 +2288,226 @@
           "想查原因：把下方「給 AI 的追查指令」整段貼給 Claude。"
         ],
         "ai_prompt": "請在 btc-bull-market-competition 追查為什麼持有 PAXG 卻找不到 PAXGUSDT 的交易規則：讀 src/btc_competition/runner.py 的 _paxg_orphan 與規則合併處（rebalance.parse_exchange_info 與 paxg_exchange_info_fn），對照 A1 的日誌（journalctl -u btc-competition-bot）與 Binance 公開 API https://api.binance.com/api/v3/exchangeInfo?symbol=PAXGUSDT 的回應，判斷是交易對暫停、下架、規則格式改變、查詢失敗還是程式問題，並提出修正。"
+      }
+    },
+    {
+      "error_id": "ERR-072",
+      "code": "MET.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "title": "無歧義的漏記平倉已自動補寫進帳本",
+      "project": "trend-meteor",
+      "sources": [
+        "src/trend_meteor/repair_bot.py:208",
+        "trade-alerts/src/trade_alerts/repair_runner.py:406"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "MECHANICAL",
+      "risk_tier": "R1",
+      "auto_action": "共用修復執行器（trade_alerts.repair_runner）判定能對應時：證據檔落地、整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、記事件日誌。V11 轉接把共用庫的平倉列整理成 V11 帳本列：腿、方向、執行模式、進場時間取自帳本裡這筆交易的進場列，補 partial=False 與 fill_key，來源記 verified_close（原值留在 repair_original_source），寫之前用 V11 的帳本契約檢查，不合就丟例外（共用庫算寫入失敗）。只修整筆交易沒有任何平倉列的孤兒進場；已有部分減碼平倉列的交易不是候選，維持對帳紅燈由人處理。交易所上這個交易對仍有部位、或持倉數量讀不出來，都不補寫。交易所有提供已實現損益、且與本地算的毛損益差超過 0.01 時，以交易所數字寫入。一輪最多寫一筆。不通知。",
+      "human_action": "無需決定。證據檔與事件日誌留有完整紀錄。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "交易所是權威資料；當平倉成交精確加總等於進場量、部位在交易所確已平掉，照交易所寫下去就是唯一正解，所以不產生決策請求，也不通知（與其他策略同一條規則）。V11 的轉接對交易所回傳的每個必要欄位都明確驗證（持倉量、訂單編號、成交編號、價格、數量、時間、手續費與其幣別必須是 USDT），缺失或讀不懂就拒絕，不用共用庫的預設值補洞（PR #197 審閱四輪的教訓：缺值被當成確定值會寫出錯誤損益）。已實現損益是明確區分的例外：交易所真的沒提供（欄位缺失）時，共用庫改用本地算的毛損益、證據檔的 close.exchange_profit_reported 是 False，帳本裡這筆平倉的 reconciliation 區塊不寫 pnl_source，修復事件日誌的 details.pnl_source 記 local（採用交易所數字時才是 exchange_realized），要確認當次損益來源就看事件日誌的 details.pnl_source；有提供卻空白、非數字、NaN 或無限大則拒絕；明確的 0 視為交易所回報的零。判準不成立時：帳本已有修復痕跡或整批寫入失敗 → REPAIR_BLOCKED（R3）；結構對不上才重試並升格（R2）。",
+      "operator_message": {
+        "what": "趨勢策略・流星池版有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。",
+        "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
+        "steps": [
+          "不需要任何動作。",
+          "想核對：meteor-audit/fleet_event_log.jsonl 裡這筆事件記著交易編號、出場價和損益，可以跟交易所 App 比對。"
+        ]
+      }
+    },
+    {
+      "error_id": "ERR-073",
+      "code": "MET.VERIFIED_CLOSE_REPAIR_FAILED",
+      "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+      "project": "trend-meteor",
+      "sources": [
+        "src/trend_meteor/repair_bot.py:208",
+        "trade-alerts/src/trade_alerts/repair_runner.py:439",
+        "trade-alerts/src/trade_alerts/repair_runner.py:453"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R2",
+      "auto_action": "共用修復執行器每輪重試：查交易所失敗（網路／API）、持倉數量或成交欄位缺失讀不懂（V11 轉接拒絕）、或判定結構對不上（平倉成交方向與進場不符、成交早於進場、成交數量加總不等於進場量、已有 trade_close）各記一次失敗事件、不通知；同一 trade_id 連續 escalate_after 次失敗才開請求、事件標 escalated、由 ops_export 通知一次（附 ai_prompt）。升格後每輪靜默重試，成功則請求 RESOLVED_AUTO；帳本出現這筆 trade_close（人工補好）則 WITHDRAWN。交易所仍有部位不算失敗。",
+      "human_action": "升格時：以交易所成交紀錄為準讓帳本、交易所、Google 表三方一致，並請 AI 追查為什麼無法自動對應。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "與其他策略同一條規則（共用修復執行器）：能對應的一律照交易所補，真正需要人的只剩結構上對不上或交易所一直查不到、或回傳的欄位不完整的情況，那時該做的是追查根因。查交易所失敗也算一次失敗，否則 API 長期壞掉不會有人知道。",
+      "operator_message": {
+        "what": "趨勢策略・流星池版有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
+        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料、回傳的欄位不完整，或查到的成交在結構上跟進場對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
+        "steps": [
+          "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它唯讀查交易所並列出對不上的地方，提出讓帳本、交易所、Google 表三方一致的補寫步驟，先給你確認再執行。",
+          "治本：同一段指令也會要求 Claude 追查為什麼無法自動對應（包括策略當初為什麼漏記平倉）。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這筆漏記平倉為什麼無法自動補寫：讀 meteor-audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），對照 meteor-audit/trading_ledger.jsonl 的 trade_open 與 src/trend_meteor/repair_bot.py 的證據抓取與欄位驗證（build_fetch_evidence、validate_closing_fill），用唯讀方式向交易所查這個交易對的持倉與成交，找出是哪一條對不上、為什麼會發生，提出治本修正。"
+      }
+    },
+    {
+      "error_id": "ERR-074",
+      "code": "MET.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+      "project": "trend-meteor",
+      "sources": [
+        "src/trend_meteor/repair_bot.py:208",
+        "trade-alerts/src/trade_alerts/repair_runner.py:471"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不寫、不重試。開請求、記事件日誌，由 ops_export 通知；此 trade_id 之後一律跳過，直到請求關閉（帳本出現這筆 trade_close 時自動 WITHDRAWN）。",
+      "human_action": "帳本裡這筆已有補到一半的紀錄（或這次寫入無法驗證），自動補完可能重複記帳。先讀清楚帳本現況，再以交易所成交紀錄為準讓帳本、交易所、Google 表三方一致，最後關閉請求。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "帳本裡已有這筆交易的修復紀錄（例如先前寫到一半）或這次寫入無法驗證，代表真實帳本的狀態已經不是「乾淨的孤兒進場」。此時自動補完後半段等於猜，而猜錯會重複或錯記真實損益——這正是必須交給人的情況。",
+      "operator_message": {
+        "what": "趨勢策略・流星池版的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。",
+        "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
+        "steps": [
+          "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
+          "確認修正步驟後照做（只追加更正事件，不改舊紀錄）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
+          "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理一筆修復停手的漏記平倉：讀 meteor-audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、meteor-audit/error_requests.jsonl 與 meteor-audit/fleet_event_log.jsonl 的相關紀錄，唯讀向交易所查這個交易對的成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
+      }
+    },
+    {
+      "error_id": "ERR-075",
+      "code": "MET.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
+      "project": "trend-meteor",
+      "sources": [
+        "src/trend_meteor/repair_bot.py:208",
+        "trade-alerts/src/trade_alerts/repair_runner.py:282"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不動帳本、不暫停。修復機器人每輪結束時數最近 7 天內這支策略的「VERIFIED_CLOSE_AUTO_REPAIRED」事件；達 2 次就寫一筆事件日誌並由 ops_export 通知一次（附次數與交易編號）。這則通知發出後 7 天內不再重發；7 天後若 7 天窗口內仍有 2 次以上，會再發一次。",
+      "human_action": "帳本已經被自動補對，不用再動帳本；要做的是追出為什麼平倉一直沒被記進帳本（有 bug 在持續漏記），並確認修正。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "自動補寫（R1）本身不通知，但若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 永遠不會被發現。門檻 7 天內 2 次、通知後 7 天內不重發，是為了讓一次偶發事件不吵人、但同一個問題連續發生時一定被看見。發的是「請追根因」而不是「帳本壞了」，所以是 R3 事件通知而不是請求。",
+      "operator_message": {
+        "what": "趨勢策略・流星池版的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。",
+        "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
+        "steps": [
+          "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查平倉一直漏記的原因：讀 meteor-audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 meteor-audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、盤中強平查不到成交，還是交易所路徑沒走到記帳），提出治本修正與回歸測試。"
+      }
+    },
+    {
+      "error_id": "ERR-076",
+      "code": "MET.UNRECORDED_FILL_CORRECTED",
+      "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+      "project": "trend-meteor",
+      "sources": [
+        "src/trend_meteor/unrecorded_fill_adapter.py:85",
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：以交易所成交重述整筆已平倉的交易（數量不平就拒絕；同一筆交易一併納入的其他未記單必須逐張證明是策略自己下的——重複送單或帶 V11 自己的單號特徵 tm-o／tm-s——有任何一張查不出來源就整筆不寫），追加 trade_correction、把 Google 表更正排入投影佇列（只入隊；派送到 Google 與接收端確認由投影派送單元另外執行，入隊失敗帳本更正仍留著，結果記在事件的 details.post）。V11 只重述「恰好一筆整筆平倉列」的交易（共用庫的更正只替換第一筆平倉列，有部分減碼的交易重述會重複計算，一律交人工）。成交逐筆驗證（含手續費幣別必須是 USDT）；寫入前先試算，重讀、試算、追加在同一把帳本鎖內。每輪最多寫一筆；寫完立刻通知，不開請求。",
+      "human_action": "帳本已經更正好，不用再動帳本；要做的是追出為什麼同一張單被送了兩次（重送 bug），並確認修正。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "與其他策略同一條規則：只有確定是自己重複送單才自動更正，因為這時更正的內容完全由交易所成交決定、沒有猜的空間；但重複送單本身是 bug，一律立刻通知人追根因，所以是 R3 而不是 R1。V11 的重複送單會讓永續合約多持一倍的倉。",
+      "operator_message": {
+        "what": "趨勢策略・流星池版自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的那筆交易整筆重述、追加一筆帳本更正（不改舊紀錄），本地帳本的數字已跟交易所成交一致；Google 表的更正只是排進了待派送佇列，派送到 Google 並經接收端確認之前，表上可能還是舊數字。",
+        "direction": "本地帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。Google 表要等派送完成才會更新，排隊也可能失敗。",
+        "steps": [
+          "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
+          "看事件的 details.post：有 google_queued 表示更正已排入佇列；有 error 表示排隊失敗——帳本是對的，但 Google 表還沒更新，要請 Claude 重新排入並確認派送完成。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次重複送單：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（src/trend_meteor/executor.py，找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。"
+      }
+    },
+    {
+      "error_id": "ERR-077",
+      "code": "MET.UNRECORDED_FILL_UNRESOLVED",
+      "title": "交易所有成交、帳本沒記，無法自動更正",
+      "project": "trend-meteor",
+      "sources": [
+        "src/trend_meteor/unrecorded_fill_adapter.py:85",
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、同一筆交易還有其他查不出來源的未記單、交易所成交無法完整重述（包括欄位缺失讀不懂、手續費幣別不是 USDT、訂單查不到成交）、這筆交易有多筆平倉列（部分減碼）、查單持續失敗、或更正寫入失敗。",
+      "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。V11 另外加了「有部分減碼的交易一律不重述」：共用庫的更正只替換第一筆平倉列，其餘平倉列仍被計入，重述會重複計算。",
+      "operator_message": {
+        "what": "趨勢策略・流星池版的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的（或這筆交易的帳本結構不適合自動更正），所以沒有自動改帳本。",
+        "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
+        "steps": [
+          "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
+          "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
+          "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理一筆帳本漏記的交易所成交：讀 meteor-audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 meteor-audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。reason_code 若是 NOT_RESTATABLE，先看原因文字：有部分減碼的交易不能用共用庫的更正重述，要另想辦法。"
+      }
+    },
+    {
+      "error_id": "ERR-078",
+      "code": "MET.LEDGER_DATA_QUALITY",
+      "title": "帳本裡有資料不完整或對不起來的列",
+      "project": "trend-meteor",
+      "sources": [
+        "src/trend_meteor/ledger_audit.py:175"
+      ],
+      "current": {
+        "latch": null,
+        "notify": null,
+        "unit_exit": null
+      },
+      "verdict": "JUDGEMENT",
+      "risk_tier": "R3",
+      "auto_action": "不動帳本、不暫停。帳本稽核（ledger_audit）每輪讀整份帳本，目前偵測五類：帳本檔讀不了（無效 UTF-8 或讀取失敗）、尾行沒換行（寫到一半被打斷）、讀不懂的行、成交列沒通過 V11 帳本契約（或沒有腿與交易編號）、每個交易對的持倉量在共用庫對帳算法與 V11 重播算法之間不一致。有問題就記一筆事件日誌並由 ops_export 通知一次；同一組問題不重發，問題內容變了才再通知；全好了清掉。目前不檢查：同一個成交編號（fill_key／order_id）被重複記帳、逐筆交易進出場是否平衡（持倉量不一致只是它們的間接徵兆）；重複成交編號偵測是後續工作。修復機器人處理不了這類（它只補孤兒進場）。",
+      "human_action": "看通知裡列出的列與原因，判斷是資料寫錯還是程式 bug；帳本只追加不改，要用更正事件讓三方一致。這類問題會讓 Google 表投影與對帳擋住該筆交易，所以要處理。",
+      "resume": "n/a",
+      "lands_in_phase": 8,
+      "rationale": "帳本是損益與對帳的唯一真相，列不完整或讀不懂時，重播、投影與對帳都會跳過或擋住那一筆，卻不會自己報錯，等於有一筆錢不見了而沒人知道。修復機器人只補「整筆沒有平倉列的孤兒進場」，處理不了這類，所以必須通知人。發的是「請人看帳本」，不是請求（不鎖機）。",
+      "operator_message": {
+        "what": "趨勢策略・流星池版的帳本稽核發現問題：帳本有讀不懂的行、尾行被打斷、成交列缺必要欄位或沒通過帳本契約，或某個交易對的持倉量在兩種算法之間不一致。系統沒有動帳本，有問題的列在重播、Google 表與對帳裡會被略過或擋住。",
+        "direction": "帳本只追加不改。先看清楚是哪幾列、為什麼壞，再決定用更正事件補正，還是追查程式為什麼寫出這樣的列。",
+        "steps": [
+          "看訊息裡列出的交易編號、事件與原因。",
+          "把下方「給 AI 的追查指令」整段貼給 Claude，讓它讀帳本與交易所成交，判斷怎麼補正（只追加更正事件，先給你確認再執行）並追查根因。"
+        ],
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理帳本資料品質問題：讀 meteor-audit/fleet_event_log.jsonl 這個 LEDGER_DATA_QUALITY 事件的 evidence 與 details，對照 meteor-audit/trading_ledger.jsonl 裡列出的列與 src/trend_meteor/ledger_sink.py 的 _check_contract 契約，找出每一列壞在哪裡、是寫入時就壞還是後來才壞，必要時唯讀向交易所查成交，提出補正步驟（只追加，先給我確認再執行）與治本修正和回歸測試。"
       }
     }
   ],

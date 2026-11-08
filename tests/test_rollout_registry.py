@@ -69,8 +69,9 @@ def test_packaged_copy_is_the_repo_file(registry):
     assert load_rollout_registry(REGISTRY_PATH) == registry
 
 
-def test_strategy_projects_are_the_four_strategies():
-    assert set(STRATEGY_PROJECTS) == {"seykota", "momentum", "mycrypto", "btc-competition"}
+def test_strategy_projects_are_the_five_strategies():
+    """v0.30.25：趨勢策略・流星池版（V11）有了自己的欄位，登記冊是五個專案欄。"""
+    assert set(STRATEGY_PROJECTS) == {"seykota", "momentum", "mycrypto", "btc-competition", "trend-meteor"}
 
 
 def test_load_rejects_another_document(tmp_path):
@@ -849,13 +850,29 @@ def test_every_verified_at_in_the_registry_is_the_check_date_its_archived_paragr
             assert status.get("verified_at") == m.check_date(archive[key]["a1_check"]), key
 
 
-def test_trend_meteor_has_no_registry_column_yet_and_cannot_be_catalogued_before_it_does(registry, catalog):
-    """v0.30.24：trend-meteor 先註冊事件專案；登記冊欄位與目錄條目一起在 V11 登記冊工作（進度頁 1.6）補。"""
-    from trade_alerts.rollout_registry import REGISTRY_PENDING_PROJECTS
-    assert REGISTRY_PENDING_PROJECTS == ("trend-meteor",)
-    assert "trend-meteor" not in STRATEGY_PROJECTS and set(STRATEGY_PROJECTS) == {"seykota", "momentum", "mycrypto", "btc-competition"}
-    assert owners("FLEET.ANYTHING") == STRATEGY_PROJECTS                                  # 跨 repo 的條件目前不含流星池（欄位建好才含）
+def test_trend_meteor_has_its_column_and_the_pending_mechanism_still_guards_the_next_project(registry, catalog, monkeypatch):
+    """v0.30.25：V11 的欄位與目錄條目一起補上（進度頁 1.6a）。`REGISTRY_PENDING_PROJECTS` 這個機制留著：之後有專案先寫事件、還沒有欄位時，它的代碼不能先進目錄。"""
+    import trade_alerts.rollout_registry as rr
+    assert rr.REGISTRY_PENDING_PROJECTS == ()
+    assert "trend-meteor" in STRATEGY_PROJECTS
+    assert owners("FLEET.ANYTHING") == STRATEGY_PROJECTS and "trend-meteor" in owners("FLEET.ANYTHING")      # 跨 repo 的條件現在也含流星池
     assert owners("MET.LEDGER_DATA_QUALITY") == ("trend-meteor",)
-    bad = json.loads(json.dumps(catalog))
-    bad["entries"].append({**bad["entries"][0], "code": "MET.SOMETHING", "project": "trend-meteor"})
-    assert any("no registry column yet" in p for p in registry_problems(registry, bad))
+    assert registry_problems(registry, catalog) == []
+    monkeypatch.setattr(rr, "REGISTRY_PENDING_PROJECTS", ("trend-meteor",))
+    assert any("no registry column yet" in p for p in registry_problems(registry, catalog))
+
+
+def test_trend_meteor_has_no_done_cell_until_it_runs_on_the_live_branch(registry):
+    """『已做』只算正式機分支（operations）上的；V11 還沒上線，所有格子都只能是未做或不適用。有一格寫已做就要先確認 sources 的 commit 真的含 V11 程式。"""
+    rows = project_rows(registry, "trend-meteor")
+    assert len(rows) == 35 + 2 * (9 + 7)                                                      # 35 項能力＋（9 條 FLEET＋7 條 MET）×（行為、事件）
+    assert {r["state"] for r in rows.values()} <= {"pending", "n/a"}, [k for k, r in rows.items() if r["state"] == "done"]
+
+
+def test_trend_meteor_catalog_entries_are_the_seven_v11_ones_with_the_tiers_the_runners_need(catalog):
+    entries = {e["code"]: e for e in catalog["entries"] if e["project"] == "trend-meteor"}
+    assert {c: (e["risk_tier"], e["verdict"]) for c, e in entries.items()} == {
+        "MET.VERIFIED_CLOSE_AUTO_REPAIRED": ("R1", "MECHANICAL"), "MET.VERIFIED_CLOSE_REPAIR_FAILED": ("R2", "JUDGEMENT"),
+        "MET.VERIFIED_CLOSE_REPAIR_BLOCKED": ("R3", "JUDGEMENT"), "MET.VERIFIED_CLOSE_REPAIR_RECURRING": ("R3", "JUDGEMENT"),
+        "MET.UNRECORDED_FILL_CORRECTED": ("R3", "JUDGEMENT"), "MET.UNRECORDED_FILL_UNRESOLVED": ("R3", "JUDGEMENT"),
+        "MET.LEDGER_DATA_QUALITY": ("R3", "JUDGEMENT")}

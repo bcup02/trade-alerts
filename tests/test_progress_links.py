@@ -16,7 +16,7 @@ _spec.loader.exec_module(cpl)
 
 
 def registry(cap_states=None, rule_states=None):
-    cap_states = cap_states or {"seykota": "done", "momentum": "pending", "mycrypto": "n/a", "btc-competition": "done"}
+    cap_states = cap_states or {"seykota": "done", "momentum": "pending", "mycrypto": "n/a", "btc-competition": "done", "trend-meteor": "n/a"}
     rule_states = rule_states or {"behaviour": "done", "emits_event": "pending"}
 
     def status(state):

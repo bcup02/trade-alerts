@@ -309,9 +309,11 @@ def drift(old: dict, new: dict, read: Reader) -> dict:
     result = {"mismatches": [], "unpaired": [], "compared": 0, "skipped": 0}
     for where, project, status in _cells(new):
         old_status = old_cells.get((where, project))
+        if old_status is None:
+            continue                                    # a cell (or a whole new project column, v0.30.25) the old registry did not have: nothing to compare against
         old_commit = old["sources"][project]["commit"]
         new_commit = new["sources"][project]["commit"]
-        if old_status is None or old_commit == new_commit:
+        if old_commit == new_commit:
             continue
         old_cites = [c for c in citation_spans(_status_text(old_status)) if c[1] is not None]
         new_cites = [c for c in citation_spans(_status_text(status)) if c[1] is not None]

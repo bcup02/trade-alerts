@@ -80,6 +80,18 @@
       "note": "2026-11-03 使用者更正：原本寫成「衛星」是用錯詞，機制叫流星。獨立的策略版本叫「競賽策略・流星池版」（策略代號 meteor、報告編號 MET）；賽道是指 CoinGecko 的賽道分類。"
     },
     {
+      "id": "strategy.trend-meteor",
+      "category": "策略",
+      "zh": "趨勢策略・流星池版",
+      "en": [
+        "trend-meteor",
+        "MET."
+      ],
+      "definition": "趨勢策略的全合約新版本（V11）：流星池勝者做空永續合約＋BTC／PAXG 永續多單腿＋兩段式保護模式＋盤中強平線，單一合約帳戶、逐倉 1 倍。放在趨勢策略的 repo（程式在 src/trend_meteor），與競賽策略各自獨立。",
+      "retired": [],
+      "note": "2026-11-08 加入。不要和「競賽策略・流星池版」（競賽策略的流星池獨立版本，回測報告編號 MET-R…）混用：前者是趨勢策略的 V11（錯誤目錄前綴 MET.、專案代號 trend-meteor），後者是回測研究。"
+    },
+    {
       "id": "strategy.fleet",
       "category": "策略",
       "zh": "全機隊",

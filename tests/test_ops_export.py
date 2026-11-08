@@ -281,7 +281,7 @@ def test_the_ai_message_is_absent_when_the_catalog_has_no_prompt():
 # trend-meteor（v0.30.24）：合法的流星池事件與請求必須能通過匯出契約（審閱 BLOCK-339-01）
 def _meteor_export(paths):
     log, queue = paths
-    _event(log, project="trend-meteor", code="LEDGER_DATA_QUALITY", risk_tier="R2", details=_escalated(), summary="壞列")
+    _event(log, project="trend-meteor", code="LEDGER_DATA_QUALITY", risk_tier="R3", summary="壞列")                # 目錄是 R3（v0.30.25），V11 程式改釘新版時一併記成 R3
     open_error_request(queue, project="trend-meteor", code="LEDGER_DATA_QUALITY", risk_tier="R3", evidence={"x": 1}, summary="壞列")
     return build_ops_export(log, queue, project="trend-meteor", catalog=CATALOG, now=NOW)
 
@@ -289,9 +289,9 @@ def _meteor_export(paths):
 def test_trend_meteor_events_and_requests_appear_in_its_ops_export_under_the_met_prefix(paths):
     export = _meteor_export(paths)
     assert export["project"] == "trend-meteor"
-    assert [n["code"] for n in export["notices"]] == ["MET.LEDGER_DATA_QUALITY"] and export["notices"][0]["risk_tier"] == "R2"
+    assert [n["code"] for n in export["notices"]] == ["MET.LEDGER_DATA_QUALITY"] and export["notices"][0]["risk_tier"] == "R3"
     assert [r["code"] for r in export["open_requests"]] == ["MET.LEDGER_DATA_QUALITY"]
-    assert export["notices"][0]["text"].startswith("【未編號】LEDGER_DATA_QUALITY")                          # 目錄還沒有 MET 條目：標未編號、不丟棄
+    assert export["notices"][0]["text"].startswith("【ERR-078】帳本裡有資料不完整或對不起來的列")                       # v0.30.25：目錄有 MET 條目了，標編號與目錄標題
 
 
 def test_trend_meteor_ops_export_matches_its_json_schema(paths):
