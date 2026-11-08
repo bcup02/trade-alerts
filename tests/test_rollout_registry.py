@@ -949,3 +949,18 @@ def test_met_entry_texts_do_not_claim_what_the_v11_code_does_not_do(catalog):
     e = _met(catalog, "FUNDING_SHEET_WRITE_FAILED")
     assert "尚未確認更新成功" in e["operator_message"]["what"] and "結果不明" in " ".join(e["operator_message"]["steps"])
     assert "沒有更新。" not in e["operator_message"]["what"]
+
+
+def test_met_entry_texts_keep_the_conditions_the_v11_code_really_has(catalog):
+    """PR #343 第二輪審閱 BLOCK-343-09～13：計數重置點、重試條件、無法識別被丟項目、強平成交沒記的範圍、表上是否被動過——都不能寫得比程式保證的更確定。"""
+    e = _met(catalog, "DATA_UNAVAILABLE")                                                      # 09 歸零在每日決策完成後（下單之前），不是「成功跑完一輪」
+    assert "決策階段完成後就歸零" in e["auto_action"] and "成功跑完一輪才歸零" not in _all_text(e) and "同一個 UTC 日只算一天" in e["auto_action"]
+    e = _met(catalog, "RUNTIME_CYCLE_FAILED")                                                  # 10 只有程式標記可重試的例外才重試；連線檢查通過後就算進入可能改動交易所的階段
+    assert "標記為可重試" in e["auto_action"] and "連線檢查通過後" in e["auto_action"] and "還沒碰交易所狀態之前失敗的" not in _all_text(e)
+    e = _met(catalog, "LEDGER_ITEM_DROPPED")                                                   # 11 積壓超限時沒有逐筆記下被丟的項目
+    steps = " ".join(e["operator_message"]["steps"])
+    assert "無法直接識別" in steps and "找出被丟的是哪幾筆" not in steps
+    e = _met(catalog, "STOP_FILL_UNKNOWN")                                                     # 12 不是所有情況都「沒有平倉」
+    assert "帳本裡有進場、沒有平倉" not in e["rationale"] and "先前已有部分減碼的平倉列" in e["rationale"]
+    e = _met(catalog, "FUNDING_SHEET_WRITE_FAILED")                                            # 13 接收端回報未成功也不保證表沒被動過
+    assert "表一定沒有更新" not in _all_text(e) and "明確回報未成功" in " ".join(e["operator_message"]["steps"]) and "不論是哪一種原因" in " ".join(e["operator_message"]["steps"])
