@@ -544,5 +544,9 @@ def test_the_auto_repair_entry_keeps_the_missing_realized_pnl_exception(catalog)
     entry = _met(catalog, "MET.VERIFIED_CLOSE_AUTO_REPAIRED")
     text = entry["rationale"] + entry["auto_action"]
     assert "已實現損益是明確區分的例外" in entry["rationale"] and "本地算的毛損益" in entry["rationale"]
-    assert "exchange_profit_reported=False" in text and "pnl_source" in text
     assert "已實現損益缺失就拒絕" not in text and "已實現損益也一樣缺失就拒絕" not in text
+    # pnl_source 在哪裡查（PR #341 複審 BLOCK-341-04）：降級時證據檔是 close.exchange_profit_reported=False、帳本更正的 reconciliation 不寫 pnl_source，
+    # 只有修復事件日誌的 details.pnl_source 會記 local；不能叫人去證據裡找一個沒寫的欄位。
+    assert "close.exchange_profit_reported 是 False" in entry["rationale"]
+    assert "reconciliation 區塊不寫 pnl_source" in entry["rationale"]
+    assert "details.pnl_source 記 local" in entry["rationale"] and "讀證據時看 pnl_source" not in text
