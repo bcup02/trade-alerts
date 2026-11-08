@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-11-08",
+  "updated_at": "2026-11-09",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
   "projects": {
     "momentum": "動能策略",
@@ -2763,7 +2763,7 @@
         "trend-meteor": {
           "state": "pending",
           "phase": "v11-5d",
-          "reason": "V11 帳本稽核（src/trend_meteor/ledger_audit.py）在開發分支，同一組問題只通知一次；呼叫它的單元在 5d。V11 程式現在把這個事件記成 R2，目錄是 R3，改釘新版時一併改成 R3。"
+          "reason": "V11 帳本稽核（src/trend_meteor/ledger_audit.py）在開發分支，同一組問題只通知一次，偵測七類（含重複成交與逐筆進出場平衡），事件記成 R3，與目錄一致；呼叫它的單元在 5d。"
         }
       },
       "emits_event": {
@@ -3271,206 +3271,10 @@
   "recent_changes": [
     {
       "kind": "rule",
-      "id": "MET.STATE_FILE_CORRUPT",
+      "id": "MET.LEDGER_DATA_QUALITY",
       "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-079，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.MISSED_DAYS",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-080，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.HEDGE_MODE",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-081，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.NOT_ISOLATED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-082，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.LEVERAGE_NOT_1",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-083，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.UNEXPECTED_POSITION",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-084，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.BAD_EXCHANGE_DATA",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-085，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.ORDER_OUTCOME_UNKNOWN",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-086，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.ORDER_NOT_TERMINAL",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-087，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.PENDING_UNRESOLVED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-088，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STEP_OUTCOME_UNKNOWN",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-089，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STOP_OUTCOME_UNKNOWN",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-090，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.PROTECTION_UNVERIFIED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-091，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STALE_STOP_CANCEL_FAILED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-092，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STOP_STATE_UNKNOWN",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-093，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STOP_STATUS_UNRECOGNIZED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-094，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.POSITION_GONE_STOP_NOT_TRIGGERED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-095，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STOP_TRIGGERED_UNREPORTED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-096，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.MARGIN_BELOW_FLOOR",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-097，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.RECOVERY_LOOKUP_FAILED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-098，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.RECOVERY_STOP_STATE",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-099，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.UNKNOWN_STEP",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-100，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.EXECUTION_FAILED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-101，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.DATA_UNAVAILABLE",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-102，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.RUNTIME_CYCLE_FAILED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-103，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.LEDGER_ITEM_DROPPED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-104，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STOP_FILL_UNKNOWN",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-105，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.WINNER_NO_PERP",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-106，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.FUNDING_SHEET_WRITE_FAILED",
-      "project": "trend-meteor",
-      "type": "added",
-      "note": "趨勢策略・流星池版（V11）：新增 ERR-107，V11 自己發出的事件或暫停原因碼（進度頁 1.6b）。"
+      "type": "updated",
+      "note": "趨勢策略・流星池版（V11）：帳本稽核補上重複成交與逐筆進出場平衡兩類偵測，條目文字同步改成實際偵測的七類（進度頁 1.6d）。"
     }
   ]
 }

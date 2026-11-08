@@ -532,11 +532,18 @@ def test_the_unrecorded_fill_notice_says_the_google_correction_is_only_queued(ca
 
 
 def test_the_ledger_data_quality_entry_lists_only_checks_the_audit_really_runs(catalog):
-    """V11 的 ledger_audit 目前偵測：讀不了、尾行沒換行、讀不懂的行、成交列沒通過契約、持倉量兩種算法不一致；沒有重複成交編號或逐筆交易平衡的檢查。"""
+    """V11 的 ledger_audit（v0.30.27 起）偵測七類：讀不了、尾行沒換行、讀不懂的行、成交列沒通過契約、持倉量兩種算法不一致、重複成交（同交易對同訂單編號兩列以上）、
+    逐筆進出場不平衡（平倉量超過進場量、整筆平倉後進場量較多；找不到對應進場的平倉自己的量不算；沒平倉的交易不查）。不查：整筆平倉後同一交易編號被重用再建立平衡進出場。"""
     entry = _met(catalog, "MET.LEDGER_DATA_QUALITY")
-    shown = json.dumps(entry["operator_message"], ensure_ascii=False)
-    assert "重複" not in shown and "進出場數量不一致" not in shown
-    assert "目前不檢查" in entry["auto_action"] and "重複成交編號偵測是後續工作" in entry["auto_action"]
+    text = entry["auto_action"]
+    assert "目前偵測七類" in text and "重複成交" in text and "進場量合計與平倉量合計對不上" in text
+    assert "orphan_close）自己的量不算" in text and "還沒平倉的交易不檢查" in text and "整筆平倉之後又被重用" in text
+    assert "重複成交編號偵測是後續工作" not in text and "目前不檢查：同一個成交編號" not in text and "目前偵測五類" not in text
+    shown = json.dumps(entry["operator_message"], ensure_ascii=False) + entry["human_action"]
+    assert "同一張訂單被記了不只一列" in shown and "進場量與平倉量對不上" in shown
+    # 對外文字不預設另一個檢查的結果（PR #205 BLOCK-205-03／04）：重複與進出場對不上的列不會被略過，所以不能說它們會被略過或擋住
+    assert "重複與進出場對不上的列不會被略過" in shown and "持倉總量一定有差" not in shown
+    assert entry["sources"] == ["src/trend_meteor/ledger_audit.py:233"]                                    # V11 development 9fad2bd 的 events.record 行
 
 
 def test_the_auto_repair_entry_keeps_the_missing_realized_pnl_exception(catalog):
