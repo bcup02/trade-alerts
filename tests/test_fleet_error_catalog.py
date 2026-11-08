@@ -546,6 +546,12 @@ def test_the_ledger_data_quality_entry_lists_only_checks_the_audit_really_runs(c
     # PR #345 審閱 BLOCK-345-01～03：容差、契約不過的下游效果、重複成交的下游效果都要寫成實際行為
     assert "1e-6 × max(1, 進場量, 平倉量) 以內不算" in text and "相對誤差 1e-6 內不算" not in text           # ledger_audit 的容差是 1e-6 × max(1, 進場量, 平倉量)
     assert "共用庫對帳讀的是原始帳本列，仍可能把它算進持倉" in entry["human_action"] and "Google 表投影會封鎖該筆交易" in entry["human_action"]     # 契約不過：只有投影封鎖，對帳仍可能計入
+    # PR #345 第二輪 BLOCK-345-04／05：rationale 也要一致；契約不過的列依能不能歸屬到交易編號，Google 表投影的結果不同（封鎖該筆交易 vs 只計入無歸屬列）
+    why = entry["rationale"]
+    assert "都會跳過或擋住" not in why and "卻不會自己報錯" not in why and "共用庫對帳仍可能把它算進持倉" in why and "無法歸屬的列只記數量" in why
+    for field in (entry["human_action"], entry["operator_message"]["what"]):
+        assert "能歸屬到某筆交易的，Google 表投影會封鎖該筆交易" in field and "只把它算進無歸屬列的數量，不會封鎖某一筆交易" in field
+        assert "重播一律略過" in field and "共用庫對帳讀的是原始帳本列，仍可能把它算進持倉" in field
     assert "各自處理" in entry["human_action"] and "不會被稽核自動移除" in entry["human_action"] and "不會被稽核自動移除" in entry["operator_message"]["what"]       # 重複成交：各下游結果不同，不寫成一致的保證
     assert entry["sources"] == ["src/trend_meteor/ledger_audit.py:233"]                                    # V11 development 9fad2bd 的 events.record 行
 
