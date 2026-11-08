@@ -115,7 +115,8 @@
           "momentum",
           "seykota",
           "mycrypto",
-          "btc-competition"
+          "btc-competition",
+          "trend-meteor"
         ]
       },
       "additionalProperties": {
@@ -144,11 +145,12 @@
         "momentum",
         "seykota",
         "mycrypto",
-        "btc-competition"
+        "btc-competition",
+        "trend-meteor"
       ],
       "additionalProperties": false,
       "patternProperties": {
-        "^(momentum|seykota|mycrypto|btc-competition)$": {
+        "^(momentum|seykota|mycrypto|btc-competition|trend-meteor)$": {
           "type": "object",
           "required": [
             "repo",
@@ -178,7 +180,8 @@
         "momentum",
         "seykota",
         "mycrypto",
-        "btc-competition"
+        "btc-competition",
+        "trend-meteor"
       ],
       "additionalProperties": false,
       "patternProperties": {
@@ -239,7 +242,7 @@
         "properties": {
           "code": {
             "type": "string",
-            "pattern": "^(SEY|MOM|MYC|BTC|FLEET)\\.[A-Z][A-Z0-9_]*$"
+            "pattern": "^(SEY|MOM|MYC|BTC|MET|FLEET)\\.[A-Z][A-Z0-9_]*$"
           },
           "behaviour": {
             "$ref": "#/definitions/per_project",
@@ -289,7 +292,8 @@
               "momentum",
               "seykota",
               "mycrypto",
-              "btc-competition"
+              "btc-competition",
+              "trend-meteor"
             ],
             "description": "Which strategy's cell/row this is about. Required for type=completed; optional for type=added/updated."
           },

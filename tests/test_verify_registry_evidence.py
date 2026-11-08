@@ -133,6 +133,17 @@ def test_unchanged_commit_is_not_compared(clones):
     assert report == {"mismatches": [], "unpaired": [], "compared": 0, "skipped": 0}
 
 
+def test_a_whole_new_project_column_is_not_compared_and_does_not_crash(clones):
+    """v0.30.25：登記冊加了新的專案欄（趨勢策略・流星池版），舊登記冊的 sources 沒有它；比對舊版時不能因此當掉（KeyError），新欄位的格子沒有舊版可比。"""
+    root, old, new = clones
+    old_registry = _registry(old, "src/bot.py:5")
+    new_registry = _registry(new, "src/bot.py:7")
+    new_registry["sources"]["q"] = dict(new_registry["sources"]["p"])
+    new_registry["capabilities"][0]["status"]["q"] = {"state": "done", "evidence": "src/bot.py:9"}
+    report = script.drift(old_registry, new_registry, _reader(root, new_registry))
+    assert report["compared"] == 1 and report["mismatches"] == []                           # 只比對舊版本來就有的 p，q 整欄略過
+
+
 def test_a_cell_that_gains_a_citation_in_another_file_is_unpaired_as_a_whole(clones):
     root, old, new = clones
     report = _drift(root, _registry(old, "src/bot.py:5"), _registry(new, "src/bot.py:7 以及 src/other.py:3"))

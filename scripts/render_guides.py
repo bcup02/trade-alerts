@@ -860,7 +860,7 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
   <div class="eyebrow">交易機隊 · 錯誤處理設計（錯誤目錄 v2）</div>
   <h1>機隊風險登記冊</h1>
   <p class="lede">
-    四支策略目前所有已知的「出問題」情況，共 <b>{count} 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
+    各策略目前所有已知的「出問題」情況，共 <b>{count} 種</b>。排列的依據是<b>「人能不能做出跟自動處理不一樣的決定」</b>，
     不是事情多嚴重：R0、R1 你沒有決定可做，所以不會通知你；R2 系統會先自己試，試不起來才找你；R3 一定要人處理。
     每一條下面標示這支策略<b>目前實際做到了沒有</b>——其中 <b>{open_count} 種</b>還有部分沒做完，點「只看還沒做完的」可以篩出來。
   </p>
@@ -992,10 +992,10 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
     )
     order = "、".join(html.escape(projects[p]) for p in STRATEGY_PROJECTS)
     body = f"""<div class="wrap">
-  <div class="eyebrow">交易機隊 · 四支策略做到哪裡了</div>
+  <div class="eyebrow">交易機隊 · 各策略做到哪裡了</div>
   <h1>機隊一致性登記冊</h1>
   <p class="lede">
-    每一項機隊功能、每一條錯誤處理規則，在四支策略裡<b>實際做到了沒有</b>。
+    每一項機隊功能、每一條錯誤處理規則，在各策略裡<b>實際做到了沒有</b>。
     <b>「已做」＝正式機已經在跑</b>（正式機分支 <code>operations</code> 上有），只合併到開發主幹、或只在開發機上的一律算「未做」；
     「未做」會寫預定在哪一關做，「不適用」會寫理由，漏寫 CI 會擋下來。
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
@@ -1011,11 +1011,11 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
   </section>
   <div class="big">
     <a class="c-pending" href="#group-pending"><b>{n_pending}</b><span>項未完成——還有策略沒做到</span></a>
-    <a class="c-done" href="#group-done"><b>{n_done}</b><span>項已完成——四支都到位，不用再動</span></a>
+    <a class="c-done" href="#group-done"><b>{n_done}</b><span>項已完成——每支相關的策略都到位，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
   <p class="dot-legend">
-    <span>每項右邊的四個點依序是 {order}：</span>
+    <span>每項右邊的點依序是 {order}：</span>
     <span><i class="dot dot-done"></i>已做</span><span><i class="dot dot-pending"></i>未做</span>
     <span><i class="dot dot-na"></i>不適用</span><span><i class="dot dot-none"></i>跟這支無關</span>
     <span><i class="dot dot-recent"></i>🆕 最新變動</span>
@@ -1042,7 +1042,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
   <div id="glossaryHost"></div>
   <div class="foot">
-    資料來源：trade-alerts <code>{registry['registry_version']}</code>（{registry['updated_at']} 對四個 repo 逐項盤點）、<code>{catalog['catalog_version']}</code> 與 <code>{glossary['glossary_version']}</code>。
+    資料來源：trade-alerts <code>{registry['registry_version']}</code>（{registry['updated_at']} 對各策略 repo 逐項盤點）、<code>{catalog['catalog_version']}</code> 與 <code>{glossary['glossary_version']}</code>。
     「檔案:行號」證據對應的版本：{sources}。各格的「A1 查證」長文（檔案雜湊、部署時間）放在 repo 的 <code>docs/registry-a1-checks.json</code>。
     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
     頁面版本碼 <code>__GUIDE_DIGEST__</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。

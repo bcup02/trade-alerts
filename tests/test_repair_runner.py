@@ -508,9 +508,9 @@ def test_the_runner_codes_are_catalogued_the_same_for_every_strategy_that_runs_i
     activity and hides the other's."""
     catalog = load_error_catalog()
     for code in RUNNER_CODES:
-        mom, sey, myc = (catalog_entry(catalog, project, code) for project in ("momentum", "seykota", "mycrypto"))
+        mom, sey, myc, met = (catalog_entry(catalog, project, code) for project in ("momentum", "seykota", "mycrypto", "trend-meteor"))
         for key in ("verdict", "risk_tier", "resume"):
-            assert mom[key] == sey[key] == myc[key], (code, key)
+            assert mom[key] == sey[key] == myc[key] == met[key], (code, key)
     tiers = {code: catalog_entry(catalog, "momentum", code)["risk_tier"] for code in RUNNER_CODES}
     assert tiers == {REPAIRED: "R1", FAILED: "R2", BLOCKED: "R3", "VERIFIED_CLOSE_REPAIR_RECURRING": "R3"}
 
@@ -538,7 +538,8 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
     # 4 runner codes x 3 strategies (momentum, seykota, mycrypto); FAILED is emitted from two call sites.
     # g1: UNRECORDED_FILL_CORRECTED for 3 strategies (g1-6: mycrypto too, 4), UNRESOLVED for all 4.
     # f-30: the pending-expired notice is emitted from one call site.
-    assert cited == 15 + 8 + 1
+    # v0.30.25: trend-meteor (V11) cites the same shared call sites: 4 runner codes (FAILED from two sites = 5) + CORRECTED + UNRESOLVED = 7.
+    assert cited == 15 + 8 + 1 + 7
 
 
 # --------------------------------------------------------------------------- #
