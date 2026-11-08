@@ -542,7 +542,11 @@ def test_the_ledger_data_quality_entry_lists_only_checks_the_audit_really_runs(c
     shown = json.dumps(entry["operator_message"], ensure_ascii=False) + entry["human_action"]
     assert "同一張訂單被記了不只一列" in shown and "進場量與平倉量對不上" in shown
     # 對外文字不預設另一個檢查的結果（PR #205 BLOCK-205-03／04）：重複與進出場對不上的列不會被略過，所以不能說它們會被略過或擋住
-    assert "重複與進出場對不上的列不會被略過" in shown and "持倉總量一定有差" not in shown
+    assert "持倉總量一定有差" not in shown and "不會被略過" not in shown and "會讓 Google 表投影與對帳擋住" not in shown
+    # PR #345 審閱 BLOCK-345-01～03：容差、契約不過的下游效果、重複成交的下游效果都要寫成實際行為
+    assert "1e-6 × max(1, 進場量, 平倉量) 以內不算" in text and "相對誤差 1e-6 內不算" not in text           # ledger_audit 的容差是 1e-6 × max(1, 進場量, 平倉量)
+    assert "共用庫對帳讀的是原始帳本列，仍可能把它算進持倉" in entry["human_action"] and "Google 表投影會封鎖該筆交易" in entry["human_action"]     # 契約不過：只有投影封鎖，對帳仍可能計入
+    assert "各自處理" in entry["human_action"] and "不會被稽核自動移除" in entry["human_action"] and "不會被稽核自動移除" in entry["operator_message"]["what"]       # 重複成交：各下游結果不同，不寫成一致的保證
     assert entry["sources"] == ["src/trend_meteor/ledger_audit.py:233"]                                    # V11 development 9fad2bd 的 events.record 行
 
 
