@@ -552,6 +552,10 @@ def test_the_ledger_data_quality_entry_lists_only_checks_the_audit_really_runs(c
     for field in (entry["human_action"], entry["operator_message"]["what"]):
         assert "能歸屬到某筆交易的，Google 表投影會封鎖該筆交易" in field and "只把它算進無歸屬列的數量，不會封鎖某一筆交易" in field
         assert "重播一律略過" in field and "共用庫對帳讀的是原始帳本列，仍可能把它算進持倉" in field
+    # PR #345 第三輪 BLOCK-345-06：讀不了／讀不懂／尾行被打斷與『JSON 讀得懂但契約不過』是兩種情境，Google 表投影前者整份讀不了（read_ledger_events 直接丟例外），不是逐列分類
+    for field in (entry["human_action"], entry["operator_message"]["what"]):
+        assert "Google 表投影整份帳本讀不了，不會逐列分類" in field and "JSON 能讀懂、但沒通過契約的列" in field
+    assert "整份帳本讀不了、不逐列分類" in why and "JSON 讀得懂但沒通過契約的列" in why
     assert "各自處理" in entry["human_action"] and "不會被稽核自動移除" in entry["human_action"] and "不會被稽核自動移除" in entry["operator_message"]["what"]       # 重複成交：各下游結果不同，不寫成一致的保證
     assert entry["sources"] == ["src/trend_meteor/ledger_audit.py:233"]                                    # V11 development 9fad2bd 的 events.record 行
 
