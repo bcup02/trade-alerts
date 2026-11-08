@@ -234,7 +234,7 @@ LINE 以外的任何決策，而且紅 unit 會在下次部署的健康檢查裡
 | ERR-077 | `MET.UNRECORDED_FILL_UNRESOLVED` | JUDGEMENT | R3 | 不能確定來源或不能重述（含有部分減碼的交易）一律不寫、開請求 |
 | ERR-078 | `MET.LEDGER_DATA_QUALITY` | JUDGEMENT | R3 | 帳本稽核發現資料不完整或對不起來的列；V11 程式目前把事件記成 R2，改釘新版時一併改 R3 |
 
-**v0.30.26（進度頁 1.6b）補上 V11 自己發的事件與暫停原因碼，共 29 條（ERR-079～107）**——六個事件（`DATA_UNAVAILABLE`、`RUNTIME_CYCLE_FAILED`、`LEDGER_ITEM_DROPPED`、`STOP_FILL_UNKNOWN`、`WINNER_NO_PERP`、`FUNDING_SHEET_WRITE_FAILED`）與 23 個執行器／主迴圈的安全暫停原因碼。分級依據：不暫停的事件，R3＝事件通知一次、R2＝重試用盡（或連續幾次）才升格通知、R0＝只記錄；所有安全暫停原因碼都是 R3（策略對部位、保護單或自己的記錄失去把握，停下來等人看交易所）。V11 程式原本把 `LEDGER_ITEM_DROPPED`、`STOP_FILL_UNKNOWN`（R2，沒有升格旗標＝不會通知）、`WINNER_NO_PERP`（R1，維運通知不通知 R1）、`EXECUTION_FAILED`（R2 附 escalated，實際一次就暫停＝R3）的記錄等級與目錄不同，V11 程式在改釘本版時一併改成目錄的等級，並有守門測試比對。不登記的：執行器只記錄的 R0 事件（`stale_stop_cancelled`、`entry_reconstructed`、`recovered_*`、`skipped:*` 等動態代碼），它們不通知、人也沒有決定可做。解除暫停用的解除工具還沒做（5d），條目只說「兩段式解除工具（5d 建）」，不寫指令。
+**v0.30.26（進度頁 1.6b）補上 V11 自己發的事件與暫停原因碼，共 29 條（ERR-079～107）**——六個事件（`DATA_UNAVAILABLE`、`RUNTIME_CYCLE_FAILED`、`LEDGER_ITEM_DROPPED`、`STOP_FILL_UNKNOWN`、`WINNER_NO_PERP`、`FUNDING_SHEET_WRITE_FAILED`）與 23 個執行器／主迴圈的安全暫停原因碼。分級依據：不暫停的事件，R3＝事件通知一次、R2＝重試用盡（或累計幾次）才升格通知、R0＝只記錄；所有安全暫停原因碼都是 R3（策略對部位、保護單或自己的記錄失去把握，停下來等人看交易所）。V11 程式原本把 `LEDGER_ITEM_DROPPED`、`STOP_FILL_UNKNOWN`（R2，沒有升格旗標＝不會通知）、`WINNER_NO_PERP`（R1，維運通知不通知 R1）、`EXECUTION_FAILED`（R2 附 escalated，實際一次就暫停＝R3）的記錄等級與目錄不同，V11 程式在改釘本版時一併改成目錄的等級，並有守門測試比對。不登記的：執行器只記錄的 R0 事件（`stale_stop_cancelled`、`entry_reconstructed`、`recovered_*`、`skipped:*` 等動態代碼；不是每個內部事件都會寫進事件日誌），它們不通知、人也沒有決定可做。解除暫停用的解除工具還沒做（5d），條目只說「兩段式解除工具（5d 建）」，不寫指令。條目文字的原則（PR #341、#343 審閱的教訓）：只寫程式實際做的事——入隊不等於送達、結果不明不等於確定失敗、備份只是嘗試、事件證據欄位依情境不同。
 
 | 編號 | 錯誤碼 | 等級 | 種類 | 標題 |
 |---|---|---|---|---|
@@ -261,7 +261,7 @@ LINE 以外的任何決策，而且紅 unit 會在下次部署的健康檢查裡
 | ERR-099 | `MET.RECOVERY_STOP_STATE` | R3 | 暫停（latch） | 重啟後結清時，條件單狀態無法判定有沒有保護 |
 | ERR-100 | `MET.UNKNOWN_STEP` | R3 | 暫停（latch） | 執行計畫裡出現程式不認得的步驟 |
 | ERR-101 | `MET.EXECUTION_FAILED` | R3 | 暫停（latch） | 這一輪的下單步驟失敗，重試後仍未全部完成 |
-| ERR-102 | `MET.DATA_UNAVAILABLE` | R2 | 暫停（latch） | 必要的輸入資料連續 3 個 UTC 日抓不到，策略安全暫停 |
+| ERR-102 | `MET.DATA_UNAVAILABLE` | R2 | 暫停（latch） | 必要的輸入資料累計 3 個 UTC 日抓不到，策略安全暫停 |
 | ERR-103 | `MET.RUNTIME_CYCLE_FAILED` | R0 | 事件 | 每日單元的未分類例外 |
 | ERR-104 | `MET.LEDGER_ITEM_DROPPED` | R3 | 事件 | 有待記帳項目被丟棄，帳本會少記 |
 | ERR-105 | `MET.STOP_FILL_UNKNOWN` | R3 | 事件 | 強平條件單已觸發，但查不到成交明細 |

@@ -909,3 +909,43 @@ def test_the_events_the_meteor_code_records_as_non_latching_say_how_they_reach_a
     assert by["MET.WINNER_NO_PERP"]["risk_tier"] == "R3" and "各通知一次" in by["MET.WINNER_NO_PERP"]["auto_action"]
     assert by["MET.RUNTIME_CYCLE_FAILED"]["risk_tier"] == "R0" and by["MET.RUNTIME_CYCLE_FAILED"]["current"]["unit_exit"] == 1
     assert by["MET.FUNDING_SHEET_WRITE_FAILED"]["current"]["unit_exit"] == 3
+
+
+# --- PR #343 審閱 BLOCK-343-01～08：條目文字只寫程式實際做的事 ----------------------------------------
+def _met(catalog, code):
+    return next(e for e in catalog["entries"] if e["code"] == f"MET.{code}")
+
+
+def _all_text(entry):
+    return json.dumps(entry, ensure_ascii=False)
+
+
+def test_met_entry_texts_do_not_claim_what_the_v11_code_does_not_do(catalog):
+    # 01 狀態檔備份只是嘗試，另存失敗時路徑仍會寫進 evidence、檔案不在
+    e = _met(catalog, "STATE_FILE_CORRUPT")
+    assert "嘗試" in e["operator_message"]["what"] and "另存失敗" in e["operator_message"]["what"]
+    assert "真的存在" in " ".join(e["operator_message"]["steps"])
+    # 02 執行器內部的 stop_missing 事件不會寫進事件日誌（halt 路徑只發布暫停事件）
+    assert "stop_missing" not in _all_text(_met(catalog, "PROTECTION_UNVERIFIED"))
+    # 03 資料抓不到的天數是「不同 UTC 日的累計」，不檢查連續日曆日；解除後補做有上限
+    e = _met(catalog, "DATA_UNAVAILABLE")
+    assert "累計 3 個" in e["operator_message"]["what"] and "不檢查" in e["auto_action"] and "連續 3 個 UTC 日" not in _all_text(e)
+    assert "MET.MISSED_DAYS" in e["human_action"] and "最多補 3 個收盤日" in e["human_action"]
+    # 04 單元非零結束只在重試用盡或不能重試時
+    e = _met(catalog, "RUNTIME_CYCLE_FAILED")
+    assert "重試" in e["auto_action"] and "最多 3 次" in e["auto_action"] and "重試用盡" in e["auto_action"] and e["current"]["unit_exit"] == 1
+    # 05 兩種觸發的 evidence 欄位不同；積壓超限不證明帳本持續寫入失敗
+    e = _met(catalog, "LEDGER_ITEM_DROPPED")
+    assert "只有 dropped" in e["auto_action"] and "不驗證失敗持續了多久" in e["auto_action"] and "只有 dropped" in " ".join(e["operator_message"]["steps"])
+    # 06 修復機器人只補「整筆交易沒有任何平倉列」的；部分減碼要人處理
+    e = _met(catalog, "STOP_FILL_UNKNOWN")
+    assert "整筆沒有任何平倉列" in e["auto_action"] or "整筆交易沒有任何平倉列" in e["auto_action"]
+    assert "部分減碼" in e["auto_action"] and "部分減碼" in e["operator_message"]["direction"]
+    # 07 開始與結束兩種事件的意義與 evidence 欄位不同，同一份文字要兩種都講
+    e = _met(catalog, "WINNER_NO_PERP")
+    assert "【開始】" in e["operator_message"]["what"] and "【結束】" in e["operator_message"]["what"]
+    assert "streak_days" in " ".join(e["operator_message"]["steps"]) and "沒有 coin 與 held" in " ".join(e["operator_message"]["steps"])
+    # 08 Google 寫入結果可能不明：不能說 G 欄確定沒更新
+    e = _met(catalog, "FUNDING_SHEET_WRITE_FAILED")
+    assert "尚未確認更新成功" in e["operator_message"]["what"] and "結果不明" in " ".join(e["operator_message"]["steps"])
+    assert "沒有更新。" not in e["operator_message"]["what"]
