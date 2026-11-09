@@ -487,11 +487,18 @@ def check_dev_v11_cycle(ctx: Context) -> Result:
     if beat.get("outcome") != "ok" or beat_at is None or ctx.now - beat_at > V11_HEARTBEAT_MAX_AGE:
         return Result(WAITING, "開發機的 V11 每日單元最近一輪不是正常走完，或太久沒有心跳。",
                       [f"最近一輪結果={beat.get('outcome')!r}，時間 {taipei_text(beat.get('at') or beat.get('strategy_heartbeat_at') or beat.get('updated_at'))}"])
-    trades = [e for e in jsonl(ctx.remote.read("dev", V11_LEDGER)) if e.get("event_type") in _TRADE_TYPES and not is_test_event(e)]
+    try:
+        ledger_text = ctx.remote.read("dev", V11_LEDGER)
+    except RemoteFileMissing:                       # 帳本檔要到第一筆成交才會建立（TradeLedger 不預先建檔）：沒有檔案＝還沒有成交，是正常的等待，不是檢查壞了（PR #349 審閱 BLOCK-349-01）
+        ledger_text = ""
+    trades = [e for e in jsonl(ledger_text) if e.get("event_type") in _TRADE_TYPES and not is_test_event(e)]
     if not trades:
         return Result(WAITING, "開發機的 V11 每日單元正常走完，但還沒有任何成交（可能是熊市空手、或測試網走不到空單）。",
                       [f"心跳：{taipei(beat_at)}（台北）結果 ok"])
-    status = load_json(ctx.remote, "dev", V11_LEDGER_STATUS)
+    try:
+        status = load_json(ctx.remote, "dev", V11_LEDGER_STATUS)
+    except RemoteFileMissing:                       # 第一筆成交之後、reconcile-compare 第一次寫出狀態檔之前（最久約 15 分鐘）
+        return Result(WAITING, "開發機 V11 已有成交，但對帳狀態檔還沒產生（對帳單元每 15 分鐘寫一次）。")
     checked = parse_time(status.get("checked_at"))
     if not _fresh(checked, ctx.now, 90):
         raise RemoteError(f"開發機 V11 的對帳狀態太舊，判斷不了（檢查時間 {taipei_text(status.get('checked_at'))}）")

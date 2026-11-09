@@ -2294,3 +2294,41 @@ def test_v11_check_is_registered_covers_the_p3_item_reads_only_the_dev_host_and_
             return super().read(host, path)
     ow.check_dev_v11_cycle(ctx(_v11(Spy(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE], status={"value": "RECONCILED", "checked_at": _iso(10), "note": "ok"})))
     assert set(hosts) == {"dev"}
+
+
+# --- PR #349 審閱 BLOCK-349-01：帳本檔還沒建立（第一筆成交前）是正常的等待 ------------------------------------------
+def test_v11_a_missing_ledger_file_before_the_first_fill_is_waiting_not_an_error():
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat={**GOOD_BEAT, "detail": {"fills": 0}})))      # 每日單元正常走完、沒有帳本檔
+    assert r.state == ow.WAITING and "還沒有任何成交" in r.summary
+
+
+def test_v11_a_missing_ledger_file_never_counts_as_an_error_run_after_run_and_never_notifies():
+    remote = _v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT)
+    previous = {}
+    for run in range(5):                                                                                        # 連續五輪：不累加錯誤次數、不發『自動檢查壞了』
+        items = ow.run_checks(remote, NOW + timedelta(minutes=30 * run), previous, checks=[c for c in ow.CHECKS if c.id == "dev-v11-cycle"])
+        entry = items["dev-v11-cycle"]
+        assert entry["state"] == ow.WAITING and entry["consecutive_errors"] == 0 and ow.notice_for(entry) is None
+        previous = {"items": items}
+
+
+def test_v11_other_read_failures_of_the_ledger_stay_errors():
+    class Refused(FakeRemote):
+        def read(self, host, path):
+            if path == ow.V11_LEDGER:
+                raise ow.RemoteError("dev: cat exit 1: Permission denied")                                       # 權限被拒不是『沒有檔案』
+            return super().read(host, path)
+    remote = _v11(Refused(), state=GOOD_STATE, heartbeat=GOOD_BEAT)
+    with pytest.raises(ow.RemoteError, match="Permission denied"):
+        ow.check_dev_v11_cycle(ctx(remote))
+    items = ow.run_checks(remote, NOW, {}, checks=[c for c in ow.CHECKS if c.id == "dev-v11-cycle"])
+    assert items["dev-v11-cycle"]["state"] == ow.ERROR and items["dev-v11-cycle"]["consecutive_errors"] == 1
+
+
+def test_v11_a_missing_reconcile_status_right_after_the_first_fill_is_waiting_but_a_corrupt_one_is_an_error():
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE])))                       # 有成交、對帳狀態檔還沒寫
+    assert r.state == ow.WAITING and "對帳狀態檔還沒產生" in r.summary
+    remote = _v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE])
+    remote.files[("dev", ow.V11_LEDGER_STATUS)] = "{not json"
+    with pytest.raises(ow.RemoteError, match="not JSON"):
+        ow.check_dev_v11_cycle(ctx(remote))
