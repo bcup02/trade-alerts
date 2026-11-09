@@ -571,3 +571,23 @@ def test_the_auto_repair_entry_keeps_the_missing_realized_pnl_exception(catalog)
     assert "close.exchange_profit_reported 是 False" in entry["rationale"]
     assert "reconciliation 區塊不寫 pnl_source" in entry["rationale"]
     assert "details.pnl_source 記 local" in entry["rationale"] and "讀證據時看 pnl_source" not in text
+
+
+# --- f-88：四支舊策略的「已照交易所自動更正」條目不能說 Google 表／LINE 查詢已一致 ----------------------------
+_CORRECTED_CODES = ("SEY.UNRECORDED_FILL_CORRECTED", "MOM.UNRECORDED_FILL_CORRECTED",
+                    "MYC.UNRECORDED_FILL_CORRECTED", "BTC.UNRECORDED_FILL_CORRECTED")
+
+
+def test_the_four_older_corrected_entries_do_not_claim_google_or_line_are_already_consistent(catalog):
+    """四支的 after_trade_correction／append_spot_fills 只把 Google 更正入隊（派送另外做、入隊也可能失敗）；LINE 查詢只有趨勢另發公開事件。"""
+    for code in _CORRECTED_CODES:
+        entry = _met(catalog, code)
+        message = entry["operator_message"]
+        shown = json.dumps(message, ensure_ascii=False) + entry["auto_action"]
+        assert "Google 表、LINE 查詢的數字已" not in shown and "排入 Google 表更正" not in shown and "更新 LINE 查詢" not in shown, code
+        assert "待派送佇列" in message["what"] and "排隊也可能失敗" in message["direction"], code
+        assert "google_intent_error" in " ".join(message["steps"]) and "只入隊" in entry["auto_action"], code
+    # 趨勢才有另發 LINE 查詢事件；動能、加密沒有推送，只說快照下次由帳本重算
+    assert "line_query_published" in _met(catalog, "SEY.UNRECORDED_FILL_CORRECTED")["auto_action"]
+    for code in ("MOM.UNRECORDED_FILL_CORRECTED", "MYC.UNRECORDED_FILL_CORRECTED"):
+        assert "沒有另外推送 LINE 查詢" in _met(catalog, code)["auto_action"], code
