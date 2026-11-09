@@ -86,6 +86,14 @@ HEALTH_PUBLISH_STATE = "/var/lib/ops-notify/health-publish-state.json"
 DUST_ATTEMPT_PATH = f"/opt/{REPOS['btc-competition']}/state/dust_convert_attempt.json"
 
 
+#: 5d-5：趨勢策略・流星池版（V11，專案代號 trend-meteor）在開發機的檔案（`deploy/install_trend_meteor.sh` 裝在 /opt/trend-meteor）。開發機專用：A1 還沒有 V11。
+V11_DIR = "/opt/trend-meteor"
+V11_STATE = f"{V11_DIR}/meteor-state/state.json"
+V11_HEARTBEAT = f"{V11_DIR}/meteor-state/heartbeat.json"
+V11_LEDGER_STATUS = f"{V11_DIR}/meteor-audit/ledger_status.json"
+V11_LEDGER = f"{V11_DIR}/meteor-audit/trading_ledger.jsonl"
+
+
 def _allowed_paths() -> frozenset[str]:
     """Exactly the files the checks below read -- nothing else under /opt, /var/lib or anywhere is readable."""
     paths = {"/var/lib/portfolio-query/my-crypto-bot/current.json", "/var/lib/ops-notify/state.json",
@@ -93,6 +101,7 @@ def _allowed_paths() -> frozenset[str]:
     for key in REPOS:
         paths |= {audit(key, name) for name in ("ledger_status.json", "google_reconcile_status.json", "trading_ledger.jsonl")}
     paths |= {audit(key, "fleet_event_log.jsonl") for key in ("seykota", "momentum", "btc-competition")}
+    paths |= {V11_STATE, V11_HEARTBEAT, V11_LEDGER_STATUS, V11_LEDGER}
     paths.add(f"/opt/{REPOS['mycrypto']}/state/state.json")      # x5b: a moved stop shows up only as a new stop_plan_order_id
     return frozenset(paths)
 
@@ -450,6 +459,58 @@ def check_dev_trend_entry(ctx: Context) -> Result:
     if verdict == "diverged":
         return Result(FAILED, "開發機趨勢策略有進場，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"])
     return Result(WAITING, "開發機趨勢策略有進場，等進場寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {taipei_text(status.get('checked_at'))}"])
+
+
+V11_HEARTBEAT_MAX_AGE = timedelta(hours=26)      # 每日單元一天跑一次（00:10 UTC）；超過 26 小時沒有新的心跳＝這一天沒跑成
+
+
+def check_dev_v11_cycle(ctx: Context) -> Result:
+    """P3（進度頁 phase-v10-p3）：V11 在開發機測試網完整跑一個日循環——每日單元跑完、有成交、帳本對交易所對帳一致、沒有安全暫停。
+
+    只在開發機看（A1 還沒有 V11）。V11 還沒裝或還沒跑過第一輪＝『等待』（不是錯誤）；裝了之後任何一項不對就說出來。
+    **這支檢查只做機械的部分**：測試網能不能走到空單（勝者要有測試網永續）、Google 表上看起來對不對、幣安測試網介面上的持倉，要人看，所以永遠 `needs_human`、不會 `closable`。"""
+    try:
+        state = load_json(ctx.remote, "dev", V11_STATE)
+    except RemoteFileMissing:
+        return Result(WAITING, "V11（趨勢策略・流星池版）還沒裝到開發機，或還沒跑過第一輪（沒有狀態檔）。")
+    halt = state.get("safe_halt")
+    if isinstance(halt, Mapping) and halt.get("active") is True:
+        return Result(FAILED, f"開發機的 V11 處於安全暫停：{halt.get('code')}。", [f"原因：{str(halt.get('reason'))[:160]}；開始 {taipei_text(halt.get('since'))}",
+                                                                              "解除要用 trend-meteor-resume（先 preview）；STATE_FILE_CORRUPT 要先確認交易所是空的。"], key=str(halt.get("code")))
+    if state.get("execution_mode") != "DEMO":
+        return Result(FAILED, f"開發機的 V11 執行模式不是 DEMO（{state.get('execution_mode')!r}）。開發機只能打測試網。", key=str(state.get("execution_mode")))
+    try:
+        beat = load_json(ctx.remote, "dev", V11_HEARTBEAT)
+    except RemoteFileMissing:
+        return Result(WAITING, "開發機的 V11 還沒有每日單元的心跳（第一輪還沒跑完）。")
+    beat_at = parse_time(beat.get("at") or beat.get("strategy_heartbeat_at") or beat.get("updated_at"))
+    if beat.get("outcome") != "ok" or beat_at is None or ctx.now - beat_at > V11_HEARTBEAT_MAX_AGE:
+        return Result(WAITING, "開發機的 V11 每日單元最近一輪不是正常走完，或太久沒有心跳。",
+                      [f"最近一輪結果={beat.get('outcome')!r}，時間 {taipei_text(beat.get('at') or beat.get('strategy_heartbeat_at') or beat.get('updated_at'))}"])
+    try:
+        ledger_text = ctx.remote.read("dev", V11_LEDGER)
+    except RemoteFileMissing:                       # 帳本檔要到第一筆成交才會建立（TradeLedger 不預先建檔）：沒有檔案＝還沒有成交，是正常的等待，不是檢查壞了（PR #349 審閱 BLOCK-349-01）
+        ledger_text = ""
+    trades = [e for e in jsonl(ledger_text) if e.get("event_type") in _TRADE_TYPES and not is_test_event(e)]
+    if not trades:
+        return Result(WAITING, "開發機的 V11 每日單元正常走完，但還沒有任何成交（可能是熊市空手、或測試網走不到空單）。",
+                      [f"心跳：{taipei(beat_at)}（台北）結果 ok"])
+    try:
+        status = load_json(ctx.remote, "dev", V11_LEDGER_STATUS)
+    except RemoteFileMissing:                       # 第一筆成交之後、reconcile-compare 第一次寫出狀態檔之前（最久約 15 分鐘）
+        return Result(WAITING, "開發機 V11 已有成交，但對帳狀態檔還沒產生（對帳單元每 15 分鐘寫一次）。")
+    checked = parse_time(status.get("checked_at"))
+    if not _fresh(checked, ctx.now, 90):
+        raise RemoteError(f"開發機 V11 的對帳狀態太舊，判斷不了（檢查時間 {taipei_text(status.get('checked_at'))}）")
+    value = status.get("value")
+    if value == "DIVERGED":
+        return Result(FAILED, "開發機 V11 有成交，帳本對交易所對帳是 DIVERGED。", [f"對帳：{status.get('note')}（{taipei(checked)} 台北）"], key="diverged")
+    if value != "RECONCILED":
+        return Result(WAITING, f"開發機 V11 有成交，帳本對交易所對帳是 {value}（可能還在寬限期，或帳本有資料品質問題）。", [f"對帳：{status.get('note')}（{taipei(checked)} 台北）"])
+    return Result(OBSERVED, "開發機 V11 在測試網完整走完一個日循環：每日單元正常、有成交、帳本對交易所對帳一致、沒有安全暫停。",
+                  [f"{len(trades)} 筆成交列；每日單元心跳 {taipei(beat_at)}（台北）；對帳（{taipei(checked)} 台北）：{status.get('note')}",
+                   "機械的部分到此為止；請人看：Google 表『趨勢策略』分頁（開發機接收端）、幣安測試網介面的持倉與條件單、勝者有測試網永續時是否真的開過空單。"],
+                  needs_human=True, key=str(len(trades)))
 
 
 _X5B_BASELINE = datetime(2026, 10, 18, 8, 0, tzinfo=timezone.utc)   # 台北 16:00: after the hand-made duplicate-send tests of that day
@@ -1276,6 +1337,7 @@ CHECKS: tuple[Check, ...] = (
     Check("dev-trend-entry", "開發機趨勢策略依訊號進場", ("f-7",), check_dev_trend_entry),
     Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
     Check("dev-trend-reconcile", "開發機趨勢策略對帳回到 RECONCILED（f-7 後半）", ("f-7",), check_dev_trend_reconcile),
+    Check("dev-v11-cycle", "開發機 V11（趨勢策略・流星池版）在測試網完整跑一個日循環", ("phase-v10-p3",), check_dev_v11_cycle),
     Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
     Check("dust-convert", "競賽策略第一次真實粉塵轉換", ("f-66",), check_dust_convert),
     Check("competition-paxg", "A1 競賽策略第一批 PAXG 成交：帳本、Google 表對帳，請人工看表與幣安 App", ("phase-r033-p4",), check_competition_paxg),

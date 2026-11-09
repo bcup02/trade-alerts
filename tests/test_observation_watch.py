@@ -2212,3 +2212,123 @@ def test_momentum_halt_only_an_ok_export_severity_closes():
     for severity in ("warn", "critical", "OK", ""):
         assert ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=3, export_severity=severity))).state == ow.FAILED, severity
     assert ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=3))).closable
+
+
+# --- 5d-5：開發機 V11（趨勢策略・流星池版）日循環 ---------------------------------------------------------------
+def _v11(remote, *, state=None, heartbeat=None, ledger=None, status=None):
+    if state is not None:
+        remote.files[("dev", ow.V11_STATE)] = json.dumps(state)
+    if heartbeat is not None:
+        remote.files[("dev", ow.V11_HEARTBEAT)] = json.dumps(heartbeat)
+    if ledger is not None:
+        remote.files[("dev", ow.V11_LEDGER)] = "\n".join(json.dumps(r) for r in ledger) + "\n"
+    if status is not None:
+        remote.files[("dev", ow.V11_LEDGER_STATUS)] = json.dumps(status)
+    return remote
+
+
+def _iso(minutes_ago):
+    return (NOW - timedelta(minutes=minutes_ago)).isoformat().replace("+00:00", "Z")
+
+
+GOOD_STATE = {"execution_mode": "DEMO", "safe_halt": None}
+GOOD_BEAT = {"outcome": "ok", "at": _iso(60), "detail": {}}
+TRADE = {"event_type": "trade_open", "trade_id": "TM-BTC-2026-11-10-001", "symbol": "BTCUSDT"}
+
+
+def test_v11_not_installed_or_not_run_yet_is_waiting_not_an_error():
+    r = ow.check_dev_v11_cycle(ctx(FakeRemote()))
+    assert r.state == ow.WAITING and "還沒裝" in r.summary
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE)))
+    assert r.state == ow.WAITING and "心跳" in r.summary
+
+
+def test_v11_safe_halt_and_a_non_demo_mode_on_the_dev_host_are_failures():
+    halt = {"active": True, "code": "MARGIN_BELOW_FLOOR", "reason": "保證金不足", "since": _iso(30)}
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state={"execution_mode": "DEMO", "safe_halt": halt})))
+    assert r.state == ow.FAILED and "MARGIN_BELOW_FLOOR" in r.summary and r.key == "MARGIN_BELOW_FLOOR" and "trend-meteor-resume" in " ".join(r.evidence)
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state={"execution_mode": "LIVE", "safe_halt": None})))
+    assert r.state == ow.FAILED and "DEMO" in r.summary
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state={"execution_mode": "DEMO", "safe_halt": {"active": False}})))       # 已解除的暫停不算
+    assert r.state == ow.WAITING
+
+
+@pytest.mark.parametrize("beat", [{"outcome": "data_unavailable", "at": _iso(60)}, {"outcome": "ok", "at": _iso(27 * 60)}, {"outcome": "ok"}, {"outcome": "ok", "at": "garbage"}])
+def test_v11_daily_run_that_did_not_finish_ok_or_is_stale_is_waiting(beat):
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=beat)))
+    assert r.state == ow.WAITING and "每日單元" in r.summary
+
+
+def test_v11_healthy_cycle_without_any_fill_yet_keeps_waiting():
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[{"event_type": "funding_fee"}, {"event_type": "trade_open", "details": {"test": True}}])))
+    assert r.state == ow.WAITING and "還沒有任何成交" in r.summary                                              # 資金費列與標了測試的列不算成交
+
+
+def test_v11_full_cycle_is_observed_but_always_needs_a_human_and_is_never_closable():
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE, {**TRADE, "event_type": "trade_close"}],
+                                        status={"value": "RECONCILED", "checked_at": _iso(10), "note": "ok"})))
+    assert r.state == ow.OBSERVED and r.needs_human is True and r.closable is False and r.key == "2"
+    assert any("Google 表" in line and "幣安測試網" in line for line in r.evidence)
+
+
+@pytest.mark.parametrize("value,expected", [("DIVERGED", "failed"), ("UNKNOWN", "waiting"), ("PENDING", "waiting")])
+def test_v11_reconcile_verdicts(value, expected):
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE], status={"value": value, "checked_at": _iso(10), "note": "x"})))
+    assert r.state == expected and r.needs_human is False
+
+
+def test_v11_a_stale_reconcile_status_is_an_error_not_a_pass():
+    with pytest.raises(ow.RemoteError, match="太舊"):
+        ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE], status={"value": "RECONCILED", "checked_at": _iso(300), "note": "x"})))
+
+
+def test_v11_check_is_registered_covers_the_p3_item_reads_only_the_dev_host_and_only_whitelisted_files():
+    check = next(c for c in ow.CHECKS if c.id == "dev-v11-cycle")
+    assert check.covers == ("phase-v10-p3",) and len({c.id for c in ow.CHECKS}) == len(ow.CHECKS)
+    assert {ow.V11_STATE, ow.V11_HEARTBEAT, ow.V11_LEDGER_STATUS, ow.V11_LEDGER} <= ow.ALLOWED_PATHS and all(p.startswith("/opt/trend-meteor/") for p in (ow.V11_STATE, ow.V11_HEARTBEAT, ow.V11_LEDGER_STATUS, ow.V11_LEDGER))
+    hosts = []
+
+    class Spy(FakeRemote):
+        def read(self, host, path):
+            hosts.append(host)
+            return super().read(host, path)
+    ow.check_dev_v11_cycle(ctx(_v11(Spy(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE], status={"value": "RECONCILED", "checked_at": _iso(10), "note": "ok"})))
+    assert set(hosts) == {"dev"}
+
+
+# --- PR #349 審閱 BLOCK-349-01：帳本檔還沒建立（第一筆成交前）是正常的等待 ------------------------------------------
+def test_v11_a_missing_ledger_file_before_the_first_fill_is_waiting_not_an_error():
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat={**GOOD_BEAT, "detail": {"fills": 0}})))      # 每日單元正常走完、沒有帳本檔
+    assert r.state == ow.WAITING and "還沒有任何成交" in r.summary
+
+
+def test_v11_a_missing_ledger_file_never_counts_as_an_error_run_after_run_and_never_notifies():
+    remote = _v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT)
+    previous = {}
+    for run in range(5):                                                                                        # 連續五輪：不累加錯誤次數、不發『自動檢查壞了』
+        items = ow.run_checks(remote, NOW + timedelta(minutes=30 * run), previous, checks=[c for c in ow.CHECKS if c.id == "dev-v11-cycle"])
+        entry = items["dev-v11-cycle"]
+        assert entry["state"] == ow.WAITING and entry["consecutive_errors"] == 0 and ow.notice_for(entry) is None
+        previous = {"items": items}
+
+
+def test_v11_other_read_failures_of_the_ledger_stay_errors():
+    class Refused(FakeRemote):
+        def read(self, host, path):
+            if path == ow.V11_LEDGER:
+                raise ow.RemoteError("dev: cat exit 1: Permission denied")                                       # 權限被拒不是『沒有檔案』
+            return super().read(host, path)
+    remote = _v11(Refused(), state=GOOD_STATE, heartbeat=GOOD_BEAT)
+    with pytest.raises(ow.RemoteError, match="Permission denied"):
+        ow.check_dev_v11_cycle(ctx(remote))
+    items = ow.run_checks(remote, NOW, {}, checks=[c for c in ow.CHECKS if c.id == "dev-v11-cycle"])
+    assert items["dev-v11-cycle"]["state"] == ow.ERROR and items["dev-v11-cycle"]["consecutive_errors"] == 1
+
+
+def test_v11_a_missing_reconcile_status_right_after_the_first_fill_is_waiting_but_a_corrupt_one_is_an_error():
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE])))                       # 有成交、對帳狀態檔還沒寫
+    assert r.state == ow.WAITING and "對帳狀態檔還沒產生" in r.summary
+    remote = _v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE])
+    remote.files[("dev", ow.V11_LEDGER_STATUS)] = "{not json"
+    with pytest.raises(ow.RemoteError, match="not JSON"):
+        ow.check_dev_v11_cycle(ctx(remote))
