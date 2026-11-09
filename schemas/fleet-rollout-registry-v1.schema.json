@@ -26,6 +26,7 @@
         "state": {
           "enum": [
             "done",
+            "built",
             "pending",
             "n/a"
           ]
@@ -33,12 +34,12 @@
         "evidence": {
           "type": "string",
           "minLength": 1,
-          "description": "done: where it lives on the sources commit (file:line or tool name)."
+          "description": "done: where it lives on the sources commit (file:line or tool name). built: where it lives on development (code merged, not on the live host yet)."
         },
         "phase": {
           "type": "string",
           "minLength": 1,
-          "description": "pending: a key of phases."
+          "description": "pending or built: a key of phases (built: the step where it goes live and is checked)."
         },
         "reason": {
           "type": "string",
@@ -48,7 +49,7 @@
         "awaits_commit": {
           "type": "string",
           "pattern": "^[0-9a-f]{7,40}$",
-          "description": "pending: the commit (in this strategy's repo) whose deployment to the live host makes this cell true; the observation watch flags the cell once that commit is running on A1."
+          "description": "pending or built: the commit (in this strategy's repo) whose deployment to the live host makes this cell true; the observation watch flags the cell once that commit is running on A1."
         },
         "verified_at": {
           "type": "string",
@@ -73,6 +74,21 @@
           "then": {
             "required": [
               "evidence"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "built"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "evidence",
+              "phase"
             ]
           }
         },

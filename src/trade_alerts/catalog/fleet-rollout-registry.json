@@ -119,9 +119,9 @@
           "evidence": "btc-competition-resume（src/btc_competition/safe_halt_resume.py）"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 的 trend-meteor-resume（PR #215）已在開發分支：兩段式確認碼、先寫帳本再清狀態、持有 state.lock；STATE_FILE_CORRUPT 解除前自己唯讀查交易所原始清單（持倉、條件單、一般委託都必須是空的）。尚未在主機實跑。"
+          "evidence": "V11 的 trend-meteor-resume（PR #215）已在開發分支：兩段式確認碼、先寫帳本再清狀態、持有 state.lock；STATE_FILE_CORRUPT 解除前自己唯讀查交易所原始清單（持倉、條件單、一般委託都必須是空的）。尚未在主機實跑（src/trend_meteor/resume.py）。"
         }
       }
     },
@@ -206,9 +206,9 @@
           "evidence": "src/btc_competition/portfolio_snapshot_adapter.py strategy.runtime_status"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 的心跳與投資人快照（src/trend_meteor/portfolio_snapshot.py）在開發分支；快照單元（trend-meteor-portfolio-snapshot，PR #215，心跳門檻 30 小時）與 ops-notify 的 runtime 軸（bcup02/ops-notify PR #68，預設不啟用）已完成；主機設定與實跑等開發機演練（P3）。"
+          "evidence": "V11 的心跳與投資人快照（src/trend_meteor/portfolio_snapshot.py）在開發分支；快照單元（trend-meteor-portfolio-snapshot，PR #215，心跳門檻 30 小時）與 ops-notify 的 runtime 軸（bcup02/ops-notify PR #68，預設不啟用）已完成；主機設定與實跑等開發機演練（P3）。"
         }
       }
     },
@@ -234,9 +234,9 @@
           "evidence": "src/btc_competition/reconcile_compare.py"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 的對帳抓取（src/trend_meteor/reconcile_fetch.py）與比對（src/trend_meteor/reconcile_compare.py，PR #213，帳本有任何資料品質問題就回 UNKNOWN）與單元（trend-meteor-reconcile-fetch，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 的對帳抓取（src/trend_meteor/reconcile_fetch.py）與比對（src/trend_meteor/reconcile_compare.py，PR #213，帳本有任何資料品質問題就回 UNKNOWN）與單元（trend-meteor-reconcile-fetch，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -292,9 +292,9 @@
           "reason": "現貨再平衡策略，沒有開倉／平倉配對，不會有漏記平倉。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 修復機器人（src/trend_meteor/repair_bot.py，PR #197）與單元入口（trend-meteor repair，PR #209／#215）已在開發分支，整輪持有 state.lock（PR #217）；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 修復機器人（src/trend_meteor/repair_bot.py，PR #197）與單元入口（trend-meteor repair，PR #209／#215）已在開發分支，整輪持有 state.lock（PR #217）；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -326,9 +326,9 @@
           "reason": "現貨再平衡策略，沒有開倉／平倉配對，不會有漏記平倉。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 補寫平倉（來源 verified_close）與單元入口已在開發分支（PR #197、#209、#217）；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 補寫平倉（來源 verified_close）與單元入口已在開發分支（PR #197、#209、#217）；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py）。"
         }
       }
     },
@@ -386,9 +386,9 @@
           "limit": "A1 的競賽沒有自己偵測到過這些暫停；2026-10-11 台北的受控測試（見 notify.line_first_notice）用人工寫的測試事件驗過匯出檔→維運通知→手機這條路。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "匯出檔由共用庫寫；V11 的修復單元（trend-meteor-repair，PR #215）每一輪（含停用、含拿不到鎖）都刷新，已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "匯出檔由共用庫寫；V11 的修復單元（trend-meteor-repair，PR #215）每一輪（含停用、含拿不到鎖）都刷新，已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       }
     },
@@ -415,9 +415,9 @@
           "evidence": "src/btc_competition/unrecorded_fill.py:219 寫出的匯出檔由維運通知轉送：正式機 /etc/ops-notify/ops-notify.env 於 2026-09-26 設 OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on，首輪匯出軸 OK、零誤發；開發機 2026-09-25 同樣開啟，DEMO 實測的 R3 通知已送達 Telegram。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "ops-notify 的 trend-meteor 目標已加（bcup02/ops-notify PR #68，預設不啟用，OPS_EXPORT 與 UNITS 都是 opt-in）；主機環境檔在開發機演練（P3）時打開。"
+          "evidence": "ops-notify 的 trend-meteor 目標已加（bcup02/ops-notify PR #68，預設不啟用，OPS_EXPORT 與 UNITS 都是 opt-in）；主機環境檔在開發機演練（P3）時打開（src/trend_meteor/cli.py）。"
         }
       }
     },
@@ -446,9 +446,9 @@
           "limit": "事件是人工寫的測試事件，競賽自己偵測到暫停的路徑在 A1 沒被實際觸發過。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "通知經維運通知送到 LINE；V11 的單元已在開發分支、ops-notify 目標已加（預設不啟用）；第一則真實通知等開發機演練（P3）。"
+          "evidence": "通知經維運通知送到 LINE；V11 的單元已在開發分支、ops-notify 目標已加（預設不啟用）；第一則真實通知等開發機演練（P3）（src/trend_meteor/cli.py）。"
         }
       }
     },
@@ -501,9 +501,9 @@
           "evidence": "deploy/btc-competition-unrecorded-fill.service 與 deploy/btc-competition-unrecorded-fill.timer 列入正式機與開發機的 OPS_NOTIFY_BTC_COMPETITION_UNITS（2026-09-26／09-25），服務單元狀態 OK。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 的 systemd 單元與計時器（trend-meteor-*，PR #215）已在開發分支，尚未裝到任何主機；ops-notify 的 UNITS 設定在開發機演練（P3）。"
+          "evidence": "V11 的 systemd 單元與計時器（trend-meteor-*，PR #215）已在開發分支，尚未裝到任何主機；ops-notify 的 UNITS 設定在開發機演練（P3）（src/trend_meteor/cli.py）。"
         }
       }
     },
@@ -535,9 +535,9 @@
           "reason": "現貨再平衡策略，不是永續合約，沒有資金費結算這個概念。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 資金費同步與寫 Google 表（src/trend_meteor/funding_sync.py、src/trend_meteor/funding_sheet.py，PR #189）在開發分支；排程單元（trend-meteor-funding-sync，PR #215）整輪持有 state.lock、只有 LIVE＋mainnet 才寫表（PR #217）；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 資金費同步與寫 Google 表（src/trend_meteor/funding_sync.py、src/trend_meteor/funding_sheet.py，PR #189）在開發分支；排程單元（trend-meteor-funding-sync，PR #215）整輪持有 state.lock、只有 LIVE＋mainnet 才寫表（PR #217）；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -567,9 +567,9 @@
           "reason": "競賽有自己的 src/btc_competition/reconcile_google.py，不用共用的 sheet_ledger_compare，自己的 src/btc_competition/reconcile_google.py:49 _GRACE_SECONDS=3600 對尚未同步的現貨成交回 PENDING。留意：PENDING 在維運通知是 warn 級、經去抖後仍會通知，競賽有調倉時是否會短暫告警還沒查。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "共用庫的對帳比對已有『剛開剛平、還在等同步』的寬限；V11 的比對單元（PR #213／#215）已在開發分支，尚未實跑，等開發機演練（P3）。"
+          "evidence": "共用庫的對帳比對已有『剛開剛平、還在等同步』的寬限；V11 的比對單元（PR #213／#215）已在開發分支，尚未實跑，等開發機演練（P3）（src/trend_meteor/google_projection.py、deploy/trend-meteor-google-projection.service）。"
         }
       }
     },
@@ -623,9 +623,9 @@
           "evidence": "src/btc_competition/executor.py:234 market_order：只有交易所明確拒絕（:108 _is_definite_rejection）才丟 OrderRejected 讓收斂迴圈重新規劃；結果不明（逾時、網路錯誤、OrderNotFound）改用同一個 client id 查單，:38 _ORDER_VISIBILITY_SECONDS 60 秒仍查不到就丟 :87 OrderOutcomeUnknown。src/btc_competition/runner.py:360 收到後本輪立刻停止送單，:460 以 ORDER_STATUS_UNKNOWN 暫停並保留 pending_target_weights。PR #35，2026-09-25 01:22 UTC 上正式機（operations 2d167aa）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 執行器送單結果不明時以自訂單號查單、不重送（src/trend_meteor/executor.py 的 order_by_client_id，PR 4f），在開發分支；尚未在測試網長期實跑，等開發機演練（P3）。"
+          "evidence": "V11 執行器送單結果不明時以自訂單號查單、不重送（src/trend_meteor/executor.py 的 order_by_client_id，PR 4f），在開發分支；尚未在測試網長期實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -653,9 +653,9 @@
           "reason": "現貨再平衡策略的帳本是逐筆成交（spot_fill），沒有開倉／平倉配對，沒有「整筆交易」可以重述；漏記的現貨成交直接補那筆 spot_fill，歸在「帳本少記交易所成交時，升格通知並以交易所為準更正」那一列處理。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 帳本更正事件的投影（correct_close_v2，PR #195）與寫入（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 帳本更正事件的投影（correct_close_v2，PR #195）與寫入（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -684,9 +684,9 @@
           "limit": "自己送出、尚未被中斷復原結清的成交對帳視為收斂中（src/btc_competition/reconcile_compare.py:255），最多等 60 分鐘（:75）才算缺口，不再先發 ERR-043；其他來源不明成交超過 15 分鐘（:70）算缺口；2026-10-31 隨 A1 部署，A1 沒發生過。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 轉接（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）只重述恰好一筆整筆平倉列的交易；單元入口（PR #209／#215）已在開發分支，整輪持有 state.lock（PR #217）；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 轉接（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）只重述恰好一筆整筆平倉列的交易；單元入口（PR #209／#215）已在開發分支，整輪持有 state.lock（PR #217）；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -718,9 +718,9 @@
           "reason": "競賽是現貨再平衡，沒有開倉／平倉配對，也沒有漏記平倉的修復機器人（見能力『修復機器人：抓錯並提出修復建議』等三格，競賽都是不適用），所以沒有『自動補寫』可以重複發生。競賽帳本少記成交走另一條路：每次補記都立刻發 R3 通知（BTC.UNRECORDED_FILL_CORRECTED，ERR-040），不是 R1 靜默補寫。2026-10-15 使用者決定列不適用。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "共用庫的修復執行器已有；V11 的 VERIFIED_CLOSE_REPAIR_RECURRING 條目已補（ERR-075），單元入口已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "共用庫的修復執行器已有；V11 的 VERIFIED_CLOSE_REPAIR_RECURRING 條目已補（ERR-075），單元入口已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       }
     },
@@ -780,9 +780,9 @@
           "limit": "競賽沒有常駐程序，A1 上還沒有在每日調整進行中被停止過，「送完手上那張單再停」只在開發機 DEMO 驗證，正式機沒有實測。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 收到停止訊號只設旗標、當輪做完（src/trend_meteor/graceful_stop.py，PR 5a；cli 的 SIGTERM／SIGINT 接線在 PR #213）在開發分支；各單元的 TimeoutStopSec 已設（PR #215，由程式常數推導預算，PR #217），實際收尾行為等開發機演練（P3）驗證。"
+          "evidence": "V11 收到停止訊號只設旗標、當輪做完（src/trend_meteor/graceful_stop.py，PR 5a；cli 的 SIGTERM／SIGINT 接線在 PR #213）在開發分支；各單元的 TimeoutStopSec 已設（PR #215，由程式常數推導預算，PR #217），實際收尾行為等開發機演練（P3）驗證。"
         }
       }
     },
@@ -810,9 +810,9 @@
           "limit": "同日重跑被遮住的舊單改用帳戶成交補記（src/btc_competition/interrupted_orders.py:256），完整清單 0 候選且滿 24 小時（:58）才結清，結清不等於交易所確證未成交，成交落在窗口外要人工處理；2026-10-31 隨 A1 部署，A1 沒發生過。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 重啟後以待處理意圖（book.pending）查單結清中斷單（Executor.recover，PR 4f）在開發分支；尚未在測試網實跑，等開發機演練（P3）。"
+          "evidence": "V11 重啟後以待處理意圖（book.pending）查單結清中斷單（Executor.recover，PR 4f）在開發分支；尚未在測試網實跑，等開發機演練（P3）（src/trend_meteor/cli.py）。"
         }
       }
     },
@@ -874,9 +874,9 @@
           "reason": "競賽是現貨，只送成交（append_fill_v2），沒有帳本更正（trade_correction）這種投影，所以不會有卡在平倉後面的更正；70630a1 的 src 內沒有任何 correct_close 或 trade_correction 的引用（2026-10-10 git grep 查證）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 的投影排隊與派送用共用庫的佇列（src/trend_meteor/google_projection.py），更正排在整筆平倉之後；派送單元（PR #215）已在開發分支；真實 Google 接收端（開發機接收端）的整合驗證在開發機演練（P3）。"
+          "evidence": "V11 的投影排隊與派送用共用庫的佇列（src/trend_meteor/google_projection.py），更正排在整筆平倉之後；派送單元（PR #215）已在開發分支；真實 Google 接收端（開發機接收端）的整合驗證在開發機演練（P3）。"
         }
       }
     },
@@ -940,9 +940,9 @@
           "reason": "競賽是現貨，每筆成交一列，沒有平倉投影，也就沒有進場價與數量被平倉覆蓋的問題。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 平倉投影用整筆交易的進場價與數量（src/trend_meteor/google_projection.py 的 _close_projection，PR #187），在開發分支；真實接收端驗證在開發機演練（P3）。"
+          "evidence": "V11 平倉投影用整筆交易的進場價與數量（src/trend_meteor/google_projection.py 的 _close_projection，PR #187），在開發分支；真實接收端驗證在開發機演練（P3）。"
         }
       }
     },
@@ -1033,9 +1033,9 @@
           "reason": "競賽策略不用 binance-trading-toolkit，自己在 src/btc_competition/rebalance.py:132 取整（floor(value / step + 1e-10) * step，已加誤差補丁）。2026-10-18 查證：送單前 ccxt 4.5.71 會再依交易所精度格式化數量（Binance 公開資料：BTC/USDT 1e-5、ETH/BTC 與 ETH/USDT 1e-4、BNB/BTC 與 SOL/BTC 1e-3）；四種步長各 40 萬筆對照十進位精確值，沒有少捨或多進一手。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 釘的工具庫是 0.4.1（requirements.lock，commit b5858cb），V11 在開發分支；實跑等開發機演練（P3）。"
+          "evidence": "V11 釘的工具庫是 0.4.1（requirements.lock，commit b5858cb）；下單量依交易所步長取整的規則在 src/trend_meteor/execution.py:82 讀入 stepSize，已在開發分支；實跑等開發機演練（P3）。"
         }
       }
     },
@@ -1860,9 +1860,9 @@
           "evidence": "src/btc_competition/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "維運通知讀 V11 的帳本對帳狀態；V11 的對帳單元（reconcile-compare，PR #213／#215）已在開發分支、ops-notify 的 trend-meteor 目標已加（預設不啟用）；尚未實跑，等開發機演練（P3）。"
+          "evidence": "維運通知讀 V11 的帳本對帳狀態；V11 的對帳單元（reconcile-compare，PR #213／#215）已在開發分支、ops-notify 的 trend-meteor 目標已加（預設不啟用）；尚未實跑，等開發機演練（P3）（src/trend_meteor/reconcile_compare.py）。"
         }
       },
       "emits_event": {
@@ -1883,9 +1883,9 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "維運通知讀 V11 的帳本對帳狀態；V11 的對帳單元（reconcile-compare，PR #213／#215）已在開發分支、ops-notify 的 trend-meteor 目標已加（預設不啟用）；尚未實跑，等開發機演練（P3）。"
+          "evidence": "維運通知讀 V11 的帳本對帳狀態；V11 的對帳單元（reconcile-compare，PR #213／#215）已在開發分支、ops-notify 的 trend-meteor 目標已加（預設不啟用）；尚未實跑，等開發機演練（P3）（src/trend_meteor/reconcile_compare.py）。"
         }
       }
     },
@@ -1958,9 +1958,9 @@
           "evidence": "src/btc_competition/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "維運通知讀 V11 的運行狀態；V11 的心跳在開發分支，快照單元（PR #215）與 ops-notify 的 runtime 軸（PR #68）已完成；主機設定與實跑等開發機演練（P3）。"
+          "evidence": "維運通知讀 V11 的運行狀態；V11 的心跳在開發分支，快照單元（PR #215）與 ops-notify 的 runtime 軸（PR #68）已完成；主機設定與實跑等開發機演練（P3）（src/trend_meteor/portfolio_snapshot.py、deploy/trend-meteor-portfolio-snapshot.service）。"
         }
       },
       "emits_event": {
@@ -1981,9 +1981,9 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "維運通知讀 V11 的運行狀態；V11 的心跳在開發分支，快照單元（PR #215）與 ops-notify 的 runtime 軸（PR #68）已完成；主機設定與實跑等開發機演練（P3）。"
+          "evidence": "維運通知讀 V11 的運行狀態；V11 的心跳在開發分支，快照單元（PR #215）與 ops-notify 的 runtime 軸（PR #68）已完成；主機設定與實跑等開發機演練（P3）（src/trend_meteor/portfolio_snapshot.py、deploy/trend-meteor-portfolio-snapshot.service）。"
         }
       }
     },
@@ -2008,9 +2008,9 @@
           "evidence": "deploy/btc-competition-unrecorded-fill.service 列入正式機 OPS_NOTIFY_BTC_COMPETITION_UNITS，由維運通知服務單元軸盯。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "維運通知盯 V11 的背景服務；V11 的 systemd 單元（trend-meteor-*，PR #215）已在開發分支，尚未裝到任何主機；ops-notify 的 UNITS 設定在開發機演練（P3）。"
+          "evidence": "維運通知盯 V11 的背景服務；V11 的 systemd 單元（trend-meteor-*，PR #215）已在開發分支，尚未裝到任何主機；ops-notify 的 UNITS 設定在開發機演練（P3）（deploy/trend-meteor-bot.service）。"
         }
       },
       "emits_event": {
@@ -2031,9 +2031,9 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "維運通知盯 V11 的背景服務；V11 的 systemd 單元（trend-meteor-*，PR #215）已在開發分支，尚未裝到任何主機；ops-notify 的 UNITS 設定在開發機演練（P3）。"
+          "evidence": "維運通知盯 V11 的背景服務；V11 的 systemd 單元（trend-meteor-*，PR #215）已在開發分支，尚未裝到任何主機；ops-notify 的 UNITS 設定在開發機演練（P3）（deploy/trend-meteor-bot.service）。"
         }
       }
     },
@@ -2058,9 +2058,9 @@
           "evidence": "src/btc_competition/unrecorded_fill.py:219 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "維運通知讀 V11 的匯出檔；匯出檔由修復單元（trend-meteor-repair，PR #215）每一輪寫出，已在開發分支；ops-notify 的 OPS_EXPORT 設定在開發機演練（P3）。"
+          "evidence": "維運通知讀 V11 的匯出檔；匯出檔由修復單元（trend-meteor-repair，PR #215）每一輪寫出，已在開發分支；ops-notify 的 OPS_EXPORT 設定在開發機演練（P3）（deploy/trend-meteor-repair.service）。"
         }
       },
       "emits_event": {
@@ -2081,9 +2081,9 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "維運通知讀 V11 的匯出檔；匯出檔由修復單元（trend-meteor-repair，PR #215）每一輪寫出，已在開發分支；ops-notify 的 OPS_EXPORT 設定在開發機演練（P3）。"
+          "evidence": "維運通知讀 V11 的匯出檔；匯出檔由修復單元（trend-meteor-repair，PR #215）每一輪寫出，已在開發分支；ops-notify 的 OPS_EXPORT 設定在開發機演練（P3）（deploy/trend-meteor-repair.service）。"
         }
       }
     },
@@ -2107,9 +2107,9 @@
           "evidence": "src/btc_competition/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "維運通知判斷 V11 的狀態檔過期；V11 的狀態檔與寫出週期已定（對帳每 15 分鐘、快照每 5 分鐘，PR #215）；ops-notify 目標已加；實跑等開發機演練（P3）。"
+          "evidence": "維運通知判斷 V11 的狀態檔過期；V11 的狀態檔與寫出週期已定（對帳每 15 分鐘、快照每 5 分鐘，PR #215）；ops-notify 目標已加；實跑等開發機演練（P3）（deploy/trend-meteor-portfolio-snapshot.timer）。"
         }
       },
       "emits_event": {
@@ -2130,9 +2130,9 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "維運通知判斷 V11 的狀態檔過期；V11 的狀態檔與寫出週期已定（對帳每 15 分鐘、快照每 5 分鐘，PR #215）；ops-notify 目標已加；實跑等開發機演練（P3）。"
+          "evidence": "維運通知判斷 V11 的狀態檔過期；V11 的狀態檔與寫出週期已定（對帳每 15 分鐘、快照每 5 分鐘，PR #215）；ops-notify 目標已加；實跑等開發機演練（P3）（deploy/trend-meteor-portfolio-snapshot.timer）。"
         }
       }
     },
@@ -2319,9 +2319,9 @@
           "reason": "競賽是現貨，Google 表只收成交（append_fill_v2，見能力『現貨成交用專屬的寫入動作』），沒有平倉投影，所以不會有找不到開倉列的平倉；同類的『帳本更正卡在被停放的平倉後面』那一格也已列不適用（src/btc_competition/google_projection_worker.py:132 只轉送共用庫的送出函式）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 的投影派送用共用庫的佇列，停放找不到進場的平倉時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 的投影派送用共用庫的佇列，停放找不到進場的平倉時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/google_projection.py、deploy/trend-meteor-google-projection.service）。"
         }
       },
       "emits_event": {
@@ -2348,9 +2348,9 @@
           "reason": "競賽是現貨，Google 表只收成交（append_fill_v2，見能力『現貨成交用專屬的寫入動作』），沒有平倉投影，所以不會有找不到開倉列的平倉；同類的『帳本更正卡在被停放的平倉後面』那一格也已列不適用（src/btc_competition/google_projection_worker.py:132 只轉送共用庫的送出函式）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 的投影派送用共用庫的佇列，停放找不到進場的平倉時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 的投影派送用共用庫的佇列，停放找不到進場的平倉時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/google_projection.py、deploy/trend-meteor-google-projection.service）。"
         }
       }
     },
@@ -2382,9 +2382,9 @@
           "limit": "A1 沒遇過編號衝突，只在共用庫與策略端測試、開發機（台北 12:03 實際停放 3 筆舊成交）驗證。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 的投影派送用共用庫的佇列，停放編號衝突時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 的投影派送用共用庫的佇列，停放編號衝突時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/google_projection.py、deploy/trend-meteor-google-projection.service）。"
         }
       },
       "emits_event": {
@@ -2413,9 +2413,9 @@
           "limit": "A1 沒有實際停放過，事件只在測試與開發機看過（開發機台北 12:03 寫過 3 筆）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 的投影派送用共用庫的佇列，停放編號衝突時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 的投影派送用共用庫的佇列，停放編號衝突時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/google_projection.py、deploy/trend-meteor-google-projection.service）。"
         }
       }
     },
@@ -2660,16 +2660,16 @@
       "code": "MET.VERIFIED_CLOSE_AUTO_REPAIRED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 補寫孤兒進場的平倉（src/trend_meteor/repair_bot.py，PR #197）在開發分支；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 補寫孤兒進場的平倉（src/trend_meteor/repair_bot.py，PR #197）在開發分支；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       }
     },
@@ -2677,16 +2677,16 @@
       "code": "MET.VERIFIED_CLOSE_REPAIR_FAILED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 轉接拒絕缺欄位或讀不懂的成交與持倉（src/trend_meteor/repair_bot.py），失敗由共用庫計次升格；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 轉接拒絕缺欄位或讀不懂的成交與持倉（src/trend_meteor/repair_bot.py），失敗由共用庫計次升格；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       }
     },
@@ -2694,16 +2694,16 @@
       "code": "MET.VERIFIED_CLOSE_REPAIR_BLOCKED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "帳本已有修復痕跡時停手由共用庫判定；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "帳本已有修復痕跡時停手由共用庫判定；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       }
     },
@@ -2711,16 +2711,16 @@
       "code": "MET.VERIFIED_CLOSE_REPAIR_RECURRING",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "7 天內自動補寫 2 次以上的升格由共用庫判定；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "7 天內自動補寫 2 次以上的升格由共用庫判定；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       }
     },
@@ -2728,16 +2728,16 @@
       "code": "MET.UNRECORDED_FILL_CORRECTED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 轉接（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）只重述恰好一筆整筆平倉列的交易；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 轉接（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）只重述恰好一筆整筆平倉列的交易；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由共用庫的未記帳處理器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由共用庫的未記帳處理器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       }
     },
@@ -2745,16 +2745,16 @@
       "code": "MET.UNRECORDED_FILL_UNRESOLVED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "不確定來源或不能重述的成交一律不寫帳本、開請求，由共用庫的未記帳處理器執行；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "不確定來源或不能重述的成交一律不寫帳本、開請求，由共用庫的未記帳處理器執行；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由共用庫的未記帳處理器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由共用庫的未記帳處理器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
         }
       }
     },
@@ -2762,16 +2762,16 @@
       "code": "MET.LEDGER_DATA_QUALITY",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 帳本稽核（src/trend_meteor/ledger_audit.py）在開發分支，同一組問題只通知一次，偵測七類（含重複成交與逐筆進出場平衡），事件記成 R3，與目錄一致；呼叫它的入口（trend-meteor ledger-audit，PR #213）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "V11 帳本稽核（src/trend_meteor/ledger_audit.py）在開發分支，同一組問題只通知一次，偵測七類（含重複成交與逐筆進出場平衡），事件記成 R3，與目錄一致；呼叫它的入口（trend-meteor ledger-audit，PR #213）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由 V11 的帳本稽核寫（src/trend_meteor/ledger_audit.py）；呼叫它的入口（trend-meteor ledger-audit，PR #213）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由 V11 的帳本稽核寫（src/trend_meteor/ledger_audit.py）；呼叫它的入口（trend-meteor ledger-audit，PR #213）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2779,16 +2779,16 @@
       "code": "MET.STATE_FILE_CORRUPT",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2796,16 +2796,16 @@
       "code": "MET.MISSED_DAYS",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2813,16 +2813,16 @@
       "code": "MET.HEDGE_MODE",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2830,16 +2830,16 @@
       "code": "MET.NOT_ISOLATED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2847,16 +2847,16 @@
       "code": "MET.LEVERAGE_NOT_1",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2864,16 +2864,16 @@
       "code": "MET.UNEXPECTED_POSITION",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2881,16 +2881,16 @@
       "code": "MET.BAD_EXCHANGE_DATA",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2898,16 +2898,16 @@
       "code": "MET.ORDER_OUTCOME_UNKNOWN",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2915,16 +2915,16 @@
       "code": "MET.ORDER_NOT_TERMINAL",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2932,16 +2932,16 @@
       "code": "MET.PENDING_UNRESOLVED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2949,16 +2949,16 @@
       "code": "MET.STEP_OUTCOME_UNKNOWN",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2966,16 +2966,16 @@
       "code": "MET.STOP_OUTCOME_UNKNOWN",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -2983,16 +2983,16 @@
       "code": "MET.PROTECTION_UNVERIFIED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3000,16 +3000,16 @@
       "code": "MET.STALE_STOP_CANCEL_FAILED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3017,16 +3017,16 @@
       "code": "MET.STOP_STATE_UNKNOWN",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3034,16 +3034,16 @@
       "code": "MET.STOP_STATUS_UNRECOGNIZED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3051,16 +3051,16 @@
       "code": "MET.POSITION_GONE_STOP_NOT_TRIGGERED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3068,16 +3068,16 @@
       "code": "MET.STOP_TRIGGERED_UNREPORTED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3085,16 +3085,16 @@
       "code": "MET.MARGIN_BELOW_FLOOR",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3102,16 +3102,16 @@
       "code": "MET.RECOVERY_LOOKUP_FAILED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3119,16 +3119,16 @@
       "code": "MET.RECOVERY_STOP_STATE",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3136,16 +3136,16 @@
       "code": "MET.UNKNOWN_STEP",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3153,16 +3153,16 @@
       "code": "MET.EXECUTION_FAILED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3170,16 +3170,16 @@
       "code": "MET.DATA_UNAVAILABLE",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3187,16 +3187,16 @@
       "code": "MET.RUNTIME_CYCLE_FAILED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "行為在開發分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
+          "evidence": "行為在開發分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3204,16 +3204,16 @@
       "code": "MET.LEDGER_ITEM_DROPPED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "行為在開發分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
+          "evidence": "行為在開發分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3221,16 +3221,16 @@
       "code": "MET.STOP_FILL_UNKNOWN",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "行為在開發分支（src/trend_meteor/ledger_sink.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
+          "evidence": "行為在開發分支（src/trend_meteor/ledger_sink.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由 V11 程式寫（src/trend_meteor/ledger_sink.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由 V11 程式寫（src/trend_meteor/ledger_sink.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3238,16 +3238,16 @@
       "code": "MET.WINNER_NO_PERP",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "行為在開發分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
+          "evidence": "行為在開發分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -3255,16 +3255,16 @@
       "code": "MET.FUNDING_SHEET_WRITE_FAILED",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "行為在開發分支（src/trend_meteor/funding_sheet.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
+          "evidence": "行為在開發分支（src/trend_meteor/funding_sheet.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "事件由 V11 程式寫（src/trend_meteor/funding_sheet.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由 V11 程式寫（src/trend_meteor/funding_sheet.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     }

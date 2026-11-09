@@ -947,6 +947,15 @@ def test_awaiting_cells_only_counts_pending_cells_with_a_commit():
     assert labels == ["能力 x.cap / mycrypto", "規則 MYC.X emits_event / mycrypto"]
 
 
+def test_awaiting_cells_also_counts_built_cells_with_a_commit():
+    """已完成、尚未上線的格子等的也是部署：帶 awaits_commit 就要被點名，沒帶就不管。"""
+    reg = _registry({"mycrypto": "abc1234"})
+    reg["capabilities"].append({"id": "b", "status": {"seykota": {"state": "built", "phase": "p", "evidence": "src/a.py", "awaits_commit": "def5678"},
+                                                      "momentum": {"state": "built", "phase": "p", "evidence": "src/b.py"}}})
+    labels = [c[0] for c in ow.awaiting_cells(reg)]
+    assert "能力 b / seykota" in labels and "能力 b / momentum" not in labels
+
+
 def test_git_head_asks_only_for_rev_parse_in_the_listed_a1_clones(monkeypatch):
     seen = []
     remote = ow.Remote("k")

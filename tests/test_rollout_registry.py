@@ -327,15 +327,63 @@ def test_pages_never_inject_html_from_data():
         assert "insertAdjacentHTML" not in html
 
 
-def test_rollout_page_groups_items_by_whether_any_cell_is_pending(registry, catalog):
+def _stage(states):
+    return "pending" if "pending" in states else ("built" if "built" in states else "done")
+
+
+def test_rollout_page_groups_items_by_whether_any_cell_is_pending_or_built(registry, catalog):
+    """未完成＝有一格是未做；沒有未做但有一格已完成未上線＝等上線；其餘才是已完成（complete 只給最後一類）。"""
     items = {i["anchor"]: i for i in _render_guides().rollout_items(catalog, registry)}
     assert len(items) == len(registry["capabilities"]) + len(registry["catalog"])
     for capability in registry["capabilities"]:
-        pending = any(s["state"] == "pending" for s in capability["status"].values())
-        assert items[f"cap-{capability['id']}"]["complete"] is not pending
+        item = items[f"cap-{capability['id']}"]
+        stage = _stage({s["state"] for s in capability["status"].values()})
+        assert item["stage"] == stage and item["complete"] is (stage == "done")
     for row in registry["catalog"]:
-        pending = any(s["state"] == "pending" for key in ("behaviour", "emits_event") for s in row[key].values())
-        assert items[f"rule-{row['code']}"]["complete"] is not pending
+        item = items[f"rule-{row['code']}"]
+        stage = _stage({s["state"] for key in ("behaviour", "emits_event") for s in row[key].values()})
+        assert item["stage"] == stage and item["complete"] is (stage == "done")
+
+
+def _first_built_cap(reg):
+    for capability in reg["capabilities"]:
+        for project, status in capability["status"].items():
+            if status["state"] == "built":
+                return capability, project, status
+    raise AssertionError("fixture has no built cell")
+
+
+def test_built_cell_needs_evidence_and_a_registered_phase(registry, catalog):
+    """已完成、尚未上線：像已做一樣要引用程式（evidence），再加上線的關卡（phase）；不能帶 reason／limit／verified_at。"""
+    for field, bad, needle in (("evidence", None, "built without evidence"), ("phase", "no-such-phase", "built phase"),
+                               ("reason", "x", "does not belong on a built cell"), ("limit", "x", "does not belong on a built cell"),
+                               ("verified_at", "2026-11-10", "does not belong on a built cell")):
+        reg = copy.deepcopy(registry)
+        _, _, status = _first_built_cap(reg)
+        if bad is None:
+            status.pop(field)
+        else:
+            status[field] = bad
+        assert [p for p in registry_problems(reg, catalog) if needle in p], field
+
+
+def test_a_built_cell_never_counts_as_done_on_the_page(registry, catalog):
+    """已完成未上線的格子在頁面是自己一類：點是 built、項目 stage 不是 done；只有每一格都是已做或不適用才算已完成。"""
+    render_guides = _render_guides()
+    capability, project, _ = _first_built_cap(registry)
+    item = {i["anchor"]: i for i in render_guides.rollout_items(catalog, registry)}[f"cap-{capability['id']}"]
+    assert item["dots"][project] == "built" and item["stage"] in ("built", "pending") and item["complete"] is False
+    html = render_guides.render_rollout_register(catalog, registry, render_guides.load_glossary())
+    assert "已完成、尚未上線" in html and 'id="group-built"' in html
+
+
+def test_built_cell_can_name_the_commit_it_waits_for(registry, catalog):
+    reg = copy.deepcopy(registry)
+    _, _, status = _first_built_cap(reg)
+    status["awaits_commit"] = "0123456789abcdef0123456789abcdef01234567"
+    assert not [p for p in registry_problems(reg, catalog) if "awaits_commit" in p]
+    status["awaits_commit"] = "XYZ"
+    assert [p for p in registry_problems(reg, catalog) if "awaits_commit must be" in p]
 
 
 def test_recent_change_pointing_at_a_still_pending_cell_is_caught(registry, catalog):
@@ -543,12 +591,12 @@ def test_recent_summary_lists_a_rule_once_when_both_aspects_flipped(registry, ca
     assert sorted(r["note"] for r in data["recent_summary"]) == ["另一句話", "同一句話"]
 
 
-def test_rollout_page_lists_only_phases_that_still_have_pending_cells(registry, catalog):
-    """'預定的關卡' is what is still to do: a phase with no pending cell left is history, not a plan."""
+def test_rollout_page_lists_only_phases_that_still_have_pending_or_built_cells(registry, catalog):
+    """'預定的關卡' is what is still to do: a phase with no pending or built (done on development, not live) cell left is history, not a plan."""
     render_guides = _render_guides()
     data = _page_data(render_guides.render_rollout_register(catalog, registry, render_guides.load_glossary()))
-    assert data["phase_order"] == [k for k in registry["phases"] if data["phase_counts"][k] > 0]
-    assert all(data["phase_counts"][k] > 0 for k in data["phase_order"])
+    assert data["phase_order"] == [k for k in registry["phases"] if data["phase_counts"][k] or data["phase_built_counts"][k]]
+    assert all(data["phase_counts"][k] or data["phase_built_counts"][k] for k in data["phase_order"])
     assert set(data["phase_counts"]) == set(registry["phases"])  # the counts still cover every phase
 
 
@@ -594,7 +642,7 @@ def test_awaits_commit_only_belongs_on_pending_cells(registry, catalog):
     capability = next(c for c in reg["capabilities"] if any(s["state"] == "done" for s in c["status"].values()))
     status = next(s for s in capability["status"].values() if s["state"] == "done")
     status["awaits_commit"] = "0123456789abcdef0123456789abcdef01234567"
-    assert [p for p in registry_problems(reg, catalog) if "only belongs on a pending cell" in p]
+    assert [p for p in registry_problems(reg, catalog) if "only belongs on a pending or built cell" in p]
 
 
 def test_a_pending_reason_that_does_not_promise_a_deployment_needs_no_commit(registry, catalog):
@@ -863,10 +911,10 @@ def test_trend_meteor_has_its_column_and_the_pending_mechanism_still_guards_the_
 
 
 def test_trend_meteor_has_no_done_cell_until_it_runs_on_the_live_branch(registry):
-    """『已做』只算正式機分支（operations）上的；V11 還沒上線，所有格子都只能是未做或不適用。有一格寫已做就要先確認 sources 的 commit 真的含 V11 程式。"""
+    """『已做』只算正式機分支（operations）上的；V11 還沒上線，所有格子只能是未做、已完成未上線或不適用，不能有已做。有一格寫已做就要先確認 sources 的 commit 真的含 V11 程式。"""
     rows = project_rows(registry, "trend-meteor")
     assert len(rows) == 35 + 2 * (9 + 36)                                                     # 35 項能力＋（9 條 FLEET＋36 條 MET）×（行為、事件）
-    assert {r["state"] for r in rows.values()} <= {"pending", "n/a"}, [k for k, r in rows.items() if r["state"] == "done"]
+    assert {r["state"] for r in rows.values()} <= {"built", "pending", "n/a"}, [k for k, r in rows.items() if r["state"] == "done"]
 
 
 V11_TIERS = {
