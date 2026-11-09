@@ -42,9 +42,11 @@ REGISTRY_PENDING_PROJECTS: tuple[str, ...] = ()
 #: The four strategies; ``fleet`` is a catalog prefix for cross-repo
 #: conditions, not a strategy that can have a capability.
 STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet" and project not in REGISTRY_PENDING_PROJECTS)
-STATES = ("done", "pending", "n/a")
+STATES = ("done", "built", "pending", "n/a")
 #: ``done`` means present where the live host deploys from -- not merely
-#: merged to development or running on the dev host.
+#: merged to development or running on the dev host.  ``built`` (已完成、尚未上線, 2026-11-10) is the honest middle: the code is written
+#: and merged on development (cites its files like a ``done`` cell) but is not on the live host yet.  It never counts as ``done``;
+#: ``pending`` is reserved for what is still not written or not decided.
 LIVE_BRANCH = "operations"
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 #: A pending cell that waits for a deployment names the commit it waits for (``awaits_commit``); the observation
@@ -95,9 +97,20 @@ def _status_problems(where: str, status: Any, phases: Mapping[str, Any]) -> list
         return isinstance(value, str) and bool(value.strip())
 
     problems = []
-    if state == "done" and not text("evidence"):
-        problems.append(f"{where}: done without evidence")
-    if state == "done":
+    if state in ("done", "built") and not text("evidence"):
+        problems.append(f"{where}: {state} without evidence")
+    if state == "built":
+        for field in ("verified_at", "limit", "reason"):
+            if field in status:
+                problems.append(f"{where}: {field} does not belong on a built cell (verified_at/limit are for done; say what is missing in a pending cell)")
+        if text("evidence") and len(status["evidence"]) > MAX_EVIDENCE_CHARS:
+            problems.append(f"{where}: evidence is {len(status['evidence'])} characters (max {MAX_EVIDENCE_CHARS})")
+        if status.get("phase") not in phases:
+            problems.append(f"{where}: built phase {status.get('phase')!r} is not a registered phase (the step where it goes live)")
+        awaits = status.get("awaits_commit")
+        if awaits is not None and not (isinstance(awaits, str) and AWAITS_COMMIT.fullmatch(awaits)):
+            problems.append(f"{where}: awaits_commit must be a 7-40 character lowercase hex commit, got {awaits!r}")
+    elif state == "done":
         if text("evidence") and len(status["evidence"]) > MAX_EVIDENCE_CHARS:
             problems.append(f"{where}: evidence is {len(status['evidence'])} characters (max {MAX_EVIDENCE_CHARS}) -- "
                             "keep what the code does and the file:line citations; put the A1 verification text in docs/registry-a1-checks.json "
@@ -127,8 +140,8 @@ def _status_problems(where: str, status: Any, phases: Mapping[str, Any]) -> list
         elif awaits is None and text("reason") and _DEPLOY_PROMISE.search(status["reason"]):
             problems.append(f"{where}: the reason promises a deployment ({_DEPLOY_PROMISE.search(status['reason']).group(0)!r}) "
                             "but names no commit -- add awaits_commit so the watch can tell when the cell must flip")
-    elif "awaits_commit" in status:
-        problems.append(f"{where}: awaits_commit only belongs on a pending cell")
+    elif "awaits_commit" in status and state != "built":
+        problems.append(f"{where}: awaits_commit only belongs on a pending or built cell")
     if state == "n/a" and not text("reason"):
         problems.append(f"{where}: n/a without a reason")
     return problems

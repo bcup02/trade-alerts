@@ -1187,16 +1187,16 @@ def _refresh(repo: Path) -> bool | None:
 
 
 def awaiting_cells(registry: Mapping[str, Any]) -> list[tuple[str, str, str]]:
-    """``(cell label, strategy key, commit)`` for every pending cell that names the commit it waits for."""
+    """``(cell label, strategy key, commit)`` for every pending or built (done on development, not live) cell that names the commit it waits for."""
     cells = []
     for capability in registry.get("capabilities") or []:
         for project, status in (capability.get("status") or {}).items():
-            if status.get("state") == "pending" and status.get("awaits_commit"):
+            if status.get("state") in ("pending", "built") and status.get("awaits_commit"):
                 cells.append((f"能力 {capability['id']} / {project}", project, status["awaits_commit"]))
     for row in registry.get("catalog") or []:
         for aspect in ("behaviour", "emits_event"):
             for project, status in (row.get(aspect) or {}).items():
-                if status.get("state") == "pending" and status.get("awaits_commit"):
+                if status.get("state") in ("pending", "built") and status.get("awaits_commit"):
                     cells.append((f"規則 {row['code']} {aspect} / {project}", project, status["awaits_commit"]))
     return cells
 

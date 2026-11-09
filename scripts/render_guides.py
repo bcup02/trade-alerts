@@ -135,7 +135,7 @@ _CSS = """
     --R2:#8C6317; --R2-bg:#F1E6C9;
     --R1:#357357; --R1-bg:#DEEAE3;
     --R0:#6B7566; --R0-bg:#E7EAE0;
-    --done:#357357; --done-bg:#DEEAE3;
+    --done:#357357; --done-bg:#DEEAE3; --built:#2F6690; --built-bg:#DCE8F2;
     --pending:#8C6317; --pending-bg:#F1E6C9;
     --na:#6B7566; --na-bg:#E7EAE0;
     --recent:#A6800A; --recent-bg:#FFF3B0;
@@ -147,7 +147,7 @@ _CSS = """
       --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
       --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
       --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
-      --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
+      --done:#7FC6A2; --done-bg:#1D3227; --built:#8DB8DE; --built-bg:#1C2D3B; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
       --recent:#FFE066; --recent-bg:#4A3B05;
     }
   }
@@ -157,7 +157,7 @@ _CSS = """
     --accent:#C6A0C8; --accent-bg:#302733; --accent-line:#5A455C;
     --R3:#E58A7C; --R3-bg:#3A241F; --R2:#D9B364; --R2-bg:#382D18;
     --R1:#7FC6A2; --R1-bg:#1D3227; --R0:#A6AD97; --R0-bg:#292B21;
-    --done:#7FC6A2; --done-bg:#1D3227; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
+    --done:#7FC6A2; --done-bg:#1D3227; --built:#8DB8DE; --built-bg:#1C2D3B; --pending:#D9B364; --pending-bg:#382D18; --na:#A6AD97; --na-bg:#292B21;
     --recent:#FFE066; --recent-bg:#4A3B05;
   }
   *{box-sizing:border-box;}
@@ -193,7 +193,7 @@ _CSS = """
   .card p.desc{margin-top:2px;}
   .status{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
   .st{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;color:var(--c);background:var(--cb);}
-  .st-done{--c:var(--done);--cb:var(--done-bg);} .st-pending{--c:var(--pending);--cb:var(--pending-bg);} .st-na{--c:var(--na);--cb:var(--na-bg);}
+  .st-done{--c:var(--done);--cb:var(--done-bg);} .st-built{--c:var(--built);--cb:var(--built-bg);} .st-pending{--c:var(--pending);--cb:var(--pending-bg);} .st-na{--c:var(--na);--cb:var(--na-bg);}
   .note{font-size:13px;color:var(--ink-soft);margin-top:6px !important;line-height:1.6;}
   details{margin-top:8px;font-size:13.5px;}
   details summary{cursor:pointer;color:var(--accent);font-weight:700;}
@@ -296,8 +296,8 @@ def check_published(kind: str, published_file: Path) -> tuple[str, str]:
 _JS_HELPERS = r"""
 var DATA = JSON.parse(document.getElementById("data").textContent);
 function el(tag, cls, text){ var n=document.createElement(tag); if(cls) n.className=cls; if(text!==undefined) n.textContent=text; return n; }
-var STATE_LABEL = {"done":"已做","pending":"未做","n/a":"不適用"};
-var STATE_CLASS = {"done":"st-done","pending":"st-pending","n/a":"st-na"};
+var STATE_LABEL = {"done":"已做","built":"已完成、尚未上線","pending":"未做","n/a":"不適用"};
+var STATE_CLASS = {"done":"st-done","built":"st-built","pending":"st-pending","n/a":"st-na"};
 function chipGroup(host, values, onPick){
   var buttons=[];
   values.forEach(function(v){
@@ -435,7 +435,7 @@ _ROLLOUT_CSS = """
   .toc-col li a .t{flex:1;min-width:0;}
   .dots{display:inline-flex;gap:3px;flex-shrink:0;}
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--dc);border:1px solid var(--dc);}
-  .dot-done{--dc:var(--done);} .dot-pending{--dc:var(--pending);} .dot-na{--dc:var(--na);opacity:.55;}
+  .dot-done{--dc:var(--done);} .dot-built{--dc:var(--built);} .dot-pending{--dc:var(--pending);} .dot-na{--dc:var(--na);opacity:.55;}
   .dot-none{--dc:var(--line);background:transparent;}
   .dot-recent{--dc:var(--recent);box-shadow:0 0 0 2px var(--recent-bg);}
   .dot-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-faint);margin:0 0 4px;}
@@ -477,7 +477,7 @@ _ROLLOUT_CSS = """
   #totop{position:fixed;right:20px;bottom:20px;width:46px;height:46px;border-radius:50%;border:1px solid var(--accent-line);background:var(--accent-bg);color:var(--accent);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:0;pointer-events:none;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility 0s linear .2s;}
   #totop.show{opacity:1;pointer-events:auto;visibility:visible;transform:none;transition:opacity .2s,transform .2s,visibility 0s;}
   #totop:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-  .c-pending{--c:var(--pending);--cb:var(--pending-bg);} .c-done{--c:var(--done);--cb:var(--done-bg);}
+  .c-pending{--c:var(--pending);--cb:var(--pending-bg);} .c-built{--c:var(--built);--cb:var(--built-bg);} .c-done{--c:var(--done);--cb:var(--done-bg);}
   .gloss-link{font-weight:700;color:var(--accent);}
   .gloss-cat{border:1px solid var(--line);border-radius:3px;background:var(--paper-raised);margin-bottom:12px;}
   .gloss-cat h3{margin:0;padding:10px 14px;font-size:14px;border-block-end:1px solid var(--line);color:var(--ink-soft);}
@@ -681,7 +681,7 @@ _HEALTH_PANEL_JS = r"""
 """
 
 _ROLLOUT_JS = HEALTH_CORE_JS.read_text(encoding="utf-8") + _JS_HELPERS + _HEALTH_PANEL_JS + r"""
-var DOT_LABEL={"done":"已做","pending":"未做","na":"不適用","none":"跟這支無關","recent":"最新變動"};
+var DOT_LABEL={"done":"已做","built":"已完成、尚未上線","pending":"未做","na":"不適用","none":"跟這支無關","recent":"最新變動"};
 var KINDS=[["cap","機隊功能"],["rule","錯誤處理規則"]];
 function dots(item){
   var s=el("span","dots"); s.setAttribute("aria-hidden","true");
@@ -735,7 +735,7 @@ function go(id){
 }
 function tocColumn(group, title){
   var col=el("div","toc-col c-"+group);
-  var items=DATA.items.filter(function(i){return (group==="done")===i.complete;});
+  var items=DATA.items.filter(function(i){return i.stage===group;});
   col.appendChild(el("h3",null,title+"（"+items.length+"）"));
   KINDS.forEach(function(k){
     var list=items.filter(function(i){return i.kind===k[0];}); if(!list.length) return;
@@ -754,9 +754,9 @@ function tocColumn(group, title){
 }
 function fillGroup(host, group){
   KINDS.forEach(function(k){
-    var list=DATA.items.filter(function(i){return (group==="done")===i.complete && i.kind===k[0];}); if(!list.length) return;
+    var list=DATA.items.filter(function(i){return i.stage===group && i.kind===k[0];}); if(!list.length) return;
     host.appendChild(el("h3","kind",k[1]+"（"+list.length+"）"));
-    list.forEach(function(i){ host.appendChild(group==="done"?doneCard(i):pendingCard(i)); });
+    list.forEach(function(i){ host.appendChild(group==="pending"?pendingCard(i):doneCard(i)); });
   });
 }
 var recentBox=document.getElementById("recentBox"), recentList=document.getElementById("recentList");
@@ -790,19 +790,20 @@ DATA.glossary.forEach(function(group){
 });
 document.querySelectorAll(".gloss-link").forEach(function(a){ a.addEventListener("click",function(ev){ ev.preventDefault(); document.getElementById("glossary").scrollIntoView({block:"start"}); }); });
 var toc=document.getElementById("toc");
-toc.appendChild(tocColumn("pending","未完成")); toc.appendChild(tocColumn("done","已完成"));
+toc.appendChild(tocColumn("pending","未完成")); toc.appendChild(tocColumn("built","已完成、尚未上線")); toc.appendChild(tocColumn("done","已完成"));
 fillGroup(document.getElementById("pending"),"pending");
+fillGroup(document.getElementById("built"),"built");
 fillGroup(document.getElementById("done"),"done");
 document.querySelectorAll(".big a").forEach(function(a){ a.addEventListener("click",function(ev){ ev.preventDefault(); go(a.getAttribute("href").slice(1)); }); });
 var sum=document.getElementById("summary");
 DATA.project_order.forEach(function(p){
   var d=el("div"); d.appendChild(el("b",null,DATA.projects[p]));
-  var t=DATA.totals[p]; d.appendChild(document.createTextNode("已做 "+t.done+"｜未做 "+t.pending+"｜不適用 "+t["n/a"])); sum.appendChild(d);
+  var t=DATA.totals[p]; d.appendChild(document.createTextNode("已做 "+t.done+"｜已完成未上線 "+t.built+"｜未做 "+t.pending+"｜不適用 "+t["n/a"])); sum.appendChild(d);
 });
 var phaseHost=document.getElementById("phases");
-if(!DATA.phase_order.length) phaseHost.appendChild(el("p","group-sub","目前沒有未做的格子。"));
+if(!DATA.phase_order.length) phaseHost.appendChild(el("p","group-sub","目前沒有等著的格子。"));
 DATA.phase_order.forEach(function(k){
-  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜未做 "+DATA.phase_counts[k]+" 格")); phaseHost.appendChild(c);
+  var c=el("div","card"); c.appendChild(el("h3",null,DATA.phases[k])); c.appendChild(el("p","code",k+"｜未做 "+DATA.phase_counts[k]+" 格｜已完成未上線 "+DATA.phase_built_counts[k]+" 格")); phaseHost.appendChild(c);
 });
 var toTop=document.getElementById("totop");
 toTop.addEventListener("click",function(){ window.scrollTo(0,0); var h=document.querySelector("h1"); if(h){ h.setAttribute("tabindex","-1"); h.focus({preventScroll:true}); } });
@@ -812,13 +813,14 @@ window.addEventListener("scroll",syncTop,{passive:true}); syncTop();
 
 
 def _combined(statuses: dict[str, Any]) -> dict[str, Any]:
-    """One status for a row that spans several strategies (FLEET.*): done only
-    if every strategy is done, n/a only if every one is n/a, else pending."""
+    """One status for a row that spans several strategies (FLEET.*): done when every
+    applicable strategy is done (n/a ones do not count), n/a only if every one is n/a, built when nothing is pending and something is
+    built, else pending."""
     states = {s["state"] for s in statuses.values()}
-    if states == {"done"}:
-        return {"state": "done"}
-    if states == {"n/a"}:
-        return {"state": "n/a"}
+    if states <= {"done", "n/a"}:
+        return {"state": "done" if "done" in states else "n/a"}
+    if "pending" not in states and "built" in states:
+        return {"state": "built"}
     return {"state": "pending"}
 
 
@@ -833,12 +835,17 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
         project_keys = owners(code)
         fleet = code.startswith("FLEET.")
         notes = []
+        still_open = False
         for key, label in (("behaviour", "行為"), ("emits_event", "寫進事件日誌")):
             for project in project_keys:
                 status = row[key][project]
                 if status["state"] == "pending":
                     who = f"{projects[project]}：" if fleet else ""
                     notes.append(f"{label}未做 — {who}{status['reason']}（預定：{phases[status['phase']]}）")
+                    still_open = True
+                elif status["state"] == "built":
+                    who = f"{projects[project]}：" if fleet else ""
+                    notes.append(f"{label}已完成、尚未上線 — {who}{status['evidence']}（預定：{phases[status['phase']]}）")
         message = entry["operator_message"]
         entries.append({
             "code": code, "error_id": entry["error_id"], "tier": entry["risk_tier"], "title": entry["title"],
@@ -850,7 +857,7 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
             "behaviour": _combined(row["behaviour"]) if fleet else {"state": row["behaviour"][project_keys[0]]["state"]},
             "emits_event": _combined(row["emits_event"]) if fleet else {"state": row["emits_event"][project_keys[0]]["state"]},
             "notes": notes,
-            "open": bool(notes),
+            "open": still_open,
         })
     bots = [{"id": p, "label": projects[p]} for p in STRATEGY_PROJECTS] + [{"id": "fleet", "label": BOT_LABEL_FLEET}]
     data = {"tiers": TIERS, "entries": entries, "bots": bots}
@@ -881,18 +888,20 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
 
 def _line(status: dict[str, Any], aspect: str | None, phases: dict[str, str]) -> dict[str, Any]:
     state = status["state"]
-    text = status["evidence"] if state == "done" else status["reason"]
+    text = status["evidence"] if state in ("done", "built") else status["reason"]
     return {"aspect": aspect, "state": state, "text": text,
-            "phase": phases[status["phase"]] if state == "pending" else None,
+            "phase": phases[status["phase"]] if state in ("pending", "built") else None,
             "limit": status.get("limit"), "verified_at": status.get("verified_at")}
 
 
 def _dot(states: set[str]) -> str:
-    """One strategy's colour in the four-dot strip: pending wins, then done."""
+    """One strategy's colour in the dot strip: pending wins, then built (done on development, not live), then done."""
     if not states:
         return "none"
     if "pending" in states:
         return "pending"
+    if "built" in states:
+        return "built"
     return "done" if "done" in states else "na"
 
 
@@ -931,7 +940,9 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
     for item in items:
         states = item.pop("states")
         item["dots"] = {p: _dot(s) for p, s in states.items()}
-        item["complete"] = "pending" not in set().union(*states.values())
+        every = set().union(*states.values())
+        item["stage"] = "pending" if "pending" in every else ("built" if "built" in every else "done")
+        item["complete"] = item["stage"] == "done"
         for p in STRATEGY_PROJECTS:
             if item["dots"][p] in ("done", "na") and (item["kind"], item["id"], p) in completed_set:
                 item["dots"][p] = "recent"
@@ -952,17 +963,21 @@ def _glossary_groups(glossary: dict[str, Any]) -> list[dict[str, Any]]:
 def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], glossary: dict[str, Any]) -> str:
     projects = registry["projects"]
     phases = registry["phases"]
-    totals = {p: {"done": 0, "pending": 0, "n/a": 0} for p in STRATEGY_PROJECTS}
+    totals = {p: {"done": 0, "built": 0, "pending": 0, "n/a": 0} for p in STRATEGY_PROJECTS}
     phase_counts = {k: 0 for k in phases}
+    phase_built_counts = {k: 0 for k in phases}
     statuses = [s for c in registry["capabilities"] for s in c["status"].items()]
     statuses += [s for row in registry["catalog"] for key in ("behaviour", "emits_event") for s in row[key].items()]
     for project, status in statuses:
         totals[project][status["state"]] += 1
         if status["state"] == "pending":
             phase_counts[status["phase"]] += 1
+        elif status["state"] == "built":
+            phase_built_counts[status["phase"]] += 1
     items = rollout_items(catalog, registry)
-    n_done = sum(1 for i in items if i["complete"])
-    n_pending = len(items) - n_done
+    n_done = sum(1 for i in items if i["stage"] == "done")
+    n_built = sum(1 for i in items if i["stage"] == "built")
+    n_pending = sum(1 for i in items if i["stage"] == "pending")
     by_key = {(i["kind"], i["id"]): i for i in items}
     recent_summary = []
     seen_recent: set[tuple[str, str | None, str]] = set()
@@ -983,7 +998,8 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
         })
     data = {
         "projects": projects, "project_order": list(STRATEGY_PROJECTS), "phases": phases,
-        "phase_order": [k for k in phases if phase_counts[k]], "phase_counts": phase_counts, "totals": totals, "items": items,
+        "phase_order": [k for k in phases if phase_counts[k] or phase_built_counts[k]], "phase_counts": phase_counts,
+        "phase_built_counts": phase_built_counts, "totals": totals, "items": items,
         "recent_summary": recent_summary, "glossary": _glossary_groups(glossary), "health": health_panel_data(glossary),
     }
     sources = "；".join(
@@ -996,7 +1012,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
   <h1>機隊一致性登記冊</h1>
   <p class="lede">
     每一項機隊功能、每一條錯誤處理規則，在各策略裡<b>實際做到了沒有</b>。
-    <b>「已做」＝正式機已經在跑</b>（正式機分支 <code>operations</code> 上有），只合併到開發主幹、或只在開發機上的一律算「未做」；
+    <b>「已做」＝正式機已經在跑</b>（正式機分支 <code>operations</code> 上有），只合併到開發主幹、或只在開發機上的，不算「已做」：程式已寫好的算「已完成、尚未上線」，還沒寫或還沒決定的才算「未做」；
     「未做」會寫預定在哪一關做，「不適用」會寫理由，漏寫 CI 會擋下來。
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>
@@ -1011,12 +1027,13 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
   </section>
   <div class="big">
     <a class="c-pending" href="#group-pending"><b>{n_pending}</b><span>項未完成——還有策略沒做到</span></a>
-    <a class="c-done" href="#group-done"><b>{n_done}</b><span>項已完成——每支相關的策略都到位，不用再動</span></a>
+    <a class="c-built" href="#group-built"><b>{n_built}</b><span>項已完成、尚未上線——程式寫好了，只差上正式機</span></a>
+    <a class="c-done" href="#group-done"><b>{n_done}</b><span>項已完成——正式機已經在跑，不用再動</span></a>
   </div>
   <div class="summary" id="summary"></div>
   <p class="dot-legend">
     <span>每項右邊的點依序是 {order}：</span>
-    <span><i class="dot dot-done"></i>已做</span><span><i class="dot dot-pending"></i>未做</span>
+    <span><i class="dot dot-done"></i>已做</span><span><i class="dot dot-built"></i>已完成、尚未上線</span><span><i class="dot dot-pending"></i>未做</span>
     <span><i class="dot dot-na"></i>不適用</span><span><i class="dot dot-none"></i>跟這支無關</span>
     <span><i class="dot dot-recent"></i>🆕 最新變動</span>
   </p>
@@ -1027,15 +1044,19 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
   <nav class="toc" id="toc" aria-label="目錄"></nav>
 
   <div class="group-head c-pending" id="group-pending"><h2>未完成</h2><span class="n">{n_pending} 項</span></div>
-  <p class="group-sub">至少有一支策略還沒做到。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
+  <p class="group-sub">至少有一格程式還沒寫、或還沒決定。黃色「未做」旁邊的虛線框是預定在哪一關做。</p>
   <div id="pending"></div>
 
+  <div class="group-head c-built" id="group-built"><h2>已完成、尚未上線</h2><span class="n">{n_built} 項</span></div>
+  <p class="group-sub">程式已經寫好並合併到開發分支，只差部署到正式機；上正式機並查證後才改成「已做」。這一類不算功能缺，是等上線。</p>
+  <div id="built"></div>
+
   <div class="group-head c-done" id="group-done"><h2>已完成</h2><span class="n">{n_done} 項</span></div>
-  <p class="group-sub">每支相關的策略都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
+  <p class="group-sub">每支相關的策略在正式機都已做到或註明不適用，不用再動。點一下可以展開看證據。</p>
   <div id="done"></div>
 
   <div class="group-head" id="group-phases" style="--c:var(--ink-soft)"><h2>預定的關卡</h2></div>
-  <p class="group-sub">只列還有未做格子的關卡；「未做」算的是格數：一項功能在兩支策略未做就算兩格。</p>
+  <p class="group-sub">只列還有格子在等的關卡；格數是一格一格算：一項功能在兩支策略未做就算兩格。</p>
   <div id="phases" class="phase-list"></div>
 
   <div class="group-head" id="glossary" style="--c:var(--accent)"><h2>名詞對照表</h2><span class="n">{len(glossary['entries'])} 條</span></div>

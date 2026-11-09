@@ -11,11 +11,11 @@ at the commit in ``sources`` -- the live branch -- and reports:
 * a ``done`` cell citing a file that does not exist at that commit (saying
   whether it exists on ``origin/development``: the usual cause is dev-only
   code marked done);
-* a ``pending`` / ``n/a`` cell citing a file that exists neither at that
+* a ``built`` / ``pending`` / ``n/a`` cell citing a file that exists neither at that
   commit nor on ``origin/development`` (their reasons may describe dev-only
   code, but not code that exists nowhere);
 * a cited line past the end of the file.
-* a ``done`` cell with no file citation at all -- "done" has to point at
+* a ``done`` or ``built`` cell with no file citation at all -- "done" has to point at
   something a reviewer can open.
 
 It prints each ``done`` citation with the cited line so a reviewer can see
@@ -444,8 +444,8 @@ def main(argv: list[str] | None = None) -> int:
         source = registry["sources"][project]
         clone = args.repos_root / source["repo"].split("/", 1)[1]
         text = " ".join(str(status.get(key, "")) for key in ("evidence", "reason"))
-        if status["state"] == "done" and not citations(status["evidence"]):
-            print(f"FAIL [done] {where} / {project}: evidence cites no file -- {status['evidence']}")
+        if status["state"] in ("done", "built") and not citations(status["evidence"]):
+            print(f"FAIL [{status['state']}] {where} / {project}: evidence cites no file -- {status['evidence']}")
             failures += 1
         for path, line in citations(text):
             content = _show(clone, source["commit"], path)
