@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -1012,3 +1013,56 @@ def test_met_entry_texts_keep_the_conditions_the_v11_code_really_has(catalog):
     assert "帳本裡有進場、沒有平倉" not in e["rationale"] and "先前已有部分減碼的平倉列" in e["rationale"]
     e = _met(catalog, "FUNDING_SHEET_WRITE_FAILED")                                            # 13 接收端回報未成功也不保證表沒被動過
     assert "表一定沒有更新" not in _all_text(e) and "明確回報未成功" in " ".join(e["operator_message"]["steps"]) and "不論是哪一種原因" in " ".join(e["operator_message"]["steps"])
+
+
+# --- 已完成、尚未上線（built）與未做（pending）的界線（PR #351 審閱 BLOCK-351-01／02）------------------------------
+@pytest.mark.parametrize("states, expected", [
+    ({"pending", "built"}, "pending"), ({"pending", "done"}, "pending"), ({"done", "built"}, "built"), ({"built"}, "built"),
+    ({"built", "n/a"}, "built"), ({"done", "n/a"}, "done"),  # 不適用的策略不拖累：其餘適用的都已做就是已做
+    ({"done"}, "done"), ({"n/a"}, "n/a"),
+])
+def test_a_fleet_row_across_strategies_combines_states_with_pending_first_then_built(states, expected):
+    statuses = {f"p{i}": {"state": s} for i, s in enumerate(sorted(states))}
+    assert _render_guides()._combined(statuses)["state"] == expected
+
+
+_WRITTEN_ON_DEVELOPMENT = re.compile(r"已在(趨勢 repo )?開發分支|在開發分支")
+_SAYS_WHAT_IS_MISSING = re.compile(r"還沒|尚未寫|沒有|要先|檢討|判斷|實測|待決定|前補|前做|之後做")
+
+
+def test_a_pending_cell_that_says_the_code_is_on_development_names_what_is_still_missing(registry):
+    """pending 專指還沒寫或還沒決定。理由若說程式已在開發分支，就必須同時寫出還缺什麼；只剩『尚未實跑』的格子是 built。"""
+    bad = []
+    for capability in registry["capabilities"]:
+        for project, status in capability["status"].items():
+            if status["state"] == "pending" and _WRITTEN_ON_DEVELOPMENT.search(status["reason"]) and not _SAYS_WHAT_IS_MISSING.search(status["reason"]):
+                bad.append(f"cap {capability['id']} / {project}")
+    for row in registry["catalog"]:
+        for aspect in ("behaviour", "emits_event"):
+            for project, status in row[aspect].items():
+                if status["state"] == "pending" and _WRITTEN_ON_DEVELOPMENT.search(status["reason"]) and not _SAYS_WHAT_IS_MISSING.search(status["reason"]):
+                    bad.append(f"{row['code']} {aspect} / {project}")
+    assert bad == []
+
+
+V11_STILL_PENDING = {
+    "cap latch.restart_only_clear", "cap latch.consecutive_failure_counter", "cap reconcile.google_status", "cap docs.glossary_adopted",
+    "cap reconcile.adopted_fills", "cap projection.requeue_parked",
+    "FLEET.OPS_GOOGLE_DIVERGED behaviour", "FLEET.OPS_GOOGLE_DIVERGED emits_event",
+    "FLEET.OPS_CLOCK_DEGRADED behaviour", "FLEET.OPS_CLOCK_DEGRADED emits_event",
+}
+
+
+def test_the_v11_cells_that_are_still_pending_are_exactly_the_ones_not_written_or_not_decided(registry):
+    """V11 還剩的『未做』逐格點名（改了要有意識地改這份清單與對外說明）：其餘寫好的都是『已完成、尚未上線』。"""
+    pending = {f"cap {c['id']}" for c in registry["capabilities"] if c["status"]["trend-meteor"]["state"] == "pending"}
+    pending |= {f"{row['code']} {aspect}" for row in registry["catalog"] for aspect in ("behaviour", "emits_event")
+                if row[aspect].get("trend-meteor", {}).get("state") == "pending"}
+    assert pending == V11_STILL_PENDING
+
+
+def test_the_rollout_page_intro_no_longer_says_development_only_code_counts_as_not_done(registry, catalog):
+    """頁面開頭要說清楚三類：不能再寫『只在開發主幹的一律算未做』，因為寫好的已經分出『已完成、尚未上線』。"""
+    html = _render_guides().render_rollout_register(catalog, registry, _render_guides().load_glossary())
+    assert "的一律算「未做」" not in html
+    assert "已完成、尚未上線" in html and "還沒寫或還沒決定的才算「未做」" in html

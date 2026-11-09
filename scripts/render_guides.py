@@ -813,13 +813,12 @@ window.addEventListener("scroll",syncTop,{passive:true}); syncTop();
 
 
 def _combined(statuses: dict[str, Any]) -> dict[str, Any]:
-    """One status for a row that spans several strategies (FLEET.*): done only
-    if every strategy is done, n/a only if every one is n/a, else pending."""
+    """One status for a row that spans several strategies (FLEET.*): done when every
+    applicable strategy is done (n/a ones do not count), n/a only if every one is n/a, built when nothing is pending and something is
+    built, else pending."""
     states = {s["state"] for s in statuses.values()}
-    if states == {"done"}:
-        return {"state": "done"}
-    if states == {"n/a"}:
-        return {"state": "n/a"}
+    if states <= {"done", "n/a"}:
+        return {"state": "done" if "done" in states else "n/a"}
     if "pending" not in states and "built" in states:
         return {"state": "built"}
     return {"state": "pending"}
@@ -1013,7 +1012,7 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
   <h1>機隊一致性登記冊</h1>
   <p class="lede">
     每一項機隊功能、每一條錯誤處理規則，在各策略裡<b>實際做到了沒有</b>。
-    <b>「已做」＝正式機已經在跑</b>（正式機分支 <code>operations</code> 上有），只合併到開發主幹、或只在開發機上的一律算「未做」；
+    <b>「已做」＝正式機已經在跑</b>（正式機分支 <code>operations</code> 上有），只合併到開發主幹、或只在開發機上的，不算「已做」：程式已寫好的算「已完成、尚未上線」，還沒寫或還沒決定的才算「未做」；
     「未做」會寫預定在哪一關做，「不適用」會寫理由，漏寫 CI 會擋下來。
     看不懂某個名詞？看最下面的 <a class="gloss-link" href="#glossary">名詞對照表</a>。
   </p>

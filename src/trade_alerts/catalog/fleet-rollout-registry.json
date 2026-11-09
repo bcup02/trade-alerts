@@ -91,9 +91,9 @@
           "evidence": "src/btc_competition/runner.py:553 build_safe_halt（Phase 4c）"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 用共用庫的安全暫停格式（safe_halt_model），規則、每日單元、守護單元與解除暫停工具都已在趨勢 repo 開發分支（5d-1～5d-3b）；尚未在任何主機實跑。"
+          "evidence": "V11 用共用庫的安全暫停格式（safe_halt_model）：規則在 src/trend_meteor/runner.py，每日單元、守護單元與解除暫停工具（src/trend_meteor/resume.py）都已在趨勢 repo 開發分支（5d-1～5d-3b）；尚未在任何主機實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -356,9 +356,9 @@
           "reason": "沒有修復機器人（見「修復機器人：抓錯並提出修復建議」）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "停用開關 TREND_METEOR_REPAIR_PAUSED 在 V11 單元入口讀取（PR #209；未記帳處理器的檢查在入口、PR #209 審閱 BLOCK-209-01），修復單元拿不到鎖時仍刷新 ops_export（PR #217）；尚未實跑，等開發機演練（P3）。"
+          "evidence": "停用開關 TREND_METEOR_REPAIR_PAUSED 在 V11 單元入口 src/trend_meteor/cli.py 讀取（未記帳處理器的檢查也在入口），修復單元拿不到鎖時仍刷新 ops_export（deploy/trend-meteor-repair.service），已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -751,9 +751,9 @@
           "limit": "策略白話警報的標題沒有在手機上逐字比對過，靠程式讀錯誤清單與自動檢查保證；這個策略自己偵測的事件在 A1 沒有實際發生過。本次測試事件是 ERR-023（下單結果不明）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "通知附錯誤編號由共用庫的匯出檔組；V11 的錯誤條目已補（ERR-072 起）；通知路徑等開發機演練（P3）實跑驗證。"
+          "evidence": "通知附錯誤編號由共用庫的匯出檔組；V11 的錯誤條目已補（ERR-072 起），匯出檔由 deploy/trend-meteor-repair.service 每輪寫出，已在開發分支；通知路徑尚未實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -1035,7 +1035,7 @@
         "trend-meteor": {
           "state": "built",
           "phase": "v11-p3",
-          "evidence": "V11 釘的工具庫是 0.4.1（requirements.lock，commit b5858cb）；下單量依交易所步長取整的規則在 src/trend_meteor/execution.py:82 讀入 stepSize，已在開發分支；實跑等開發機演練（P3）。"
+          "evidence": "V11 釘的工具庫是 0.4.1（requirements.lock，commit b5858cb），守門測試 tests/test_toolkit_round_to_step.py 擋退版；V11 自己的下單量取整是 src/trend_meteor/execution.py:59 的 floor_step（整數單位加微小容差），已在開發分支；實跑等開發機演練（P3）。"
         }
       }
     },
