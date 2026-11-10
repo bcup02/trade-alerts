@@ -1050,7 +1050,7 @@ def test_a_pending_cell_that_says_the_code_is_on_development_names_what_is_still
 
 
 V11_STILL_PENDING = {
-    # 2026-11-10（進度頁 1.10）：P3 前能做的都做完（Google 對帳 3 格、重新排入、名詞表掃描、連續失敗、帳本積壓通知 2 格）改成已完成、尚未上線；
+    # 2026-11-10（進度頁 1.10）：P3 前能做的都做完（Google 對帳單元與通知軸 2 格、重新排入、名詞表掃描、連續失敗、帳本積壓通知 2 格）改成已完成、尚未上線（Google 的事件日誌格是不適用）；
     # 剩下這 4 項依登記冊的理由要等開發機演練（P3）：要看過實際暫停、要測試網實測、時鐘軸是主機設定。
     "cap latch.restart_only_clear", "cap reconcile.adopted_fills",
     "FLEET.OPS_CLOCK_DEGRADED behaviour", "FLEET.OPS_CLOCK_DEGRADED emits_event",
@@ -1142,3 +1142,23 @@ def test_the_ledger_write_stuck_entry_notifies_once_and_never_halts(catalog, reg
     prompt = entry["operator_message"]["ai_prompt"]
     assert "只有 dropped 數量" in prompt and "能識別的才逐筆列出" in prompt and "無法直接識別被丟棄的是哪幾筆" in prompt
     assert "帳本與交易所成交的差異" in prompt and "待確認的補記方案" in prompt and "列出被丟棄的項目並對照交易所成交" not in prompt
+
+
+def test_v11_google_status_rule_notifies_through_the_status_file_not_the_event_log(registry):
+    """PR #359 審閱 BLOCK-359-01：維運通知直接讀狀態檔，所以 emits_event 與其他四支一樣是不適用，不是已完成。"""
+    row = next(r for r in registry["catalog"] if r["code"] == "FLEET.OPS_GOOGLE_DIVERGED")
+    assert row["behaviour"]["trend-meteor"]["state"] == "built"
+    assert row["emits_event"]["trend-meteor"] == {"state": "n/a", "reason": "維運通知直接讀狀態檔，不經事件日誌。"}
+    assert {c["state"] for p, c in row["emits_event"].items() if p != "trend-meteor"} == {"n/a"}
+
+
+def test_ledger_write_stuck_texts_do_not_promise_delivery_or_exactly_once(registry, catalog):
+    """PR #359 審閱 BLOCK-359-02／03：事件寫進事件日誌不等於通知送達（匯出軸是 opt-in、第一次啟用不補發）；『只記一次』只在正常路徑成立（事件成功後存檔前中斷會再記一筆）。"""
+    row = next(r for r in registry["catalog"] if r["code"] == "MET.LEDGER_WRITE_STUCK")
+    texts = [row["behaviour"]["trend-meteor"]["evidence"], row["emits_event"]["trend-meteor"]["evidence"]]
+    cap = next(c for c in registry["capabilities"] if c["id"] == "latch.consecutive_failure_counter")
+    texts.append(cap["status"]["trend-meteor"]["evidence"])
+    assert all("OPS_NOTIFY_TREND_METEOR_OPS_EXPORT" in t for t in texts[1:])                       # 通知要靠啟用匯出軸（P3 設定）
+    assert "寧可重複不漏" in texts[0] and "不等於通知送達" in texts[1]
+    entry = next(e for e in catalog["entries"] if e["code"] == "MET.LEDGER_WRITE_STUCK")
+    assert "寧可重複通知，不漏通知" in entry["auto_action"] and "第一次啟用時既有事件不補發" in entry["auto_action"] and "由匯出檔通知一次" not in entry["auto_action"]
