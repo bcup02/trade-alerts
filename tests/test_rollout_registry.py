@@ -1133,4 +1133,9 @@ def test_the_ledger_write_stuck_entry_notifies_once_and_never_halts(catalog, reg
     assert entry["current"]["latch"] is None and catalog["error_ids_issued"] == 108
     assert "不暫停" in entry["auto_action"] and "3 天" in entry["auto_action"] and "不同的 UTC 日" in entry["auto_action"]
     assert "MET.LEDGER_ITEM_DROPPED" in entry["auto_action"]                                       # 丟棄是另一條（R3），這條不取代它
-    assert "不需要手動補記" in entry["operator_message"]["direction"]
+    # BLOCK-355-01：自動補記只適用於仍留在待記帳清單的項目；已被丟棄的（MET.LEDGER_ITEM_DROPPED）不會自動補回，文字不可無條件承諾「不需要手動補記」
+    for text in (entry["human_action"], entry["operator_message"]["direction"]):
+        assert "仍留在待記帳清單" in text and "MET.LEDGER_ITEM_DROPPED" in text and "不會自動補回" in text
+    assert "不需要手動補記" not in entry["human_action"] + entry["operator_message"]["direction"] + " ".join(entry["operator_message"]["steps"])
+    assert any("MET.LEDGER_ITEM_DROPPED" in step for step in entry["operator_message"]["steps"])
+    assert "不保證沒有項目已經被丟棄" in entry["auto_action"]
