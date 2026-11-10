@@ -1050,11 +1050,10 @@ def test_a_pending_cell_that_says_the_code_is_on_development_names_what_is_still
 
 
 V11_STILL_PENDING = {
-    "cap latch.restart_only_clear", "cap latch.consecutive_failure_counter", "cap reconcile.google_status", "cap docs.glossary_adopted",
-    "cap reconcile.adopted_fills", "cap projection.requeue_parked",
-    "FLEET.OPS_GOOGLE_DIVERGED behaviour", "FLEET.OPS_GOOGLE_DIVERGED emits_event",
+    # 2026-11-10（進度頁 1.10）：P3 前能做的都做完（Google 對帳 3 格、重新排入、名詞表掃描、連續失敗、帳本積壓通知 2 格）改成已完成、尚未上線；
+    # 剩下這 4 項依登記冊的理由要等開發機演練（P3）：要看過實際暫停、要測試網實測、時鐘軸是主機設定。
+    "cap latch.restart_only_clear", "cap reconcile.adopted_fills",
     "FLEET.OPS_CLOCK_DEGRADED behaviour", "FLEET.OPS_CLOCK_DEGRADED emits_event",
-    "MET.LEDGER_WRITE_STUCK behaviour", "MET.LEDGER_WRITE_STUCK emits_event",     # 新條目：程式在 V11 的 1.10 做，做完改已完成、尚未上線
 }
 
 
