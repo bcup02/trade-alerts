@@ -180,7 +180,7 @@
         "trend-meteor": {
           "state": "built",
           "phase": "v11-p3",
-          "evidence": "V11 的連續失敗分工（使用者 2026-11-10 定：只通知不暫停，保護類失敗不放寬）：輸入抓不到連續 3 個 UTC 日才安全暫停（src/trend_meteor/runner.py _data_unavailable）；待記帳積壓累計 3 個不同 UTC 日寫一筆 R2 已升格事件、不暫停（src/trend_meteor/runner.py _track_ledger_backlog，PR #224，目錄 ERR-108）——事件要由啟用的維運通知匯出檔通知（OPS_NOTIFY_TREND_METEOR_OPS_EXPORT=on，預設關，P3 設定），第一次啟用時既有事件不補發；未分類例外持續失敗靠每日單元非零結束，由維運通知服務單元軸通知（OPS_NOTIFY_TREND_METEOR_UNITS 要列入每日單元，P3）；保護類失敗仍一次就暫停。"
+          "evidence": "V11 的連續失敗分工（使用者 2026-11-10 定：只通知不暫停，保護類失敗不放寬）：輸入抓不到連續 3 個 UTC 日才安全暫停（src/trend_meteor/runner.py _data_unavailable）；待記帳積壓累計 3 個不同 UTC 日寫一筆 R2 已升格事件、不暫停（src/trend_meteor/runner.py _track_ledger_backlog，PR #224，目錄 ERR-108）；通知另有條件：要設定 OPS_NOTIFY_TREND_METEOR_AUDIT 建立 V11 目標、OPS_NOTIFY_TREND_METEOR_OPS_EXPORT=on 啟用匯出軸（預設關，P3 設定），事件仍在匯出視窗內（預設 7 天）；匯出軸每次第一次啟用或關掉後重新啟用，當下已存在的事件都視為已送達、不補發；未分類例外持續失敗靠每日單元非零結束，由維運通知服務單元軸通知（OPS_NOTIFY_TREND_METEOR_UNITS 要列入每日單元，P3）；保護類失敗仍一次就暫停。"
         }
       }
     },
@@ -3273,14 +3273,14 @@
         "trend-meteor": {
           "state": "built",
           "phase": "v11-p3",
-          "evidence": "V11 每日單元走完整輪後待記帳清單仍非空就算積壓的一天，累計 3 個不同 UTC 日寫一筆 R2 已升格事件、清空歸零、不暫停（src/trend_meteor/runner.py _track_ledger_backlog；狀態欄位在 src/trend_meteor/state.py）；正常路徑每段積壓記一次，事件寫進事件日誌之後、狀態存檔之前程序中斷（或存檔失敗），下一輪會再記一筆（寧可重複不漏）。趨勢 repo 開發分支 PR #224，改釘 trade-alerts v0.30.32。尚未在主機實跑，等開發機演練（P3）。"
+          "evidence": "V11 每日單元走完整輪後待記帳清單仍非空就算積壓的一天，累計 3 個不同 UTC 日寫一筆 R2 已升格事件、清空歸零、不暫停（src/trend_meteor/runner.py _track_ledger_backlog；狀態欄位在 src/trend_meteor/state.py）；正常路徑每段積壓記一次，事件寫進事件日誌之後、狀態存檔之前程序中斷（或存檔失敗），下一輪會再記一筆（寧可重複記錄事件，避免因存檔失敗而漏記事件；不是通知保證）。趨勢 repo 開發分支 PR #224，改釘 trade-alerts v0.30.32。尚未在主機實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
           "phase": "v11-p3",
-          "evidence": "事件由 V11 程式寫進事件日誌：code LEDGER_WRITE_STUCK、risk_tier R2、details.escalated True（src/trend_meteor/runner.py _track_ledger_backlog，PR #224）；事件寫入成功才設已記錄旗標，寫失敗下一個走完整輪的日子再記。寫進事件日誌不等於通知送達：通知由啟用的維運通知匯出檔負責（OPS_NOTIFY_TREND_METEOR_OPS_EXPORT=on，預設關，P3 設定）。目錄守門測試（tests/test_trend_meteor_catalog_guard.py）強制與目錄一致。尚未實跑，等開發機演練（P3）。"
+          "evidence": "事件由 V11 程式寫進事件日誌：code LEDGER_WRITE_STUCK、risk_tier R2、details.escalated True（src/trend_meteor/runner.py _track_ledger_backlog，PR #224）；事件寫入成功才設已記錄旗標，寫失敗下一個走完整輪的日子再記。寫進事件日誌不等於通知送達。通知另有條件：要設定 OPS_NOTIFY_TREND_METEOR_AUDIT 建立 V11 目標、OPS_NOTIFY_TREND_METEOR_OPS_EXPORT=on 啟用匯出軸（預設關，P3 設定），事件仍在匯出視窗內（預設 7 天）；匯出軸每次第一次啟用或關掉後重新啟用，當下已存在的事件都視為已送達、不補發。目錄守門測試（tests/test_trend_meteor_catalog_guard.py）強制與目錄一致。尚未實跑，等開發機演練（P3）。"
         }
       }
     }

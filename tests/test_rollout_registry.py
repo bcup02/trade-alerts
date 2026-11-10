@@ -1153,12 +1153,17 @@ def test_v11_google_status_rule_notifies_through_the_status_file_not_the_event_l
 
 
 def test_ledger_write_stuck_texts_do_not_promise_delivery_or_exactly_once(registry, catalog):
-    """PR #359 審閱 BLOCK-359-02／03：事件寫進事件日誌不等於通知送達（匯出軸是 opt-in、第一次啟用不補發）；『只記一次』只在正常路徑成立（事件成功後存檔前中斷會再記一筆）。"""
+    """PR #359 審閱 BLOCK-359-02／03／04：事件寫進事件日誌不等於通知送達——要建立 V11 目標、啟用匯出軸（預設關）、事件在匯出視窗內，而且匯出軸每次第一次啟用**或關掉後重新啟用**，
+    當下已存在的事件都視為已送達、不補發；『只記一次』只在正常路徑成立（事件成功後存檔前中斷會再記一筆）；『寧可重複』只是記錄事件，不是通知保證。"""
     row = next(r for r in registry["catalog"] if r["code"] == "MET.LEDGER_WRITE_STUCK")
-    texts = [row["behaviour"]["trend-meteor"]["evidence"], row["emits_event"]["trend-meteor"]["evidence"]]
-    cap = next(c for c in registry["capabilities"] if c["id"] == "latch.consecutive_failure_counter")
-    texts.append(cap["status"]["trend-meteor"]["evidence"])
-    assert all("OPS_NOTIFY_TREND_METEOR_OPS_EXPORT" in t for t in texts[1:])                       # 通知要靠啟用匯出軸（P3 設定）
-    assert "寧可重複不漏" in texts[0] and "不等於通知送達" in texts[1]
-    entry = next(e for e in catalog["entries"] if e["code"] == "MET.LEDGER_WRITE_STUCK")
-    assert "寧可重複通知，不漏通知" in entry["auto_action"] and "第一次啟用時既有事件不補發" in entry["auto_action"] and "由匯出檔通知一次" not in entry["auto_action"]
+    behaviour, emits = row["behaviour"]["trend-meteor"]["evidence"], row["emits_event"]["trend-meteor"]["evidence"]
+    cap = next(c for c in registry["capabilities"] if c["id"] == "latch.consecutive_failure_counter")["status"]["trend-meteor"]["evidence"]
+    entry = next(e for e in catalog["entries"] if e["code"] == "MET.LEDGER_WRITE_STUCK")["auto_action"]
+    for text in (emits, cap, entry):                                                     # 通知的完整條件
+        for needle in ("OPS_NOTIFY_TREND_METEOR_AUDIT", "OPS_NOTIFY_TREND_METEOR_OPS_EXPORT", "7 天", "重新啟用", "不補發"):
+            assert needle in text, needle
+    assert "不等於通知送達" in emits and "不是通知保證" in behaviour and "避免因存檔失敗而漏記事件" in behaviour
+    assert "避免因狀態存檔失敗而漏記事件" in entry and "這不是通知保證" in entry and "不保證你一定收到通知" in entry
+    for text in (behaviour, emits, cap, entry):                                          # 舊的過度承諾不得再出現
+        for banned in ("不漏通知", "寧可重複不漏", "由匯出檔通知一次", "第一次啟用時既有事件不補發"):
+            assert banned not in text, banned
