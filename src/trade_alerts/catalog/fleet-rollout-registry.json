@@ -2,13 +2,13 @@
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
   "updated_at": "2026-11-10",
-  "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json.",
+  "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json. Retired projects (trade_alerts.rollout_registry.RETIRED_PROJECTS: the old trend strategy, 舊趨勢（已停用、待封存）) keep their existing cells and SEY.* rows as evidence but get no column on the rollout register page, and a new capability or FLEET.* row need not fill their cell.",
   "projects": {
     "momentum": "動能策略",
-    "seykota": "趨勢策略",
+    "seykota": "舊趨勢（已停用、待封存）",
     "mycrypto": "加密策略",
     "btc-competition": "競賽策略",
-    "trend-meteor": "趨勢策略・流星池版"
+    "trend-meteor": "趨勢策略"
   },
   "phases": {
     "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
@@ -597,7 +597,7 @@
         "trend-meteor": {
           "state": "pending",
           "phase": "v11-p3",
-          "reason": "名詞對照表已加入『趨勢策略・流星池版』；V11 repo 內文件與訊息逐條對照名詞表的全面掃描還沒做，開發機演練（P3）前做。"
+          "reason": "名詞對照表已加入『趨勢策略』；V11 repo 內文件與訊息逐條對照名詞表的全面掃描還沒做，開發機演練（P3）前做。"
         }
       }
     },
@@ -3275,518 +3275,245 @@
       "id": "latch.unified_model",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "latch.resume_tool",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "latch.restart_only_clear",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "latch.consecutive_failure_counter",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "runtime.status_snapshot",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "reconcile.ledger_status",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "reconcile.google_status",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "repair_bot.detect_propose",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "repair_bot.verified_close",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "repair_bot.pause_brake",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "ops_export.writer",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "ops_notify.export_relay_enabled",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "notify.line_first_notice",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
+    },
+    {
+      "kind": "cap",
+      "id": "notify.telegram_repeat",
+      "project": "trend-meteor",
+      "type": "updated",
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "ops_notify.units_axis",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "reconcile.funding_fee_sync",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "reconcile.google_projection_grace",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "docs.glossary_adopted",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "orders.single_send",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "ledger.trade_correction",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "reconcile.unrecorded_fill_handling",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "repair_bot.recurrence_escalation",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "notify.error_id",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "stop.graceful",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "recovery.interrupted_order",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "reconcile.adopted_fills",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "projection.park_unconfirmed_correction",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "projection.requeue_parked",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "google.close_whole_trade_entry",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
+    },
+    {
+      "kind": "cap",
+      "id": "google.spot_fill_row",
+      "project": "trend-meteor",
+      "type": "updated",
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.pending_age_cap",
+      "project": "trend-meteor",
+      "type": "updated",
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
       "kind": "cap",
       "id": "orders.step_rounding_decimal",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "趨勢策略・流星池版（V11）：5d 做完（單元、安裝腳本、解除暫停、帳本鎖，趨勢 repo PR #209～#217），預定關卡由 5d 改成開發機演練（P3）並寫明已在開發分支的內容（進度頁 1.5d5）。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
-      "kind": "rule",
-      "id": "FLEET.OPS_CLOCK_DEGRADED",
+      "kind": "cap",
+      "id": "ledger.capital_flow",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
-      "kind": "rule",
-      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
+      "kind": "cap",
+      "id": "ledger.dust_convert",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     },
     {
-      "kind": "rule",
-      "id": "FLEET.OPS_GOOGLE_DIVERGED",
+      "kind": "cap",
+      "id": "bear.paxg_asset",
       "project": "trend-meteor",
       "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_LEDGER_DIVERGED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_RUNTIME_ALERT",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_STATUS_STALE",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_UNIT_FAILED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.BAD_EXCHANGE_DATA",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.DATA_UNAVAILABLE",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.EXECUTION_FAILED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.FUNDING_SHEET_WRITE_FAILED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.HEDGE_MODE",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.LEDGER_DATA_QUALITY",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.LEDGER_ITEM_DROPPED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.LEVERAGE_NOT_1",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.MARGIN_BELOW_FLOOR",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.MISSED_DAYS",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.NOT_ISOLATED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.ORDER_NOT_TERMINAL",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.ORDER_OUTCOME_UNKNOWN",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.PENDING_UNRESOLVED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.POSITION_GONE_STOP_NOT_TRIGGERED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.PROTECTION_UNVERIFIED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.RECOVERY_LOOKUP_FAILED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.RECOVERY_STOP_STATE",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.RUNTIME_CYCLE_FAILED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STALE_STOP_CANCEL_FAILED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STATE_FILE_CORRUPT",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STEP_OUTCOME_UNKNOWN",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STOP_FILL_UNKNOWN",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STOP_OUTCOME_UNKNOWN",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STOP_STATE_UNKNOWN",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STOP_STATUS_UNRECOGNIZED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.STOP_TRIGGERED_UNREPORTED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.UNEXPECTED_POSITION",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.UNKNOWN_STEP",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.UNRECORDED_FILL_CORRECTED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.UNRECORDED_FILL_UNRESOLVED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_AUTO_REPAIRED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_BLOCKED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_FAILED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_RECURRING",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.WINNER_NO_PERP",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 的預定關卡由 5d 改成開發機演練（P3），理由寫明已在開發分支的內容。"
+      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
     }
   ]
 }

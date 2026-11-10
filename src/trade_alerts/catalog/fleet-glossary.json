@@ -1,23 +1,23 @@
 {
   "glossary_version": "fleet-glossary/v1",
-  "updated_at": "2026-11-04",
+  "updated_at": "2026-11-10",
   "note": "機隊全專案中文用詞對照表。給人看的文字一律用 zh；retired 是不要再用的舊叫法，tests/test_fleet_glossary.py 會掃描 trade-alerts 內給人看的文字，出現就擋。英文代號只如實列出，不在這裡改。",
   "entries": [
     {
       "id": "strategy.seykota",
       "category": "策略",
-      "zh": "趨勢策略",
+      "zh": "舊趨勢（已停用、待封存）",
       "en": [
         "seykota",
         "ed-seykota-systematic-trend-following",
         "SEY."
       ],
-      "definition": "用 4 小時 K 線做 BTC 趨勢跟隨的策略，持倉通常比較久。",
+      "definition": "原本的趨勢策略（V1.1，用 4 小時 K 線做 BTC 趨勢跟隨）。2026-10-29 起兩台主機都已停用，等正式機下線、repo 封存；「趨勢策略」這個名字已改給全合約新版本。",
       "retired": [
         "長線策略",
         "4 小時趨勢追蹤"
       ],
-      "note": "程式裡的專案代號目前不只一個（seykota-btcusdt-4h、ed-seykota），這次只統一中文。"
+      "note": "2026-11-10 使用者定：V11 改叫「趨勢策略」，舊的標「舊趨勢（已停用、待封存）」。程式與錯誤編號仍是 seykota／SEY.，只統一中文；舊程式碼裡寫「趨勢策略」的地方指的是舊趨勢，逐步改。"
     },
     {
       "id": "strategy.momentum",
@@ -82,14 +82,16 @@
     {
       "id": "strategy.trend-meteor",
       "category": "策略",
-      "zh": "趨勢策略・流星池版",
+      "zh": "趨勢策略",
       "en": [
         "trend-meteor",
         "MET."
       ],
-      "definition": "趨勢策略的全合約新版本（V11）：流星池勝者做空永續合約＋BTC／PAXG 永續多單腿＋兩段式保護模式＋盤中強平線，單一合約帳戶、逐倉 1 倍。放在趨勢策略的 repo（程式在 src/trend_meteor），與競賽策略各自獨立。",
-      "retired": [],
-      "note": "2026-11-08 加入。不要和「競賽策略・流星池版」（競賽策略的流星池獨立版本，回測報告編號 MET-R…）混用：前者是趨勢策略的 V11（錯誤目錄前綴 MET.、專案代號 trend-meteor），後者是回測研究。"
+      "definition": "趨勢策略（2026-11-10 起專指全合約新版本 V11）：流星池勝者做空永續合約＋BTC／PAXG 永續多單腿＋兩段式保護模式＋盤中強平線，單一合約帳戶、逐倉 1 倍。放在趨勢策略的 repo（程式在 src/trend_meteor），與競賽策略各自獨立。",
+      "retired": [
+        "趨勢策略・流星池版"
+      ],
+      "note": "2026-11-10 起 V11 的正式中文名就是「趨勢策略」（原「趨勢策略・流星池版」改用此名）。不要和「競賽策略・流星池版」（競賽策略的流星池獨立版本，回測報告編號 MET-R…）混用；V11 的錯誤目錄前綴是 MET.、專案代號 trend-meteor。"
     },
     {
       "id": "strategy.fleet",

@@ -42,6 +42,12 @@ REGISTRY_PENDING_PROJECTS: tuple[str, ...] = ()
 #: The four strategies; ``fleet`` is a catalog prefix for cross-repo
 #: conditions, not a strategy that can have a capability.
 STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet" and project not in REGISTRY_PENDING_PROJECTS)
+#: Strategies that are stopped and waiting to be archived (舊趨勢, 2026-11-10: V11 took the name 趨勢策略).  Their existing cells and
+#: ``SEY.*`` rows stay as evidence (nothing is deleted until the old trend is taken off A1 and its repo archived), but the rollout
+#: register page shows no column for them and a new capability or ``FLEET.*`` row need not fill their cell.
+RETIRED_PROJECTS: tuple[str, ...] = ("seykota",)
+#: The columns the rollout register page shows and new features must fill.
+ACTIVE_PROJECTS = tuple(project for project in STRATEGY_PROJECTS if project not in RETIRED_PROJECTS)
 STATES = ("done", "built", "pending", "n/a")
 #: ``done`` means present where the live host deploys from -- not merely
 #: merged to development or running on the dev host.  ``built`` (已完成、尚未上線, 2026-11-10) is the honest middle: the code is written
@@ -191,8 +197,9 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
             if not (isinstance(capability.get(key), str) and capability[key].strip()):
                 problems.append(f"capability {cid}: missing {key}")
         status = capability.get("status") or {}
-        if set(status) != set(STRATEGY_PROJECTS):
-            problems.append(f"capability {cid}: must list all four strategies, got {sorted(status)}")
+        if not set(ACTIVE_PROJECTS) <= set(status) <= set(STRATEGY_PROJECTS):
+            problems.append(f"capability {cid}: must list every active strategy {sorted(ACTIVE_PROJECTS)} "
+                            f"(retired {sorted(RETIRED_PROJECTS)} optional), got {sorted(status)}")
         for project, value in status.items():
             problems += _status_problems(f"capability {cid} / {project}", value, phases)
 
@@ -213,8 +220,12 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
         expected = set(owners(code))
         for key in ("behaviour", "emits_event"):
             status = row.get(key) or {}
-            if set(status) != expected:
-                problems.append(f"{code} {key}: must list exactly {sorted(expected)}, got {sorted(status)}")
+            # A retired project's cell is optional on a cross-repo (FLEET.*) row; a single-owner row keeps its one cell.
+            required = expected - set(RETIRED_PROJECTS) if len(expected) > 1 else expected
+            if not required <= set(status) <= expected:
+                problems.append(f"{code} {key}: must list exactly {sorted(required)}"
+                                f"{' (retired ' + str(sorted(RETIRED_PROJECTS)) + ' optional)' if required != expected else ''}, "
+                                f"got {sorted(status)}")
             for project, value in status.items():
                 problems += _status_problems(f"{code} {key} / {project}", value, phases)
         if code in retired:
@@ -279,7 +290,8 @@ def project_rows(registry: Mapping[str, Any], project: str) -> dict[str, dict[st
         raise ValueError(f"unknown strategy project {project!r}")
     rows: dict[str, dict[str, Any]] = {}
     for capability in registry.get("capabilities") or []:
-        rows[f"capability:{capability['id']}"] = dict(capability["status"][project])
+        if project in capability["status"]:      # a retired project need not fill a newer capability
+            rows[f"capability:{capability['id']}"] = dict(capability["status"][project])
     for row in registry.get("catalog") or []:
         for key in ("behaviour", "emits_event"):
             if project in (row.get(key) or {}):

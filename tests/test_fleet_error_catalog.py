@@ -212,7 +212,11 @@ def test_error_id_is_shown_on_both_register_pages(catalog):
     risk_data = json.loads(re.search(r'<script type="application/json" id="data">\n(.*?)\n</script>', pages["fleet-risk-register.html"], re.S)
                            .group(1).replace("<\\/", "</"))
     assert any(e["error_id"] == first["error_id"] and e["code"] == first["code"] for e in risk_data["entries"])
-    assert f'{first["error_id"]} · {first["code"]}' in pages["fleet-rollout-register.html"]
+    # 舊趨勢（SEY.*）已停用、待封存：一致性登記冊沒有它的欄，只留在風險登記冊；其餘條目兩頁都要有錯誤編號。
+    from trade_alerts.rollout_registry import RETIRED_PROJECTS, owners
+    shown = next(e for e in catalog["entries"] if set(owners(e["code"])) - set(RETIRED_PROJECTS))
+    assert f'{shown["error_id"]} · {shown["code"]}' in pages["fleet-rollout-register.html"]
+    assert f'{first["error_id"]} · {first["code"]}' not in pages["fleet-rollout-register.html"]
 
 
 def test_retiring_an_entry_keeps_its_error_id_in_retired_codes(catalog):

@@ -22,7 +22,7 @@ from trade_alerts import (
     registry_problems,
 )
 from trade_alerts.fleet_event_log import load_error_catalog
-from trade_alerts.rollout_registry import owners
+from trade_alerts.rollout_registry import ACTIVE_PROJECTS, RETIRED_PROJECTS, STRATEGY_PROJECTS, owners
 
 _ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = _ROOT / "src" / "trade_alerts" / "catalog" / "fleet-rollout-registry.json"
@@ -149,7 +149,7 @@ def test_missing_project_is_caught(registry, catalog):
 
 def test_capability_missing_a_strategy_is_caught(registry, catalog):
     problems = _problems_after(registry, catalog, lambda r: _capability(r)["status"].pop("btc-competition"))
-    assert any("must list all four strategies" in p for p in problems)
+    assert any("must list every active strategy" in p for p in problems)
 
 
 def test_duplicate_capability_id_is_caught(registry, catalog):
@@ -317,7 +317,8 @@ def test_pages_cover_every_catalog_entry_and_capability(registry, catalog):
     pages = {path.name: html for path, html in _render_guides().rendered_pages().items()}
     for entry in catalog["entries"]:
         assert entry["code"] in pages["fleet-risk-register.html"]
-        assert entry["code"] in pages["fleet-rollout-register.html"]
+        # 舊趨勢（SEY.*）已停用：一致性登記冊沒有它的欄，只在風險登記冊
+        assert (entry["code"] in pages["fleet-rollout-register.html"]) is bool(set(owners(entry["code"])) - set(RETIRED_PROJECTS))
     for capability in registry["capabilities"]:
         assert capability["id"] in pages["fleet-rollout-register.html"]
 
@@ -335,14 +336,15 @@ def _stage(states):
 def test_rollout_page_groups_items_by_whether_any_cell_is_pending_or_built(registry, catalog):
     """未完成＝有一格是未做；沒有未做但有一格已完成未上線＝等上線；其餘才是已完成（complete 只給最後一類）。"""
     items = {i["anchor"]: i for i in _render_guides().rollout_items(catalog, registry)}
-    assert len(items) == len(registry["capabilities"]) + len(registry["catalog"])
+    shown_rules = [row for row in registry["catalog"] if set(owners(row["code"])) - set(RETIRED_PROJECTS)]
+    assert len(items) == len(registry["capabilities"]) + len(shown_rules)
     for capability in registry["capabilities"]:
         item = items[f"cap-{capability['id']}"]
-        stage = _stage({s["state"] for s in capability["status"].values()})
+        stage = _stage({s["state"] for p, s in capability["status"].items() if p in ACTIVE_PROJECTS})
         assert item["stage"] == stage and item["complete"] is (stage == "done")
-    for row in registry["catalog"]:
+    for row in shown_rules:
         item = items[f"rule-{row['code']}"]
-        stage = _stage({s["state"] for key in ("behaviour", "emits_event") for s in row[key].values()})
+        stage = _stage({s["state"] for key in ("behaviour", "emits_event") for p, s in row[key].items() if p in ACTIVE_PROJECTS})
         assert item["stage"] == stage and item["complete"] is (stage == "done")
 
 
@@ -577,7 +579,7 @@ def test_recent_summary_lists_a_rule_once_when_both_aspects_flipped(registry, ca
     reg = copy.deepcopy(registry)
     code, project = next(
         (row["code"], p) for row in reg["catalog"] for p in row["behaviour"]
-        if row["behaviour"][p]["state"] == "done" and row["emits_event"][p]["state"] == "done"
+        if p in ACTIVE_PROJECTS and row["behaviour"][p]["state"] == "done" and row["emits_event"][p]["state"] == "done"
     )
     reg["recent_changes"] = [
         {"kind": "rule", "id": code, "project": project, "aspect": aspect, "type": "completed", "note": "同一句話"}
@@ -1066,3 +1068,57 @@ def test_the_rollout_page_intro_no_longer_says_development_only_code_counts_as_n
     html = _render_guides().render_rollout_register(catalog, registry, _render_guides().load_glossary())
     assert "的一律算「未做」" not in html
     assert "已完成、尚未上線" in html and "還沒寫或還沒決定的才算「未做」" in html
+
+
+# --- 2026-11-10 登記冊命名統一（進度頁 1.9）：V11 叫「趨勢策略」，舊趨勢已停用、待封存、頁面不顯示欄 ---------------------------
+
+
+def test_v11_is_called_trend_strategy_and_the_old_one_is_marked_retired(registry):
+    assert registry["projects"]["trend-meteor"] == "趨勢策略"
+    assert registry["projects"]["seykota"] == "舊趨勢（已停用、待封存）"
+    assert RETIRED_PROJECTS == ("seykota",) and "seykota" not in ACTIVE_PROJECTS
+    assert set(ACTIVE_PROJECTS) | set(RETIRED_PROJECTS) == set(STRATEGY_PROJECTS)
+
+
+def test_rollout_page_has_no_column_for_the_retired_project_but_the_data_is_kept(registry, catalog):
+    data = _page_data(_render_guides().render_rollout_register(catalog, registry, _render_guides().load_glossary()))
+    assert data["project_order"] == list(ACTIVE_PROJECTS)
+    assert set(data["totals"]) == set(ACTIVE_PROJECTS)
+    for item in data["items"]:
+        assert set(item["dots"]) == set(ACTIVE_PROJECTS)
+        assert all(row["label"] != registry["projects"]["seykota"] for row in item["rows"])
+    # 資料留著，等舊趨勢在正式機下線、repo 封存時再整批刪
+    assert any("seykota" in c["status"] for c in registry["capabilities"])
+    assert any(code.startswith("SEY.") for code in (row["code"] for row in registry["catalog"]))
+    assert "seykota" in registry["sources"]
+
+
+def test_risk_page_still_lists_the_retired_project_errors_under_its_new_label(registry, catalog):
+    pages = {path.name: html for path, html in _render_guides().rendered_pages().items()}
+    risk = _page_data(pages["fleet-risk-register.html"])
+    sey = [e for e in risk["entries"] if e["code"].startswith("SEY.")]
+    assert sey and {e["bot_label"] for e in sey} == {"舊趨勢（已停用、待封存）"}
+    assert any(b["id"] == "seykota" and b["label"] == "舊趨勢（已停用、待封存）" for b in risk["bots"])
+
+
+def test_a_new_capability_or_fleet_row_need_not_fill_the_retired_cell(registry, catalog):
+    problems = _problems_after(registry, catalog, lambda r: _capability(r)["status"].pop("seykota"))
+    assert not [p for p in problems if "capability" in p]
+    fleet_code = next(row["code"] for row in registry["catalog"] if row["code"].startswith("FLEET."))
+
+    def drop(reg):
+        row = next(r for r in reg["catalog"] if r["code"] == fleet_code)
+        for key in ("behaviour", "emits_event"):
+            row[key].pop("seykota")
+    assert not [p for p in _problems_after(registry, catalog, drop) if fleet_code in p]
+    # 但活著的策略一個都不能少
+    problems = _problems_after(registry, catalog, lambda r: _capability(r)["status"].pop("trend-meteor"))
+    assert any("must list every active strategy" in p for p in problems)
+
+
+def test_a_single_owner_rule_still_needs_its_own_cell(registry, catalog):
+    sey = next(row["code"] for row in registry["catalog"] if row["code"].startswith("SEY."))
+
+    def drop(reg):
+        next(r for r in reg["catalog"] if r["code"] == sey)["behaviour"].pop("seykota")
+    assert any(sey in p and "behaviour" in p for p in _problems_after(registry, catalog, drop))

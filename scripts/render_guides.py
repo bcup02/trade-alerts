@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from trade_alerts.fleet_event_log import load_error_catalog  # noqa: E402
 from trade_alerts.glossary import load_glossary  # noqa: E402
-from trade_alerts.rollout_registry import STRATEGY_PROJECTS, load_rollout_registry, owners  # noqa: E402
+from trade_alerts.rollout_registry import ACTIVE_PROJECTS, STRATEGY_PROJECTS, load_rollout_registry, owners  # noqa: E402
 
 GUIDES = ROOT / "docs" / "guides"
 HEALTH_CORE_JS = ROOT / "scripts" / "health_panel_core.js"
@@ -838,6 +838,8 @@ def render_risk_register(catalog: dict[str, Any], registry: dict[str, Any]) -> s
         still_open = False
         for key, label in (("behaviour", "行為"), ("emits_event", "寫進事件日誌")):
             for project in project_keys:
+                if project not in row[key]:     # a retired project's cell is optional on FLEET.* rows
+                    continue
                 status = row[key][project]
                 if status["state"] == "pending":
                     who = f"{projects[project]}：" if fleet else ""
@@ -921,17 +923,19 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
     items = []
     for capability in registry["capabilities"]:
         rows = [{"label": projects[p], "lines": [_line(capability["status"][p], None, phases)]}
-                for p in STRATEGY_PROJECTS if p in capability["status"]]
-        states = {p: {capability["status"][p]["state"]} if p in capability["status"] else set() for p in STRATEGY_PROJECTS}
+                for p in ACTIVE_PROJECTS if p in capability["status"]]
+        states = {p: {capability["status"][p]["state"]} if p in capability["status"] else set() for p in ACTIVE_PROJECTS}
         items.append({"kind": "cap", "id": capability["id"], "anchor": f"cap-{capability['id']}", "title": capability["title"],
                       "sub": capability["description"], "rows": rows, "states": states})
     for row in registry["catalog"]:
         tier, title, error_id = titles[row["code"]]
-        present = [p for p in STRATEGY_PROJECTS if p in row["behaviour"]]
+        present = [p for p in ACTIVE_PROJECTS if p in row["behaviour"]]
+        if not present:                 # a rule only a retired project owns (SEY.*): kept in the data, no column to show it in
+            continue
         rows = [{"label": projects[p], "lines": [_line(row["behaviour"][p], "行為", phases),
                                                  _line(row["emits_event"][p], "寫進事件日誌", phases)]} for p in present]
         states = {p: ({row["behaviour"][p]["state"], row["emits_event"][p]["state"]} if p in present else set())
-                  for p in STRATEGY_PROJECTS}
+                  for p in ACTIVE_PROJECTS}
         items.append({"kind": "rule", "id": row["code"], "anchor": f"rule-{row['code']}", "title": f"{tier}｜{title}",
                       "sub": f"{error_id} · {row['code']}", "rows": rows, "states": states})
     changes = registry.get("recent_changes") or []
@@ -943,10 +947,10 @@ def rollout_items(catalog: dict[str, Any], registry: dict[str, Any]) -> list[dic
         every = set().union(*states.values())
         item["stage"] = "pending" if "pending" in every else ("built" if "built" in every else "done")
         item["complete"] = item["stage"] == "done"
-        for p in STRATEGY_PROJECTS:
+        for p in ACTIVE_PROJECTS:
             if item["dots"][p] in ("done", "na") and (item["kind"], item["id"], p) in completed_set:
                 item["dots"][p] = "recent"
-        item["has_recent"] = any((item["kind"], item["id"], p) in completed_set for p in STRATEGY_PROJECTS)
+        item["has_recent"] = any((item["kind"], item["id"], p) in completed_set for p in ACTIVE_PROJECTS)
         item["added_recent"] = (item["kind"], item["id"]) in added_set
     return items
 
@@ -963,12 +967,14 @@ def _glossary_groups(glossary: dict[str, Any]) -> list[dict[str, Any]]:
 def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], glossary: dict[str, Any]) -> str:
     projects = registry["projects"]
     phases = registry["phases"]
-    totals = {p: {"done": 0, "built": 0, "pending": 0, "n/a": 0} for p in STRATEGY_PROJECTS}
+    totals = {p: {"done": 0, "built": 0, "pending": 0, "n/a": 0} for p in ACTIVE_PROJECTS}
     phase_counts = {k: 0 for k in phases}
     phase_built_counts = {k: 0 for k in phases}
     statuses = [s for c in registry["capabilities"] for s in c["status"].items()]
     statuses += [s for row in registry["catalog"] for key in ("behaviour", "emits_event") for s in row[key].items()]
     for project, status in statuses:
+        if project not in totals:       # retired project: kept in the data, not counted on the page
+            continue
         totals[project][status["state"]] += 1
         if status["state"] == "pending":
             phase_counts[status["phase"]] += 1
@@ -997,16 +1003,16 @@ def render_rollout_register(catalog: dict[str, Any], registry: dict[str, Any], g
             "project": projects[project] if project else None, "note": change["note"],
         })
     data = {
-        "projects": projects, "project_order": list(STRATEGY_PROJECTS), "phases": phases,
+        "projects": projects, "project_order": list(ACTIVE_PROJECTS), "phases": phases,
         "phase_order": [k for k in phases if phase_counts[k] or phase_built_counts[k]], "phase_counts": phase_counts,
         "phase_built_counts": phase_built_counts, "totals": totals, "items": items,
         "recent_summary": recent_summary, "glossary": _glossary_groups(glossary), "health": health_panel_data(glossary),
     }
     sources = "；".join(
         f"{html.escape(registry['projects'][p])} <code>{html.escape(s['repo'])}@{html.escape(s['branch'])} {html.escape(s['commit'][:7])}</code>"
-        for p, s in ((p, registry["sources"][p]) for p in STRATEGY_PROJECTS)
+        for p, s in ((p, registry["sources"][p]) for p in ACTIVE_PROJECTS)
     )
-    order = "、".join(html.escape(projects[p]) for p in STRATEGY_PROJECTS)
+    order = "、".join(html.escape(projects[p]) for p in ACTIVE_PROJECTS)
     body = f"""<div class="wrap">
   <div class="eyebrow">交易機隊 · 各策略做到哪裡了</div>
   <h1>機隊一致性登記冊</h1>

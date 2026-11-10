@@ -53,6 +53,8 @@ from .ops_export import (
 )
 from .rollout_registry import (
     REGISTRY_VERSION,
+    ACTIVE_PROJECTS,
+    RETIRED_PROJECTS,
     STRATEGY_PROJECTS,
     load_rollout_registry,
     project_rows,
@@ -273,6 +275,8 @@ __all__ = [
     "render_notice_text",
     "write_ops_export",
     "REGISTRY_VERSION",
+    "ACTIVE_PROJECTS",
+    "RETIRED_PROJECTS",
     "STRATEGY_PROJECTS",
     "load_rollout_registry",
     "project_rows",
