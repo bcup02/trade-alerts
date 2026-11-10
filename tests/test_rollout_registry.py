@@ -1139,3 +1139,7 @@ def test_the_ledger_write_stuck_entry_notifies_once_and_never_halts(catalog, reg
     assert "不需要手動補記" not in entry["human_action"] + entry["operator_message"]["direction"] + " ".join(entry["operator_message"]["steps"])
     assert any("MET.LEDGER_ITEM_DROPPED" in step for step in entry["operator_message"]["steps"])
     assert "不保證沒有項目已經被丟棄" in entry["auto_action"]
+    # BLOCK-355-02：ai_prompt 不能無條件要求列出被丟棄的項目——積壓超過上限的丟棄只記數量（ERR-104 的證據限制），所以要有「無法識別」的分支
+    prompt = entry["operator_message"]["ai_prompt"]
+    assert "只有 dropped 數量" in prompt and "能識別的才逐筆列出" in prompt and "無法直接識別被丟棄的是哪幾筆" in prompt
+    assert "帳本與交易所成交的差異" in prompt and "待確認的補記方案" in prompt and "列出被丟棄的項目並對照交易所成交" not in prompt
