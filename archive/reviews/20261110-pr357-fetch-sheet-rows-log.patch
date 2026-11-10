@@ -1,0 +1,144 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index 4a51d5d..fe8943f 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.32"
++version = "0.30.33"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index d11090f..92840ad 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -351,4 +351,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.20"
++__version__ = "0.30.33"
+diff --git a/src/trade_alerts/ledger_reconcile.py b/src/trade_alerts/ledger_reconcile.py
+index 4c68e8c..7583d49 100644
+--- a/src/trade_alerts/ledger_reconcile.py
++++ b/src/trade_alerts/ledger_reconcile.py
+@@ -790,6 +790,16 @@ def _is_estimate_close(event: dict[str, Any] | None) -> bool:
+     return False
+ 
+ 
++def _describe_fetch_failure(exc: BaseException) -> str:
++    """The error text a failed sheet read leaves behind (returned to the caller AND written to the retry log): the exception **class name** and, when the
++    exception carries an HTTP response, its status code -- never ``str(exc)``.  ``requests`` puts the full request URL (the Apps Script deployment URL, and
++    any query string) into the message of a ``HTTPError``/``ConnectionError``; that text used to reach the log and every strategy's reconcile status
++    ``note``.  Nothing downstream needs the message: the class name and status say what kind of failure it was."""
++    status = getattr(getattr(exc, "response", None), "status_code", None)
++    name = type(exc).__name__
++    return f"{name} status={status}" if isinstance(status, int) and not isinstance(status, bool) else name
++
++
+ def fetch_sheet_rows(
+     *, sheet_name: str, url: str | None = None, secret: str | None = None,
+     attempts: int = 5, initial_backoff_seconds: float = 2.0, sleep=None,
+@@ -834,7 +844,7 @@ def fetch_sheet_rows(
+                     clean.append({"row": entry.get("row"), "values": list(entry.get("values") or [])})
+                 return clean, None
+         except Exception as exc:  # noqa: BLE001 - detection tool must not crash the timer
+-            last_error = f"{type(exc).__name__}: {exc}"
++            last_error = _describe_fetch_failure(exc)
+         if attempt < attempts:
+             log.warning("list_by_sheet attempt %d failed (%s); retrying in %ss", attempt, last_error, backoff)
+             sleep(backoff)
+diff --git a/tests/test_ledger_reconcile.py b/tests/test_ledger_reconcile.py
+index 4f014be..e931c54 100644
+--- a/tests/test_ledger_reconcile.py
++++ b/tests/test_ledger_reconcile.py
+@@ -632,6 +632,52 @@ def test_fetch_exhausts_retries(monkeypatch):
+     assert rows is None and "ConnectionError" in err
+ 
+ 
++SECRET_URL = "https://script.google.com/macros/s/AKfycbxSECRETDEPLOYMENT/exec?token=SECRET123"
++
++
++class _HttpError(Exception):
++    """Stand-in for requests.HTTPError: the message carries the full request URL and the exception carries the response."""
++
++    def __init__(self, status_code):
++        super().__init__(f"{status_code} Server Error: Internal Server Error for url: {SECRET_URL}")
++        self.response = _Resp(status_code=status_code)
++
++
++def test_a_failed_read_never_puts_the_exception_text_in_the_log_or_the_returned_error(monkeypatch, caplog):
++    """Review of ed-seykota PR #221 (2026-11-10): the retry log and the returned error used to carry ``str(exc)`` -- for requests that is the full URL."""
++    def _post(*a, **k):
++        raise _HttpError(500)
++
++    monkeypatch.setattr(lr.requests, "post", _post)
++    with caplog.at_level("DEBUG", logger="trade_alerts.ledger_reconcile"):
++        rows, err = fetch_sheet_rows(sheet_name="S", url=SECRET_URL, secret="s3cr3t-body-secret", attempts=3, sleep=lambda _s: None)
++    assert rows is None and err == "_HttpError status=500"
++    assert len([r for r in caplog.records if "list_by_sheet attempt" in r.getMessage()]) == 2        # the retries are still logged
++    blob = caplog.text + str(err)
++    for needle in ("SECRET123", "SECRETDEPLOYMENT", "script.google.com", "Internal Server Error", "s3cr3t-body-secret", "token="):
++        assert needle not in blob, needle
++
++
++def test_a_connection_failure_message_with_a_url_is_not_logged_either(monkeypatch, caplog):
++    def _boom(*a, **k):
++        raise ConnectionError(f"HTTPSConnectionPool(host='script.google.com'): Max retries exceeded with url: {SECRET_URL}")
++
++    monkeypatch.setattr(lr.requests, "post", _boom)
++    with caplog.at_level("DEBUG", logger="trade_alerts.ledger_reconcile"):
++        rows, err = fetch_sheet_rows(sheet_name="S", url=SECRET_URL, secret="s", attempts=2, sleep=lambda _s: None)
++    assert rows is None and err == "ConnectionError"
++    assert "SECRET123" not in caplog.text + err and "script.google.com" not in caplog.text + err
++
++
++def test_a_status_code_that_is_not_an_int_is_not_copied():
++    class Odd(Exception):
++        response = type("R", (), {"status_code": "500 and SECRET"})()
++
++    assert lr._describe_fetch_failure(Odd()) == "Odd"
++    assert lr._describe_fetch_failure(_HttpError(404)) == "_HttpError status=404"
++    assert lr._describe_fetch_failure(ValueError("x https://u")) == "ValueError"
++
++
+ def test_fetch_empty_body_exhausts(monkeypatch):
+     monkeypatch.setattr(lr.requests, "post", lambda *a, **k: _Resp(text="   "))
+     rows, err = fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s",
+diff --git a/tests/test_version_consistency.py b/tests/test_version_consistency.py
+new file mode 100644
+index 0000000..ea683a4
+--- /dev/null
++++ b/tests/test_version_consistency.py
+@@ -0,0 +1,28 @@
++"""`trade_alerts.__version__` 必須等於 pyproject.toml 的版本。
++
++`__version__` 曾經停在 0.30.20，而 pyproject 已經發到 0.30.32（PR #357 審閱 BLOCK-357-01 發現）：使用 `trade_alerts.__version__` 的版本檢查與除錯資訊
++會和實際發布的 tag 不一樣。之後每次改 pyproject 的版本都要同步改它，這個測試擋住再次分岔。
++"""
++from __future__ import annotations
++
++import re
++from pathlib import Path
++
++import trade_alerts
++
++_ROOT = Path(__file__).resolve().parents[1]
++
++
++def _pyproject_version() -> str:
++    text = (_ROOT / "pyproject.toml").read_text(encoding="utf-8")
++    match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
++    assert match, "pyproject.toml 找不到 version"
++    return match.group(1)
++
++
++def test_package_dunder_version_matches_pyproject():
++    assert trade_alerts.__version__ == _pyproject_version()
++
++
++def test_the_version_is_a_plain_semver_triplet():
++    assert re.fullmatch(r"\d+\.\d+\.\d+", trade_alerts.__version__)
