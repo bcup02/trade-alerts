@@ -790,6 +790,16 @@ def _is_estimate_close(event: dict[str, Any] | None) -> bool:
     return False
 
 
+def _describe_fetch_failure(exc: BaseException) -> str:
+    """The error text a failed sheet read leaves behind (returned to the caller AND written to the retry log): the exception **class name** and, when the
+    exception carries an HTTP response, its status code -- never ``str(exc)``.  ``requests`` puts the full request URL (the Apps Script deployment URL, and
+    any query string) into the message of a ``HTTPError``/``ConnectionError``; that text used to reach the log and every strategy's reconcile status
+    ``note``.  Nothing downstream needs the message: the class name and status say what kind of failure it was."""
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    name = type(exc).__name__
+    return f"{name} status={status}" if isinstance(status, int) and not isinstance(status, bool) else name
+
+
 def fetch_sheet_rows(
     *, sheet_name: str, url: str | None = None, secret: str | None = None,
     attempts: int = 5, initial_backoff_seconds: float = 2.0, sleep=None,
@@ -834,7 +844,7 @@ def fetch_sheet_rows(
                     clean.append({"row": entry.get("row"), "values": list(entry.get("values") or [])})
                 return clean, None
         except Exception as exc:  # noqa: BLE001 - detection tool must not crash the timer
-            last_error = f"{type(exc).__name__}: {exc}"
+            last_error = _describe_fetch_failure(exc)
         if attempt < attempts:
             log.warning("list_by_sheet attempt %d failed (%s); retrying in %ss", attempt, last_error, backoff)
             sleep(backoff)
