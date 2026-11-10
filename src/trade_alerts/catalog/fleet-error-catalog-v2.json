@@ -34,7 +34,7 @@
     "momentum": "mexc-4h-momentum-trailing-stop",
     "mycrypto": "my-crypto-bot",
     "btc-competition": "btc-bull-market-competition",
-    "trend-meteor": "ed-seykota-systematic-trend-following (趨勢策略・流星池版 V11，src/trend_meteor)",
+    "trend-meteor": "ed-seykota-systematic-trend-following (趨勢策略 V11，src/trend_meteor)",
     "fleet": "(cross-repo: same condition implemented in every strategy)"
   },
   "error_ids_issued": 107,
@@ -2316,7 +2316,7 @@
       "lands_in_phase": 8,
       "rationale": "交易所是權威資料；當平倉成交精確加總等於進場量、部位在交易所確已平掉，照交易所寫下去就是唯一正解，所以不產生決策請求，也不通知（與其他策略同一條規則）。V11 的轉接對交易所回傳的每個必要欄位都明確驗證（持倉量、訂單編號、成交編號、價格、數量、時間、手續費與其幣別必須是 USDT），缺失或讀不懂就拒絕，不用共用庫的預設值補洞（PR #197 審閱四輪的教訓：缺值被當成確定值會寫出錯誤損益）。已實現損益是明確區分的例外：交易所真的沒提供（欄位缺失）時，共用庫改用本地算的毛損益、證據檔的 close.exchange_profit_reported 是 False，帳本裡這筆平倉的 reconciliation 區塊不寫 pnl_source，修復事件日誌的 details.pnl_source 記 local（採用交易所數字時才是 exchange_realized），要確認當次損益來源就看事件日誌的 details.pnl_source；有提供卻空白、非數字、NaN 或無限大則拒絕；明確的 0 視為交易所回報的零。判準不成立時：帳本已有修復痕跡或整批寫入失敗 → REPAIR_BLOCKED（R3）；結構對不上才重試並升格（R2）。",
       "operator_message": {
-        "what": "趨勢策略・流星池版有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。",
+        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。",
         "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
         "steps": [
           "不需要任何動作。",
@@ -2347,13 +2347,13 @@
       "lands_in_phase": 8,
       "rationale": "與其他策略同一條規則（共用修復執行器）：能對應的一律照交易所補，真正需要人的只剩結構上對不上或交易所一直查不到、或回傳的欄位不完整的情況，那時該做的是追查根因。查交易所失敗也算一次失敗，否則 API 長期壞掉不會有人知道。",
       "operator_message": {
-        "what": "趨勢策略・流星池版有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
+        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
         "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料、回傳的欄位不完整，或查到的成交在結構上跟進場對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
         "steps": [
           "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它唯讀查交易所並列出對不上的地方，提出讓帳本、交易所、Google 表三方一致的補寫步驟，先給你確認再執行。",
           "治本：同一段指令也會要求 Claude 追查為什麼無法自動對應（包括策略當初為什麼漏記平倉）。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這筆漏記平倉為什麼無法自動補寫：讀 meteor-audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），對照 meteor-audit/trading_ledger.jsonl 的 trade_open 與 src/trend_meteor/repair_bot.py 的證據抓取與欄位驗證（build_fetch_evidence、validate_closing_fill），用唯讀方式向交易所查這個交易對的持倉與成交，找出是哪一條對不上、為什麼會發生，提出治本修正。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這筆漏記平倉為什麼無法自動補寫：讀 meteor-audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），對照 meteor-audit/trading_ledger.jsonl 的 trade_open 與 src/trend_meteor/repair_bot.py 的證據抓取與欄位驗證（build_fetch_evidence、validate_closing_fill），用唯讀方式向交易所查這個交易對的持倉與成交，找出是哪一條對不上、為什麼會發生，提出治本修正。"
       }
     },
     {
@@ -2378,14 +2378,14 @@
       "lands_in_phase": 8,
       "rationale": "帳本裡已有這筆交易的修復紀錄（例如先前寫到一半）或這次寫入無法驗證，代表真實帳本的狀態已經不是「乾淨的孤兒進場」。此時自動補完後半段等於猜，而猜錯會重複或錯記真實損益——這正是必須交給人的情況。",
       "operator_message": {
-        "what": "趨勢策略・流星池版的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。",
+        "what": "趨勢策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。",
         "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
         "steps": [
           "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
           "確認修正步驟後照做（只追加更正事件，不改舊紀錄）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
           "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理一筆修復停手的漏記平倉：讀 meteor-audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、meteor-audit/error_requests.jsonl 與 meteor-audit/fleet_event_log.jsonl 的相關紀錄，唯讀向交易所查這個交易對的成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理一筆修復停手的漏記平倉：讀 meteor-audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、meteor-audit/error_requests.jsonl 與 meteor-audit/fleet_event_log.jsonl 的相關紀錄，唯讀向交易所查這個交易對的成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
       }
     },
     {
@@ -2410,13 +2410,13 @@
       "lands_in_phase": 8,
       "rationale": "自動補寫（R1）本身不通知，但若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 永遠不會被發現。門檻 7 天內 2 次、通知後 7 天內不重發，是為了讓一次偶發事件不吵人、但同一個問題連續發生時一定被看見。發的是「請追根因」而不是「帳本壞了」，所以是 R3 事件通知而不是請求。",
       "operator_message": {
-        "what": "趨勢策略・流星池版的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。",
+        "what": "趨勢策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。",
         "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
         "steps": [
           "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查平倉一直漏記的原因：讀 meteor-audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 meteor-audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、盤中強平查不到成交，還是交易所路徑沒走到記帳），提出治本修正與回歸測試。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查平倉一直漏記的原因：讀 meteor-audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 meteor-audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、盤中強平查不到成交，還是交易所路徑沒走到記帳），提出治本修正與回歸測試。"
       }
     },
     {
@@ -2441,14 +2441,14 @@
       "lands_in_phase": 8,
       "rationale": "與其他策略同一條規則：只有確定是自己重複送單才自動更正，因為這時更正的內容完全由交易所成交決定、沒有猜的空間；但重複送單本身是 bug，一律立刻通知人追根因，所以是 R3 而不是 R1。V11 的重複送單會讓永續合約多持一倍的倉。",
       "operator_message": {
-        "what": "趨勢策略・流星池版自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的那筆交易整筆重述、追加一筆帳本更正（不改舊紀錄），本地帳本的數字已跟交易所成交一致；Google 表的更正只是排進了待派送佇列，派送到 Google 並經接收端確認之前，表上可能還是舊數字。",
+        "what": "趨勢策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的那筆交易整筆重述、追加一筆帳本更正（不改舊紀錄），本地帳本的數字已跟交易所成交一致；Google 表的更正只是排進了待派送佇列，派送到 Google 並經接收端確認之前，表上可能還是舊數字。",
         "direction": "本地帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。Google 表要等派送完成才會更新，排隊也可能失敗。",
         "steps": [
           "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
           "看事件的 details.post：有 google_queued 表示更正已排入佇列；有 error 表示排隊失敗——帳本是對的，但 Google 表還沒更新，要請 Claude 重新排入並確認派送完成。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次重複送單：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（src/trend_meteor/executor.py，找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次重複送單：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（src/trend_meteor/executor.py，找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。"
       }
     },
     {
@@ -2473,7 +2473,7 @@
       "lands_in_phase": 8,
       "rationale": "不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。V11 另外加了「有部分減碼的交易一律不重述」：共用庫的更正只替換第一筆平倉列，其餘平倉列仍被計入，重述會重複計算。",
       "operator_message": {
-        "what": "趨勢策略・流星池版的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的（或這筆交易的帳本結構不適合自動更正），所以沒有自動改帳本。",
+        "what": "趨勢策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的（或這筆交易的帳本結構不適合自動更正），所以沒有自動改帳本。",
         "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
         "steps": [
           "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
@@ -2481,7 +2481,7 @@
           "如果是策略下的單：到電腦前請 Claude 依交易所成交把帳本補正（只追加更正事件，不改舊紀錄）；完成後下一輪會自動撤回這個請求。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理一筆帳本漏記的交易所成交：讀 meteor-audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 meteor-audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。reason_code 若是 NOT_RESTATABLE，先看原因文字：有部分減碼的交易不能用共用庫的更正重述，要另想辦法。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理一筆帳本漏記的交易所成交：讀 meteor-audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 meteor-audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。reason_code 若是 NOT_RESTATABLE，先看原因文字：有部分減碼的交易不能用共用庫的更正重述，要另想辦法。"
       }
     },
     {
@@ -2505,13 +2505,13 @@
       "lands_in_phase": 8,
       "rationale": "帳本是損益與對帳的唯一真相。帳本壞掉的方式不同，各處理器的反應也不同：檔案讀不了、JSON 讀不懂或尾行被打斷時，Google 表投影整份帳本讀不了、不逐列分類；JSON 讀得懂但沒通過契約的列，重播略過它、Google 表投影封鎖所屬交易（無法歸屬的列只記數量）、共用庫對帳仍可能把它算進持倉。任何一個處理器都不能單獨證明帳本是對的，等於可能有一筆錢多算或少算而沒人整體看過。修復機器人只補「整筆沒有平倉列的孤兒進場」，處理不了這類，所以必須通知人。發的是「請人看帳本」，不是請求（不鎖機）。",
       "operator_message": {
-        "what": "趨勢策略・流星池版的帳本稽核發現問題：帳本有讀不懂的行、尾行被打斷、成交列缺必要欄位或沒通過帳本契約、某個交易對的持倉量在兩種算法之間不一致、同一張訂單被記了不只一列，或某筆交易的進場量與平倉量對不上。系統沒有動帳本。帳本讀不了、有讀不懂的行、尾行被打斷：Google 表投影整份帳本讀不了，不會逐列分類，要先修好檔案；JSON 能讀懂、但沒通過契約的列：重播一律略過；有腿與交易編號、能歸屬到某筆交易的，Google 表投影會封鎖該筆交易；缺腿或交易編號、無法歸屬的，Google 表投影只把它算進無歸屬列的數量，不會封鎖某一筆交易；共用庫對帳讀的是原始帳本列，仍可能把它算進持倉。重複成交與進出場對不上不會被稽核自動移除，各下游處理器可能重複計入、擋住該筆投影或算出不同結果。",
+        "what": "趨勢策略的帳本稽核發現問題：帳本有讀不懂的行、尾行被打斷、成交列缺必要欄位或沒通過帳本契約、某個交易對的持倉量在兩種算法之間不一致、同一張訂單被記了不只一列，或某筆交易的進場量與平倉量對不上。系統沒有動帳本。帳本讀不了、有讀不懂的行、尾行被打斷：Google 表投影整份帳本讀不了，不會逐列分類，要先修好檔案；JSON 能讀懂、但沒通過契約的列：重播一律略過；有腿與交易編號、能歸屬到某筆交易的，Google 表投影會封鎖該筆交易；缺腿或交易編號、無法歸屬的，Google 表投影只把它算進無歸屬列的數量，不會封鎖某一筆交易；共用庫對帳讀的是原始帳本列，仍可能把它算進持倉。重複成交與進出場對不上不會被稽核自動移除，各下游處理器可能重複計入、擋住該筆投影或算出不同結果。",
         "direction": "帳本只追加不改。先看清楚是哪幾列、為什麼壞，再決定用更正事件補正，還是追查程式為什麼寫出這樣的列。",
         "steps": [
           "看訊息裡列出的交易編號、事件與原因。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，讓它讀帳本與交易所成交，判斷怎麼補正（只追加更正事件，先給你確認再執行）並追查根因。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理帳本資料品質問題：讀 meteor-audit/fleet_event_log.jsonl 這個 LEDGER_DATA_QUALITY 事件的 evidence 與 details，對照 meteor-audit/trading_ledger.jsonl 裡列出的列與 src/trend_meteor/ledger_sink.py 的 _check_contract 契約，找出每一列壞在哪裡、是寫入時就壞還是後來才壞，必要時唯讀向交易所查成交，提出補正步驟（只追加，先給我確認再執行）與治本修正和回歸測試。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理帳本資料品質問題：讀 meteor-audit/fleet_event_log.jsonl 這個 LEDGER_DATA_QUALITY 事件的 evidence 與 details，對照 meteor-audit/trading_ledger.jsonl 裡列出的列與 src/trend_meteor/ledger_sink.py 的 _check_contract 契約，找出每一列壞在哪裡、是寫入時就壞還是後來才壞，必要時唯讀向交易所查成交，提出補正步驟（只追加，先給我確認再執行）與治本修正和回歸測試。"
       }
     },
     {
@@ -2543,7 +2543,7 @@
           "解除前先預覽並想清楚：解除後下一輪是全新狀態——V11 的全新狀態是全空手重新開始，不是接手交易所上既有的持倉；交易所有持倉時先處理（平倉，或請 Claude 重建狀態）。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STATE_FILE_CORRUPT：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/runner.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查持倉與保護單，判斷狀態檔為什麼壞掉（寫到一半被打斷、磁碟問題或程式 bug），備份檔還能不能用，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STATE_FILE_CORRUPT：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/runner.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查持倉與保護單，判斷狀態檔為什麼壞掉（寫到一半被打斷、磁碟問題或程式 bug），備份檔還能不能用，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2575,7 +2575,7 @@
           "決定補做（逐日補做決策）還是重設：請 Claude 依實際持倉與這幾天的行情，先給你預覽再執行。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 MISSED_DAYS：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/runner.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查每條腿的持倉與條件單，判斷為什麼停了這麼多天沒處理，應該補做還是重設，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 MISSED_DAYS：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/runner.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查每條腿的持倉與條件單，判斷為什麼停了這麼多天沒處理，應該補做還是重設，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2606,7 +2606,7 @@
           "改成單向持倉模式。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 HEDGE_MODE：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查帳戶的持倉模式，判斷持倉模式為什麼被改成雙向（誰改的、什麼時候），提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 HEDGE_MODE：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查帳戶的持倉模式，判斷持倉模式為什麼被改成雙向（誰改的、什麼時候），提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2637,7 +2637,7 @@
           "到交易所 App 把那個交易對改成逐倉（有持倉時可能要先處理持倉）。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 NOT_ISOLATED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那個交易對的保證金模式與持倉，判斷保證金模式為什麼不是逐倉（程式設定失敗、還是被手動改過），提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 NOT_ISOLATED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那個交易對的保證金模式與持倉，判斷保證金模式為什麼不是逐倉（程式設定失敗、還是被手動改過），提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2668,7 +2668,7 @@
           "到交易所 App 把那個交易對的槓桿改回 1 倍（有持倉時可能要先處理持倉）。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 LEVERAGE_NOT_1：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那個交易對的槓桿設定與持倉，判斷槓桿為什麼不是 1 倍（程式設定失敗、還是被手動改過），提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 LEVERAGE_NOT_1：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那個交易對的槓桿設定與持倉，判斷槓桿為什麼不是 1 倍（程式設定失敗、還是被手動改過），提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2699,7 +2699,7 @@
           "到交易所 App 確認那個持倉是不是你手動開的，或是重複成交多出來的；先處理掉（平倉，或確認要保留並請 Claude 評估）。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 UNEXPECTED_POSITION：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查所有持倉與近期成交，判斷多出來的持倉是誰開的（手動、重複送單、還是程式 bug），提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 UNEXPECTED_POSITION：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查所有持倉與近期成交，判斷多出來的持倉是誰開的（手動、重複送單、還是程式 bug），提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2730,7 +2730,7 @@
           "到交易所確認帳戶與持倉資料正常（也可能只是交易所暫時回傳異常）。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 BAD_EXCHANGE_DATA：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查同一份資料（持倉、帳戶、條件單），判斷是交易所暫時異常、API 格式變了，還是程式解析有誤，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 BAD_EXCHANGE_DATA：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查同一份資料（持倉、帳戶、條件單），判斷是交易所暫時異常、API 格式變了，還是程式解析有誤，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2761,7 +2761,7 @@
           "到交易所 App 的訂單紀錄用那個自訂單號找這張單，確認有沒有成交、成交多少。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 ORDER_OUTCOME_UNKNOWN：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那張單（用自訂單號）與該交易對的持倉，判斷單到底有沒有成交、為什麼查不到，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 ORDER_OUTCOME_UNKNOWN：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那張單（用自訂單號）與該交易對的持倉，判斷單到底有沒有成交、為什麼查不到，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2792,7 +2792,7 @@
           "到交易所 App 確認這張單現在的狀態與成交量。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 ORDER_NOT_TERMINAL：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那張單（用自訂單號）與該交易對的持倉，判斷單為什麼一直不是終態（流動性、交易所延遲或其他原因），提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 ORDER_NOT_TERMINAL：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那張單（用自訂單號）與該交易對的持倉，判斷單為什麼一直不是終態（流動性、交易所延遲或其他原因），提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2823,7 +2823,7 @@
           "到交易所 App 對照這些單的狀態。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 PENDING_UNRESOLVED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查腿簿裡待處理的每一張單，判斷這些待處理為什麼沒被結清（結清時查詢失敗、還是被打斷），提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 PENDING_UNRESOLVED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查腿簿裡待處理的每一張單，判斷這些待處理為什麼沒被結清（結清時查詢失敗、還是被打斷），提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2854,7 +2854,7 @@
           "到交易所 App 確認那條腿的持倉、保證金與委託現況。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STEP_OUTCOME_UNKNOWN：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的持倉、保證金與委託，判斷那個步驟到底有沒有生效、為什麼結果不明，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STEP_OUTCOME_UNKNOWN：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的持倉、保證金與委託，判斷那個步驟到底有沒有生效、為什麼結果不明，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2885,7 +2885,7 @@
           "沒掛上就補掛，或請 Claude 協助；確認那條腿有保護。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STOP_OUTCOME_UNKNOWN：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的條件單（用自訂單號）與持倉，判斷條件單為什麼結果不明、現在有沒有保護，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STOP_OUTCOME_UNKNOWN：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的條件單（用自訂單號）與持倉，判斷條件單為什麼結果不明、現在有沒有保護，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2916,7 +2916,7 @@
           "沒有條件單：手動補掛一張強平條件單，或直接平倉（掛單價請 Claude 依策略規則算給你確認）。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 PROTECTION_UNVERIFIED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的持倉與條件單，判斷條件單為什麼沒掛上（被拒、沒送出、還是掛了又被取消），提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 PROTECTION_UNVERIFIED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的持倉與條件單，判斷條件單為什麼沒掛上（被拒、沒送出、還是掛了又被取消），提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2947,7 +2947,7 @@
           "手動取消多餘的舊單（只留策略目前要的那一張），或請 Claude 協助。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STALE_STOP_CANCEL_FAILED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的條件單清單，判斷取消為什麼失敗、現在是不是有多張或沒有保護，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STALE_STOP_CANCEL_FAILED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的條件單清單，判斷取消為什麼失敗、現在是不是有多張或沒有保護，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -2979,7 +2979,7 @@
           "請 Claude 讓帳本與交易所一致（只追加更正事件，先給你確認再執行）。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STOP_STATE_UNKNOWN：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的成交紀錄與條件單歷史，判斷持倉為什麼消失、帳本要怎麼補，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STOP_STATE_UNKNOWN：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的成交紀錄與條件單歷史，判斷持倉為什麼消失、帳本要怎麼補，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -3010,7 +3010,7 @@
           "到交易所 App 確認那張條件單實際的狀態與那條腿的持倉。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STOP_STATUS_UNRECOGNIZED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那張條件單的狀態與持倉，判斷是不是交易所新增了狀態而程式要更新，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STOP_STATUS_UNRECOGNIZED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那張條件單的狀態與持倉，判斷是不是交易所新增了狀態而程式要更新，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -3041,7 +3041,7 @@
           "請 Claude 讓帳本與交易所一致（只追加更正事件，先給你確認再執行）。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 POSITION_GONE_STOP_NOT_TRIGGERED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的成交與強平紀錄，判斷持倉為什麼消失（爆倉、手動平倉或其他）、帳本要怎麼補，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 POSITION_GONE_STOP_NOT_TRIGGERED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的成交與強平紀錄，判斷持倉為什麼消失（爆倉、手動平倉或其他）、帳本要怎麼補，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -3072,7 +3072,7 @@
           "請 Claude 檢查腿簿的觸發紀錄為什麼沒有被處理。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STOP_TRIGGERED_UNREPORTED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的成交與條件單歷史，判斷觸發為什麼沒有交給決策核心，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 STOP_TRIGGERED_UNREPORTED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的成交與條件單歷史，判斷觸發為什麼沒有交給決策核心，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -3103,7 +3103,7 @@
           "補保證金（轉入資金），或把那條腿平倉。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 MARGIN_BELOW_FLOOR：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的保證金、強平價與可用餘額，判斷保證金為什麼不夠、離強平還有多遠，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 MARGIN_BELOW_FLOOR：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的保證金、強平價與可用餘額，判斷保證金為什麼不夠、離強平還有多遠，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -3134,7 +3134,7 @@
           "看事件的 summary 裡的自訂單號，到交易所用它查那張單。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 RECOVERY_LOOKUP_FAILED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那張單（用自訂單號），判斷查詢為什麼失敗（連線、權限、限流），提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 RECOVERY_LOOKUP_FAILED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那張單（用自訂單號），判斷查詢為什麼失敗（連線、權限、限流），提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -3165,7 +3165,7 @@
           "沒有保護時補掛強平條件單，或直接平倉。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 RECOVERY_STOP_STATE：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的持倉與條件單，判斷條件單為什麼是這個狀態、這條腿現在有沒有保護，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 RECOVERY_STOP_STATE：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查那條腿的持倉與條件單，判斷條件單為什麼是這個狀態、這條腿現在有沒有保護，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -3196,7 +3196,7 @@
           "把下方「給 AI 的追查指令」整段貼給 Claude，修正程式並補測試。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 UNKNOWN_STEP：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查持倉與保護單（確認這次沒有任何單被送出），判斷規劃器為什麼產生不認得的步驟，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 UNKNOWN_STEP：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查持倉與保護單（確認這次沒有任何單被送出），判斷規劃器為什麼產生不認得的步驟，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -3227,7 +3227,7 @@
           "到交易所 App 確認持倉與保護單現況。",
           "確認後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 EXECUTION_FAILED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查最近的下單與持倉，判斷步驟為什麼一直失敗，提出修正與回歸測試；不要自己解除暫停。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查這次安全暫停 EXECUTION_FAILED：讀 meteor-audit/fleet_event_log.jsonl 這個事件的 summary 與 evidence、狀態檔裡的 safe_halt 與腿簿（book），對照 src/trend_meteor/executor.py 的觸發條件與 meteor-audit/trading_ledger.jsonl，用唯讀方式向交易所查最近的下單與持倉，判斷步驟為什麼一直失敗，提出修正與回歸測試；不要自己解除暫停。"
       }
     },
     {
@@ -3251,7 +3251,7 @@
       "lands_in_phase": 8,
       "rationale": "單日抓不到不是問題（資料源偶爾失敗，隔天補做就好），所以只記錄；累計 3 個不同的 UTC 日都抓不到代表資料源或網路壞了，策略這幾天都沒有調整持倉，要人看。天數由狀態檔記，必要輸入與每日決策完成後就歸零。",
       "operator_message": {
-        "what": "趨勢策略・流星池版在期間沒有成功取得輸入的情況下，累計 3 個不同的 UTC 日抓不到必要的輸入資料（幣安日線或賽道快照），這幾天都沒有調整持倉，系統安全暫停。",
+        "what": "趨勢策略在期間沒有成功取得輸入的情況下，累計 3 個不同的 UTC 日抓不到必要的輸入資料（幣安日線或賽道快照），這幾天都沒有調整持倉，系統安全暫停。",
         "direction": "暫停本身不會動持倉，也不會取消已掛的強平條件單；只是策略沒在做每日決策。先確認資料來源與連線，恢復後解除；解除後系統補做缺的日子（一次最多補 3 個收盤日，超過會先觸發好幾個收盤日沒處理的暫停）。",
         "steps": [
           "看事件的 summary（失敗原因）與 evidence 的 consecutive_days。",
@@ -3259,7 +3259,7 @@
           "資料恢復後用解除工具（兩段式：先預覽拿確認碼，再帶確認碼解除；工具在 5d 才建）解除。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，追查資料為什麼抓不到。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查必要輸入為什麼累計 3 個 UTC 日抓不到：讀 meteor-audit/fleet_event_log.jsonl 的 DATA_UNAVAILABLE 事件（summary 是失敗原因，evidence 有 day 與 consecutive_days）與 src/trend_meteor/runner.py 的 _data_unavailable，對照 src/trend_meteor/data.py 與 market.py 的抓取程式，判斷是幣安日線、CoinGecko 賽道快照、額度或網路問題，提出治本修正與回歸測試。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查必要輸入為什麼累計 3 個 UTC 日抓不到：讀 meteor-audit/fleet_event_log.jsonl 的 DATA_UNAVAILABLE 事件（summary 是失敗原因，evidence 有 day 與 consecutive_days）與 src/trend_meteor/runner.py 的 _data_unavailable，對照 src/trend_meteor/data.py 與 market.py 的抓取程式，判斷是幣安日線、CoinGecko 賽道快照、額度或網路問題，提出治本修正與回歸測試。"
       }
     },
     {
@@ -3283,7 +3283,7 @@
       "lands_in_phase": 8,
       "rationale": "未分類例外大多是暫時的（網路、交易所偶發錯誤），重試就好，所以事件本身只記錄。程式目前只計次、沒有『連續 N 次才升格』；只有重試用盡或不能重試時單元才以非零結束（current.unit_exit 指的就是這種情況），持續失敗靠單元失敗通知被看見。是否要加連續升格與暫停，留到 5d 設計單元時決定（與趨勢、加密策略的 R2 作法不同、與動能策略相同）。",
       "operator_message": {
-        "what": "趨勢策略・流星池版的每日單元運作中出現一個沒被特別分類的錯誤，這一輪沒做完。",
+        "what": "趨勢策略的每日單元運作中出現一個沒被特別分類的錯誤，這一輪沒做完。",
         "direction": "系統不會停下來；標記為可重試的失敗會自動重試，不可重試或重試用盡時，單元失敗另有維運通知。",
         "steps": [
           "不需要任何動作。",
@@ -3312,14 +3312,14 @@
       "lands_in_phase": 8,
       "rationale": "被丟棄的成交不在帳本裡，損益、對帳與 Google 表都會缺這一筆，而且不會自己好；重試對壞掉的項目沒用，所以丟棄是對的，但必須讓人知道。程式原本把它記成 R2（沒有升格旗標，不會通知），V11 程式在改釘本版時一併改成 R3。",
       "operator_message": {
-        "what": "趨勢策略・流星池版有待記帳的項目沒能記進帳本就被丟棄了（單筆內容壞掉，或待記帳積壓超過 500 筆、最舊的被丟掉，後者可能是帳本持續寫不進去）。被丟棄的成交不在帳本裡。",
+        "what": "趨勢策略有待記帳的項目沒能記進帳本就被丟棄了（單筆內容壞掉，或待記帳積壓超過 500 筆、最舊的被丟掉，後者可能是帳本持續寫不進去）。被丟棄的成交不在帳本裡。",
         "direction": "交易所的成交紀錄是標準答案。要把被丟棄的成交補回帳本，並找出為什麼記不進去。",
         "steps": [
           "看事件的 summary 與 evidence：單筆壞掉的事件有 key 與 kind（被丟棄的項目）；積壓超限的事件只有 dropped（丟了幾筆），程式沒有逐筆記下被丟的是哪幾筆，存檔後腿簿裡也不再有它們：請先找有沒有可交叉比對的歷史資料（舊的狀態檔副本、單元 journal 的相關紀錄），找不到就維持「無法直接識別」，改用帳本與交易所成交的差異（維運通知的帳本軸）找出缺了哪些成交。",
           "到交易所 App 核對這段時間的成交；維運通知的帳本軸通常會同時顯示不一致。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，以交易所成交補回帳本（只追加更正事件）並追查根因。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理被丟棄的待記帳項目：讀 meteor-audit/fleet_event_log.jsonl 的 LEDGER_ITEM_DROPPED 事件（單筆壞掉的 evidence 有 key、kind；積壓超限的只有 dropped）、meteor-audit/trading_ledger.jsonl 與狀態檔腿簿裡的 unledgered，對照 src/trend_meteor/runner.py 的記帳流程與 ledger_sink.py，唯讀向交易所查那段時間的成交，列出帳本缺的成交，提出只追加的補記步驟（先給我確認再執行），並追查為什麼項目壞掉或帳本寫不進去，提出治本修正與回歸測試。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理被丟棄的待記帳項目：讀 meteor-audit/fleet_event_log.jsonl 的 LEDGER_ITEM_DROPPED 事件（單筆壞掉的 evidence 有 key、kind；積壓超限的只有 dropped）、meteor-audit/trading_ledger.jsonl 與狀態檔腿簿裡的 unledgered，對照 src/trend_meteor/runner.py 的記帳流程與 ledger_sink.py，唯讀向交易所查那段時間的成交，列出帳本缺的成交，提出只追加的補記步驟（先給我確認再執行），並追查為什麼項目壞掉或帳本寫不進去，提出治本修正與回歸測試。"
       }
     },
     {
@@ -3343,14 +3343,14 @@
       "lands_in_phase": 8,
       "rationale": "這次強平的成交沒有成功記進帳本（這筆交易可能整筆沒有平倉列，也可能先前已有部分減碼的平倉列），損益與對帳都不完整；成交價不能用估算值寫進帳本（估算值會變成正式損益），所以放棄補記並通知人。程式原本把它記成 R2（沒有升格旗標，不會通知），V11 程式在改釘本版時一併改成 R3。",
       "operator_message": {
-        "what": "趨勢策略・流星池版有一條腿的強平條件單已經觸發、倉位被交易所平掉，但連續 3 次都查不到成交明細，帳本沒有補記這筆平倉，也沒有猜成交價。",
+        "what": "趨勢策略有一條腿的強平條件單已經觸發、倉位被交易所平掉，但連續 3 次都查不到成交明細，帳本沒有補記這筆平倉，也沒有猜成交價。",
         "direction": "交易所的成交紀錄是標準答案。修復機器人只能補「整筆交易沒有任何平倉列」的漏記平倉；有部分減碼的交易、或補不起來的，要人處理，不要只等自動修復。",
         "steps": [
           "看事件的 summary 與 evidence：leg、symbol、stop_id、actual_order_id。",
           "到交易所 App 找那筆平倉成交（價格、數量、手續費），確認倉位真的已平。",
           "把下方「給 AI 的追查指令」整段貼給 Claude，先看這筆交易有沒有部分減碼的平倉列（有的話修復機器人不會補），再確認修復機器人有沒有補寫；沒有的話以交易所成交補記（只追加，先給你確認再執行）。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理一筆查不到成交的強平觸發：讀 meteor-audit/fleet_event_log.jsonl 的 STOP_FILL_UNKNOWN 事件（evidence 的 leg、symbol、stop_id、actual_order_id）與 meteor-audit/trading_ledger.jsonl 裡那筆交易，對照 src/trend_meteor/ledger_sink.py 的強平記帳，唯讀向交易所查那張實際成交單的成交明細，判斷為什麼查不到（延遲、單號不對還是交易所問題），並檢查修復機器人有沒有補寫；沒有就提出以交易所成交補記的步驟（只追加，先給我確認再執行）與治本修正。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）處理一筆查不到成交的強平觸發：讀 meteor-audit/fleet_event_log.jsonl 的 STOP_FILL_UNKNOWN 事件（evidence 的 leg、symbol、stop_id、actual_order_id）與 meteor-audit/trading_ledger.jsonl 裡那筆交易，對照 src/trend_meteor/ledger_sink.py 的強平記帳，唯讀向交易所查那張實際成交單的成交明細，判斷為什麼查不到（延遲、單號不對還是交易所問題），並檢查修復機器人有沒有補寫；沒有就提出以交易所成交補記的步驟（只追加，先給我確認再執行）與治本修正。"
       }
     },
     {
@@ -3374,13 +3374,13 @@
       "lands_in_phase": 8,
       "rationale": "使用者 2026-11-07 決定：勝者沒有永續時維持原持倉、不換次佳也不先限定永續，但要知道被擋了、擋了幾天。這不是錯誤也不會停機，但要通知人，所以記成 R3（事件通知一次）：R1 在維運通知裡不會通知。程式原本把它記成 R1，V11 程式在改釘本版時一併改成 R3。",
       "operator_message": {
-        "what": "趨勢策略・流星池版的勝者被擋這件事有兩種通知，請看通知內容判斷是哪一種：【開始】勝者幣在下單的交易所沒有永續合約，策略維持原持倉（沒有就空手），隔天用重算的勝者再判斷；【結束】連續被擋的區段結束了（當天已不再被擋），通知會說明連續擋了幾天與累計天數，此時策略已不是因為沒有永續而維持原持倉。",
+        "what": "趨勢策略的勝者被擋這件事有兩種通知，請看通知內容判斷是哪一種：【開始】勝者幣在下單的交易所沒有永續合約，策略維持原持倉（沒有就空手），隔天用重算的勝者再判斷；【結束】連續被擋的區段結束了（當天已不再被擋），通知會說明連續擋了幾天與累計天數，此時策略已不是因為沒有永續而維持原持倉。",
         "direction": "不需要做任何事，系統不會停機，隔天用重算的勝者再判斷。要不要改選池是你的投資決定。",
         "steps": [
           "開始事件的 evidence 有 phase、day、coin（勝者幣）、held（維持的持倉）、blocked_days_total；結束事件的 evidence 有 phase、day、streak_days（這段連續擋了幾天）、blocked_days_total，沒有 coin 與 held。",
           "不需要任何動作；若想檢討選池，累計被擋天數記在策略狀態檔裡。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）說明這次勝者被擋：讀 meteor-audit/fleet_event_log.jsonl 的 WINNER_NO_PERP 事件（phase 是 start 時有 coin、held、blocked_days_total；是 end 時有 streak_days、blocked_days_total），對照狀態檔 extra.blocked 的 log，列出被擋的日期、幣與維持的持倉，並說明這段期間持倉相對勝者的差距；不要改任何設定。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）說明這次勝者被擋：讀 meteor-audit/fleet_event_log.jsonl 的 WINNER_NO_PERP 事件（phase 是 start 時有 coin、held、blocked_days_total；是 end 時有 streak_days、blocked_days_total），對照狀態檔 extra.blocked 的 log，列出被擋的日期、幣與維持的持倉，並說明這段期間持倉相對勝者的差距；不要改任何設定。"
       }
     },
     {
@@ -3404,7 +3404,7 @@
       "lands_in_phase": 8,
       "rationale": "與趨勢、動能、加密三支同一條規則（f-26a）：資金費寫表的問題要看表上實際文字與接收端設定，是人才有的資訊，所以是通知人附步驟與追查指令（R2：重試用盡才通知），不是自動處理。",
       "operator_message": {
-        "what": "趨勢策略・流星池版的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但表上這支策略那一列的累計資金費（G 欄）尚未確認更新成功：表上可能還是舊數字，也可能其實已更新、只是沒收到可確認的回覆。",
+        "what": "趨勢策略的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但表上這支策略那一列的累計資金費（G 欄）尚未確認更新成功：表上可能還是舊數字，也可能其實已更新、只是沒收到可確認的回覆。",
         "direction": "帳本是正本、交易不受影響，不需要立刻動作。要讓分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致；不一致就改表上的文字，或請 Claude 改程式設定。",
         "steps": [
           "看訊息裡的原因（reason）與專案名（project_name）：receiver_rejected 是接收端明確回報未成功（程式不保證表完全沒被動過）；repeated 是連線逾時、網路錯誤或空回覆連續 3 次（結果不明，請求可能已送達並已寫入）。",
@@ -3413,7 +3413,7 @@
           "文字不同：把表上 B 欄改成跟程式一致，或請 Claude 改程式設定；修好後下一輪自動寫入，失敗次數歸零。",
           "文字相同、或是連線類失敗：把下方「給 AI 的追查指令」整段貼給 Claude，追查原因並提出修正。"
         ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略・流星池版，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看表上 G 欄實際是舊數字還是已更新（連線類失敗的結果不明），再看事件日誌 meteor-audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看資金費同步單元最近幾次執行的 journal（程式在 src/trend_meteor/funding_sheet.py 與 funding_sync.py）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name 逐字比對（全形半形、空白、括號都算）；其他被拒原因查接收端的部署身分與 secret、網址、分頁名稱；reason 是 repeated 判斷是接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪單元結束碼回到 0。"
+        "ai_prompt": "請在 ed-seykota-systematic-trend-following（趨勢策略，程式在 src/trend_meteor，審計資料夾 meteor-audit）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看表上 G 欄實際是舊數字還是已更新（連線類失敗的結果不明），再看事件日誌 meteor-audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看資金費同步單元最近幾次執行的 journal（程式在 src/trend_meteor/funding_sheet.py 與 funding_sync.py）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name 逐字比對（全形半形、空白、括號都算）；其他被拒原因查接收端的部署身分與 secret、網址、分頁名稱；reason 是 repeated 判斷是接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪單元結束碼回到 0。"
       }
     }
   ],
