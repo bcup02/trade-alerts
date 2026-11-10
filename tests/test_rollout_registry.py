@@ -916,7 +916,7 @@ def test_trend_meteor_has_its_column_and_the_pending_mechanism_still_guards_the_
 def test_trend_meteor_has_no_done_cell_until_it_runs_on_the_live_branch(registry):
     """『已做』只算正式機分支（operations）上的；V11 還沒上線，所有格子只能是未做、已完成未上線或不適用，不能有已做。有一格寫已做就要先確認 sources 的 commit 真的含 V11 程式。"""
     rows = project_rows(registry, "trend-meteor")
-    assert len(rows) == 35 + 2 * (9 + 36)                                                     # 35 項能力＋（9 條 FLEET＋36 條 MET）×（行為、事件）
+    assert len(rows) == 35 + 2 * (9 + 37)                                                     # 35 項能力＋（9 條 FLEET＋36 條 MET）×（行為、事件）
     assert {r["state"] for r in rows.values()} <= {"built", "pending", "n/a"}, [k for k, r in rows.items() if r["state"] == "done"]
 
 
@@ -929,6 +929,8 @@ V11_TIERS = {
     # 1.6b：V11 自己發的事件
     "MET.DATA_UNAVAILABLE": ("R2", "JUDGEMENT"), "MET.RUNTIME_CYCLE_FAILED": ("R0", "MECHANICAL"), "MET.LEDGER_ITEM_DROPPED": ("R3", "JUDGEMENT"),
     "MET.STOP_FILL_UNKNOWN": ("R3", "JUDGEMENT"), "MET.WINNER_NO_PERP": ("R3", "JUDGEMENT"), "MET.FUNDING_SHEET_WRITE_FAILED": ("R2", "JUDGEMENT"),
+    # v0.30.32（進度頁 1.10）：待記帳積壓累計 3 個 UTC 日才通知一次，只通知不暫停
+    "MET.LEDGER_WRITE_STUCK": ("R2", "JUDGEMENT"),
     # 1.6b：V11 的安全暫停原因碼（全部 R3：策略對部位、保護單或自己的記錄失去把握，停下來等人看交易所）
     **{f"MET.{c}": ("R3", "JUDGEMENT") for c in (
         "STATE_FILE_CORRUPT", "MISSED_DAYS", "HEDGE_MODE", "NOT_ISOLATED", "LEVERAGE_NOT_1", "UNEXPECTED_POSITION", "BAD_EXCHANGE_DATA",
@@ -940,7 +942,7 @@ V11_TIERS = {
 
 def test_trend_meteor_catalog_entries_are_the_v11_ones_with_the_tiers_the_code_and_runners_need(catalog):
     entries = {e["code"]: e for e in catalog["entries"] if e["project"] == "trend-meteor"}
-    assert {c: (e["risk_tier"], e["verdict"]) for c, e in entries.items()} == V11_TIERS and len(V11_TIERS) == 36
+    assert {c: (e["risk_tier"], e["verdict"]) for c, e in entries.items()} == V11_TIERS and len(V11_TIERS) == 37
 
 
 def test_trend_meteor_halt_entries_latch_and_say_the_resume_tool_is_a_5d_job(catalog):
@@ -1052,6 +1054,7 @@ V11_STILL_PENDING = {
     "cap reconcile.adopted_fills", "cap projection.requeue_parked",
     "FLEET.OPS_GOOGLE_DIVERGED behaviour", "FLEET.OPS_GOOGLE_DIVERGED emits_event",
     "FLEET.OPS_CLOCK_DEGRADED behaviour", "FLEET.OPS_CLOCK_DEGRADED emits_event",
+    "MET.LEDGER_WRITE_STUCK behaviour", "MET.LEDGER_WRITE_STUCK emits_event",     # 新條目：程式在 V11 的 1.10 做，做完改已完成、尚未上線
 }
 
 
@@ -1122,3 +1125,12 @@ def test_a_single_owner_rule_still_needs_its_own_cell(registry, catalog):
     def drop(reg):
         next(r for r in reg["catalog"] if r["code"] == sey)["behaviour"].pop("seykota")
     assert any(sey in p and "behaviour" in p for p in _problems_after(registry, catalog, drop))
+
+
+def test_the_ledger_write_stuck_entry_notifies_once_and_never_halts(catalog, registry):
+    entry = next(e for e in catalog["entries"] if e["code"] == "MET.LEDGER_WRITE_STUCK")
+    assert (entry["error_id"], entry["risk_tier"], entry["resume"]) == ("ERR-108", "R2", "n/a")
+    assert entry["current"]["latch"] is None and catalog["error_ids_issued"] == 108
+    assert "不暫停" in entry["auto_action"] and "3 天" in entry["auto_action"] and "不同的 UTC 日" in entry["auto_action"]
+    assert "MET.LEDGER_ITEM_DROPPED" in entry["auto_action"]                                       # 丟棄是另一條（R3），這條不取代它
+    assert "不需要手動補記" in entry["operator_message"]["direction"]

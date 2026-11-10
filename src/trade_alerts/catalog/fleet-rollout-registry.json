@@ -3267,253 +3267,32 @@
           "evidence": "事件由 V11 程式寫（src/trend_meteor/funding_sheet.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
         }
       }
+    },
+    {
+      "code": "MET.LEDGER_WRITE_STUCK",
+      "behaviour": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-p3",
+          "reason": "V11 還沒有帳本積壓天數計數與這個事件（目前寫不進帳本只寫 log）；使用者 2026-11-10 定只通知不暫停，程式在 V11 的進度頁 1.10 做（先改釘本版目錄），做完改『已完成、尚未上線』。"
+        }
+      },
+      "emits_event": {
+        "trend-meteor": {
+          "state": "pending",
+          "phase": "v11-p3",
+          "reason": "V11 還沒有帳本積壓天數計數與這個事件（目前寫不進帳本只寫 log）；使用者 2026-11-10 定只通知不暫停，程式在 V11 的進度頁 1.10 做（先改釘本版目錄），做完改『已完成、尚未上線』。"
+        }
+      }
     }
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "latch.unified_model",
+      "kind": "rule",
+      "id": "MET.LEDGER_WRITE_STUCK",
       "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "latch.resume_tool",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "latch.restart_only_clear",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "latch.consecutive_failure_counter",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "runtime.status_snapshot",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.ledger_status",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.google_status",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.detect_propose",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.verified_close",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.pause_brake",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_export.writer",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.export_relay_enabled",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "notify.line_first_notice",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "notify.telegram_repeat",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.units_axis",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.funding_fee_sync",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.google_projection_grace",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "docs.glossary_adopted",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "orders.single_send",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ledger.trade_correction",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.unrecorded_fill_handling",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.recurrence_escalation",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "notify.error_id",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "stop.graceful",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "recovery.interrupted_order",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.adopted_fills",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.park_unconfirmed_correction",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.requeue_parked",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.close_whole_trade_entry",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.spot_fill_row",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.pending_age_cap",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "orders.step_rounding_decimal",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ledger.capital_flow",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ledger.dust_convert",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
-    },
-    {
-      "kind": "cap",
-      "id": "bear.paxg_asset",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "登記冊命名統一（進度頁 1.9）：V11 的專案欄改叫「趨勢策略」，舊趨勢標「舊趨勢（已停用、待封存）」，一致性登記冊頁面不再顯示舊趨勢欄（資料留著，待封存時整批刪）。"
+      "type": "added",
+      "note": "新增 ERR-108：趨勢策略待記帳項目累計 3 個 UTC 日沒能寫進帳本時通知一次（只通知、不暫停）；程式在 V11 做，格子先標未做。"
     }
   ]
 }
