@@ -178,9 +178,9 @@
           "reason": "未分類例外不暫停：寫錯誤心跳、隔天重試（R0）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 輸入抓不到連續 3 個 UTC 日才暫停（src/trend_meteor/runner.py 的 data_failure_halt_days），在開發分支；下單與帳本失敗要不要也連續計數，開發機演練（P3）前檢討。"
+          "evidence": "V11 的連續失敗分工（使用者 2026-11-10 定：只通知不暫停，保護類失敗不放寬）：輸入抓不到連續 3 個 UTC 日才安全暫停（src/trend_meteor/runner.py _data_unavailable）；待記帳積壓累計 3 個不同 UTC 日寫一筆 R2 已升格事件、不暫停（src/trend_meteor/runner.py _track_ledger_backlog，PR #224，目錄 ERR-108）；通知另有條件：要設定 OPS_NOTIFY_TREND_METEOR_AUDIT 建立 V11 目標、OPS_NOTIFY_TREND_METEOR_OPS_EXPORT=on 啟用匯出軸（預設關，P3 設定），事件仍在匯出視窗內（預設 7 天）；匯出軸每次第一次啟用或關掉後重新啟用，當下已存在的事件都視為已送達、不補發；未分類例外持續失敗靠每日單元非零結束，由維運通知服務單元軸通知（OPS_NOTIFY_TREND_METEOR_UNITS 要列入每日單元，P3）；保護類失敗仍一次就暫停。"
         }
       }
     },
@@ -262,9 +262,9 @@
           "evidence": "src/btc_competition/reconcile_google.py"
         },
         "trend-meteor": {
-          "state": "pending",
-          "phase": "v11-google-reconcile",
-          "reason": "V11 的 Google 投影（src/trend_meteor/google_projection.py）在開發分支；帳本↔Google 表對帳單元還沒有（U3 已定沿用 ed-seykota「趨勢策略」，5d 之後做）。"
+          "state": "built",
+          "phase": "v11-p3",
+          "evidence": "V11 的帳本對 Google 表對帳單元已在趨勢 repo 開發分支（PR #221）：`trend-meteor google-reconcile`（src/trend_meteor/google_reconcile.py）讀帳本與共用表「趨勢策略」分頁（只比 TM- 開頭的列、本機的交易取自 google_projection.plan()），寫 audit/google_reconcile_status.json；帳本有品質問題或有交易投影被擋／孤兒／無法歸屬時不宣告已一致；讀表錯誤只輸出固定摘要。接進 deploy/trend-meteor-reconcile-fetch.service 第四步。尚未在主機實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -595,9 +595,9 @@
           "evidence": "AI-for-column5/btc-bull-market-competition#33（2026-09-19 squash 合併 a878166，外部審閱 PASS）：README、docs/branch-governance.md、docs/btc-competition-onboarding-plan.md、docs/execution-flow.md、docs/recon-strategy4.md 加 src/btc_competition/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。過程中排除了兩處剛好包含子字串、但語意其實是買賣盤報價、跟交易模式無關的詞，也刻意不動 tests/test_portfolio_snapshot_adapter.py 的跨 repo digest 一致性 fixture（要跟 portfolio-query 同步才能改，留給 n6）。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "名詞對照表已加入『趨勢策略』；V11 repo 內文件與訊息逐條對照名詞表的全面掃描還沒做，開發機演練（P3）前做。"
+          "evidence": "V11 的程式說明、文件與部署檔已逐條對照名詞對照表掃描，並把舊叫法改成名詞表的正式名稱（PR #222，涵蓋 src/trend_meteor、deploy、docs/trend_meteor_*.md；純文字，沒有改邏輯與識別字）。刻意保留三處：投資人快照的 project_name（src/trend_meteor/portfolio_snapshot.py，隨 P4 來源身分切換再改）、vendored 的 src/trend_meteor/portfolio_snapshot_contract.py 說明、帳本沒有進場列的平倉這個概念（程式裡叫 orphan_close；名詞表把它對到另一個意思的詞，不硬換）。"
         }
       }
     },
@@ -908,9 +908,9 @@
           "limit": "競賽的指令稿只在測試驗證，沒有在任何主機實際執行過；通用重排只是複製原本的綁定，不是把舊投影搬到新動作的 migration 工具。"
         },
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "重新排入停放投影的正式工具還沒做（V11 開發分支沒有），開發機演練（P3）前補。"
+          "evidence": "重新排入停放投影的工具已在趨勢 repo 開發分支（PR #222）：`trend-meteor-requeue-projection --trade-id <TM-…>`（src/trend_meteor/requeue_projection.py），把一筆交易停放（REJECTED）的 Google 投影項目放回佇列、維持原順序，只動本機佇列檔，不連 Google。尚未在主機實跑，等開發機演練（P3）。"
         }
       }
     },
@@ -1909,9 +1909,9 @@
           "evidence": "src/btc_competition/reconcile_google.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
         },
         "trend-meteor": {
-          "state": "pending",
-          "phase": "v11-google-reconcile",
-          "reason": "維運通知讀 V11 的 Google 表對帳狀態；V11 還沒有帳本↔Google 表對帳單元（U3 已定沿用 ed-seykota「趨勢策略」，5d 之後做），ops-notify 的 trend-meteor 目標先不放 google 軸。"
+          "state": "built",
+          "phase": "v11-p3",
+          "evidence": "Google 表對帳狀態由 V11 的 google-reconcile 單元寫（src/trend_meteor/google_reconcile.py，PR #221；audit/google_reconcile_status.json），維運通知的 trend-meteor 目標已加上 google 軸（bcup02/ops-notify PR #70，預設不啟用）；啟用目標與主機設定在開發機演練（P3）。"
         }
       },
       "emits_event": {
@@ -1932,9 +1932,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "pending",
-          "phase": "v11-google-reconcile",
-          "reason": "維運通知讀 V11 的 Google 表對帳狀態；V11 還沒有帳本↔Google 表對帳單元（U3 已定沿用 ed-seykota「趨勢策略」，5d 之後做），ops-notify 的 trend-meteor 目標先不放 google 軸。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -3272,27 +3271,62 @@
       "code": "MET.LEDGER_WRITE_STUCK",
       "behaviour": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 還沒有帳本積壓天數計數與這個事件（目前寫不進帳本只寫 log）；使用者 2026-11-10 定只通知不暫停，程式在 V11 的進度頁 1.10 做（先改釘本版目錄），做完改『已完成、尚未上線』。"
+          "evidence": "V11 每日單元走完整輪後待記帳清單仍非空就算積壓的一天，累計 3 個不同 UTC 日寫一筆 R2 已升格事件、清空歸零、不暫停（src/trend_meteor/runner.py _track_ledger_backlog；狀態欄位在 src/trend_meteor/state.py）；正常路徑每段積壓記一次，事件寫進事件日誌之後、狀態存檔之前程序中斷（或存檔失敗），下一輪會再記一筆（寧可重複記錄事件，避免因存檔失敗而漏記事件；不是通知保證）。趨勢 repo 開發分支 PR #224，改釘 trade-alerts v0.30.32。尚未在主機實跑，等開發機演練（P3）。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "pending",
+          "state": "built",
           "phase": "v11-p3",
-          "reason": "V11 還沒有帳本積壓天數計數與這個事件（目前寫不進帳本只寫 log）；使用者 2026-11-10 定只通知不暫停，程式在 V11 的進度頁 1.10 做（先改釘本版目錄），做完改『已完成、尚未上線』。"
+          "evidence": "事件由 V11 程式寫進事件日誌：code LEDGER_WRITE_STUCK、risk_tier R2、details.escalated True（src/trend_meteor/runner.py _track_ledger_backlog，PR #224）；事件寫入成功才設已記錄旗標，寫失敗下一個走完整輪的日子再記。寫進事件日誌不等於通知送達。通知另有條件：要設定 OPS_NOTIFY_TREND_METEOR_AUDIT 建立 V11 目標、OPS_NOTIFY_TREND_METEOR_OPS_EXPORT=on 啟用匯出軸（預設關，P3 設定），事件仍在匯出視窗內（預設 7 天）；匯出軸每次第一次啟用或關掉後重新啟用，當下已存在的事件都視為已送達、不補發。目錄守門測試（tests/test_trend_meteor_catalog_guard.py）強制與目錄一致。尚未實跑，等開發機演練（P3）。"
         }
       }
     }
   ],
   "recent_changes": [
     {
+      "kind": "cap",
+      "id": "reconcile.google_status",
+      "project": "trend-meteor",
+      "type": "updated",
+      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
+    },
+    {
+      "kind": "cap",
+      "id": "projection.requeue_parked",
+      "project": "trend-meteor",
+      "type": "updated",
+      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
+    },
+    {
+      "kind": "cap",
+      "id": "docs.glossary_adopted",
+      "project": "trend-meteor",
+      "type": "updated",
+      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
+    },
+    {
+      "kind": "cap",
+      "id": "latch.consecutive_failure_counter",
+      "project": "trend-meteor",
+      "type": "updated",
+      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_GOOGLE_DIVERGED",
+      "project": "trend-meteor",
+      "type": "updated",
+      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
+    },
+    {
       "kind": "rule",
       "id": "MET.LEDGER_WRITE_STUCK",
       "project": "trend-meteor",
-      "type": "added",
-      "note": "新增 ERR-108：趨勢策略待記帳項目累計 3 個 UTC 日沒能寫進帳本時通知一次（只通知、不暫停）；程式在 V11 做，格子先標未做。"
+      "type": "updated",
+      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
     }
   ]
 }

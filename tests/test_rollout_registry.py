@@ -1050,11 +1050,10 @@ def test_a_pending_cell_that_says_the_code_is_on_development_names_what_is_still
 
 
 V11_STILL_PENDING = {
-    "cap latch.restart_only_clear", "cap latch.consecutive_failure_counter", "cap reconcile.google_status", "cap docs.glossary_adopted",
-    "cap reconcile.adopted_fills", "cap projection.requeue_parked",
-    "FLEET.OPS_GOOGLE_DIVERGED behaviour", "FLEET.OPS_GOOGLE_DIVERGED emits_event",
+    # 2026-11-10（進度頁 1.10）：P3 前能做的都做完（Google 對帳單元與通知軸 2 格、重新排入、名詞表掃描、連續失敗、帳本積壓通知 2 格）改成已完成、尚未上線（Google 的事件日誌格是不適用）；
+    # 剩下這 4 項依登記冊的理由要等開發機演練（P3）：要看過實際暫停、要測試網實測、時鐘軸是主機設定。
+    "cap latch.restart_only_clear", "cap reconcile.adopted_fills",
     "FLEET.OPS_CLOCK_DEGRADED behaviour", "FLEET.OPS_CLOCK_DEGRADED emits_event",
-    "MET.LEDGER_WRITE_STUCK behaviour", "MET.LEDGER_WRITE_STUCK emits_event",     # 新條目：程式在 V11 的 1.10 做，做完改已完成、尚未上線
 }
 
 
@@ -1143,3 +1142,28 @@ def test_the_ledger_write_stuck_entry_notifies_once_and_never_halts(catalog, reg
     prompt = entry["operator_message"]["ai_prompt"]
     assert "只有 dropped 數量" in prompt and "能識別的才逐筆列出" in prompt and "無法直接識別被丟棄的是哪幾筆" in prompt
     assert "帳本與交易所成交的差異" in prompt and "待確認的補記方案" in prompt and "列出被丟棄的項目並對照交易所成交" not in prompt
+
+
+def test_v11_google_status_rule_notifies_through_the_status_file_not_the_event_log(registry):
+    """PR #359 審閱 BLOCK-359-01：維運通知直接讀狀態檔，所以 emits_event 與其他四支一樣是不適用，不是已完成。"""
+    row = next(r for r in registry["catalog"] if r["code"] == "FLEET.OPS_GOOGLE_DIVERGED")
+    assert row["behaviour"]["trend-meteor"]["state"] == "built"
+    assert row["emits_event"]["trend-meteor"] == {"state": "n/a", "reason": "維運通知直接讀狀態檔，不經事件日誌。"}
+    assert {c["state"] for p, c in row["emits_event"].items() if p != "trend-meteor"} == {"n/a"}
+
+
+def test_ledger_write_stuck_texts_do_not_promise_delivery_or_exactly_once(registry, catalog):
+    """PR #359 審閱 BLOCK-359-02／03／04：事件寫進事件日誌不等於通知送達——要建立 V11 目標、啟用匯出軸（預設關）、事件在匯出視窗內，而且匯出軸每次第一次啟用**或關掉後重新啟用**，
+    當下已存在的事件都視為已送達、不補發；『只記一次』只在正常路徑成立（事件成功後存檔前中斷會再記一筆）；『寧可重複』只是記錄事件，不是通知保證。"""
+    row = next(r for r in registry["catalog"] if r["code"] == "MET.LEDGER_WRITE_STUCK")
+    behaviour, emits = row["behaviour"]["trend-meteor"]["evidence"], row["emits_event"]["trend-meteor"]["evidence"]
+    cap = next(c for c in registry["capabilities"] if c["id"] == "latch.consecutive_failure_counter")["status"]["trend-meteor"]["evidence"]
+    entry = next(e for e in catalog["entries"] if e["code"] == "MET.LEDGER_WRITE_STUCK")["auto_action"]
+    for text in (emits, cap, entry):                                                     # 通知的完整條件
+        for needle in ("OPS_NOTIFY_TREND_METEOR_AUDIT", "OPS_NOTIFY_TREND_METEOR_OPS_EXPORT", "7 天", "重新啟用", "不補發"):
+            assert needle in text, needle
+    assert "不等於通知送達" in emits and "不是通知保證" in behaviour and "避免因存檔失敗而漏記事件" in behaviour
+    assert "避免因狀態存檔失敗而漏記事件" in entry and "這不是通知保證" in entry and "不保證你一定收到通知" in entry
+    for text in (behaviour, emits, cap, entry):                                          # 舊的過度承諾不得再出現
+        for banned in ("不漏通知", "寧可重複不漏", "由匯出檔通知一次", "第一次啟用時既有事件不補發"):
+            assert banned not in text, banned
