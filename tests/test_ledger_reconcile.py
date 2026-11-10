@@ -632,6 +632,52 @@ def test_fetch_exhausts_retries(monkeypatch):
     assert rows is None and "ConnectionError" in err
 
 
+SECRET_URL = "https://script.google.com/macros/s/AKfycbxSECRETDEPLOYMENT/exec?token=SECRET123"
+
+
+class _HttpError(Exception):
+    """Stand-in for requests.HTTPError: the message carries the full request URL and the exception carries the response."""
+
+    def __init__(self, status_code):
+        super().__init__(f"{status_code} Server Error: Internal Server Error for url: {SECRET_URL}")
+        self.response = _Resp(status_code=status_code)
+
+
+def test_a_failed_read_never_puts_the_exception_text_in_the_log_or_the_returned_error(monkeypatch, caplog):
+    """Review of ed-seykota PR #221 (2026-11-10): the retry log and the returned error used to carry ``str(exc)`` -- for requests that is the full URL."""
+    def _post(*a, **k):
+        raise _HttpError(500)
+
+    monkeypatch.setattr(lr.requests, "post", _post)
+    with caplog.at_level("DEBUG", logger="trade_alerts.ledger_reconcile"):
+        rows, err = fetch_sheet_rows(sheet_name="S", url=SECRET_URL, secret="s3cr3t-body-secret", attempts=3, sleep=lambda _s: None)
+    assert rows is None and err == "_HttpError status=500"
+    assert len([r for r in caplog.records if "list_by_sheet attempt" in r.getMessage()]) == 2        # the retries are still logged
+    blob = caplog.text + str(err)
+    for needle in ("SECRET123", "SECRETDEPLOYMENT", "script.google.com", "Internal Server Error", "s3cr3t-body-secret", "token="):
+        assert needle not in blob, needle
+
+
+def test_a_connection_failure_message_with_a_url_is_not_logged_either(monkeypatch, caplog):
+    def _boom(*a, **k):
+        raise ConnectionError(f"HTTPSConnectionPool(host='script.google.com'): Max retries exceeded with url: {SECRET_URL}")
+
+    monkeypatch.setattr(lr.requests, "post", _boom)
+    with caplog.at_level("DEBUG", logger="trade_alerts.ledger_reconcile"):
+        rows, err = fetch_sheet_rows(sheet_name="S", url=SECRET_URL, secret="s", attempts=2, sleep=lambda _s: None)
+    assert rows is None and err == "ConnectionError"
+    assert "SECRET123" not in caplog.text + err and "script.google.com" not in caplog.text + err
+
+
+def test_a_status_code_that_is_not_an_int_is_not_copied():
+    class Odd(Exception):
+        response = type("R", (), {"status_code": "500 and SECRET"})()
+
+    assert lr._describe_fetch_failure(Odd()) == "Odd"
+    assert lr._describe_fetch_failure(_HttpError(404)) == "_HttpError status=404"
+    assert lr._describe_fetch_failure(ValueError("x https://u")) == "ValueError"
+
+
 def test_fetch_empty_body_exhausts(monkeypatch):
     monkeypatch.setattr(lr.requests, "post", lambda *a, **k: _Resp(text="   "))
     rows, err = fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s",
