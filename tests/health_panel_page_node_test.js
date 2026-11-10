@@ -92,7 +92,7 @@ function fakeMcp(deliver) {
   assert.deepEqual([mcp.watches[0].server, mcp.watches[0].tool, mcp.watches[0].input], ['Google Drive', 'read_file_content', {fileId: FILE_ID}]);
   assert.equal(mcp.watches[0].options.refetchInterval, 60000);
   let text = texts(page.panel);
-  for (const label of ['動能策略', '加密策略', '趨勢策略', '競賽策略', '主機', '帳本軸', 'Google 表軸', '運行狀態軸', '服務單元軸', '匯出檔軸', '時鐘軸']) assert.ok(text.includes(label), label);
+  for (const label of ['動能策略', '加密策略', '舊趨勢（已停用、待封存）', '競賽策略', '主機', '帳本軸', 'Google 表軸', '運行狀態軸', '服務單元軸', '匯出檔軸', '時鐘軸']) assert.ok(text.includes(label), label);
   assert.ok(text.includes('DIVERGED') && text.includes('RECONCILED') && text.includes('HEALTHY'));
   assert.ok(text.includes('有項目異常'));                              // two DIVERGED readings
   assert.ok(text.includes('讀數產生 10/22 15:51') && text.includes('最後一次輪詢 10/22 15:50'));
