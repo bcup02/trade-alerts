@@ -2142,32 +2142,46 @@ def test_momentum_halt_a_fresh_event_is_waiting_and_a_baseline_mark_is_not_proof
     assert marked.state == ow.OBSERVED and marked.needs_human and not marked.closable
 
 
-def aged_ctx(remote, *, past_retention_by_hours):
+def aged_ctx(remote, *, past_retention_by_hours, previous=None):
     """Context whose clock is ``past_retention_by_hours`` after an event recorded 2 h before NOW has been around for the retention (negative = still inside)."""
-    return ow.Context(remote, NOW - timedelta(hours=2) + ow.DELIVERY_RECORD_RETENTION + timedelta(hours=past_retention_by_hours), {})
+    return ow.Context(remote, NOW - timedelta(hours=2) + ow.DELIVERY_RECORD_RETENTION + timedelta(hours=past_retention_by_hours), previous or {})
 
 
-def test_momentum_halt_an_event_older_than_the_delivery_record_retention_is_not_a_failure():
-    """2026-11-11: f-38 flipped from closed to failed 14 days after the event because ops-notify prunes delivered ids (verified: no re-send)."""
-    old = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None), past_retention_by_hours=1))
-    assert old.state == ow.OBSERVED and old.closable and not old.needs_human and old.key == "E1"
-    assert "保留期限" in old.evidence[0] and "沒有送出" not in old.summary
-    inside = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None), past_retention_by_hours=-1))
+def test_momentum_halt_a_pruned_record_is_not_a_failure_but_only_a_remembered_proof_closes():
+    """2026-11-11: f-38 flipped from closed to failed 14 days after the event because ops-notify prunes delivered ids (verified: no re-send).
+    A missing record on an old event is not a miss -- and not proof either: only a delivery this check saw earlier lets it stay closable."""
+    first = ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=5)))
+    assert first.closable and "E1" in first.extra["proven"]                                  # the proof is remembered in the check's own state
+    remembered = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None), past_retention_by_hours=1, previous=first.extra))
+    assert remembered.state == ow.OBSERVED and remembered.closable and not remembered.needs_human and remembered.key == "E1"
+    assert "先前已查到送出紀錄" in remembered.evidence[0]
+    never = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None), past_retention_by_hours=1))
+    assert never.state == ow.OBSERVED and never.needs_human and not never.closable and never.key == "unproven:E1"
+    assert "不能證明有送出" in never.evidence[0]
+    inside = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None), past_retention_by_hours=-1, previous=first.extra))
     assert inside.state == ow.FAILED                                                        # still inside the retention: a missing record is a miss
-    broken = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None, export_severity="critical"), past_retention_by_hours=1))
+    broken = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None, export_severity="critical"), past_retention_by_hours=1, previous=first.extra))
     assert broken.state == ow.FAILED                                                        # an old event never hides a broken export axis
+    stuck = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None, ai_pending={"momentum": {"E1": iso(NOW - timedelta(days=13))}}),
+                                                   past_retention_by_hours=1, previous=first.extra))
+    assert stuck.state == ow.FAILED                                                         # a second message still owed is its own evidence
 
 
-def test_strategy_event_notice_older_than_the_delivery_record_retention_is_closable_not_failed():
-    def remote(*extra):
-        return events_remote(momentum=[event("PROTECTION_UNVERIFIED", hours=2, event_id="E1"), *extra])
-    old = ow.check_safe_halt_notice(aged_ctx(remote(), past_retention_by_hours=1))
-    assert old.state == ow.OBSERVED and old.closable and not old.needs_human and old.key == "E1"
-    assert "保留期限" in old.evidence[0]
-    assert ow.check_safe_halt_notice(aged_ctx(remote(), past_retention_by_hours=-1)).state == ow.FAILED
-    # a second, recent event without a delivery record still fails even when the first one has aged out
+def test_strategy_event_notice_a_pruned_record_never_hides_an_owed_second_message_or_proves_a_delivery():
+    def remote(*extra, delivered=None, ai_pending=None):
+        return events_remote(momentum=[event("PROTECTION_UNVERIFIED", hours=2, event_id="E1"), *extra],
+                             delivered={"momentum": delivered} if delivered else None, ai_pending=ai_pending)
+    first = ow.check_safe_halt_notice(ctx(remote(delivered=["E1"])))
+    assert first.state == ow.OBSERVED and "E1" in first.extra["proven"]
+    remembered = ow.check_safe_halt_notice(aged_ctx(remote(), past_retention_by_hours=1, previous=first.extra))
+    assert remembered.state == ow.OBSERVED and remembered.key == "E1" and "先前已查到送出紀錄" in remembered.evidence[0]   # same key as the earlier (acked) result
+    never = ow.check_safe_halt_notice(aged_ctx(remote(), past_retention_by_hours=1))
+    assert never.state == ow.OBSERVED and never.needs_human and not never.closable and never.key == "unproven:E1"
+    owed = ow.check_safe_halt_notice(aged_ctx(remote(ai_pending={"momentum": {"E1": iso(NOW - timedelta(days=13))}}), past_retention_by_hours=1, previous=first.extra))
+    assert owed.state == ow.FAILED and owed.key == "overdue:E1"                              # BLOCK-361-01: the owed second message is judged first
+    assert ow.check_safe_halt_notice(aged_ctx(remote(), past_retention_by_hours=-1, previous=first.extra)).state == ow.FAILED
     fresh = event("SAFE_HALT_2", hours=-(14 * 24) + 2, event_id="E2")                       # recorded 1 h before the clock, no record: past the 40-minute grace
-    assert ow.check_safe_halt_notice(aged_ctx(remote(fresh), past_retention_by_hours=1)).state == ow.FAILED
+    assert ow.check_safe_halt_notice(aged_ctx(remote(fresh), past_retention_by_hours=1, previous=first.extra)).state == ow.FAILED
 
 
 def test_batch2_checks_are_registered_with_their_items():
