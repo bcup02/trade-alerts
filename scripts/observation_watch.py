@@ -909,6 +909,10 @@ def check_crypto_stop(ctx: Context) -> Result:
 
 #: ops-notify's export timer runs every minute and ops-notify polls every 10 minutes: a notice should be out within ~11.
 EXPORT_NOTICE_LATENCY = timedelta(minutes=15)
+#: ops-notify forgets a delivered id this long after it was sent (export_relay.py: "kept for window_days + 7 days (at least 14)").  An event older than
+#: this with no delivery record is NOT evidence of a missed notice: the record may simply have been pruned (2026-11-11: f-38 and f-35/f-37 flipped
+#: from closed to failed exactly 14 days after the 10-28 event, while ops-notify had sent nothing new).
+DELIVERY_RECORD_RETENTION = timedelta(days=14)
 _MOMENTUM_REAL_FROM = datetime(2026, 10, 13, 4, 0, tzinfo=timezone.utc)
 
 
@@ -929,7 +933,7 @@ def check_momentum_halt_notice(ctx: Context) -> Result:
     if not isinstance(export_reading, Mapping) or not isinstance(export_reading.get("severity"), str):
         raise RemoteError("ops-notify 狀態檔沒有 momentum:export 的讀數（或沒有 severity），判斷不了匯出檔軸是否正常")
     baseline = parse_time(target.get("baseline_at"))
-    evidence, late, unsent, unproven = [], [], [], []
+    evidence, late, unsent, unproven, expired = [], [], [], [], []
     for _, event in events[:5]:
         at, event_id = parse_time(event.get("recorded_at")), event.get("event_id")
         sent = parse_time((target.get("delivered") or {}).get(event_id))
@@ -937,6 +941,9 @@ def check_momentum_halt_notice(ctx: Context) -> Result:
         if sent is not None and baseline is not None and at <= baseline:
             unproven.append(label)
             evidence.append(label + "；早於維運通知建立基準，送出紀錄只是略過標記")
+        elif sent is None and ctx.now - at > DELIVERY_RECORD_RETENTION:
+            expired.append(label)
+            evidence.append(label + "；送出紀錄已超過維運通知的保留期限（14 天）被清掉，不能再用紀錄判斷有沒有送出")
         elif sent is None:
             (late if ctx.now - at > EXPORT_NOTICE_LATENCY else unsent).append(label)
             evidence.append(label + "；維運通知還沒有送出紀錄")
@@ -955,6 +962,8 @@ def check_momentum_halt_notice(ctx: Context) -> Result:
         return Result(WAITING, "事件已記錄，等維運通知下一輪送出。", evidence)
     if unproven:
         return Result(OBSERVED, "A1 動能策略出現 R3 事件，但無法從紀錄證明維運通知有送出，請你確認有沒有收到。", evidence, needs_human=True, key="unproven:" + key)
+    if len(expired) == len(events[:5]):
+        return Result(OBSERVED, "A1 動能策略的 R3 事件都已超過維運通知送出紀錄的保留期限（14 天），不能再用紀錄判斷；匯出檔軸正常。", evidence, closable=True, key=key)
     return Result(OBSERVED, "A1 動能策略的 R3 事件已在預期時間內送出維運通知，匯出檔軸正常。", evidence, closable=True, key=key)
 
 
@@ -1105,7 +1114,7 @@ def _strategy_event_result(ctx: Context, events: list[tuple[str, dict[str, Any]]
     the event, the delivery evidence, and what only the operator can confirm."""
     state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
     exported = state.get("_export") if isinstance(state.get("_export"), Mapping) else {}
-    evidence, overdue, undelivered, unproven = [], [], [], []
+    evidence, overdue, undelivered, unproven, expired = [], [], [], [], []
     for key, event in events[:5]:
         target = exported.get(key) if isinstance(exported.get(key), Mapping) else {}
         delivered = (target.get("delivered") or {}).get(event.get("event_id"))
@@ -1119,6 +1128,10 @@ def _strategy_event_result(ctx: Context, events: list[tuple[str, dict[str, Any]]
             unproven.append(label)
             evidence.append(label + "；第一則：無法證明有送出（這則事件早於維運通知首次建立基準的時間，"
                                     "送出紀錄是當時的略過標記，不是實際送出）")
+        elif not delivered and ctx.now - at > DELIVERY_RECORD_RETENTION:
+            # ops-notify prunes delivered ids after DELIVERY_RECORD_RETENTION: no record on an event this old proves nothing.
+            expired.append(label)
+            evidence.append(label + "；第一則：送出紀錄已超過維運通知的保留期限（14 天）被清掉，不能再用紀錄判斷")
         elif not delivered:
             (overdue if ctx.now - at > EVENT_NOTICE_OVERDUE else undelivered).append(label)
             evidence.append(label + "；第一則：維運通知還沒有送出紀錄")
@@ -1134,6 +1147,8 @@ def _strategy_event_result(ctx: Context, events: list[tuple[str, dict[str, Any]]
         return Result(WAITING, "事件已記錄，等維運通知下一輪送出。", evidence)
     if unproven:
         return Result(OBSERVED, seen + "但維運通知有沒有送出無法從紀錄證明，請你確認有沒有收到。", evidence, needs_human=True, key="unproven:" + key)
+    if len(expired) == len(events[:5]):
+        return Result(OBSERVED, seen + "事件都已超過維運通知送出紀錄的保留期限（14 天），不能再用紀錄判斷；先前的確認結果以進度頁為準。", evidence, closable=True, key=key)
     return Result(OBSERVED, seen + ask, evidence, needs_human=True, key=key)
 
 

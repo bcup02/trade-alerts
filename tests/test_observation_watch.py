@@ -2142,6 +2142,34 @@ def test_momentum_halt_a_fresh_event_is_waiting_and_a_baseline_mark_is_not_proof
     assert marked.state == ow.OBSERVED and marked.needs_human and not marked.closable
 
 
+def aged_ctx(remote, *, past_retention_by_hours):
+    """Context whose clock is ``past_retention_by_hours`` after an event recorded 2 h before NOW has been around for the retention (negative = still inside)."""
+    return ow.Context(remote, NOW - timedelta(hours=2) + ow.DELIVERY_RECORD_RETENTION + timedelta(hours=past_retention_by_hours), {})
+
+
+def test_momentum_halt_an_event_older_than_the_delivery_record_retention_is_not_a_failure():
+    """2026-11-11: f-38 flipped from closed to failed 14 days after the event because ops-notify prunes delivered ids (verified: no re-send)."""
+    old = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None), past_retention_by_hours=1))
+    assert old.state == ow.OBSERVED and old.closable and not old.needs_human and old.key == "E1"
+    assert "保留期限" in old.evidence[0] and "沒有送出" not in old.summary
+    inside = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None), past_retention_by_hours=-1))
+    assert inside.state == ow.FAILED                                                        # still inside the retention: a missing record is a miss
+    broken = ow.check_momentum_halt_notice(aged_ctx(halt_remote(sent_after_minutes=None, export_severity="critical"), past_retention_by_hours=1))
+    assert broken.state == ow.FAILED                                                        # an old event never hides a broken export axis
+
+
+def test_strategy_event_notice_older_than_the_delivery_record_retention_is_closable_not_failed():
+    def remote(*extra):
+        return events_remote(momentum=[event("PROTECTION_UNVERIFIED", hours=2, event_id="E1"), *extra])
+    old = ow.check_safe_halt_notice(aged_ctx(remote(), past_retention_by_hours=1))
+    assert old.state == ow.OBSERVED and old.closable and not old.needs_human and old.key == "E1"
+    assert "保留期限" in old.evidence[0]
+    assert ow.check_safe_halt_notice(aged_ctx(remote(), past_retention_by_hours=-1)).state == ow.FAILED
+    # a second, recent event without a delivery record still fails even when the first one has aged out
+    fresh = event("SAFE_HALT_2", hours=-(14 * 24) + 2, event_id="E2")                       # recorded 1 h before the clock, no record: past the 40-minute grace
+    assert ow.check_safe_halt_notice(aged_ctx(remote(fresh), past_retention_by_hours=1)).state == ow.FAILED
+
+
 def test_batch2_checks_are_registered_with_their_items():
     ids = {c.id: c for c in ow.CHECKS}
     assert ids["a1-stable"].covers == ("phase-x8", "f-63", "phase-x5")
