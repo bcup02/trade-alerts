@@ -579,7 +579,7 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:406"
+        "trade-alerts/src/trade_alerts/repair_runner.py:407"
       ],
       "current": {
         "latch": null,
@@ -609,7 +609,7 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:471"
+        "trade-alerts/src/trade_alerts/repair_runner.py:472"
       ],
       "current": {
         "latch": null,
@@ -641,8 +641,8 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:439",
-        "trade-alerts/src/trade_alerts/repair_runner.py:453"
+        "trade-alerts/src/trade_alerts/repair_runner.py:440",
+        "trade-alerts/src/trade_alerts/repair_runner.py:454"
       ],
       "current": {
         "latch": null,
@@ -1049,7 +1049,7 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:406"
+        "trade-alerts/src/trade_alerts/repair_runner.py:407"
       ],
       "current": {
         "latch": null,
@@ -1079,8 +1079,8 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:439",
-        "trade-alerts/src/trade_alerts/repair_runner.py:453"
+        "trade-alerts/src/trade_alerts/repair_runner.py:440",
+        "trade-alerts/src/trade_alerts/repair_runner.py:454"
       ],
       "current": {
         "latch": null,
@@ -1111,7 +1111,7 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:471"
+        "trade-alerts/src/trade_alerts/repair_runner.py:472"
       ],
       "current": {
         "latch": null,
@@ -1755,7 +1755,7 @@
       "project": "momentum",
       "sources": [
         "scripts/repair_bot.py:163",
-        "trade-alerts/src/trade_alerts/repair_runner.py:282"
+        "trade-alerts/src/trade_alerts/repair_runner.py:283"
       ],
       "current": {
         "latch": null,
@@ -1786,7 +1786,7 @@
       "project": "seykota",
       "sources": [
         "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:282"
+        "trade-alerts/src/trade_alerts/repair_runner.py:283"
       ],
       "current": {
         "latch": null,
@@ -1944,7 +1944,7 @@
       "title": "對帳標記超過 24 小時沒結清，系統已不再等待",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/repair_runner.py:310"
+        "trade-alerts/src/trade_alerts/repair_runner.py:311"
       ],
       "current": {
         "latch": null,
@@ -2010,7 +2010,7 @@
       "title": "無歧義的漏記平倉已自動補寫進帳本",
       "project": "mycrypto",
       "sources": [
-        "trade-alerts/src/trade_alerts/repair_runner.py:406"
+        "trade-alerts/src/trade_alerts/repair_runner.py:407"
       ],
       "current": {
         "latch": null,
@@ -2039,7 +2039,7 @@
       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
       "project": "mycrypto",
       "sources": [
-        "trade-alerts/src/trade_alerts/repair_runner.py:471"
+        "trade-alerts/src/trade_alerts/repair_runner.py:472"
       ],
       "current": {
         "latch": null,
@@ -2070,8 +2070,8 @@
       "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
       "project": "mycrypto",
       "sources": [
-        "trade-alerts/src/trade_alerts/repair_runner.py:439",
-        "trade-alerts/src/trade_alerts/repair_runner.py:453"
+        "trade-alerts/src/trade_alerts/repair_runner.py:440",
+        "trade-alerts/src/trade_alerts/repair_runner.py:454"
       ],
       "current": {
         "latch": null,
@@ -2101,7 +2101,7 @@
       "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
       "project": "mycrypto",
       "sources": [
-        "trade-alerts/src/trade_alerts/repair_runner.py:282"
+        "trade-alerts/src/trade_alerts/repair_runner.py:283"
       ],
       "current": {
         "latch": null,
@@ -2301,7 +2301,7 @@
       "project": "trend-meteor",
       "sources": [
         "src/trend_meteor/repair_bot.py:208",
-        "trade-alerts/src/trade_alerts/repair_runner.py:406"
+        "trade-alerts/src/trade_alerts/repair_runner.py:407"
       ],
       "current": {
         "latch": null,
@@ -2331,8 +2331,8 @@
       "project": "trend-meteor",
       "sources": [
         "src/trend_meteor/repair_bot.py:208",
-        "trade-alerts/src/trade_alerts/repair_runner.py:439",
-        "trade-alerts/src/trade_alerts/repair_runner.py:453"
+        "trade-alerts/src/trade_alerts/repair_runner.py:440",
+        "trade-alerts/src/trade_alerts/repair_runner.py:454"
       ],
       "current": {
         "latch": null,
@@ -2363,7 +2363,7 @@
       "project": "trend-meteor",
       "sources": [
         "src/trend_meteor/repair_bot.py:208",
-        "trade-alerts/src/trade_alerts/repair_runner.py:471"
+        "trade-alerts/src/trade_alerts/repair_runner.py:472"
       ],
       "current": {
         "latch": null,
@@ -2395,7 +2395,7 @@
       "project": "trend-meteor",
       "sources": [
         "src/trend_meteor/repair_bot.py:208",
-        "trade-alerts/src/trade_alerts/repair_runner.py:282"
+        "trade-alerts/src/trade_alerts/repair_runner.py:283"
       ],
       "current": {
         "latch": null,

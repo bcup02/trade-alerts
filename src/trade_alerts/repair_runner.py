@@ -116,6 +116,7 @@ class RepairAdapter:
     norm_symbol: Callable[[Any], str] = norm_symbol_plain
     #: Position side assumed for a ``trade_open`` that records none.
     default_position_side: str = "long"
+    opened_at_is_fill_time: bool = False  # True only if every trade_open's opened_at is the exchange fill time; see assess_repair
 
 
 @dataclass(frozen=True)
@@ -337,7 +338,7 @@ class _Round:
 
         identity = {"incident_id": evidence.get("incident_id"), **identity}
         assessment = assess_repair(
-            evidence, ledger_events, default_position_side=self.adapter.default_position_side,
+            evidence, ledger_events, default_position_side=self.adapter.default_position_side, opened_at_is_fill_time=self.adapter.opened_at_is_fill_time,
         )
         if assessment["verdict"] == HALT:
             self._block(identity, "the ledger already carries repair records for this trade",

@@ -603,6 +603,76 @@ def test_assess_calls_a_fill_that_predates_the_trade_open_unmappable():
     assert "predates the trade_open" in _reasons(result)
 
 
+OPENED_MS = 1788408032000        # _open_event()["opened_at"]（04:00:32Z）
+
+
+def _late_booked_open(gap_ms=10 * 3_600_000, **kw):
+    """補記晚的開倉列：opened_at＝成交時間（04:00:32Z），event_epoch_ms＝記帳時間（晚 gap_ms）。"""
+    return {**_open_event(), "event_epoch_ms": OPENED_MS + gap_ms, **kw}
+
+
+def _late_assess(open_events, time_ms, flag=True):
+    return _assess(_clean_evidence(open_event=open_events[0], time_ms=time_ms), events=open_events, opened_at_is_fill_time=flag)
+
+
+def test_assess_accepts_a_close_between_fill_time_and_late_booking_time_when_the_adapter_guarantees_opened_at():
+    late = _late_booked_open()
+    result = _late_assess([late], OPENED_MS + 3_600_000)               # 平倉成交在開倉成交後 1 小時、記帳前 9 小時
+    assert result["verdict"] == "repair", _reasons(result)
+    assert result["checks"]["trade_open_ms"] == OPENED_MS
+
+
+def test_assess_without_the_guarantee_keeps_the_written_time_boundary_even_for_a_late_booked_row():
+    late = _late_booked_open()
+    result = _late_assess([late], OPENED_MS + 3_600_000, flag=False)    # 預設：不信任 opened_at（它可能是任何本地時間）
+    assert result["verdict"] == "unmappable" and "predates the trade_open" in _reasons(result)
+    assert result["checks"]["trade_open_ms"] == late["event_epoch_ms"]
+
+
+def test_assess_does_not_let_an_untrusted_earlier_opened_at_admit_a_previous_positions_close():
+    ev = _late_booked_open(gap_ms=65 * 60_000)                           # 記帳 10:06；opened_at 當作本地時間 09:00（早 65 分）；前一部位 09:30 平倉
+    result = _late_assess([ev], OPENED_MS + 30 * 60_000, flag=False)
+    assert result["verdict"] == "unmappable"
+
+
+def test_assess_still_rejects_a_fill_before_the_fill_time_of_a_late_booked_open():
+    result = _late_assess([_late_booked_open()], OPENED_MS - 1)
+    assert result["verdict"] == "unmappable" and "predates the trade_open" in _reasons(result)
+
+
+@pytest.mark.parametrize("opened_at", [None, "", "not-a-time", "2026-09-03T04:00:32", 12345, True])
+def test_assess_ignores_an_unusable_opened_at_even_with_the_guarantee(opened_at):
+    ev = _late_booked_open(opened_at=opened_at)
+    result = _late_assess([ev], OPENED_MS + 3_600_000)
+    assert result["verdict"] == "unmappable" and "predates the trade_open" in _reasons(result)
+
+
+@pytest.mark.parametrize("gap_ms, early_enough", [(999, False), (1000, True), (1001, True)])
+def test_assess_uses_opened_at_only_from_a_one_second_gap(gap_ms, early_enough):
+    ev = _late_booked_open(gap_ms=gap_ms)
+    result = _late_assess([ev], OPENED_MS + 500)                         # 落在 opened_at 與 event_epoch_ms 之間
+    assert (result["verdict"] == "repair") is early_enough, _reasons(result)
+    assert (result["checks"]["trade_open_ms"] == OPENED_MS) is early_enough
+
+
+@pytest.mark.parametrize("bad", [-5, 0, True, False, None, "x", float("nan")])
+def test_assess_fails_closed_on_an_invalid_event_epoch_ms(bad):
+    ev = _late_booked_open(event_epoch_ms=bad)
+    for flag in (True, False):
+        result = _late_assess([ev], OPENED_MS + 3_600_000, flag=flag)
+        assert result["verdict"] == "unmappable" and "no event_epoch_ms" in _reasons(result), (bad, flag)
+
+
+def test_assess_with_several_open_legs_starts_at_the_earliest_effective_open():
+    first = _late_booked_open()                                          # 04:00:32Z 成交、10 小時後記帳
+    add = {**_open_event(), "event_epoch_ms": OPENED_MS + 12 * 3_600_000, "opened_at": "2026-09-03T05:00:00Z"}
+    result = _late_assess([first, add], OPENED_MS + 3_600_000)
+    assert result["verdict"] == "repair", _reasons(result)
+    assert result["checks"]["trade_open_ms"] == OPENED_MS
+    bad_add = {**add, "event_epoch_ms": -1}                              # 其中一筆時間無效 → 整筆不可對應
+    assert _late_assess([first, bad_add], OPENED_MS + 3_600_000)["verdict"] == "unmappable"
+
+
 def test_assess_calls_deals_without_timestamps_unmappable():
     evidence = _clean_evidence()
     for deal in evidence["trade"]["close"]["deals"]:

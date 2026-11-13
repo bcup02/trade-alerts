@@ -566,11 +566,54 @@ def expected_closing_side(open_event: dict[str, Any], *, default_position_side: 
     return _CLOSING_SIDE.get(side)
 
 
+# opened_at is sometimes only second-resolution (a few hundred ms before the row's event_epoch_ms), so a gap below this is rounding, not a late booking.
+_OPENED_AT_ROUNDING_MS = 1000
+
+
+def _opened_at_ms(value: Any) -> int:
+    """``opened_at`` (ISO text) as epoch ms; 0 when missing, unparseable or timezone-less (= not used)."""
+    if not isinstance(value, str):
+        return 0
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return 0
+    return int(parsed.timestamp() * 1000) if parsed.tzinfo is not None else 0
+
+
+def _written_ms(event: dict[str, Any]) -> int:
+    """``event_epoch_ms`` as a positive int; 0 (= unmappable) for missing, bool, non-numeric, zero or negative values (fail closed)."""
+    raw = event.get("event_epoch_ms")
+    if isinstance(raw, bool):
+        return 0
+    try:
+        value = int(raw or 0)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+    return value if value > 0 else 0
+
+
+def _effective_open_ms(event: dict[str, Any], *, opened_at_is_fill_time: bool) -> int:
+    """The lower bound of the closing-fill window for one ``trade_open`` row.
+
+    ``event_epoch_ms`` is when the row was *written*. A late booking (recovery, retried backlog) writes it long after the fill. Only a strategy whose adapter
+    *guarantees* ``opened_at`` is the exchange fill time (``opened_at_is_fill_time=True``) may have the window start at the earlier ``opened_at``; otherwise
+    ``opened_at`` could be any local timestamp and trusting it would let a previous position's close through. Even then a gap below one second is
+    ``opened_at`` rounding and keeps the written-time boundary. Invalid ``event_epoch_ms`` stays 0 (= unmappable); invalid ``opened_at`` is ignored.
+    """
+    written = _written_ms(event)
+    if not written or not opened_at_is_fill_time:
+        return written
+    opened = _opened_at_ms(event.get("opened_at"))
+    return opened if 0 < opened and written - opened >= _OPENED_AT_ROUNDING_MS else written
+
+
 def assess_repair(
     evidence: dict[str, Any],
     ledger_events: list[dict[str, Any]],
     *,
     default_position_side: str = "long",
+    opened_at_is_fill_time: bool = False,
     max_exchange_pnl_residual: Decimal = DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL,
 ) -> dict[str, Any]:
     """Decide what the repair runner does with one freshly fetched evidence
@@ -627,11 +670,11 @@ def assess_repair(
             "these fills are not this trade's close"
         )
 
-    epochs = [int(event.get("event_epoch_ms") or 0) for event in opens]
+    epochs = [_effective_open_ms(event, opened_at_is_fill_time=opened_at_is_fill_time) for event in opens]
     open_epoch_ms = min(epochs) if epochs and all(epochs) else 0
     deal_times = [int(deal.get("time_ms") or 0) for deal in deals]
     checks["earliest_deal_ms"] = min(deal_times) if deal_times else None
-    checks["trade_open_ms"] = open_epoch_ms or None
+    checks["trade_open_ms"] = open_epoch_ms or None   # lower bound of the closing-fill window (the written time, or opened_at when the adapter guarantees it is the fill time)
     if not deal_times or not all(deal_times):
         unmappable.append("evidence has deals without a timestamp, so the fetch window cannot be verified")
     elif opens and not open_epoch_ms:
