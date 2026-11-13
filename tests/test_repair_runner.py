@@ -8,6 +8,7 @@ what lands in the ledger, the fleet event log, the request queue and
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -866,3 +867,18 @@ def test_an_export_failure_after_the_event_does_not_repeat_the_notice(host, monk
     again = _round(_Exchange(host.ledger, {}), host)
     assert again["pending_expired"] is None and len(_events(host, PENDING_EXPIRED)) == 1
     assert len(_export(host)["notices"]) == 1                 # the export catches up from the log
+
+
+def test_adapter_flag_opened_at_is_fill_time_decides_whether_a_late_booked_orphan_is_repaired(host):
+    import dataclasses
+    opened_ms = OPENED_MS                                                # 成交時間；opened_at 寫成同一刻
+    late = {**_open(), "opened_at": datetime.fromtimestamp(opened_ms / 1000, timezone.utc).isoformat(), "event_epoch_ms": opened_ms + 10 * 3_600_000}     # 補記：記帳時間晚 10 小時
+    fills = [[_fill(time_ms=opened_ms + 3_600_000)]]                     # 平倉成交在成交與記帳之間
+    _seed(host, late)
+    exchange = _Exchange(host.ledger, {"T1": fills})
+    assert RepairAdapter.__dataclass_fields__["opened_at_is_fill_time"].default is False
+    refused = run_repair_round(exchange.adapter(), host, paused=False)
+    assert refused["repaired"] == [] and [e["event_type"] for e in read_ledger(host.ledger)] == ["trade_open"]
+    trusted = dataclasses.replace(exchange.adapter(), opened_at_is_fill_time=True)
+    accepted = run_repair_round(trusted, host, paused=False)
+    assert [item["trade_id"] for item in accepted["repaired"]] == ["T1"]
