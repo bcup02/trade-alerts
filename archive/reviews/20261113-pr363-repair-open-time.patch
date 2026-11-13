@@ -1,0 +1,394 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index ccfd3d6..747d15b 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.35"
++version = "0.30.36"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index a289474..44a9bb9 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -351,4 +351,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.35"
++__version__ = "0.30.36"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 4eb0b77..5320536 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -579,7 +579,7 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:406"
++        "trade-alerts/src/trade_alerts/repair_runner.py:407"
+       ],
+       "current": {
+         "latch": null,
+@@ -609,7 +609,7 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:471"
++        "trade-alerts/src/trade_alerts/repair_runner.py:472"
+       ],
+       "current": {
+         "latch": null,
+@@ -641,8 +641,8 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:439",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:453"
++        "trade-alerts/src/trade_alerts/repair_runner.py:440",
++        "trade-alerts/src/trade_alerts/repair_runner.py:454"
+       ],
+       "current": {
+         "latch": null,
+@@ -1049,7 +1049,7 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:406"
++        "trade-alerts/src/trade_alerts/repair_runner.py:407"
+       ],
+       "current": {
+         "latch": null,
+@@ -1079,8 +1079,8 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:439",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:453"
++        "trade-alerts/src/trade_alerts/repair_runner.py:440",
++        "trade-alerts/src/trade_alerts/repair_runner.py:454"
+       ],
+       "current": {
+         "latch": null,
+@@ -1111,7 +1111,7 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:471"
++        "trade-alerts/src/trade_alerts/repair_runner.py:472"
+       ],
+       "current": {
+         "latch": null,
+@@ -1755,7 +1755,7 @@
+       "project": "momentum",
+       "sources": [
+         "scripts/repair_bot.py:163",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:282"
++        "trade-alerts/src/trade_alerts/repair_runner.py:283"
+       ],
+       "current": {
+         "latch": null,
+@@ -1786,7 +1786,7 @@
+       "project": "seykota",
+       "sources": [
+         "scripts/repair_bot.py:186",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:282"
++        "trade-alerts/src/trade_alerts/repair_runner.py:283"
+       ],
+       "current": {
+         "latch": null,
+@@ -1944,7 +1944,7 @@
+       "title": "對帳標記超過 24 小時沒結清，系統已不再等待",
+       "project": "momentum",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/repair_runner.py:310"
++        "trade-alerts/src/trade_alerts/repair_runner.py:311"
+       ],
+       "current": {
+         "latch": null,
+@@ -2010,7 +2010,7 @@
+       "title": "無歧義的漏記平倉已自動補寫進帳本",
+       "project": "mycrypto",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/repair_runner.py:406"
++        "trade-alerts/src/trade_alerts/repair_runner.py:407"
+       ],
+       "current": {
+         "latch": null,
+@@ -2039,7 +2039,7 @@
+       "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
+       "project": "mycrypto",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/repair_runner.py:471"
++        "trade-alerts/src/trade_alerts/repair_runner.py:472"
+       ],
+       "current": {
+         "latch": null,
+@@ -2070,8 +2070,8 @@
+       "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
+       "project": "mycrypto",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/repair_runner.py:439",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:453"
++        "trade-alerts/src/trade_alerts/repair_runner.py:440",
++        "trade-alerts/src/trade_alerts/repair_runner.py:454"
+       ],
+       "current": {
+         "latch": null,
+@@ -2101,7 +2101,7 @@
+       "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
+       "project": "mycrypto",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/repair_runner.py:282"
++        "trade-alerts/src/trade_alerts/repair_runner.py:283"
+       ],
+       "current": {
+         "latch": null,
+@@ -2301,7 +2301,7 @@
+       "project": "trend-meteor",
+       "sources": [
+         "src/trend_meteor/repair_bot.py:208",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:406"
++        "trade-alerts/src/trade_alerts/repair_runner.py:407"
+       ],
+       "current": {
+         "latch": null,
+@@ -2331,8 +2331,8 @@
+       "project": "trend-meteor",
+       "sources": [
+         "src/trend_meteor/repair_bot.py:208",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:439",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:453"
++        "trade-alerts/src/trade_alerts/repair_runner.py:440",
++        "trade-alerts/src/trade_alerts/repair_runner.py:454"
+       ],
+       "current": {
+         "latch": null,
+@@ -2363,7 +2363,7 @@
+       "project": "trend-meteor",
+       "sources": [
+         "src/trend_meteor/repair_bot.py:208",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:471"
++        "trade-alerts/src/trade_alerts/repair_runner.py:472"
+       ],
+       "current": {
+         "latch": null,
+@@ -2395,7 +2395,7 @@
+       "project": "trend-meteor",
+       "sources": [
+         "src/trend_meteor/repair_bot.py:208",
+-        "trade-alerts/src/trade_alerts/repair_runner.py:282"
++        "trade-alerts/src/trade_alerts/repair_runner.py:283"
+       ],
+       "current": {
+         "latch": null,
+diff --git a/src/trade_alerts/repair_runner.py b/src/trade_alerts/repair_runner.py
+index 2599ad3..8213f1d 100644
+--- a/src/trade_alerts/repair_runner.py
++++ b/src/trade_alerts/repair_runner.py
+@@ -116,6 +116,7 @@ class RepairAdapter:
+     norm_symbol: Callable[[Any], str] = norm_symbol_plain
+     #: Position side assumed for a ``trade_open`` that records none.
+     default_position_side: str = "long"
++    opened_at_is_fill_time: bool = False  # True only if every trade_open's opened_at is the exchange fill time; see assess_repair
+ 
+ 
+ @dataclass(frozen=True)
+@@ -337,7 +338,7 @@ class _Round:
+ 
+         identity = {"incident_id": evidence.get("incident_id"), **identity}
+         assessment = assess_repair(
+-            evidence, ledger_events, default_position_side=self.adapter.default_position_side,
++            evidence, ledger_events, default_position_side=self.adapter.default_position_side, opened_at_is_fill_time=self.adapter.opened_at_is_fill_time,
+         )
+         if assessment["verdict"] == HALT:
+             self._block(identity, "the ledger already carries repair records for this trade",
+diff --git a/src/trade_alerts/verified_close_backfill.py b/src/trade_alerts/verified_close_backfill.py
+index 9395868..c1ec14d 100644
+--- a/src/trade_alerts/verified_close_backfill.py
++++ b/src/trade_alerts/verified_close_backfill.py
+@@ -566,11 +566,54 @@ def expected_closing_side(open_event: dict[str, Any], *, default_position_side:
+     return _CLOSING_SIDE.get(side)
+ 
+ 
++# opened_at is sometimes only second-resolution (a few hundred ms before the row's event_epoch_ms), so a gap below this is rounding, not a late booking.
++_OPENED_AT_ROUNDING_MS = 1000
++
++
++def _opened_at_ms(value: Any) -> int:
++    """``opened_at`` (ISO text) as epoch ms; 0 when missing, unparseable or timezone-less (= not used)."""
++    if not isinstance(value, str):
++        return 0
++    try:
++        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
++    except ValueError:
++        return 0
++    return int(parsed.timestamp() * 1000) if parsed.tzinfo is not None else 0
++
++
++def _written_ms(event: dict[str, Any]) -> int:
++    """``event_epoch_ms`` as a positive int; 0 (= unmappable) for missing, bool, non-numeric, zero or negative values (fail closed)."""
++    raw = event.get("event_epoch_ms")
++    if isinstance(raw, bool):
++        return 0
++    try:
++        value = int(raw or 0)
++    except (TypeError, ValueError, OverflowError):
++        return 0
++    return value if value > 0 else 0
++
++
++def _effective_open_ms(event: dict[str, Any], *, opened_at_is_fill_time: bool) -> int:
++    """The lower bound of the closing-fill window for one ``trade_open`` row.
++
++    ``event_epoch_ms`` is when the row was *written*. A late booking (recovery, retried backlog) writes it long after the fill. Only a strategy whose adapter
++    *guarantees* ``opened_at`` is the exchange fill time (``opened_at_is_fill_time=True``) may have the window start at the earlier ``opened_at``; otherwise
++    ``opened_at`` could be any local timestamp and trusting it would let a previous position's close through. Even then a gap below one second is
++    ``opened_at`` rounding and keeps the written-time boundary. Invalid ``event_epoch_ms`` stays 0 (= unmappable); invalid ``opened_at`` is ignored.
++    """
++    written = _written_ms(event)
++    if not written or not opened_at_is_fill_time:
++        return written
++    opened = _opened_at_ms(event.get("opened_at"))
++    return opened if 0 < opened and written - opened >= _OPENED_AT_ROUNDING_MS else written
++
++
+ def assess_repair(
+     evidence: dict[str, Any],
+     ledger_events: list[dict[str, Any]],
+     *,
+     default_position_side: str = "long",
++    opened_at_is_fill_time: bool = False,
+     max_exchange_pnl_residual: Decimal = DEFAULT_MAX_EXCHANGE_PNL_RESIDUAL,
+ ) -> dict[str, Any]:
+     """Decide what the repair runner does with one freshly fetched evidence
+@@ -627,11 +670,11 @@ def assess_repair(
+             "these fills are not this trade's close"
+         )
+ 
+-    epochs = [int(event.get("event_epoch_ms") or 0) for event in opens]
++    epochs = [_effective_open_ms(event, opened_at_is_fill_time=opened_at_is_fill_time) for event in opens]
+     open_epoch_ms = min(epochs) if epochs and all(epochs) else 0
+     deal_times = [int(deal.get("time_ms") or 0) for deal in deals]
+     checks["earliest_deal_ms"] = min(deal_times) if deal_times else None
+-    checks["trade_open_ms"] = open_epoch_ms or None
++    checks["trade_open_ms"] = open_epoch_ms or None   # lower bound of the closing-fill window (the written time, or opened_at when the adapter guarantees it is the fill time)
+     if not deal_times or not all(deal_times):
+         unmappable.append("evidence has deals without a timestamp, so the fetch window cannot be verified")
+     elif opens and not open_epoch_ms:
+diff --git a/tests/test_repair_runner.py b/tests/test_repair_runner.py
+index b4ef462..e350ef8 100644
+--- a/tests/test_repair_runner.py
++++ b/tests/test_repair_runner.py
+@@ -8,6 +8,7 @@ what lands in the ledger, the fleet event log, the request queue and
+ from __future__ import annotations
+ 
+ import json
++from datetime import datetime, timezone
+ from pathlib import Path
+ 
+ import pytest
+@@ -866,3 +867,18 @@ def test_an_export_failure_after_the_event_does_not_repeat_the_notice(host, monk
+     again = _round(_Exchange(host.ledger, {}), host)
+     assert again["pending_expired"] is None and len(_events(host, PENDING_EXPIRED)) == 1
+     assert len(_export(host)["notices"]) == 1                 # the export catches up from the log
++
++
++def test_adapter_flag_opened_at_is_fill_time_decides_whether_a_late_booked_orphan_is_repaired(host):
++    import dataclasses
++    opened_ms = OPENED_MS                                                # 成交時間；opened_at 寫成同一刻
++    late = {**_open(), "opened_at": datetime.fromtimestamp(opened_ms / 1000, timezone.utc).isoformat(), "event_epoch_ms": opened_ms + 10 * 3_600_000}     # 補記：記帳時間晚 10 小時
++    fills = [[_fill(time_ms=opened_ms + 3_600_000)]]                     # 平倉成交在成交與記帳之間
++    _seed(host, late)
++    exchange = _Exchange(host.ledger, {"T1": fills})
++    assert RepairAdapter.__dataclass_fields__["opened_at_is_fill_time"].default is False
++    refused = run_repair_round(exchange.adapter(), host, paused=False)
++    assert refused["repaired"] == [] and [e["event_type"] for e in read_ledger(host.ledger)] == ["trade_open"]
++    trusted = dataclasses.replace(exchange.adapter(), opened_at_is_fill_time=True)
++    accepted = run_repair_round(trusted, host, paused=False)
++    assert [item["trade_id"] for item in accepted["repaired"]] == ["T1"]
+diff --git a/tests/test_verified_close_backfill.py b/tests/test_verified_close_backfill.py
+index a8cdaa3..2fb93c7 100644
+--- a/tests/test_verified_close_backfill.py
++++ b/tests/test_verified_close_backfill.py
+@@ -603,6 +603,76 @@ def test_assess_calls_a_fill_that_predates_the_trade_open_unmappable():
+     assert "predates the trade_open" in _reasons(result)
+ 
+ 
++OPENED_MS = 1788408032000        # _open_event()["opened_at"]（04:00:32Z）
++
++
++def _late_booked_open(gap_ms=10 * 3_600_000, **kw):
++    """補記晚的開倉列：opened_at＝成交時間（04:00:32Z），event_epoch_ms＝記帳時間（晚 gap_ms）。"""
++    return {**_open_event(), "event_epoch_ms": OPENED_MS + gap_ms, **kw}
++
++
++def _late_assess(open_events, time_ms, flag=True):
++    return _assess(_clean_evidence(open_event=open_events[0], time_ms=time_ms), events=open_events, opened_at_is_fill_time=flag)
++
++
++def test_assess_accepts_a_close_between_fill_time_and_late_booking_time_when_the_adapter_guarantees_opened_at():
++    late = _late_booked_open()
++    result = _late_assess([late], OPENED_MS + 3_600_000)               # 平倉成交在開倉成交後 1 小時、記帳前 9 小時
++    assert result["verdict"] == "repair", _reasons(result)
++    assert result["checks"]["trade_open_ms"] == OPENED_MS
++
++
++def test_assess_without_the_guarantee_keeps_the_written_time_boundary_even_for_a_late_booked_row():
++    late = _late_booked_open()
++    result = _late_assess([late], OPENED_MS + 3_600_000, flag=False)    # 預設：不信任 opened_at（它可能是任何本地時間）
++    assert result["verdict"] == "unmappable" and "predates the trade_open" in _reasons(result)
++    assert result["checks"]["trade_open_ms"] == late["event_epoch_ms"]
++
++
++def test_assess_does_not_let_an_untrusted_earlier_opened_at_admit_a_previous_positions_close():
++    ev = _late_booked_open(gap_ms=65 * 60_000)                           # 記帳 10:06；opened_at 當作本地時間 09:00（早 65 分）；前一部位 09:30 平倉
++    result = _late_assess([ev], OPENED_MS + 30 * 60_000, flag=False)
++    assert result["verdict"] == "unmappable"
++
++
++def test_assess_still_rejects_a_fill_before_the_fill_time_of_a_late_booked_open():
++    result = _late_assess([_late_booked_open()], OPENED_MS - 1)
++    assert result["verdict"] == "unmappable" and "predates the trade_open" in _reasons(result)
++
++
++@pytest.mark.parametrize("opened_at", [None, "", "not-a-time", "2026-09-03T04:00:32", 12345, True])
++def test_assess_ignores_an_unusable_opened_at_even_with_the_guarantee(opened_at):
++    ev = _late_booked_open(opened_at=opened_at)
++    result = _late_assess([ev], OPENED_MS + 3_600_000)
++    assert result["verdict"] == "unmappable" and "predates the trade_open" in _reasons(result)
++
++
++@pytest.mark.parametrize("gap_ms, early_enough", [(999, False), (1000, True), (1001, True)])
++def test_assess_uses_opened_at_only_from_a_one_second_gap(gap_ms, early_enough):
++    ev = _late_booked_open(gap_ms=gap_ms)
++    result = _late_assess([ev], OPENED_MS + 500)                         # 落在 opened_at 與 event_epoch_ms 之間
++    assert (result["verdict"] == "repair") is early_enough, _reasons(result)
++    assert (result["checks"]["trade_open_ms"] == OPENED_MS) is early_enough
++
++
++@pytest.mark.parametrize("bad", [-5, 0, True, False, None, "x", float("nan")])
++def test_assess_fails_closed_on_an_invalid_event_epoch_ms(bad):
++    ev = _late_booked_open(event_epoch_ms=bad)
++    for flag in (True, False):
++        result = _late_assess([ev], OPENED_MS + 3_600_000, flag=flag)
++        assert result["verdict"] == "unmappable" and "no event_epoch_ms" in _reasons(result), (bad, flag)
++
++
++def test_assess_with_several_open_legs_starts_at_the_earliest_effective_open():
++    first = _late_booked_open()                                          # 04:00:32Z 成交、10 小時後記帳
++    add = {**_open_event(), "event_epoch_ms": OPENED_MS + 12 * 3_600_000, "opened_at": "2026-09-03T05:00:00Z"}
++    result = _late_assess([first, add], OPENED_MS + 3_600_000)
++    assert result["verdict"] == "repair", _reasons(result)
++    assert result["checks"]["trade_open_ms"] == OPENED_MS
++    bad_add = {**add, "event_epoch_ms": -1}                              # 其中一筆時間無效 → 整筆不可對應
++    assert _late_assess([first, bad_add], OPENED_MS + 3_600_000)["verdict"] == "unmappable"
++
++
+ def test_assess_calls_deals_without_timestamps_unmappable():
+     evidence = _clean_evidence()
+     for deal in evidence["trade"]["close"]["deals"]:
