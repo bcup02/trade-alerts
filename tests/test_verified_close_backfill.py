@@ -603,6 +603,45 @@ def test_assess_calls_a_fill_that_predates_the_trade_open_unmappable():
     assert "predates the trade_open" in _reasons(result)
 
 
+def _late_booked_open(**kw):
+    """補記晚的開倉列：opened_at＝真正成交時間（04:00:32Z），event_epoch_ms＝記帳時間（10 小時後）。"""
+    return {**_open_event(), "event_epoch_ms": 1788408032000 + 10 * 3_600_000, **kw}
+
+
+def test_assess_accepts_a_close_between_the_fill_time_and_a_late_booking_time():
+    late = _late_booked_open()
+    result = _assess(_clean_evidence(open_event=late, time_ms=1788408032000 + 3_600_000), events=[late])      # 平倉成交在開倉成交後 1 小時、記帳前 9 小時
+    assert result["verdict"] == "repair", _reasons(result)
+    assert result["checks"]["trade_open_ms"] == 1788408032000
+
+
+def test_assess_still_rejects_a_fill_before_the_fill_time_of_a_late_booked_open():
+    late = _late_booked_open()
+    result = _assess(_clean_evidence(open_event=late, time_ms=1788408032000 - 1), events=[late])
+    assert result["verdict"] == "unmappable" and "predates the trade_open" in _reasons(result)
+
+
+@pytest.mark.parametrize("opened_at", [None, "", "not-a-time", "2026-09-03T04:00:32", 12345])
+def test_assess_ignores_an_unusable_opened_at_and_keeps_the_written_time_boundary(opened_at):
+    ev = _open_event()
+    ev["opened_at"] = opened_at
+    result = _assess(_clean_evidence(open_event=ev, time_ms=ev["event_epoch_ms"] - 1), events=[ev])
+    assert result["verdict"] == "unmappable" and "predates the trade_open" in _reasons(result)
+
+
+def test_assess_treats_a_sub_second_opened_at_gap_as_rounding_not_late_booking():
+    ev = _open_event()                                                      # opened_at 04:00:32Z 比 event_epoch_ms 早 535 ms：只是秒級進位
+    assert ev["event_epoch_ms"] - 1788408032000 < 1000
+    result = _assess(_clean_evidence(open_event=ev, time_ms=ev["event_epoch_ms"] - 1), events=[ev])
+    assert result["verdict"] == "unmappable"
+
+
+def test_assess_keeps_a_missing_event_epoch_unmappable_even_with_opened_at():
+    ev = _late_booked_open()
+    ev.pop("event_epoch_ms")
+    assert "no event_epoch_ms" in _reasons(_assess(_clean_evidence(open_event=ev), events=[ev]))
+
+
 def test_assess_calls_deals_without_timestamps_unmappable():
     evidence = _clean_evidence()
     for deal in evidence["trade"]["close"]["deals"]:

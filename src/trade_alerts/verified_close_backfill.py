@@ -566,6 +566,33 @@ def expected_closing_side(open_event: dict[str, Any], *, default_position_side: 
     return _CLOSING_SIDE.get(side)
 
 
+# opened_at is sometimes only second-resolution (a few hundred ms before the row's event_epoch_ms), so a gap below this is rounding, not a late booking.
+_OPENED_AT_ROUNDING_MS = 1000
+
+
+def _opened_at_ms(value: Any) -> int:
+    """``opened_at`` (ISO text) as epoch ms; 0 when missing, unparseable or timezone-less (= not used)."""
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return 0
+    return int(parsed.timestamp() * 1000) if parsed.tzinfo is not None else 0
+
+
+def _effective_open_ms(event: dict[str, Any]) -> int:
+    """The time the position really opened, as far as the row says.
+
+    ``event_epoch_ms`` is when the row was *written*. A late booking (recovery, retried backlog) writes it long after the fill, while ``opened_at`` carries the
+    fill time. A real closing fill can fall between the two, so the window check must start at the earlier one -- but only when the gap is a genuine late
+    booking (>= 1 s); a smaller gap is ``opened_at`` rounding and keeps the original boundary. Missing/invalid ``event_epoch_ms`` stays 0 (= unmappable).
+    """
+    written = int(event.get("event_epoch_ms") or 0)
+    if written <= 0:
+        return written
+    opened = _opened_at_ms(event.get("opened_at"))
+    return opened if 0 < opened and written - opened >= _OPENED_AT_ROUNDING_MS else written
+
+
 def assess_repair(
     evidence: dict[str, Any],
     ledger_events: list[dict[str, Any]],
@@ -627,7 +654,7 @@ def assess_repair(
             "these fills are not this trade's close"
         )
 
-    epochs = [int(event.get("event_epoch_ms") or 0) for event in opens]
+    epochs = [_effective_open_ms(event) for event in opens]
     open_epoch_ms = min(epochs) if epochs and all(epochs) else 0
     deal_times = [int(deal.get("time_ms") or 0) for deal in deals]
     checks["earliest_deal_ms"] = min(deal_times) if deal_times else None
