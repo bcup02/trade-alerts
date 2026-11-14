@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-11-10",
+  "updated_at": "2026-11-15",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json. Retired projects (trade_alerts.rollout_registry.RETIRED_PROJECTS: the old trend strategy, 舊趨勢（已停用、待封存）) keep their existing cells and SEY.* rows as evidence but get no column on the rollout register page, and a new capability or FLEET.* row need not fill their cell.",
   "projects": {
     "momentum": "動能策略",
@@ -45,7 +45,7 @@
     "momentum": {
       "repo": "AI-for-column5/mexc-4h-momentum-trailing-stop",
       "branch": "operations",
-      "commit": "fcbd71d951b63c75deb6f6b9169aa326d18cbbd5"
+      "commit": "4914b52ea381ea4c431ca8c64e1e0f191898f61d"
     },
     "seykota": {
       "repo": "AI-for-column5/ed-seykota-systematic-trend-following",
@@ -55,12 +55,12 @@
     "mycrypto": {
       "repo": "AI-for-column5/my-crypto-bot",
       "branch": "operations",
-      "commit": "097fe19ae8e9d036931ce6a1cd52faebda87b528"
+      "commit": "9c2cae1dcbf17e77582b44dd5a2d635e43ae383a"
     },
     "btc-competition": {
       "repo": "AI-for-column5/btc-bull-market-competition",
       "branch": "operations",
-      "commit": "cba8efb4f42736c8469f7322cd8f0118955508bf"
+      "commit": "32331cbd23a792f129c891daf6cc28dec7cb262b"
     },
     "trend-meteor": {
       "repo": "AI-for-column5/ed-seykota-systematic-trend-following",
@@ -1018,7 +1018,7 @@
         },
         "momentum": {
           "state": "done",
-          "evidence": "pyproject.toml:26 與 deploy/install_systemd.sh:205 把 binance-trading-toolkit 釘在 b5858cb（0.4.1，toolkit #12 的十進位取整）；tests/test_toolkit_round_to_step.py:9、:16、:21 釘選守門測試。mexc-4h-momentum #153（審閱 PASS）。2026-10-17 台北 23:00～23:15 隨 A1 正式機（新）依序部署（部署前後單元清單、啟用狀態、模式檔與環境檔雜湊完全相同、0 個失敗單元；A1 venv 的工具庫 0.4.1，round_to_step(85721.9, 0.1) 回 85721.9；部署後對帳 RECONCILED）。",
+          "evidence": "pyproject.toml:26 與 deploy/install_systemd.sh:212 把 binance-trading-toolkit 釘在 b5858cb（0.4.1，toolkit #12 的十進位取整）；tests/test_toolkit_round_to_step.py:9、:16、:21 釘選守門測試。mexc-4h-momentum #153（審閱 PASS）。2026-10-17 台北 23:00～23:15 隨 A1 正式機（新）依序部署（部署前後單元清單、啟用狀態、模式檔與環境檔雜湊完全相同、0 個失敗單元；A1 venv 的工具庫 0.4.1，round_to_step(85721.9, 0.1) 回 85721.9；部署後對帳 RECONCILED）。",
           "verified_at": "2026-10-17",
           "limit": "新版 round_to_step 對非有限數字（NaN／無限大）丟 ValueError，不會被工具庫的 except BinanceAPIError 接住；下單輸入都是策略自己算出的有限數字，沒有實際遇到過，只有工具庫測試驗證。"
         },
@@ -3288,45 +3288,10 @@
   "recent_changes": [
     {
       "kind": "cap",
-      "id": "reconcile.google_status",
-      "project": "trend-meteor",
+      "id": "orders.step_rounding_decimal",
+      "project": "momentum",
       "type": "updated",
-      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.requeue_parked",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
-    },
-    {
-      "kind": "cap",
-      "id": "docs.glossary_adopted",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
-    },
-    {
-      "kind": "cap",
-      "id": "latch.consecutive_failure_counter",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_GOOGLE_DIVERGED",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.LEDGER_WRITE_STUCK",
-      "project": "trend-meteor",
-      "type": "updated",
-      "note": "V11 在趨勢 repo 開發分支完成進度頁 1.10 的 6 項（PR #221、#222、#224）：Google 表對帳單元、重新排入停放投影工具、文件與訊息對照名詞表掃描、帳本積壓通知（連續失敗分工），格子由「未做」改成「已完成、尚未上線」。"
+      "note": "動能安裝腳本（A1 operations）新增維運通知專用唯讀群組段落（進度頁 f-90），釘版引用的行號 install_systemd.sh 由 :205 改 :212；三支策略 sources 提交同步換成 A1 現行版（動能 4914b52、加密 9c2cae1、競賽 32331cb），其餘引用逐筆比對未變。"
     }
   ]
 }
