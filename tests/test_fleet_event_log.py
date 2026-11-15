@@ -138,7 +138,7 @@ def test_load_error_catalog_rejects_a_document_that_is_not_a_catalog(tmp_path):
 
 
 def test_trend_meteor_is_a_registered_event_project(tmp_path):
-    """v0.30.24：流星池（趨勢策略・流星池版 V11）註冊前，它寫的每一則事件都被 FleetEventLogError 吞掉。"""
+    """v0.30.24：流星池（競賽策略・流星版 V11）註冊前，它寫的每一則事件都被 FleetEventLogError 吞掉。"""
     assert PROJECT_CODE_PREFIXES["trend-meteor"] == "MET"
     path = tmp_path / "log.jsonl"
     record = append_fleet_event(path, project="trend-meteor", code="LEDGER_DATA_QUALITY", risk_tier="R2", summary="x")

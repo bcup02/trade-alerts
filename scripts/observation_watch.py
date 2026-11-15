@@ -86,7 +86,7 @@ HEALTH_PUBLISH_STATE = "/var/lib/ops-notify/health-publish-state.json"
 DUST_ATTEMPT_PATH = f"/opt/{REPOS['btc-competition']}/state/dust_convert_attempt.json"
 
 
-#: 5d-5：趨勢策略・流星池版（V11，專案代號 trend-meteor）在開發機的檔案（`deploy/install_trend_meteor.sh` 裝在 /opt/trend-meteor）。開發機專用：A1 還沒有 V11。
+#: 5d-5：競賽策略・流星版（V11，專案代號 trend-meteor）在開發機的檔案（`deploy/install_trend_meteor.sh` 裝在 /opt/trend-meteor）。開發機專用：A1 還沒有 V11。
 V11_DIR = "/opt/trend-meteor"
 V11_STATE = f"{V11_DIR}/meteor-state/state.json"
 V11_HEARTBEAT = f"{V11_DIR}/meteor-state/heartbeat.json"
@@ -472,7 +472,7 @@ def check_dev_v11_cycle(ctx: Context) -> Result:
     try:
         state = load_json(ctx.remote, "dev", V11_STATE)
     except RemoteFileMissing:
-        return Result(WAITING, "V11（趨勢策略・流星池版）還沒裝到開發機，或還沒跑過第一輪（沒有狀態檔）。")
+        return Result(WAITING, "V11（競賽策略・流星版）還沒裝到開發機，或還沒跑過第一輪（沒有狀態檔）。")
     halt = state.get("safe_halt")
     if isinstance(halt, Mapping) and halt.get("active") is True:
         return Result(FAILED, f"開發機的 V11 處於安全暫停：{halt.get('code')}。", [f"原因：{str(halt.get('reason'))[:160]}；開始 {taipei_text(halt.get('since'))}",
@@ -1378,7 +1378,7 @@ CHECKS: tuple[Check, ...] = (
     Check("dev-trend-entry", "開發機趨勢策略依訊號進場", ("f-7",), check_dev_trend_entry),
     Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
     Check("dev-trend-reconcile", "開發機趨勢策略對帳回到 RECONCILED（f-7 後半）", ("f-7",), check_dev_trend_reconcile),
-    Check("dev-v11-cycle", "開發機 V11（趨勢策略・流星池版）在測試網完整跑一個日循環", ("phase-v10-p3",), check_dev_v11_cycle),
+    Check("dev-v11-cycle", "開發機 V11（競賽策略・流星版）在測試網完整跑一個日循環", ("phase-v10-p3",), check_dev_v11_cycle),
     Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
     Check("dust-convert", "競賽策略第一次真實粉塵轉換", ("f-66",), check_dust_convert),
     Check("competition-paxg", "A1 競賽策略第一批 PAXG 成交：帳本、Google 表對帳，請人工看表與幣安 App", ("phase-r033-p4",), check_competition_paxg),

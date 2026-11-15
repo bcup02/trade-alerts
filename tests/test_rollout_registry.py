@@ -71,7 +71,7 @@ def test_packaged_copy_is_the_repo_file(registry):
 
 
 def test_strategy_projects_are_the_five_strategies():
-    """v0.30.25：趨勢策略・流星池版（V11）有了自己的欄位，登記冊是五個專案欄。"""
+    """v0.30.25：競賽策略・流星版（V11）有了自己的欄位，登記冊是五個專案欄。"""
     assert set(STRATEGY_PROJECTS) == {"seykota", "momentum", "mycrypto", "btc-competition", "trend-meteor"}
 
 
@@ -1072,11 +1072,11 @@ def test_the_rollout_page_intro_no_longer_says_development_only_code_counts_as_n
     assert "已完成、尚未上線" in html and "還沒寫或還沒決定的才算「未做」" in html
 
 
-# --- 2026-11-10 登記冊命名統一（進度頁 1.9）：V11 叫「趨勢策略」，舊趨勢已停用、待封存、頁面不顯示欄 ---------------------------
+# --- 2026-11-10 登記冊命名統一（進度頁 1.9）：V11 曾叫「趨勢策略」（11/15 改叫「競賽策略・流星版」），舊趨勢已停用、待封存、頁面不顯示欄 ---------------------------
 
 
-def test_v11_is_called_trend_strategy_and_the_old_one_is_marked_retired(registry):
-    assert registry["projects"]["trend-meteor"] == "趨勢策略"
+def test_v11_is_called_competition_meteor_and_the_old_one_is_marked_retired(registry):
+    assert registry["projects"]["trend-meteor"] == "競賽策略・流星版"
     assert registry["projects"]["seykota"] == "舊趨勢（已停用、待封存）"
     assert RETIRED_PROJECTS == ("seykota",) and "seykota" not in ACTIVE_PROJECTS
     assert set(ACTIVE_PROJECTS) | set(RETIRED_PROJECTS) == set(STRATEGY_PROJECTS)
