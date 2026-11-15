@@ -2265,7 +2265,7 @@ def test_momentum_halt_only_an_ok_export_severity_closes():
     assert ow.check_momentum_halt_notice(ctx(halt_remote(sent_after_minutes=3))).closable
 
 
-# --- 5d-5：開發機 V11（趨勢策略・流星池版）日循環 ---------------------------------------------------------------
+# --- 5d-5：開發機 V11（競賽策略・流星版）日循環 ---------------------------------------------------------------
 def _v11(remote, *, state=None, heartbeat=None, ledger=None, status=None):
     if state is not None:
         remote.files[("dev", ow.V11_STATE)] = json.dumps(state)

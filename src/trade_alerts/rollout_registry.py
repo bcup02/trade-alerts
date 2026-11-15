@@ -34,7 +34,7 @@ from .fleet_event_log import PROJECT_CODE_PREFIXES
 REGISTRY_VERSION = "fleet-rollout-registry/v1"
 PACKAGED_REGISTRY_NAME = "fleet-rollout-registry.json"
 #: Projects that already write fleet events (so ``PROJECT_CODE_PREFIXES`` knows them) but have no column in the rollout
-#: registry yet.  Empty since v0.30.25: ``trend-meteor`` (趨勢策略・流星池版 V11) was registered for events first (v0.30.24: without
+#: registry yet.  Empty since v0.30.25: ``trend-meteor`` (競賽策略・流星版 V11) was registered for events first (v0.30.24: without
 #: it every event it wrote was silently dropped); its 35-capability column, its ``sources`` entry and its first catalog entries
 #: (MET.*) landed with the V11 registry work (progress item 1.6a).  The mechanism stays for the next project that starts writing
 #: events before it has a column: while it is listed here no catalog entry may use its prefix (``registry_problems`` reports it).
@@ -42,7 +42,7 @@ REGISTRY_PENDING_PROJECTS: tuple[str, ...] = ()
 #: The four strategies; ``fleet`` is a catalog prefix for cross-repo
 #: conditions, not a strategy that can have a capability.
 STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet" and project not in REGISTRY_PENDING_PROJECTS)
-#: Strategies that are stopped and waiting to be archived (舊趨勢, 2026-11-10: V11 took the name 趨勢策略).  Their existing cells and
+#: Strategies that are stopped and waiting to be archived (舊趨勢, 2026-11-10: V11 took the name 趨勢策略; 2026-11-15: V11 became 競賽策略・流星版).  Their existing cells and
 #: ``SEY.*`` rows stay as evidence (nothing is deleted until the old trend is taken off A1 and its repo archived), but the rollout
 #: register page shows no column for them and a new capability or ``FLEET.*`` row need not fill their cell.
 RETIRED_PROJECTS: tuple[str, ...] = ("seykota",)

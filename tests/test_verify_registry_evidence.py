@@ -134,7 +134,7 @@ def test_unchanged_commit_is_not_compared(clones):
 
 
 def test_a_whole_new_project_column_is_not_compared_and_does_not_crash(clones):
-    """v0.30.25：登記冊加了新的專案欄（趨勢策略・流星池版），舊登記冊的 sources 沒有它；比對舊版時不能因此當掉（KeyError），新欄位的格子沒有舊版可比。"""
+    """v0.30.25：登記冊加了新的專案欄（競賽策略・流星版），舊登記冊的 sources 沒有它；比對舊版時不能因此當掉（KeyError），新欄位的格子沒有舊版可比。"""
     root, old, new = clones
     old_registry = _registry(old, "src/bot.py:5")
     new_registry = _registry(new, "src/bot.py:7")

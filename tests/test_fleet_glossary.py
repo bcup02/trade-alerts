@@ -66,8 +66,9 @@ def test_glossary_is_self_consistent(glossary):
 
 def test_the_four_strategies_have_their_agreed_names(glossary):
     names = {e["id"]: e["zh"] for e in glossary["entries"]}
-    # 2026-11-10：V11 接手「趨勢策略」這個名字，原本的趨勢策略標成已停用、待封存。
-    assert names["strategy.trend-meteor"] == "趨勢策略"
+    # 2026-11-10：V11 接手「趨勢策略」這個名字；2026-11-15 改叫「競賽策略・流星版」（與原「競賽策略・流星池版」合併成一條）。
+    assert names["strategy.meteor"] == "競賽策略・流星版"
+    assert "strategy.trend-meteor" not in names
     assert names["strategy.seykota"] == "舊趨勢（已停用、待封存）"
     assert names["strategy.momentum"] == "動能策略"
     assert names["strategy.mycrypto"] == "加密策略"
