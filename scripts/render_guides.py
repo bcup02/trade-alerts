@@ -50,7 +50,7 @@ HEALTH_CAPABILITIES = {"mcp": {"servers": [{"server": "Google Drive", "tools": [
 
 #: ops-notify target keys in the order the health panel lists them -> the glossary term that names them.
 HEALTH_TARGETS = [("momentum", "strategy.momentum"), ("mycrypto", "strategy.mycrypto"), ("seykota", "strategy.seykota"),
-                  ("btc-competition", "strategy.btc-competition")]
+                  ("btc-competition", "strategy.btc-competition"), ("trend-meteor", "strategy.meteor")]
 HEALTH_HOST_TARGET = ("host", "主機")
 _FILE_ID = re.compile(r"^[A-Za-z0-9_-]{20,100}$")
 

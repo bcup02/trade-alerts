@@ -79,8 +79,8 @@ def test_the_names_on_the_panel_are_the_glossary_and_axes_table_names(page_text,
     data = _page_data(page_text)["health"]
     glossary = load_glossary()
     zh = {entry["id"]: entry["zh"] for entry in glossary["entries"]}
-    assert [t["label"] for t in data["targets"][:4]] == [zh["strategy.momentum"], zh["strategy.mycrypto"], zh["strategy.seykota"], zh["strategy.btc-competition"]]
-    assert data["targets"][4] == {"id": "host", "label": "主機"}
+    assert [t["label"] for t in data["targets"][:5]] == [zh["strategy.momentum"], zh["strategy.mycrypto"], zh["strategy.seykota"], zh["strategy.btc-competition"], zh["strategy.meteor"]]
+    assert data["targets"][5] == {"id": "host", "label": "主機"}   # 主機排在最後；trend-meteor 顯示「競賽策略・流星版」，不顯示原始代號
     assert [(a["id"], a["label"]) for a in data["axes"]] == [(key, name) for name, key, _m, _c in module.OPS_NOTIFY_AXES]
     assert [s["label"] for s in data["sources"]] == [zh["host.main"], zh["host.dev"]]      # A1 first: the page opens on it
 
@@ -102,7 +102,7 @@ def test_the_page_opens_on_a1_and_offers_the_development_host_as_a_tab(page_text
 
 
 def test_the_target_keys_are_the_ones_ops_notify_publishes(module):
-    assert [key for key, _term in module.HEALTH_TARGETS] == ["momentum", "mycrypto", "seykota", "btc-competition"]
+    assert [key for key, _term in module.HEALTH_TARGETS] == ["momentum", "mycrypto", "seykota", "btc-competition", "trend-meteor"]
     assert module.HEALTH_HOST_TARGET[0] == "host"
 
 
