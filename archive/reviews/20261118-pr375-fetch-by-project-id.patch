@@ -1,0 +1,135 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index 8cdbf48..fbdf91d 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.39"
++version = "0.30.40"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 02452da..778bc3f 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -351,4 +351,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.39"
++__version__ = "0.30.40"
+diff --git a/src/trade_alerts/ledger_integrity.py b/src/trade_alerts/ledger_integrity.py
+index d11ef39..b555299 100644
+--- a/src/trade_alerts/ledger_integrity.py
++++ b/src/trade_alerts/ledger_integrity.py
+@@ -25,9 +25,9 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
+ # A spreadsheet tab name is shown to people, so it may be written in Chinese (f-26b: 趨勢策略 ...).  It is matched
+ # byte-for-byte against the name registered in the receiver, so the accepted set is an explicit whitelist, not
+ # "any Unicode word character": the ASCII identifier set plus CJK Unified Ideographs (U+4E00-U+9FFF) and Extension A
+-# (U+3400-U+4DBF).  Hangul fillers, full-width forms, circled/superscript digits, zero-width and combining marks stay out.
++# (U+3400-U+4DBF), plus the katakana middle dot U+30FB (not first) that the strategy name 競賽策略・流星版 contains.  Hangul fillers, full-width forms, circled/superscript digits, zero-width and combining marks stay out.
+ # The length limit is the same 256 as the ASCII identifier contract, so every previously valid ASCII name stays valid.
+-_SHEET_NAME_RE = re.compile(r"^[A-Za-z0-9\u3400-\u4dbf\u4e00-\u9fff][A-Za-z0-9._:\-\u3400-\u4dbf\u4e00-\u9fff]{0,255}$")
++_SHEET_NAME_RE = re.compile(r"^[A-Za-z0-9\u3400-\u4dbf\u4e00-\u9fff][A-Za-z0-9._:\-\u30fb\u3400-\u4dbf\u4e00-\u9fff]{0,255}$")
+ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+ 
+ 
+diff --git a/src/trade_alerts/ledger_reconcile.py b/src/trade_alerts/ledger_reconcile.py
+index 7583d49..3e37d15 100644
+--- a/src/trade_alerts/ledger_reconcile.py
++++ b/src/trade_alerts/ledger_reconcile.py
+@@ -801,7 +801,8 @@ def _describe_fetch_failure(exc: BaseException) -> str:
+ 
+ 
+ def fetch_sheet_rows(
+-    *, sheet_name: str, url: str | None = None, secret: str | None = None,
++    *, sheet_name: str | None = None, project_id: str | None = None,
++    url: str | None = None, secret: str | None = None,
+     attempts: int = 5, initial_backoff_seconds: float = 2.0, sleep=None,
+ ) -> tuple[list[dict[str, Any]] | None, str | None]:
+     """Read a sheet tab via the shared Apps Script Web App's read-only
+@@ -811,14 +812,26 @@ def fetch_sheet_rows(
+     ``_post_sheets_sync``.  Never raises; returns ``(rows, None)`` on success or
+     ``(None, error)``.  ``url`` / ``secret`` default to ``SHEETS_SYNC_URL`` /
+     ``SHEETS_SYNC_SECRET`` in the environment.
++
++    Name the tab with exactly ONE of ``sheet_name`` (the tab's current title)
++    or ``project_id`` (the receiver looks the tab up through its registered
++    source for that project, so renaming the tab needs no release here; the
++    receiver must be v0.30.39+ and the project's registration must resolve to
++    one tab).  Anything else returns ``(None, error)`` without a request.
+     """
+     sleep = sleep or time.sleep
++    target = sheet_name if sheet_name is not None else project_id
++    if (sheet_name is None) == (project_id is None) or not isinstance(target, str) or not target:
++        return None, "exactly one non-empty string of sheet_name / project_id is required"
+     url = url if url is not None else os.getenv("SHEETS_SYNC_URL")
+     secret = secret if secret is not None else os.getenv("SHEETS_SYNC_SECRET")
+     if not url or not secret:
+         return None, "SHEETS_SYNC_URL / SHEETS_SYNC_SECRET not configured"
+ 
+-    payload = {"secret": secret, "sheet_name": sheet_name, "action": "list_by_sheet"}
++    if sheet_name is not None:
++        payload = {"secret": secret, "sheet_name": sheet_name, "action": "list_by_sheet"}  # key order is the pre-0.30.40 wire order
++    else:
++        payload = {"secret": secret, "project_id": project_id, "action": "list_by_sheet"}
+     backoff = initial_backoff_seconds
+     last_error: str | None = None
+     for attempt in range(1, attempts + 1):
+diff --git a/tests/test_ledger_reconcile.py b/tests/test_ledger_reconcile.py
+index e931c54..4472d71 100644
+--- a/tests/test_ledger_reconcile.py
++++ b/tests/test_ledger_reconcile.py
+@@ -592,6 +592,32 @@ def test_fetch_success(monkeypatch):
+     assert rows == [{"row": 14, "values": ["t1", "LIVE"]}]
+ 
+ 
++def test_fetch_by_project_id_sends_project_id_not_sheet_name(monkeypatch):
++    sent = []
++    monkeypatch.setattr(lr.requests, "post", lambda url, json=None, **k: sent.append(json) or _Resp(text=_OK_BODY))
++    rows, err = fetch_sheet_rows(project_id="trend-meteor", url="https://x/exec", secret="s")
++    assert err is None and rows[0]["row"] == 14
++    assert json.dumps(sent[0]) == '{"secret": "s", "project_id": "trend-meteor", "action": "list_by_sheet"}'
++
++
++def test_fetch_by_sheet_name_payload_unchanged(monkeypatch):
++    sent = []
++    monkeypatch.setattr(lr.requests, "post", lambda url, json=None, **k: sent.append(json) or _Resp(text=_OK_BODY))
++    fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s")
++    assert sent == [{"secret": "s", "sheet_name": "S", "action": "list_by_sheet"}]
++    # dict equality ignores key order; the bytes requests sends do not (review PR #375: wire order must equal the pre-0.30.40 request)
++    assert json.dumps(sent[0]) == '{"secret": "s", "sheet_name": "S", "action": "list_by_sheet"}'
++
++
++@pytest.mark.parametrize("kw", [{}, {"sheet_name": "S", "project_id": "p"}, {"sheet_name": ""}, {"project_id": ""}, {"project_id": 5}, {"sheet_name": None, "project_id": None}])
++def test_fetch_requires_exactly_one_target_and_sends_nothing(monkeypatch, kw):
++    def _boom(*a, **k):
++        raise AssertionError("no request may be sent")
++    monkeypatch.setattr(lr.requests, "post", _boom)
++    rows, err = fetch_sheet_rows(url="https://x/exec", secret="s", **kw)
++    assert rows is None and "exactly one" in err
++
++
+ def test_fetch_follows_302(monkeypatch):
+     monkeypatch.setattr(lr.requests, "post", lambda *a, **k: _Resp(
+         status_code=302, headers={"Location": "https://x/echo"}))
+diff --git a/tests/test_sheet_name_cjk.py b/tests/test_sheet_name_cjk.py
+index cb0cbe4..d8cc45a 100644
+--- a/tests/test_sheet_name_cjk.py
++++ b/tests/test_sheet_name_cjk.py
+@@ -127,3 +127,12 @@ def test_reconciliation_and_audit_requests_accept_chinese_tabs():
+         source_hmac_secret="test-secret",
+     )
+     assert audit["sheet_name"] == "趨勢策略" and verify_signed_request(audit, source_hmac_secret="test-secret")
++
++
++def test_the_middle_dot_of_the_meteor_strategy_name_is_accepted_but_not_first_and_not_look_alikes():
++    """競賽策略・流星版 (U+30FB) is the real tab/strategy name; U+00B7 and U+FF65 look alike and stay refused, as does a leading dot."""
++    payload = _signed("競賽策略・流星版")
++    assert '"sheet_name":"競賽策略・流星版"' in canonical_json({k: v for k, v in payload.items() if k != "signature"})
++    for bad in ("競賽策略·流星版", "競賽策略･流星版", "・流星版", "競賽策略・\u200b流星版"):
++        with pytest.raises(LedgerIntegrityError, match="invalid sheet_name"):
++            _signed(bad)
