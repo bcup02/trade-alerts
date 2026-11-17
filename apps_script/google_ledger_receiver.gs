@@ -40,6 +40,19 @@
  * those.  Errors: action_not_allowed, health_sheet_not_allowed, health_payload_invalid, health_too_large,
  * sheet_not_found, plus the usual source_not_allowed / signature_invalid / request_not_fresh.
  *
+ * --- Sheet-id registration (stable tab addressing) ---
+ * A GOOGLE_LEDGER_V2_SOURCES entry may name its tab by fixed id instead of by name:
+ *   "trend-meteor-dev": {"hmac_secret":"...","project_id":"trend-meteor","sheet_id":123456789,"sheet_name":"<label only>"}
+ * sheet_id is the number after "#gid=" in the tab's address (or run listSheetIdsForRegistration in the editor).  With
+ * sheet_id the receiver finds the tab by id and ignores the request's sheet_name, so the tab can be renamed without
+ * releasing any caller.  Without sheet_id the exact-name rule is unchanged (every source registered before this).
+ * sheet_id that is present but not a non-negative whole number allows nothing.  put_health_v1 through a sheet_id source
+ * still writes only to a tab whose CURRENT name is 維運健康.  Read-only list_by_sheet also accepts
+ * {"secret":"...","project_id":"trend-meteor","action":"list_by_sheet"} (project_id INSTEAD of sheet_name; both together
+ * is ambiguous_sheet_selector); the registry says which tab: project_not_registered / project_ambiguous otherwise
+ * (several registrations of one project must resolve to the same actual tab, by name or by id alike).
+ * No other legacy action accepts project_id (project_id_not_supported_for_action).
+ *
  * --- Redeploy (manual, whole-endpoint) ---
  * Paste this whole file into the spreadsheet's Apps Script editor (Extensions ->
  * Apps Script) -> Manage deployments -> edit -> new version. The Web App URL is
@@ -194,10 +207,24 @@ function handleLegacy(data) {
   const received = (data.secret || '').trim();
   if (!expected || received !== expected) return {ok: false, error: 'unauthorized', debug: {expected_len: expected.length, received_len: received.length}};
 
-  const sheetName = data.sheet_name;
-  if (!sheetName) return {ok: false, error: 'missing sheet_name'};
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) return {ok: false, error: 'sheet not found: ' + sheetName};
+  let sheetName = data.sheet_name;
+  let sheet;
+  if (Object.prototype.hasOwnProperty.call(data, 'project_id')) {
+    // Stable addressing (sheet-id registration): the caller names the PROJECT, the registry says which tab it is, so a
+    // renamed tab needs no caller release.  Read-only: list_by_sheet is the only action that accepts it.
+    if (Object.prototype.hasOwnProperty.call(data, 'sheet_name')) return {ok: false, error: 'ambiguous_sheet_selector'};
+    if (data.action !== 'list_by_sheet') return {ok: false, error: 'project_id_not_supported_for_action'};
+    const book = SpreadsheetApp.getActiveSpreadsheet();
+    const registered = registeredSourceForProject(book, data.project_id);
+    if (registered.error) return {ok: false, error: registered.error};
+    sheet = resolveRegisteredSheet(book, registered.source);
+    if (!sheet) return {ok: false, error: 'sheet_not_found'};
+    sheetName = sheet.getName();
+  } else {
+    if (!sheetName) return {ok: false, error: 'missing sheet_name'};
+    sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+    if (!sheet) return {ok: false, error: 'sheet not found: ' + sheetName};
+  }
 
   if (data.action === 'update_by_trade_id') return handleLegacyUpdateByTradeId(sheet, sheetName, data);
   if (data.action === 'update_by_key') return handleLegacyUpdateByKey(sheet, sheetName, data);
@@ -321,13 +348,17 @@ function handleLegacyUpdateByKey(sheet, sheetName, data) {
 function handleV2(data) {
   if (!['append_open_v2', 'append_fill_v2', 'update_close_v2', 'correct_close_v2', 'read_audit_v2', 'read_reconciliation_v2', 'quarantine_v2', HEALTH_ACTION].includes(data.action)) return {ok: false, error: 'unsupported_action'};
   const source = sourceRegistration(data.source_id);
-  if (!source || data.project_id !== source.project_id || data.sheet_name !== source.sheet_name) return {ok: false, error: 'source_not_allowed'};
+  // A source registered WITH a sheet_id is bound to that tab by its id: the request's sheet_name is a label the receiver
+  // ignores, so renaming the tab needs no release.  A source without sheet_id keeps the exact-name rule.
+  const byId = !!source && Object.prototype.hasOwnProperty.call(source, 'sheet_id');
+  if (!source || data.project_id !== source.project_id || (!byId && data.sheet_name !== source.sheet_name)) return {ok: false, error: 'source_not_allowed'};
   if (!verifySignature(data, source.hmac_secret)) return {ok: false, error: 'signature_invalid'};
   if (!isRecentIso(data.issued_at) || !isUuid(data.request_id)) return {ok: false, error: 'request_not_fresh'};
   if (!actionAllowedForSource(source, data.action)) return {ok: false, error: 'action_not_allowed'};
-  if (data.action === HEALTH_ACTION && source.sheet_name !== HEALTH_SHEET_NAME) return {ok: false, error: 'health_sheet_not_allowed'};
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(source.sheet_name);
+  if (data.action === HEALTH_ACTION && !byId && source.sheet_name !== HEALTH_SHEET_NAME) return {ok: false, error: 'health_sheet_not_allowed'};
+  const sheet = resolveRegisteredSheet(SpreadsheetApp.getActiveSpreadsheet(), source);
   if (!sheet) return {ok: false, error: 'sheet_not_found'};
+  if (data.action === HEALTH_ACTION && byId && sheet.getName() !== HEALTH_SHEET_NAME) return {ok: false, error: 'health_sheet_not_allowed'};
   if (data.action === HEALTH_ACTION) return putHealth(sheet, data);
   if (data.action === 'read_reconciliation_v2') return readReconciliationInventory(sheet, data);
   if (!validProvenance(data.provenance, data)) return {ok: false, error: 'provenance_invalid'};
@@ -366,17 +397,86 @@ function putHealth(sheet, data) {
   return {ok: true, cell_chars: text.length, written_at: new Date().toISOString()};
 }
 
-function sourceRegistration(sourceId) {
-  if (typeof sourceId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(sourceId)) return null;
+// A registration binds a source to ONE tab, either by exact tab name (sheet_name, the original way) or by the tab's
+// fixed id (sheet_id, the number after "#gid=" in the sheet's address).  sheet_id present but not a non-negative whole
+// number is a registration mistake and allows nothing -- it never falls back to the name rule.  With sheet_id, sheet_name
+// is only a label (and must still be text if it is there).
+function isSheetId(value) {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function validRegistration(source) {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return false;
+  if (typeof source.hmac_secret !== 'string' || !source.hmac_secret || !source.project_id) return false;
+  if (Object.prototype.hasOwnProperty.call(source, 'sheet_id')) {
+    if (!isSheetId(source.sheet_id)) return false;
+    return !Object.prototype.hasOwnProperty.call(source, 'sheet_name') || typeof source.sheet_name === 'string';
+  }
+  return !!source.sheet_name;
+}
+
+function loadRegistry() {
   const raw = PropertiesService.getScriptProperties().getProperty('GOOGLE_LEDGER_V2_SOURCES');
   if (!raw) return null;
   try {
     const registry = JSON.parse(raw);
-    const source = registry[sourceId];
-    return source && typeof source.hmac_secret === 'string' && source.hmac_secret && source.project_id && source.sheet_name ? source : null;
+    return registry && typeof registry === 'object' && !Array.isArray(registry) ? registry : null;
   } catch (err) {
     return null;
   }
+}
+
+function sourceRegistration(sourceId) {
+  if (typeof sourceId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(sourceId)) return null;
+  const registry = loadRegistry();
+  if (!registry || !Object.prototype.hasOwnProperty.call(registry, sourceId)) return null;
+  return validRegistration(registry[sourceId]) ? registry[sourceId] : null;
+}
+
+function findSheetById(book, id) {
+  const sheets = book.getSheets();
+  for (let i = 0; i < sheets.length; i++) {
+    if (sheets[i].getSheetId() === id) return sheets[i];
+  }
+  return null;
+}
+
+function resolveRegisteredSheet(book, source) {
+  if (Object.prototype.hasOwnProperty.call(source, 'sheet_id')) return findSheetById(book, source.sheet_id);
+  return book.getSheetByName(source.sheet_name);
+}
+
+// Which registered source a project_id points at, for the read-only list_by_sheet.  Every valid registration with that
+// project_id counts; they must all resolve to the SAME actual tab -- compared by the tab's real id, so a registration by
+// name and one by id for the same tab agree.  A registration that resolves to no tab counts as its own target, so it
+// disagrees with one that does: the receiver never guesses between two tabs (project_ambiguous).
+function registeredSourceForProject(book, projectId) {
+  if (typeof projectId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(projectId)) return {error: 'project_not_registered'};
+  const registry = loadRegistry();
+  if (!registry) return {error: 'project_not_registered'};
+  let chosen = null;
+  let chosenTarget = null;
+  const ids = Object.keys(registry);
+  for (let i = 0; i < ids.length; i++) {
+    const source = registry[ids[i]];
+    if (!validRegistration(source) || source.project_id !== projectId) continue;
+    const resolved = resolveRegisteredSheet(book, source);
+    const target = resolved
+      ? 'sheet:' + resolved.getSheetId()
+      : 'unresolved:' + (Object.prototype.hasOwnProperty.call(source, 'sheet_id') ? 'id:' + source.sheet_id : 'name:' + source.sheet_name);
+    if (chosen && target !== chosenTarget) return {error: 'project_ambiguous'};
+    chosen = source;
+    chosenTarget = target;
+  }
+  return chosen ? {source: chosen} : {error: 'project_not_registered'};
+}
+
+// Run by hand in the Apps Script editor (never routed from a request): lists every tab's name and fixed id, so the
+// operator can read the id to register without hunting for "#gid=" in the address bar.  Read-only.
+function listSheetIdsForRegistration() {
+  const rows = SpreadsheetApp.getActiveSpreadsheet().getSheets().map(sheet => ({name: sheet.getName(), sheet_id: sheet.getSheetId()}));
+  Logger.log(JSON.stringify(rows));
+  return rows;
 }
 
 function canonicalJson(value) {
