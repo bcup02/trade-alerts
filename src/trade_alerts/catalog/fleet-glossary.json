@@ -1029,6 +1029,61 @@
       "retired": []
     },
     {
+      "id": "source.entry",
+      "category": "帳本來源代碼",
+      "zh": "進場開倉",
+      "en": [
+        "entry"
+      ],
+      "definition": "策略依進場訊號開新倉（競賽策略・流星版的帳本）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.exit",
+      "category": "帳本來源代碼",
+      "zh": "策略出場平倉",
+      "en": [
+        "exit"
+      ],
+      "definition": "策略依自己的出場規則主動平倉（競賽策略・流星版的帳本）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.recovery",
+      "category": "帳本來源代碼",
+      "zh": "中斷後依交易所成交接手補記",
+      "en": [
+        "recovery"
+      ],
+      "definition": "程式中斷後重新開機，依交易所成交把漏記的進出場補進帳本；價格與數量為估算，會標記待對帳（競賽策略・流星版的帳本）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.intraday_stop",
+      "category": "帳本來源代碼",
+      "zh": "盤中強平觸發平倉",
+      "en": [
+        "intraday_stop"
+      ],
+      "definition": "盤中價格碰到強平價，條件單觸發把腿平掉；成交取自該條件單對應的交易所成交明細（競賽策略・流星版的帳本）。",
+      "note": "",
+      "retired": []
+    },
+    {
+      "id": "source.verified_close",
+      "category": "帳本來源代碼",
+      "zh": "依交易所成交補記平倉（修復機器人）",
+      "en": [
+        "verified_close"
+      ],
+      "definition": "帳本漏記平倉，修復機器人依交易所成交明細補寫平倉列（競賽策略・流星版的帳本）。",
+      "note": "",
+      "retired": []
+    },
+    {
       "id": "correction.duplicate_entry_unrecorded",
       "category": "帳本更正原因代碼",
       "zh": "重複送單，帳本漏記",

@@ -117,13 +117,16 @@ const EXIT_REASON_ZH = {
   "dry_run_signal": "紙上模擬進場",
   "dry_run_simulated": "紙上模擬平倉",
   "emergency_close_after_protection_failure": "停損掛失敗後緊急平倉",
+  "entry": "進場開倉",
   "entry_signal": "進場訊號開倉",
   "entry_signal_recovered": "進場中斷後接手補記",
   "exchange_fill": "依交易所成交開倉",
   "exchange_history_reconciliation": "依交易所成交歷史補記",
   "exchange_position_sync": "依交易所部位接手",
+  "exit": "策略出場平倉",
   "g1_5_dev_verification": "g1-5 開發機驗證",
   "interrupted_order_recovery": "中斷的單補記",
+  "intraday_stop": "盤中強平觸發平倉",
   "legacy_state_backfill": "舊狀態檔補填接手",
   "live_smoke_test": "實機冒煙測試",
   "mexc_futures_toolkit_smoke_test": "實機冒煙測試",
@@ -132,11 +135,13 @@ const EXIT_REASON_ZH = {
   "native_stop_reconciled": "停損觸發或手動平倉（事後補記）",
   "native_trailing_stop": "交易所移動停損觸發",
   "reconcile_apply": "人工對帳套用",
+  "recovery": "中斷後依交易所成交接手補記",
   "spot_fill": "現貨成交",
   "state_missing_or_stale": "狀態檔遺失或過舊，依交易所部位接手",
   "stop_breached_market_close": "停損已被越過，改用市價平倉",
   "trend_reversal": "趨勢反轉平倉",
-  "unrecorded_fill": "帳本少記的成交（自動補記）"
+  "unrecorded_fill": "帳本少記的成交（自動補記）",
+  "verified_close": "依交易所成交補記平倉（修復機器人）"
 };
 // END EXIT_REASON_ZH
 function exitReasonLabel(value) {
