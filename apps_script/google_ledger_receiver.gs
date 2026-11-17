@@ -49,7 +49,8 @@
  * sheet_id that is present but not a non-negative whole number allows nothing.  put_health_v1 through a sheet_id source
  * still writes only to a tab whose CURRENT name is 維運健康.  Read-only list_by_sheet also accepts
  * {"secret":"...","project_id":"trend-meteor","action":"list_by_sheet"} (project_id INSTEAD of sheet_name; both together
- * is ambiguous_sheet_selector); the registry says which tab: project_not_registered / project_ambiguous otherwise.
+ * is ambiguous_sheet_selector); the registry says which tab: project_not_registered / project_ambiguous otherwise
+ * (several registrations of one project must resolve to the same actual tab, by name or by id alike).
  * No other legacy action accepts project_id (project_id_not_supported_for_action).
  *
  * --- Redeploy (manual, whole-endpoint) ---
@@ -213,9 +214,10 @@ function handleLegacy(data) {
     // renamed tab needs no caller release.  Read-only: list_by_sheet is the only action that accepts it.
     if (Object.prototype.hasOwnProperty.call(data, 'sheet_name')) return {ok: false, error: 'ambiguous_sheet_selector'};
     if (data.action !== 'list_by_sheet') return {ok: false, error: 'project_id_not_supported_for_action'};
-    const registered = registeredSourceForProject(data.project_id);
+    const book = SpreadsheetApp.getActiveSpreadsheet();
+    const registered = registeredSourceForProject(book, data.project_id);
     if (registered.error) return {ok: false, error: registered.error};
-    sheet = resolveRegisteredSheet(SpreadsheetApp.getActiveSpreadsheet(), registered.source);
+    sheet = resolveRegisteredSheet(book, registered.source);
     if (!sheet) return {ok: false, error: 'sheet_not_found'};
     sheetName = sheet.getName();
   } else {
@@ -445,9 +447,10 @@ function resolveRegisteredSheet(book, source) {
 }
 
 // Which registered source a project_id points at, for the read-only list_by_sheet.  Every valid registration with that
-// project_id counts; they must all name the same tab (same id, or same name), otherwise the answer is "ambiguous" -- the
-// receiver never guesses between two tabs.
-function registeredSourceForProject(projectId) {
+// project_id counts; they must all resolve to the SAME actual tab -- compared by the tab's real id, so a registration by
+// name and one by id for the same tab agree.  A registration that resolves to no tab counts as its own target, so it
+// disagrees with one that does: the receiver never guesses between two tabs (project_ambiguous).
+function registeredSourceForProject(book, projectId) {
   if (typeof projectId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(projectId)) return {error: 'project_not_registered'};
   const registry = loadRegistry();
   if (!registry) return {error: 'project_not_registered'};
@@ -457,7 +460,10 @@ function registeredSourceForProject(projectId) {
   for (let i = 0; i < ids.length; i++) {
     const source = registry[ids[i]];
     if (!validRegistration(source) || source.project_id !== projectId) continue;
-    const target = Object.prototype.hasOwnProperty.call(source, 'sheet_id') ? 'id:' + source.sheet_id : 'name:' + source.sheet_name;
+    const resolved = resolveRegisteredSheet(book, source);
+    const target = resolved
+      ? 'sheet:' + resolved.getSheetId()
+      : 'unresolved:' + (Object.prototype.hasOwnProperty.call(source, 'sheet_id') ? 'id:' + source.sheet_id : 'name:' + source.sheet_name);
     if (chosen && target !== chosenTarget) return {error: 'project_ambiguous'};
     chosen = source;
     chosenTarget = target;

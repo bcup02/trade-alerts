@@ -155,6 +155,23 @@ assert.deepEqual(legacy({project_id: 'twin'}), {ok: false, error: 'project_ambig
 sources['twin-b'] = {hmac_secret: 'b', project_id: 'twin', sheet_id: 111, sheet_name: 'other label'};   // same tab again: fine
 assert.equal(legacy({project_id: 'twin'}).ok, true);
 delete sources['twin-a']; delete sources['twin-b'];
+// review of #372: one tab registered BOTH by name and by id is the same tab, not ambiguous (migration from name to id)
+sources['mix-name'] = {hmac_secret: 'a', project_id: 'mix', sheet_name: '競賽策略・流星版'};
+sources['mix-id'] = {hmac_secret: 'b', project_id: 'mix', sheet_id: 111};
+answer = legacy({project_id: 'mix'});
+assert.equal(answer.ok, true); assert.equal(answer.sheet, '競賽策略・流星版'); assert.deepEqual(answer.rows.map(r => r.values[0]), ['TM-1']);
+// the same two registrations, but the id names a DIFFERENT tab: ambiguous
+sources['mix-id'] = {hmac_secret: 'b', project_id: 'mix', sheet_id: 222};
+assert.deepEqual(legacy({project_id: 'mix'}), {ok: false, error: 'project_ambiguous'});
+// a name registration for a tab that no longer exists (renamed) next to a good id registration: disagree, fail closed
+sources['mix-name'] = {hmac_secret: 'a', project_id: 'mix', sheet_name: 'stale-old-name'};
+sources['mix-id'] = {hmac_secret: 'b', project_id: 'mix', sheet_id: 111};
+assert.deepEqual(legacy({project_id: 'mix'}), {ok: false, error: 'project_ambiguous'});
+// two registrations that both resolve to nothing, the same way: still "tab not found", not ambiguous
+sources['mix-name'] = {hmac_secret: 'a', project_id: 'mix', sheet_name: 'stale-old-name'};
+sources['mix-id'] = {hmac_secret: 'b', project_id: 'mix', sheet_name: 'stale-old-name', allowed_actions: []};
+assert.deepEqual(legacy({project_id: 'mix'}), {ok: false, error: 'sheet_not_found'});
+delete sources['mix-name']; delete sources['mix-id'];
 // an invalid registration never counts toward a project
 sources['broken'] = {hmac_secret: 'a', project_id: 'broken-project', sheet_id: '111'};
 assert.deepEqual(legacy({project_id: 'broken-project'}), {ok: false, error: 'project_not_registered'});
