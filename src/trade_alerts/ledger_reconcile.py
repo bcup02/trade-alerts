@@ -828,8 +828,10 @@ def fetch_sheet_rows(
     if not url or not secret:
         return None, "SHEETS_SYNC_URL / SHEETS_SYNC_SECRET not configured"
 
-    payload = {"secret": secret, "action": "list_by_sheet"}
-    payload.update({"sheet_name": sheet_name} if sheet_name is not None else {"project_id": project_id})
+    if sheet_name is not None:
+        payload = {"secret": secret, "sheet_name": sheet_name, "action": "list_by_sheet"}  # key order is the pre-0.30.40 wire order
+    else:
+        payload = {"secret": secret, "project_id": project_id, "action": "list_by_sheet"}
     backoff = initial_backoff_seconds
     last_error: str | None = None
     for attempt in range(1, attempts + 1):
