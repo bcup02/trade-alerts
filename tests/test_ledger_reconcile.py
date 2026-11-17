@@ -592,6 +592,32 @@ def test_fetch_success(monkeypatch):
     assert rows == [{"row": 14, "values": ["t1", "LIVE"]}]
 
 
+def test_fetch_by_project_id_sends_project_id_not_sheet_name(monkeypatch):
+    sent = []
+    monkeypatch.setattr(lr.requests, "post", lambda url, json=None, **k: sent.append(json) or _Resp(text=_OK_BODY))
+    rows, err = fetch_sheet_rows(project_id="trend-meteor", url="https://x/exec", secret="s")
+    assert err is None and rows[0]["row"] == 14
+    assert json.dumps(sent[0]) == '{"secret": "s", "project_id": "trend-meteor", "action": "list_by_sheet"}'
+
+
+def test_fetch_by_sheet_name_payload_unchanged(monkeypatch):
+    sent = []
+    monkeypatch.setattr(lr.requests, "post", lambda url, json=None, **k: sent.append(json) or _Resp(text=_OK_BODY))
+    fetch_sheet_rows(sheet_name="S", url="https://x/exec", secret="s")
+    assert sent == [{"secret": "s", "sheet_name": "S", "action": "list_by_sheet"}]
+    # dict equality ignores key order; the bytes requests sends do not (review PR #375: wire order must equal the pre-0.30.40 request)
+    assert json.dumps(sent[0]) == '{"secret": "s", "sheet_name": "S", "action": "list_by_sheet"}'
+
+
+@pytest.mark.parametrize("kw", [{}, {"sheet_name": "S", "project_id": "p"}, {"sheet_name": ""}, {"project_id": ""}, {"project_id": 5}, {"sheet_name": None, "project_id": None}])
+def test_fetch_requires_exactly_one_target_and_sends_nothing(monkeypatch, kw):
+    def _boom(*a, **k):
+        raise AssertionError("no request may be sent")
+    monkeypatch.setattr(lr.requests, "post", _boom)
+    rows, err = fetch_sheet_rows(url="https://x/exec", secret="s", **kw)
+    assert rows is None and "exactly one" in err
+
+
 def test_fetch_follows_302(monkeypatch):
     monkeypatch.setattr(lr.requests, "post", lambda *a, **k: _Resp(
         status_code=302, headers={"Location": "https://x/echo"}))

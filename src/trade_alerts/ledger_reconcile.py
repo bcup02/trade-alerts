@@ -801,7 +801,8 @@ def _describe_fetch_failure(exc: BaseException) -> str:
 
 
 def fetch_sheet_rows(
-    *, sheet_name: str, url: str | None = None, secret: str | None = None,
+    *, sheet_name: str | None = None, project_id: str | None = None,
+    url: str | None = None, secret: str | None = None,
     attempts: int = 5, initial_backoff_seconds: float = 2.0, sleep=None,
 ) -> tuple[list[dict[str, Any]] | None, str | None]:
     """Read a sheet tab via the shared Apps Script Web App's read-only
@@ -811,14 +812,26 @@ def fetch_sheet_rows(
     ``_post_sheets_sync``.  Never raises; returns ``(rows, None)`` on success or
     ``(None, error)``.  ``url`` / ``secret`` default to ``SHEETS_SYNC_URL`` /
     ``SHEETS_SYNC_SECRET`` in the environment.
+
+    Name the tab with exactly ONE of ``sheet_name`` (the tab's current title)
+    or ``project_id`` (the receiver looks the tab up through its registered
+    source for that project, so renaming the tab needs no release here; the
+    receiver must be v0.30.39+ and the project's registration must resolve to
+    one tab).  Anything else returns ``(None, error)`` without a request.
     """
     sleep = sleep or time.sleep
+    target = sheet_name if sheet_name is not None else project_id
+    if (sheet_name is None) == (project_id is None) or not isinstance(target, str) or not target:
+        return None, "exactly one non-empty string of sheet_name / project_id is required"
     url = url if url is not None else os.getenv("SHEETS_SYNC_URL")
     secret = secret if secret is not None else os.getenv("SHEETS_SYNC_SECRET")
     if not url or not secret:
         return None, "SHEETS_SYNC_URL / SHEETS_SYNC_SECRET not configured"
 
-    payload = {"secret": secret, "sheet_name": sheet_name, "action": "list_by_sheet"}
+    if sheet_name is not None:
+        payload = {"secret": secret, "sheet_name": sheet_name, "action": "list_by_sheet"}  # key order is the pre-0.30.40 wire order
+    else:
+        payload = {"secret": secret, "project_id": project_id, "action": "list_by_sheet"}
     backoff = initial_backoff_seconds
     last_error: str | None = None
     for attempt in range(1, attempts + 1):
