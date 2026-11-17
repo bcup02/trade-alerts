@@ -25,9 +25,9 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 # A spreadsheet tab name is shown to people, so it may be written in Chinese (f-26b: 趨勢策略 ...).  It is matched
 # byte-for-byte against the name registered in the receiver, so the accepted set is an explicit whitelist, not
 # "any Unicode word character": the ASCII identifier set plus CJK Unified Ideographs (U+4E00-U+9FFF) and Extension A
-# (U+3400-U+4DBF).  Hangul fillers, full-width forms, circled/superscript digits, zero-width and combining marks stay out.
+# (U+3400-U+4DBF), plus the katakana middle dot U+30FB (not first) that the strategy name 競賽策略・流星版 contains.  Hangul fillers, full-width forms, circled/superscript digits, zero-width and combining marks stay out.
 # The length limit is the same 256 as the ASCII identifier contract, so every previously valid ASCII name stays valid.
-_SHEET_NAME_RE = re.compile(r"^[A-Za-z0-9\u3400-\u4dbf\u4e00-\u9fff][A-Za-z0-9._:\-\u3400-\u4dbf\u4e00-\u9fff]{0,255}$")
+_SHEET_NAME_RE = re.compile(r"^[A-Za-z0-9\u3400-\u4dbf\u4e00-\u9fff][A-Za-z0-9._:\-\u30fb\u3400-\u4dbf\u4e00-\u9fff]{0,255}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 

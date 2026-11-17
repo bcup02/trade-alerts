@@ -127,3 +127,12 @@ def test_reconciliation_and_audit_requests_accept_chinese_tabs():
         source_hmac_secret="test-secret",
     )
     assert audit["sheet_name"] == "趨勢策略" and verify_signed_request(audit, source_hmac_secret="test-secret")
+
+
+def test_the_middle_dot_of_the_meteor_strategy_name_is_accepted_but_not_first_and_not_look_alikes():
+    """競賽策略・流星版 (U+30FB) is the real tab/strategy name; U+00B7 and U+FF65 look alike and stay refused, as does a leading dot."""
+    payload = _signed("競賽策略・流星版")
+    assert '"sheet_name":"競賽策略・流星版"' in canonical_json({k: v for k, v in payload.items() if k != "signature"})
+    for bad in ("競賽策略·流星版", "競賽策略･流星版", "・流星版", "競賽策略・\u200b流星版"):
+        with pytest.raises(LedgerIntegrityError, match="invalid sheet_name"):
+            _signed(bad)
