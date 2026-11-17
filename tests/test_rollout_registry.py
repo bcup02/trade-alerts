@@ -1077,7 +1077,7 @@ def test_the_rollout_page_intro_no_longer_says_development_only_code_counts_as_n
 
 def test_v11_is_called_competition_meteor_and_the_old_one_is_marked_retired(registry):
     assert registry["projects"]["trend-meteor"] == "競賽策略・流星版"
-    assert registry["projects"]["seykota"] == "舊趨勢（已停用、待封存）"
+    assert registry["projects"]["seykota"] == "舊趨勢策略（已停用、待封存）"
     assert RETIRED_PROJECTS == ("seykota",) and "seykota" not in ACTIVE_PROJECTS
     assert set(ACTIVE_PROJECTS) | set(RETIRED_PROJECTS) == set(STRATEGY_PROJECTS)
 
@@ -1099,8 +1099,8 @@ def test_risk_page_still_lists_the_retired_project_errors_under_its_new_label(re
     pages = {path.name: html for path, html in _render_guides().rendered_pages().items()}
     risk = _page_data(pages["fleet-risk-register.html"])
     sey = [e for e in risk["entries"] if e["code"].startswith("SEY.")]
-    assert sey and {e["bot_label"] for e in sey} == {"舊趨勢（已停用、待封存）"}
-    assert any(b["id"] == "seykota" and b["label"] == "舊趨勢（已停用、待封存）" for b in risk["bots"])
+    assert sey and {e["bot_label"] for e in sey} == {"舊趨勢策略（已停用、待封存）"}
+    assert any(b["id"] == "seykota" and b["label"] == "舊趨勢策略（已停用、待封存）" for b in risk["bots"])
 
 
 def test_a_new_capability_or_fleet_row_need_not_fill_the_retired_cell(registry, catalog):
