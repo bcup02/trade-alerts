@@ -1,0 +1,205 @@
+diff --git a/docs/observation-watch.md b/docs/observation-watch.md
+index e78b116..fe0bc3c 100644
+--- a/docs/observation-watch.md
++++ b/docs/observation-watch.md
+@@ -59,10 +59,10 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項
+ 
+ - 狀態檔在取得檔案鎖「之後」才讀（`run` 與 `ack` 都是）：排在另一輪後面的那一輪，依前一輪存下的結果決定要不要通知，不會用鎖之前讀到的舊狀態重複發送。`ack` 會等鎖（等到前一輪結束），`run` 遇到鎖仍是略過這一輪。
+ 
+-## f-70 第一批：原本靠收尾手動查的三項（`dev-trend-reconcile`、`health-publish`、`dust-convert`）
++## f-70 第一批：原本靠收尾手動查的三項（`dev-trend-reconcile`〔已拿掉〕、`health-publish`、`dust-convert`）
+ 2026-10-24 使用者要求把觀察區「AI檢查」的項目改成偵測程式自動通知。第一批是資料單純、不用記「連續幾天」以外狀態的三項；第二批（A1 健康穩定天數、f-63 同一天只進一次、x5 停損觸發與移動、f-38）見下一節。
+ 
+-- **`dev-trend-reconcile`（f-7 後半）**：開發機趨勢的 `ledger_status.json`。20 張手動測試單留下 25 筆帳本沒記的成交，對帳只看最近 168 小時，所以最後一批滑出窗口（2026-10-27 台北 17:00）後應自動回到 `RECONCILED`。讀數超過 90 分鐘或讀不到是 `error`；`RECONCILED` 為 `observed`（發一則，不算可結案：f-7 的進場那一半由 `dev-trend-entry` 看；那串 UNRESOLVED 請求有沒有自動撤回，這支沒讀）；其他值是 `waiting`。
++- **`dev-trend-reconcile`（f-7 後半；2026-11-18 已拿掉：開發機舊趨勢策略已停用，狀態檔不再更新，檢查只會一直壞）**：開發機趨勢的 `ledger_status.json`。20 張手動測試單留下 25 筆帳本沒記的成交，對帳只看最近 168 小時，所以最後一批滑出窗口（2026-10-27 台北 17:00）後應自動回到 `RECONCILED`。讀數超過 90 分鐘或讀不到是 `error`；`RECONCILED` 為 `observed`（發一則，不算可結案：f-7 的進場那一半由 `dev-trend-entry` 看；那串 UNRESOLVED 請求有沒有自動撤回，這支沒讀）；其他值是 `waiting`。
+ - **`health-publish`（f-45）**：兩台主機的 `/var/lib/ops-notify/health-publish-state.json`（新增兩個可讀路徑之一；A1 與開發機同一個路徑）。每台「正常」＝`consecutive_failures` 是 0 且 `last_success_at` 在 25 分鐘內。連續 `STABLE_STREAK`（72 小時，預設）每一輪都兩台正常才發「可結案」一則；中間任何一輪有一台不正常就把穩定時間歸零；**前一個看到兩台正常的輪次離這一輪超過 45 分鐘也歸零**（`STREAK_MAX_GAP`；中間有一輪讀不到、讀檔失敗或偵測沒跑，就是看不到的空窗，不能算進連續時間——檢查出錯的那一輪會保留舊的 `extra`，所以靠這個間隔判斷；2026-10-24 審閱 #304 BLOCK-304-01 抓到）。起點與最近看到的時間記在檢查自己的 `extra.healthy_since`／`extra.last_seen`，看不到過去，所以從第一個看到兩台正常的那一輪起算；任一台連續失敗 3 次以上是 `failed`；檔案讀不懂是 `error`。登記冊面板的 A1／開發機分頁有沒有被標過期，這支沒讀，結案時仍要看一眼頁面。
+ - **`dust-convert`（f-66）**：競賽策略第一次真實的粉塵轉換。讀競賽帳本裡 `capital_flow` 的 `dust_convert_out`／`dust_convert_in`（只算 LIVE、不算 `details.test`）、競賽的 `ledger_status.json`，以及 `state/dust_convert_attempt.json`（新增的第二個可讀路徑；沒有這個檔案＝還沒試過，不是錯誤）。`needs_review`、`failed`、`partial`，或 `converting` 超過 30 分鐘沒更新（程式中途掛了、結果不明）都是 `failed`（同一策略日同一狀態只通知一次）；帳本有轉出與轉入列＋狀態 `done`＋轉換後（超過寬限）對帳 `RECONCILED` 才是 `observed`，而且保持 `needs_human`：對照幣安 App 的小額資產轉換紀錄與備註裡的 tranId，只有你能做。對帳 `DIVERGED` 是 `failed`。
+ 
+diff --git a/pyproject.toml b/pyproject.toml
+index fbdf91d..17f1b1e 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.40"
++version = "0.30.41"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index 34e2832..a050cc3 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -442,25 +442,6 @@ def check_trend_addon(ctx: Context) -> Result:
+                   [f"加碼交易：{', '.join(added)}", f"對帳：{status.get('value')}"], needs_human=True, key=",".join(added))
+ 
+ 
+-def check_dev_trend_entry(ctx: Context) -> Result:
+-    """f-7: the dev host's trend strategy really places a testnet entry on a signal (not a manual test) and records it."""
+-    events = list(jsonl(ctx.remote.read("dev", audit("seykota", "trading_ledger.jsonl"))))
+-    entries = [e for e in events if e.get("event_type") == "trade_open" and e.get("source") == "entry_signal"
+-               and (parse_time(e.get("event_time")) or datetime.min.replace(tzinfo=timezone.utc)) > datetime(2026, 10, 3, 8, 0, tzinfo=timezone.utc)]
+-    if not entries:
+-        return Result(WAITING, "開發機趨勢策略還沒有因進場訊號而下的測試網單。")
+-    status = load_json(ctx.remote, "dev", audit("seykota", "google_reconcile_status.json"))
+-    last = max(parse_time(e["event_time"]) for e in entries)
+-    verdict = reconcile_covers(status, last, ctx.now)
+-    if verdict == "covered":
+-        return Result(OBSERVED, "開發機趨勢策略依進場訊號在測試網下單，進場後的帳本對 Google 表對帳一致。",
+-                      [f"{len(entries)} 筆進場；最近 {taipei(last)}（台北）；對帳（{taipei(parse_time(status['checked_at']))}）：{status.get('note')}"],
+-                      closable=True, key=str(len(entries)))
+-    if verdict == "diverged":
+-        return Result(FAILED, "開發機趨勢策略有進場，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"])
+-    return Result(WAITING, "開發機趨勢策略有進場，等進場寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {taipei_text(status.get('checked_at'))}"])
+-
+-
+ V11_HEARTBEAT_MAX_AGE = timedelta(hours=26)      # 每日單元一天跑一次（00:10 UTC）；超過 26 小時沒有新的心跳＝這一天沒跑成
+ 
+ 
+@@ -626,25 +607,6 @@ HEALTH_PUBLISH_FRESH_MINUTES = 25         # the publisher runs every 10 minutes
+ STREAK_MAX_GAP = timedelta(minutes=45)
+ 
+ 
+-def check_dev_trend_reconcile(ctx: Context) -> Result:
+-    """f-7 (second half): the dev host's trend ledger-vs-exchange reconcile is back to RECONCILED.
+-
+-    Twenty hand-made test orders (2026-10-17..20) left 25 exchange fills the ledger never recorded; the reconcile only looks at
+-    the last 168 hours, so the verdict should flip by itself once the last of them slides out (2026-10-27 17:00 Taipei).  The
+-    first half of f-7 (a real entry on a signal) is ``dev-trend-entry``.  A stale or unreadable status is never "recovered"."""
+-    status = load_json(ctx.remote, "dev", audit("seykota", "ledger_status.json"))
+-    checked = parse_time(status.get("checked_at"))
+-    if not _fresh(checked, ctx.now, 90):
+-        raise RemoteError(f"開發機趨勢的對帳狀態太舊，判斷不了是否恢復（檢查時間 {taipei_text(status.get('checked_at'))}）")
+-    value = status.get("value")
+-    if value == "RECONCILED":
+-        return Result(OBSERVED, "開發機趨勢策略的帳本對交易所對帳已回到 RECONCILED（那批手動測試單已滑出 168 小時窗口）。",
+-                      [f"對帳：{status.get('note')}（{taipei(checked)} 台北）",
+-                       "這只是 f-7 的對帳那一半；進場那一半由 dev-trend-entry 看。那串 UNRESOLVED 請求是否自動撤回，這支檢查沒有讀。"],
+-                      key="reconciled")
+-    return Result(WAITING, f"開發機趨勢策略的帳本對交易所對帳還是 {value}。", [f"對帳：{status.get('note')}（{taipei(checked)} 台北）"])
+-
+-
+ def _health_publish(ctx: Context, host: str) -> tuple[bool, str, int]:
+     """(healthy, sentence, consecutive_failures) of one host's health-reading publisher."""
+     state = load_json(ctx.remote, host, HEALTH_PUBLISH_STATE)
+@@ -1375,9 +1337,7 @@ CHECKS: tuple[Check, ...] = (
+     Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
+     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
+     Check("trend-addon", "A1 趨勢策略加碼交易", ("e-5",), check_trend_addon),
+-    Check("dev-trend-entry", "開發機趨勢策略依訊號進場", ("f-7",), check_dev_trend_entry),
+     Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
+-    Check("dev-trend-reconcile", "開發機趨勢策略對帳回到 RECONCILED（f-7 後半）", ("f-7",), check_dev_trend_reconcile),
+     Check("dev-v11-cycle", "開發機 V11（競賽策略・流星版）在測試網完整跑一個日循環", ("phase-v10-p3",), check_dev_v11_cycle),
+     Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
+     Check("dust-convert", "競賽策略第一次真實粉塵轉換", ("f-66",), check_dust_convert),
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 778bc3f..ce679a8 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -351,4 +351,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.40"
++__version__ = "0.30.41"
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index 62ce91d..f98c368 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -148,7 +148,7 @@ def test_tabs_demo_trades_are_not_real_trades():
+     assert ow.check_sheet_tab_names(ctx(r)).state == ow.WAITING
+ 
+ 
+-# --- competition fill (e-2), trend add-on (e-5), dev entry (f-7) ----------------------------------------------------------
++# --- competition fill (e-2), trend add-on (e-5) ----------------------------------------------------------
+ 
+ def test_competition_fill_waits_then_closes_when_the_sheet_agrees():
+     r = tabs_remote()
+@@ -172,16 +172,6 @@ def test_trend_without_an_add_keeps_waiting():
+     assert ow.check_trend_addon(ctx(r)).state == ow.WAITING
+ 
+ 
+-def test_dev_entry_must_come_from_a_signal_not_a_manual_test():
+-    r = FakeRemote()
+-    put(r, "dev", "seykota", "google_reconcile_status.json", {"value": "RECONCILED", "note": "ok", "checked_at": iso(NOW - timedelta(minutes=10))})
+-    put(r, "dev", "seykota", "trading_ledger.jsonl", [trade(6, "trade_open", source="add", trade_id="T")], jsonl=True)
+-    assert ow.check_dev_trend_entry(ctx(r)).state == ow.WAITING
+-    put(r, "dev", "seykota", "trading_ledger.jsonl", [trade(6, "trade_open", source="entry_signal", trade_id="T")], jsonl=True)
+-    result = ow.check_dev_trend_entry(ctx(r))
+-    assert result.state == ow.OBSERVED and result.closable
+-
+-
+ # --- status alerts (f-23 / f-40 / f-41) and reminders (f-39) --------------------------------------------------------
+ 
+ def line(notices, attempted, sent, failures=0, stamp="Oct 14 03:10:01"):
+@@ -438,32 +428,12 @@ def demo_check(monkeypatch):
+     return check
+ 
+ 
+-# --- f-70 batch 1: dev trend reconcile, health publishers, dust convert --------------------------------------------------
++# --- f-70 batch 1: health publishers, dust convert --------------------------------------------------
+ 
+ def _status_file(value, minutes_ago=10, note="n"):
+     return {"value": value, "checked_at": iso(NOW - timedelta(minutes=minutes_ago)), "note": note}
+ 
+ 
+-def test_dev_trend_reconcile_waits_while_diverged_and_tells_once_it_is_reconciled():
+-    r = FakeRemote()
+-    put(r, "dev", "seykota", "ledger_status.json", _status_file("DIVERGED", note="18 exchange fill(s) not recorded in the ledger"))
+-    waiting = ow.check_dev_trend_reconcile(ctx(r))
+-    assert waiting.state == ow.WAITING and "DIVERGED" in waiting.summary
+-    put(r, "dev", "seykota", "ledger_status.json", _status_file("RECONCILED"))
+-    done = ow.check_dev_trend_reconcile(ctx(r))
+-    assert done.state == ow.OBSERVED and not done.needs_human and not done.closable and done.key == "reconciled"
+-    assert "dev-trend-entry" in " ".join(done.evidence)
+-
+-
+-def test_dev_trend_reconcile_raises_on_a_stale_or_missing_status():
+-    r = FakeRemote()
+-    put(r, "dev", "seykota", "ledger_status.json", _status_file("RECONCILED", minutes_ago=200))
+-    with pytest.raises(ow.RemoteError):
+-        ow.check_dev_trend_reconcile(ctx(r))
+-    with pytest.raises(ow.RemoteError):
+-        ow.check_dev_trend_reconcile(ctx(FakeRemote()))
+-
+-
+ def _publish_remote(a1=None, dev=None):
+     r = FakeRemote()
+     for host, state in (("a1", a1), ("dev", dev)):
+@@ -644,7 +614,7 @@ def test_dust_convert_tells_when_paxg_was_among_the_converted_coins():
+ 
+ def test_f70_batch1_checks_are_registered_and_read_only_whitelisted():
+     ids = {c.id: c for c in ow.CHECKS}
+-    assert ids["dev-trend-reconcile"].covers == ("f-7",) and ids["health-publish"].covers == ("f-45",) and ids["dust-convert"].covers == ("f-66",)
++    assert ids["health-publish"].covers == ("f-45",) and ids["dust-convert"].covers == ("f-66",)
+     assert ow.HEALTH_PUBLISH_STATE in ow.ALLOWED_PATHS and ow.DUST_ATTEMPT_PATH in ow.ALLOWED_PATHS
+     assert ow.audit("seykota", "ledger_status.json") in ow.ALLOWED_PATHS and ow.audit("btc-competition", "ledger_status.json") in ow.ALLOWED_PATHS
+ 
+@@ -682,7 +652,7 @@ def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
+     assert len(ids) == len(set(ids))
+     assert all(c.covers and c.title for c in ow.CHECKS)
+     covered = {i for c in ow.CHECKS for i in c.covers}
+-    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x5b", "phase-r033-p4"} <= covered
++    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "phase-g2", "phase-x5b", "phase-r033-p4"} <= covered
+ 
+ 
+ # --- deployment files ----------------------------------------------------------------------------------------------
+@@ -752,15 +722,11 @@ def test_tabs_closes_only_after_a_reconcile_that_ran_past_the_grace_of_the_newes
+     assert ow.reconcile_covers(_status(30), NOW - timedelta(minutes=50), NOW) == "pending"      # trade still inside its grace
+ 
+ 
+-def test_competition_and_dev_entry_also_wait_for_a_reconcile_after_the_grace():
++def test_competition_fill_also_waits_for_a_reconcile_after_the_grace():
+     r = tabs_remote()
+     put(r, "a1", "btc-competition", "trading_ledger.jsonl", [trade(0, "spot_fill", execution_mode="LIVE")], jsonl=True)
+     put(r, "a1", "btc-competition", "google_reconcile_status.json", _status(5, name="競賽策略"))
+     assert ow.check_competition_fill(ctx(r)).state == ow.WAITING                                # RECONCILED, but older than the grace
+-    d = FakeRemote()
+-    put(d, "dev", "seykota", "trading_ledger.jsonl", [trade(0, "trade_open", source="entry_signal", trade_id="T")], jsonl=True)
+-    put(d, "dev", "seykota", "google_reconcile_status.json", _status(5, name="趨勢策略"))
+-    assert ow.check_dev_trend_entry(ctx(d)).state == ow.WAITING
+ 
+ 
+ # --- one run at a time; a message that was sent but not remembered (review of #183) -----------------------------------------
