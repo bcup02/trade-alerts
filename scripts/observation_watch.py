@@ -359,7 +359,7 @@ def check_sheet_tab_names(ctx: Context) -> Result:
     remembered = (ctx.previous or {}).get("covered")
     remembered = remembered if isinstance(remembered, dict) else {}             # a damaged memory is no memory
     covered_now: dict[str, dict[str, str]] = {}
-    for key in REPOS:
+    for key in _ACTIVE_A1_STRATEGIES:                     # 舊趨勢策略 2026-11-18 在 A1 下線：不再有新交易，不看它（進度頁 f-96）
         status = load_json(ctx.remote, "a1", audit(key, "google_reconcile_status.json"))
         trades = _trades_after(jsonl(ctx.remote.read("a1", audit(key, "trading_ledger.jsonl"))), _F26_BASELINE)
         name = LABELS[key]
@@ -398,7 +398,7 @@ def check_sheet_tab_names(ctx: Context) -> Result:
     if bad:
         return Result(FAILED, "新分頁名有策略不符合預期：" + "、".join(bad), evidence, key="bad:" + ",".join(bad), extra={"covered": covered_now})
     if not waiting and not carried:
-        return Result(OBSERVED, "四支策略的新交易都走新分頁名，帳本對 Google 表一致。", evidence, closable=True, key="all",
+        return Result(OBSERVED, "三支策略的新交易都走新分頁名，帳本對 Google 表一致。", evidence, closable=True, key="all",
                       extra={"covered": covered_now})
     confirmed = [*ok, *(f"{name}（{'本輪讀不到 Google 表' if reason == 'unknown' else '新交易在對帳寬限內'}，沿用 {taipei(since)} 的確認）"
                         for name, reason, since in carried)]
@@ -1050,7 +1050,8 @@ def check_reminders(ctx: Context) -> Result:
 
 
 def _a1_event_logs() -> list[tuple[str, str]]:
-    return [(key, audit(key, "fleet_event_log.jsonl")) for key in ("seykota", "momentum", "btc-competition")]
+    # 舊趨勢策略已在 A1 下線（4.1）：歷史事件檔留在主機不刪，但不再當作觀察對象，免得它的舊事件因送達證據被清掉而誤報（進度頁 f-97）
+    return [(key, audit(key, "fleet_event_log.jsonl")) for key in ("momentum", "btc-competition")]
 
 
 def _real_events(ctx: Context, after: datetime, *, codes: set[str] | None = None, not_codes: set[str] = frozenset(),
@@ -1321,7 +1322,7 @@ def check_registry_drift(ctx: Context) -> Result:
 
 
 CHECKS: tuple[Check, ...] = (
-    Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
+    Check("sheet-tab-names", "三支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
     Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
     Check("dev-v11-cycle", "開發機 V11（競賽策略・流星版）在測試網完整跑一個日循環", ("phase-v10-p3",), check_dev_v11_cycle),

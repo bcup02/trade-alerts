@@ -1362,7 +1362,7 @@ def test_tabs_a_google_read_that_failed_keeps_a_confirmed_strategy_listed_with_t
     r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
     out = ow.check_sheet_tab_names(ctx(r, _covered_before()))
     assert out.state == ow.WAITING and not out.closable
-    assert "動能策略（本輪讀不到 Google 表，沿用" in out.summary and "還在等新交易：趨勢策略" in out.summary
+    assert "動能策略（本輪讀不到 Google 表，沿用" in out.summary and "趨勢策略" not in out.summary          # 舊趨勢策略已下線，不再列為「還在等」
     assert any(line.startswith("動能策略：這一輪對帳讀不到 Google 表（UNKNOWN）") for line in out.evidence)
     assert out.extra["covered"]["momentum"]["at"] == iso(NOW - timedelta(hours=1))                    # the bound does not slide
 
@@ -2341,3 +2341,37 @@ def test_the_retired_old_trend_strategy_is_not_a_required_ops_reading():
     """舊趨勢策略 2026-11-18 在 A1 下線、維運通知的 seykota 目標關掉：穩定檢查不能再要求它的讀數，否則整個檢查壞掉。"""
     assert not any(k.startswith("seykota:") for k in ow.REQUIRED_READINGS)
     assert "seykota" not in ow._STABLE_TARGETS and "seykota" in ow.REPOS     # REPOS 仍留著它（登記冊 sources 與部署複本比對用）
+
+
+# --- 舊趨勢策略下線後的尾巴（進度頁 f-96／f-97／f-98） ------------------------------------------------------------------
+def test_tabs_ignores_the_retired_old_trend_strategy_even_with_a_wrong_tab_name_or_a_missing_file():
+    """f-96：舊趨勢策略在 A1 下線，它的分頁名或對帳檔再怎麼樣都不影響分頁名檢查。"""
+    t = NOW - timedelta(hours=3)
+    good = {"momentum": _status(30), "mycrypto": _status(30, name="加密策略"), "btc-competition": _status(30, name="競賽策略"),
+            "seykota": _status(30, name="舊趨勢策略")}                                  # 已改名的舊分頁：以前會判「分頁名不符」
+    r = tabs_remote(trades={k: [{"event_type": "trade_close", "event_time": iso(t)}] for k in ow.REPOS}, status=good)
+    result = ow.check_sheet_tab_names(ctx(r))
+    assert result.closable and "趨勢策略" not in result.summary and "舊趨勢策略" not in "".join(result.evidence)
+    assert "seykota" not in ow._ACTIVE_A1_STRATEGIES
+
+
+def test_event_log_checks_do_not_read_the_retired_old_trend_strategys_history():
+    """f-97：舊趨勢策略的歷史事件（送達證據早被清掉）不能讓事件類檢查誤報。"""
+    assert [key for key, _ in ow._a1_event_logs()] == ["momentum", "btc-competition"]
+    stale = events_remote(seykota=[event("PROTECTION_UNVERIFIED", event_id="OLD1")])      # 沒有送達證據、不在 delivered 裡
+    assert ow.check_momentum_halt_notice(ctx(stale)).state == ow.WAITING
+
+
+def test_a1_stable_ignores_stale_leftover_readings_of_the_retired_old_trend_strategy():
+    """f-98：維運通知狀態檔裡殘留過期、不正常的 seykota 讀數，不影響穩定檢查。"""
+    old = iso(B2_NOW - timedelta(days=30))
+    leftovers = {f"seykota:{axis}": {"severity": "critical", "value": "STALE", "checked_at": old}
+                 for axis in ("runtime", "ledger", "google", "export", "units")}
+    clean = ow.check_a1_stable(b2_ctx(ops_remote(), {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}))
+    r = ops_remote()
+    state = json.loads(r.files[("a1", OPS_STATE)])
+    state.update(leftovers)
+    r.files[("a1", OPS_STATE)] = json.dumps(state)
+    with_leftovers = ow.check_a1_stable(b2_ctx(r, {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}))
+    assert (with_leftovers.state, with_leftovers.summary, with_leftovers.key) == (clean.state, clean.summary, clean.key)
+
