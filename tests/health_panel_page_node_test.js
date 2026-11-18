@@ -93,12 +93,13 @@ function fakeMcp(deliver) {
   assert.equal(mcp.watches[0].options.refetchInterval, 60000);
   let text = texts(page.panel);
   for (const label of ['動能策略', '加密策略', '舊趨勢策略（已停用、待封存）', '競賽策略', '主機', '帳本軸', 'Google 表軸', '運行狀態軸', '服務單元軸', '匯出檔軸', '時鐘軸']) assert.ok(text.includes(label), label);
-  assert.ok(text.includes('DIVERGED') && text.includes('RECONCILED') && text.includes('HEALTHY'));
+  assert.ok(text.includes('DIVERGED') && text.includes('OK'));        // abnormal words stay; RECONCILED / HEALTHY are shown as OK
   assert.ok(text.includes('有項目異常'));                              // two DIVERGED readings
   assert.ok(text.includes('讀數產生 10/22 15:51') && text.includes('最後一次輪詢 10/22 15:50'));
   assert.ok(text.includes('發布停 25 分鐘') && text.includes('輪詢停 45 分鐘'));
   const chips = page.panel.find(n => /\bhv-/.test(n.className) && n.tagName === 'span' && !/hv-age|hv-none/.test(n.className));
   assert.equal(chips.length, 20);
+  assert.equal(chips.filter(n => n.textContent === 'RECONCILED' || n.textContent === 'HEALTHY').length, 0);
   assert.equal(chips.filter(n => n.className.includes('hv-alert')).length, 2);
   assert.equal(chips.filter(n => n.className.includes('hv-stale') || n.className.includes('hv-notime')).length, 0);
   assert.ok(page.timers.length >= 1);                                 // the 30-second age refresh is armed
