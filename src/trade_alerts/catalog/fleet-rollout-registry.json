@@ -39,7 +39,8 @@
     "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）",
     "r033-paxg": "R033：競賽策略在 BTC 熊市持有 PAXG（歷史狀態：程式 2026-10-31 台北 16:23 部署 A1、開關同日台北 22:38 打開，見已做的 bear.paxg_asset；兩個 PAXG 錯誤規則（ERR-070、ERR-071）的四格 2026-11-18 查證為已做，這個階段已沒有未做的格子）",
     "v11-p3": "V11 開發機測試網演練（進度頁 P3）：單元、安裝腳本、解除暫停工具與帳本鎖都已在趨勢 repo 開發分支完成（5d-1～5d-4，PR #209～#217），尚未在任何主機實跑；在開發機實跑驗證、打開 ops-notify 目標與觀察區檢查之後才上正式機（P5）",
-    "v11-google-reconcile": "V11 的帳本↔Google 表對帳單元（寫 google_reconcile_status.json）：使用者 2026-11-10 定沿用舊趨勢的 ed-seykota「趨勢策略」，5d 之後做；做之前要先核對開發機階段交易投影不會寫進正式表分頁"
+    "v11-google-reconcile": "V11 的帳本↔Google 表對帳單元（寫 google_reconcile_status.json）：使用者 2026-11-10 定沿用舊趨勢的 ed-seykota「趨勢策略」，5d 之後做；做之前要先核對開發機階段交易投影不會寫進正式表分頁",
+    "sheet-id-rollout": "Google 表分頁改用分頁編號登記（進度頁 f-93、f-95）：流星版開發機已完成；正式機的拆分頁要等舊趨勢策略下線（4.1）與流星版上線（P5）；動能、加密、競賽沒有改名計畫，列未做，等哪天要改分頁名稱時一起做"
   },
   "sources": {
     "momentum": {
@@ -1123,6 +1124,37 @@
         "trend-meteor": {
           "state": "n/a",
           "reason": "這是競賽 R033 的熊市 PAXG 規則；V11 的 PAXG 多單腿是另一套規則，不是這項能力。"
+        }
+      }
+    },
+    {
+      "id": "google.sheet_id_registration",
+      "title": "Google 表分頁改用分頁編號登記",
+      "description": "接收端用固定的分頁編號（sheet_id）找分頁，策略對帳用 project_id 讀表；以後分頁改名不用發版。",
+      "status": {
+        "momentum": {
+          "state": "pending",
+          "phase": "sheet-id-rollout",
+          "reason": "這支還用分頁名稱登記（接收端 GOOGLE_LEDGER_V2_SOURCES 的 sheet_name）；改名機率低，等哪天真的要改分頁名稱、或正式機一起拆分頁時再改成分頁編號（sheet_id）登記，同一輪要改接收端登記與對帳讀表的呼叫。"
+        },
+        "seykota": {
+          "state": "n/a",
+          "reason": "舊趨勢策略已停用、待封存，不再改登記方式。"
+        },
+        "mycrypto": {
+          "state": "pending",
+          "phase": "sheet-id-rollout",
+          "reason": "這支還用分頁名稱登記（接收端 GOOGLE_LEDGER_V2_SOURCES 的 sheet_name）；改名機率低，等哪天真的要改分頁名稱、或正式機一起拆分頁時再改成分頁編號（sheet_id）登記，同一輪要改接收端登記與對帳讀表的呼叫。"
+        },
+        "btc-competition": {
+          "state": "pending",
+          "phase": "sheet-id-rollout",
+          "reason": "這支還用分頁名稱登記（接收端 GOOGLE_LEDGER_V2_SOURCES 的 sheet_name）；改名機率低，等哪天真的要改分頁名稱、或正式機一起拆分頁時再改成分頁編號（sheet_id）登記，同一輪要改接收端登記與對帳讀表的呼叫。"
+        },
+        "trend-meteor": {
+          "state": "built",
+          "phase": "sheet-id-rollout",
+          "evidence": "開發機已完成（2026-11-18）：對帳用 project_id 讀自己的分頁（src/trend_meteor/google_reconcile.py:152 fetch(project_id=…)，ed-seykota PR #248，共用庫 v0.30.40），接收端 v0.30.39 以 sheet_id 登記「競賽策略・流星版」分頁；正式機要等舊趨勢策略下線（4.1）、流星版上線（P5）同一輪拆分頁並改登記，現在改名會讓舊趨勢策略寫不進去。"
         }
       }
     }
@@ -3321,6 +3353,12 @@
       "aspect": "emits_event",
       "type": "completed",
       "note": "2026-11-18 逐格讀正式機分支 32331cb 的程式與測試（A1 檔案雜湊相同），test_runner_paxg 43 個測試通過；由未做改已做（進度頁 f-82）。"
+    },
+    {
+      "kind": "cap",
+      "id": "google.sheet_id_registration",
+      "type": "added",
+      "note": "2026-11-18 新增：Google 表分頁改用分頁編號登記；流星版開發機已完成，動能、加密、競賽列未做（進度頁 f-95）。"
     }
   ]
 }
