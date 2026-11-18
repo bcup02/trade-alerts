@@ -292,6 +292,19 @@ def _first_seen(path: str, directory: str, moment_ms: int) -> tuple[int, str | N
     return moment_ms, None
 
 
+def _google_queue_failed(result: Mapping[str, Any]) -> bool:
+    """Whether the strategy's follow-up (queueing the Google correction) reported a failure.
+
+    The strategies disagree on how: the hook returns ``google_intent_error`` (momentum, crypto, competition, the
+    old trend strategy) or raises, which ``_correct_trade`` stores as ``error`` (the meteor strategy).  Either key
+    with a non-empty value is a failure.  The error text is not copied into the notice (it is outside text; it
+    stays in the event's ``post`` / ``written`` details)."""
+    return any(isinstance(result.get(key), str) and bool(result[key].strip()) for key in ("google_intent_error", "error"))
+
+
+GOOGLE_QUEUE_FAILED_LINE = "注意：Google 表的更正沒有排進待派送佇列，帳本已正確，但表上可能還是舊數字，請檢查 Google 表對帳並重新排入。"
+
+
 def _request_notice(request: Mapping[str, Any]) -> str:
     """The unresolved-order notice rebuilt from the request alone."""
     details = request.get("details") if isinstance(request.get("details"), Mapping) else {}
@@ -659,6 +672,7 @@ class _Round:
             f"一併重述的訂單: {', '.join(group_ids)}",
             f"數量 {previous['exit_volume']} → {corrected['exit_volume']}；淨損益 {previous['net_pnl']} → {corrected['net_pnl']}",
             f"帳本更正事件: {event_id}",
+            *([GOOGLE_QUEUE_FAILED_LINE] if _google_queue_failed(post) else []),
         ])
         event = append_fleet_event(
             self.paths.fleet_event_log, project=self.project, code=CODE_CORRECTED, risk_tier=self.tiers[CODE_CORRECTED],
@@ -703,6 +717,7 @@ class _Round:
             "策略自己重複送單，帳本漏記的現貨成交已照交易所自動補記（只追加）。",
             f"symbol: {order['symbol']}  重複的訂單: {oid}（與帳本已記的 {match['order_id']} 同一個自訂編號 {match['client_order_id']}）",
             f"補記事件: {', '.join(map(str, written.get('event_ids') or []))}",
+            *([GOOGLE_QUEUE_FAILED_LINE] if _google_queue_failed(written) else []),
         ])
         event = append_fleet_event(
             self.paths.fleet_event_log, project=self.project, code=CODE_CORRECTED, risk_tier=self.tiers[CODE_CORRECTED],
