@@ -123,11 +123,11 @@ def test_prefix_table_reproduces_every_published_catalog_code():
 
 def test_catalog_lookup_resolves_a_tier_from_a_bare_condition_name():
     catalog = load_error_catalog(CATALOG_PATH)
-    assert risk_tier_for(catalog, "seykota", "PROTECTION_UNVERIFIED") == "R3"
-    assert risk_tier_for(catalog, "seykota", "TRADE_EXIT") == "R0"
-    assert catalog_entry(catalog, "seykota", "PROTECTION_PLACEMENT_FAILED_FLATTENED")["resume"] == "automatic"
+    assert risk_tier_for(catalog, "momentum", "PROTECTION_UNVERIFIED") == "R3"
+    assert risk_tier_for(catalog, "momentum", "RUNTIME_CYCLE_FAILED") == "R0"
+    assert catalog_entry(catalog, "momentum", "RUNTIME_CYCLE_FAILED")["resume"] == "automatic"
     with pytest.raises(FleetEventLogError, match="no catalog entry"):
-        risk_tier_for(catalog, "seykota", "NOT_A_REAL_CONDITION")
+        risk_tier_for(catalog, "momentum", "NOT_A_REAL_CONDITION")
 
 
 def test_load_error_catalog_rejects_a_document_that_is_not_a_catalog(tmp_path):

@@ -216,7 +216,7 @@ def test_error_id_is_shown_on_both_register_pages(catalog):
     from trade_alerts.rollout_registry import RETIRED_PROJECTS, owners
     shown = next(e for e in catalog["entries"] if set(owners(e["code"])) - set(RETIRED_PROJECTS))
     assert f'{shown["error_id"]} · {shown["code"]}' in pages["fleet-rollout-register.html"]
-    assert f'{first["error_id"]} · {first["code"]}' not in pages["fleet-rollout-register.html"]
+    assert f'{first["error_id"]} · {first["code"]}' in pages["fleet-rollout-register.html"]       # 舊趨勢（SEY.*）已退役，沒有只屬於它的條目了
 
 
 def test_retiring_an_entry_keeps_its_error_id_in_retired_codes(catalog):
@@ -323,24 +323,6 @@ def test_bash_c_commands_carry_their_flags_inside_the_quotes(catalog):
     assert not problems, "\n".join(problems)
 
 
-def test_correction_tool_steps_give_both_the_preview_and_the_apply_command_and_say_closed_only(catalog):
-    # append_trade_correction.py only accepts a CLOSED trade that has a trade_open (trade_alerts.trade_correction):
-    # an operator on an open position must be told not to run it (review #173 BLOCK-173-02).
-    for error_id in ("ERR-007", "ERR-037"):
-        entry = next(e for e in catalog["entries"] if e["error_id"] == error_id)
-        text = " ".join(entry["operator_message"]["steps"])
-        spans = [s for s in re.findall(r"`([^`]+)`", text) if "append_trade_correction.py" in s]
-        assert len(spans) == 2, (error_id, spans)
-        preview, apply_ = spans
-        assert "--apply" not in preview and "--confirm" not in preview
-        assert apply_.endswith(' --apply --confirm "<確認碼>"\'')        # inside the closing quote
-        assert apply_.replace(' --apply --confirm "<確認碼>"', "") == preview
-        assert "已平倉" in text
-    err037 = next(e for e in catalog["entries"] if e["error_id"] == "ERR-037")
-    text037 = " ".join(err037["operator_message"]["steps"])
-    assert "trade_close" in text037 and "還開著" in text037 and "不要硬做" in text037
-
-
 # --- f-37: a placeholder the operator must replace is ONE quoted word -------------------------------------------------
 #
 # 2026-10-12 (ops-notify #49 review): an unquoted `<確認碼>` is an input redirection in bash -- pasting it as written
@@ -405,8 +387,9 @@ def test_every_pasted_command_is_valid_bash_and_has_no_unquoted_placeholder(cata
 def test_the_catalog_does_have_quoted_placeholders_to_check(catalog):
     # a guard that sees no placeholder at all would pass for the wrong reason
     spans = [s for e in catalog["entries"] for _n, s in _command_spans(e) if "<" in s]
-    assert len(spans) >= 10 and all("<確認碼>" in s or "<交易編號>" in s or "<金額>" in s for s in spans)
-    assert any(_inner_script(s) is not None for s in spans)
+    assert len(spans) >= 5 and all("<確認碼>" in s or "<交易編號>" in s or "<金額>" in s for s in spans)
+    # 目前現役條目裡沒有 `bash -c '...'` 的指令了（原本只有已退役的舊趨勢條目有）；改用一個例子保留 helper 的覆蓋
+    assert _inner_script("bash -c 'echo \"<確認碼>\"'") == 'echo "<確認碼>"' and _inner_script("echo hi") is None
 
 
 @pytest.mark.parametrize("span", [
@@ -578,7 +561,7 @@ def test_the_auto_repair_entry_keeps_the_missing_realized_pnl_exception(catalog)
 
 
 # --- f-88：四支舊策略的「已照交易所自動更正」條目不能說 Google 表／LINE 查詢已一致 ----------------------------
-_CORRECTED_CODES = ("SEY.UNRECORDED_FILL_CORRECTED", "MOM.UNRECORDED_FILL_CORRECTED",
+_CORRECTED_CODES = ("MOM.UNRECORDED_FILL_CORRECTED",
                     "MYC.UNRECORDED_FILL_CORRECTED", "BTC.UNRECORDED_FILL_CORRECTED")
 
 
@@ -591,7 +574,6 @@ def test_the_four_older_corrected_entries_do_not_claim_google_or_line_are_alread
         assert "Google 表、LINE 查詢的數字已" not in shown and "排入 Google 表更正" not in shown and "更新 LINE 查詢" not in shown, code
         assert "待派送佇列" in message["what"] and "排隊也可能失敗" in message["direction"], code
         assert "google_intent_error" in " ".join(message["steps"]) and "只入隊" in entry["auto_action"], code
-    # 趨勢才有另發 LINE 查詢事件；動能、加密沒有推送，只說快照下次由帳本重算
-    assert "line_query_published" in _met(catalog, "SEY.UNRECORDED_FILL_CORRECTED")["auto_action"]
+    # 動能、加密沒有推送，只說快照下次由帳本重算（舊趨勢退役前曾是唯一另發 LINE 查詢事件的）
     for code in ("MOM.UNRECORDED_FILL_CORRECTED", "MYC.UNRECORDED_FILL_CORRECTED"):
         assert "沒有另外推送 LINE 查詢" in _met(catalog, code)["auto_action"], code

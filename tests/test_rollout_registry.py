@@ -100,10 +100,12 @@ def test_project_rows_covers_every_claim_about_one_strategy(registry):
     rows = project_rows(registry, "seykota")
     for capability in registry["capabilities"]:
         assert rows[f"capability:{capability['id']}"] == capability["status"]["seykota"]
-    sey_codes = [row["code"] for row in registry["catalog"] if row["code"].startswith("SEY.")]
-    assert sey_codes
-    for code in sey_codes:
-        assert f"{code}:behaviour" in rows and f"{code}:emits_event" in rows
+    assert not any(key.startswith("SEY.") for key in rows)          # 舊趨勢的 SEY.* 條目 2026-11-18 退役，只剩能力與 FLEET.* 的格子
+    mom = project_rows(registry, "momentum")
+    mom_codes = [row["code"] for row in registry["catalog"] if row["code"].startswith("MOM.")]
+    assert mom_codes
+    for code in mom_codes:
+        assert f"{code}:behaviour" in mom and f"{code}:emits_event" in mom
     assert not any(key.startswith("MOM.") for key in rows)
 
 
@@ -207,11 +209,11 @@ def test_row_for_an_unknown_code_is_caught(registry, catalog):
 
 def test_row_claiming_another_strategy_is_caught(registry, catalog):
     def add_foreign(r):
-        row = next(row for row in r["catalog"] if row["code"].startswith("SEY."))
-        row["behaviour"]["momentum"] = {"state": "n/a", "reason": "not mine"}
+        row = next(row for row in r["catalog"] if row["code"].startswith("MOM."))
+        row["behaviour"]["btc-competition"] = {"state": "n/a", "reason": "not mine"}
 
     problems = _problems_after(registry, catalog, add_foreign)
-    assert any("behaviour: must list exactly ['seykota']" in p for p in problems)
+    assert any("behaviour: must list exactly ['momentum']" in p for p in problems)
 
 
 def test_retired_code_marked_done_is_caught(registry, catalog):
@@ -1089,18 +1091,19 @@ def test_rollout_page_has_no_column_for_the_retired_project_but_the_data_is_kept
     for item in data["items"]:
         assert set(item["dots"]) == set(ACTIVE_PROJECTS)
         assert all(row["label"] != registry["projects"]["seykota"] for row in item["rows"])
-    # 資料留著，等舊趨勢在正式機下線、repo 封存時再整批刪
+    # 能力格子的資料留著，等 repo 封存時再整批刪；SEY.* 條目 2026-11-18 已退役（移到 retired_codes）
     assert any("seykota" in c["status"] for c in registry["capabilities"])
-    assert any(code.startswith("SEY.") for code in (row["code"] for row in registry["catalog"]))
+    assert not any(row["code"].startswith("SEY.") for row in registry["catalog"])
     assert "seykota" in registry["sources"]
 
 
-def test_risk_page_still_lists_the_retired_project_errors_under_its_new_label(registry, catalog):
+def test_risk_page_no_longer_lists_the_retired_old_trend_errors(registry, catalog):
+    """舊趨勢的 23 條 SEY.* 2026-11-18 退役：風險登記冊不再列它們，編號與代碼留在 retired_codes 永不重用。"""
     pages = {path.name: html for path, html in _render_guides().rendered_pages().items()}
     risk = _page_data(pages["fleet-risk-register.html"])
-    sey = [e for e in risk["entries"] if e["code"].startswith("SEY.")]
-    assert sey and {e["bot_label"] for e in sey} == {"舊趨勢策略（已停用、待封存）"}
-    assert any(b["id"] == "seykota" and b["label"] == "舊趨勢策略（已停用、待封存）" for b in risk["bots"])
+    assert not [e for e in risk["entries"] if e["code"].startswith("SEY.")]
+    retired_sey = [item for item in catalog["retired_codes"] if item["code"].startswith("SEY.") and "error_id" in item]
+    assert len(retired_sey) == 23
 
 
 def test_a_new_capability_or_fleet_row_need_not_fill_the_retired_cell(registry, catalog):
@@ -1119,11 +1122,11 @@ def test_a_new_capability_or_fleet_row_need_not_fill_the_retired_cell(registry, 
 
 
 def test_a_single_owner_rule_still_needs_its_own_cell(registry, catalog):
-    sey = next(row["code"] for row in registry["catalog"] if row["code"].startswith("SEY."))
+    mom = next(row["code"] for row in registry["catalog"] if row["code"].startswith("MOM."))
 
     def drop(reg):
-        next(r for r in reg["catalog"] if r["code"] == sey)["behaviour"].pop("seykota")
-    assert any(sey in p and "behaviour" in p for p in _problems_after(registry, catalog, drop))
+        next(r for r in reg["catalog"] if r["code"] == mom)["behaviour"].pop("momentum")
+    assert any(mom in p and "behaviour" in p for p in _problems_after(registry, catalog, drop))
 
 
 def test_the_ledger_write_stuck_entry_notifies_once_and_never_halts(catalog, registry):

@@ -93,7 +93,7 @@ def _trade_adapter(paths: UnrecordedFillPaths, exchange: Exchange, *, append=Non
         return event_id
 
     return UnrecordedFillAdapter(
-        project="seykota", style="trade", client_ids=True, evidence_source="fixture",
+        project="momentum", style="trade", client_ids=True, evidence_source="fixture",
         client_order_id=exchange.client_order_id, fetch_fills=exchange.fetch_fills,
         append_trade_correction=append or append_trade_correction,
         after_trade_correction=lambda fields, event_id: {"queued": event_id},
@@ -135,7 +135,7 @@ def test_a_certain_duplicate_send_is_corrected_like_the_manual_h4_fix(tmp_path):
     assert "重複送單" in event["details"]["notice_text"]
     assert event["details"]["post"] == {"queued": "corr-1"}
     assert outstanding_error_requests(paths.request_queue) == []
-    assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "SEY." + CODE_CORRECTED
+    assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "MOM." + CODE_CORRECTED
 
 
 def _with_hook(adapter, hook):
@@ -346,14 +346,14 @@ def test_nothing_happens_unless_the_verdict_is_diverged(tmp_path):
 def test_the_catalog_carries_every_code_an_adapter_can_emit():
     tiers = {e["code"]: e["risk_tier"] for e in CATALOG["entries"]}
     # g1-6: mycrypto gained its own client-order-id scheme on Binance, so it has both codes now.
-    for prefix in ("SEY", "MOM", "BTC", "MYC"):
+    for prefix in ("MOM", "BTC", "MYC"):          # 舊趨勢（SEY）2026-11-18 退役，不再在目錄裡
         for code in (CODE_CORRECTED, CODE_UNRESOLVED):
             assert tiers[f"{prefix}.{code}"] == "R3"
 
 
 def test_an_adapter_that_corrects_must_say_how():
     with pytest.raises(ValueError, match="append_trade_correction"):
-        UnrecordedFillAdapter(project="seykota", style="trade", client_ids=True, evidence_source="x",
+        UnrecordedFillAdapter(project="momentum", style="trade", client_ids=True, evidence_source="x",
                               client_order_id=lambda s, o: None, fetch_fills=lambda s, o: [])
 
 
@@ -512,7 +512,7 @@ def test_a_correction_killed_before_its_notice_is_announced_next_round(tmp_path,
     assert set(event["evidence"]["order_ids"]) == {DUPLICATE, EXIT}
     assert replayed_for == ["corr-1"]
     assert [r["code"] for r in result["replayed"]] == ["PROJECTION", CODE_CORRECTED]
-    assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "SEY." + CODE_CORRECTED
+    assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "MOM." + CODE_CORRECTED
 
     again = _round(adapter, paths)  # idempotent: nothing more to announce
     assert again["replayed"] == [] and replayed_for == ["corr-1"] and _codes(paths) == [CODE_CORRECTED]
