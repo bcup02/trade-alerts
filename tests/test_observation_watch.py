@@ -1828,9 +1828,9 @@ _AXIS_VALUES = {"runtime": "HEALTHY", "ledger": "RECONCILED", "google": "RECONCI
 
 
 def ops_readings(now=B2_NOW, **overrides):
-    """ops-notify's per-axis readings for the four strategies and the host clock; ``overrides`` maps ``target:axis`` to a dict."""
+    """ops-notify's per-axis readings for the three running strategies and the host clock; ``overrides`` maps ``target:axis`` to a dict."""
     state = {}
-    for target in (*ow.REPOS, "host"):
+    for target in (*ow._ACTIVE_A1_STRATEGIES, "host"):
         for axis, value in (_AXIS_VALUES.items() if target != "host" else [("clock", "OK")]):
             state[f"{target}:{axis}"] = {"severity": "ok", "value": value,
                                          "checked_at": None if axis == "units" else iso(now - timedelta(minutes=5))}
@@ -1859,7 +1859,7 @@ def test_a1_stable_starts_a_streak_and_announces_after_72_hours_only():
 @pytest.mark.parametrize("override", [
     {"mycrypto__runtime": {"severity": "critical", "value": "STALE"}},
     {"momentum__ledger": {"severity": "warn", "value": "DIVERGED"}},
-    {"seykota__units": {"severity": "critical", "value": "FAILED"}},
+    {"momentum__units": {"severity": "critical", "value": "FAILED"}},
     {"host__clock": {"value": "UNSYNCED"}},                                                # severity ok but not a healthy value
 ])
 def test_a1_stable_any_unhealthy_reading_restarts_the_streak(override):
@@ -1870,31 +1870,31 @@ def test_a1_stable_any_unhealthy_reading_restarts_the_streak(override):
 
 def test_a1_stable_a_paused_strategy_does_not_restart_the_streak_but_is_named():
     prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
-    result = ow.check_a1_stable(b2_ctx(ops_remote(seykota__runtime={"severity": "ok", "value": "PAUSED"}), prev))
+    result = ow.check_a1_stable(b2_ctx(ops_remote(momentum__runtime={"severity": "ok", "value": "PAUSED"}), prev))
     assert result.state == ow.OBSERVED and result.closable and result.extra["healthy_since"] == prev["healthy_since"]
-    assert any("暫停中" in line and "seykota" in line and "不算穩定證據" in line for line in result.evidence)
+    assert any("暫停中" in line and "momentum" in line and "不算穩定證據" in line for line in result.evidence)
     # the headline must not claim four strategies: it names who it speaks for and who it does not
-    assert "四支策略" not in result.summary and "不含暫停中的 seykota" in result.summary and "沒有被驗證" in result.summary
+    assert "四支策略" not in result.summary and "不含暫停中的 momentum" in result.summary and "沒有被驗證" in result.summary
     assert "A1 四支策略與主機的讀數已連續正常" not in result.summary
 
 
 def test_a1_stable_a_paused_strategy_under_72_hours_is_also_worded_honestly():
     prev = {"healthy_since": iso(B2_NOW - timedelta(hours=10)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
-    result = ow.check_a1_stable(b2_ctx(ops_remote(seykota__runtime={"severity": "ok", "value": "PAUSED"}), prev))
+    result = ow.check_a1_stable(b2_ctx(ops_remote(momentum__runtime={"severity": "ok", "value": "PAUSED"}), prev))
     assert result.state == ow.WAITING and not result.closable
-    assert "不含暫停中的 seykota" in result.summary and "A1 讀數全部正常" not in result.summary
+    assert "不含暫停中的 momentum" in result.summary and "A1 讀數全部正常" not in result.summary
 
 
 def test_a1_stable_without_a_pause_keeps_the_original_wording():
     prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
     done = ow.check_a1_stable(b2_ctx(ops_remote(), prev))
-    assert done.summary.startswith("A1 四支策略與主機的讀數已連續正常 100 小時。") and "暫停" not in done.summary
+    assert done.summary.startswith("A1 三支策略與主機的讀數已連續正常 100 小時。") and "暫停" not in done.summary
 
 
 @pytest.mark.parametrize("override", [
-    {"seykota__runtime": {"severity": "warn", "value": "PAUSED"}},          # PAUSED is only fine at severity ok
-    {"seykota__ledger": {"severity": "ok", "value": "PAUSED"}},             # and only on the runtime axis
-    {"seykota__runtime": {"severity": "ok", "value": "STALE"}},
+    {"momentum__runtime": {"severity": "warn", "value": "PAUSED"}},          # PAUSED is only fine at severity ok
+    {"momentum__ledger": {"severity": "ok", "value": "PAUSED"}},             # and only on the runtime axis
+    {"momentum__runtime": {"severity": "ok", "value": "STALE"}},
 ])
 def test_a1_stable_paused_is_accepted_only_as_runtime_with_severity_ok(override):
     prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
@@ -2148,8 +2148,8 @@ def test_batch2_checks_are_registered_with_their_items():
 LONG_STREAK = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
 
 
-def test_the_stability_check_needs_exactly_the_21_required_readings():
-    assert len(ow.REQUIRED_READINGS) == 21 and len(set(ow.REQUIRED_READINGS)) == 21
+def test_the_stability_check_needs_exactly_the_16_required_readings():
+    assert len(ow.REQUIRED_READINGS) == 16 and len(set(ow.REQUIRED_READINGS)) == 16
     assert set(ow.REQUIRED_READINGS) == set(ops_readings())
 
 
@@ -2176,7 +2176,7 @@ def test_a1_stable_five_runtime_readings_alone_cannot_close():
     {"checked_at": None}, {"checked_at": ""}, {"checked_at": "garbage"}, {"checked_at": iso(B2_NOW - timedelta(hours=3))},
     {"checked_at": iso(B2_NOW + timedelta(hours=3))}, "not an object", None,
 ])
-@pytest.mark.parametrize("axis", ["mycrypto__runtime", "momentum__ledger", "seykota__google", "btc-competition__export", "host__clock"])
+@pytest.mark.parametrize("axis", ["mycrypto__runtime", "momentum__ledger", "momentum__google", "btc-competition__export", "host__clock"])
 def test_a1_stable_a_timestamped_axis_without_a_usable_checked_at_is_an_error(axis, reading):
     """BLOCK-306-02: only the units axis may lack ``checked_at``; every other one must have a parseable fresh time."""
     state = ops_readings()
@@ -2195,7 +2195,7 @@ def test_a1_stable_only_the_units_axis_may_lack_a_timestamp_and_a_bad_one_there_
     for bad in ("garbage", iso(B2_NOW - timedelta(hours=3))):
         with pytest.raises(ow.RemoteError):
             ow.check_a1_stable(b2_ctx(ops_remote(**{"momentum__units": {"checked_at": bad}}), LONG_STREAK))
-    assert ops_readings()["seykota:units"]["checked_at"] is None                        # the fixture really models the by-design gap
+    assert ops_readings()["momentum:units"]["checked_at"] is None                        # the fixture really models the by-design gap
 
 
 @pytest.mark.parametrize("reading", [None, {}, {"value": "OK"}, {"severity": None, "value": "OK"}, {"severity": 1}, "ok"])
@@ -2335,3 +2335,9 @@ def test_v11_a_missing_reconcile_status_right_after_the_first_fill_is_waiting_bu
     remote.files[("dev", ow.V11_LEDGER_STATUS)] = "{not json"
     with pytest.raises(ow.RemoteError, match="not JSON"):
         ow.check_dev_v11_cycle(ctx(remote))
+
+
+def test_the_retired_old_trend_strategy_is_not_a_required_ops_reading():
+    """舊趨勢策略 2026-11-18 在 A1 下線、維運通知的 seykota 目標關掉：穩定檢查不能再要求它的讀數，否則整個檢查壞掉。"""
+    assert not any(k.startswith("seykota:") for k in ow.REQUIRED_READINGS)
+    assert "seykota" not in ow._STABLE_TARGETS and "seykota" in ow.REPOS     # REPOS 仍留著它（登記冊 sources 與部署複本比對用）
