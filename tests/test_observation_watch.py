@@ -148,7 +148,7 @@ def test_tabs_demo_trades_are_not_real_trades():
     assert ow.check_sheet_tab_names(ctx(r)).state == ow.WAITING
 
 
-# --- competition fill (e-2), trend add-on (e-5) ----------------------------------------------------------
+# --- competition fill (e-2) ----------------------------------------------------------
 
 def test_competition_fill_waits_then_closes_when_the_sheet_agrees():
     r = tabs_remote()
@@ -156,20 +156,6 @@ def test_competition_fill_waits_then_closes_when_the_sheet_agrees():
     put(r, "a1", "btc-competition", "trading_ledger.jsonl", [trade(5, "spot_fill", execution_mode="LIVE")], jsonl=True)
     result = ow.check_competition_fill(ctx(r))
     assert result.state == ow.OBSERVED and result.closable
-
-
-def test_trend_addon_needs_a_human_to_look_at_the_sheet():
-    r = tabs_remote()
-    put(r, "a1", "seykota", "trading_ledger.jsonl",
-        [trade(9, "trade_open", trade_id="T1"), trade(5, "trade_open", trade_id="T1"), trade(4, "trade_open", trade_id="T2")], jsonl=True)
-    result = ow.check_trend_addon(ctx(r))
-    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and "T1" in result.evidence[0]
-
-
-def test_trend_without_an_add_keeps_waiting():
-    r = tabs_remote()
-    put(r, "a1", "seykota", "trading_ledger.jsonl", [trade(9, "trade_open", trade_id="T1")], jsonl=True)
-    assert ow.check_trend_addon(ctx(r)).state == ow.WAITING
 
 
 # --- status alerts (f-23 / f-40 / f-41) and reminders (f-39) --------------------------------------------------------
@@ -652,7 +638,7 @@ def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
     assert len(ids) == len(set(ids))
     assert all(c.covers and c.title for c in ow.CHECKS)
     covered = {i for c in ow.CHECKS for i in c.covers}
-    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "phase-g2", "phase-x5b", "phase-r033-p4"} <= covered
+    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "phase-g2", "phase-x5b", "phase-r033-p4"} <= covered
 
 
 # --- deployment files ----------------------------------------------------------------------------------------------

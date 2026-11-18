@@ -425,23 +425,6 @@ def check_competition_fill(ctx: Context) -> Result:
     return Result(WAITING, "競賽策略有新成交，等成交寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {taipei_text(status.get('checked_at'))}"])
 
 
-def check_trend_addon(ctx: Context) -> Result:
-    """e-5: a trade with a pyramid add on A1 shows the whole-trade entry price and size on the sheet."""
-    events = jsonl(ctx.remote.read("a1", audit("seykota", "trading_ledger.jsonl")))
-    opens: dict[str, int] = {}
-    for event in _trades_after(events, datetime(2026, 10, 8, 12, 30, tzinfo=timezone.utc), ("trade_open",)):
-        opens[str(event.get("trade_id"))] = opens.get(str(event.get("trade_id")), 0) + 1
-    added = sorted(t for t, n in opens.items() if n >= 2)
-    if not added:
-        return Result(WAITING, "A1 趨勢策略還沒有加碼的交易。")
-    status = load_json(ctx.remote, "a1", audit("seykota", "google_reconcile_status.json"))
-    last = max(parse_time(e["event_time"]) for e in _trades_after(jsonl(ctx.remote.read("a1", audit("seykota", "trading_ledger.jsonl"))),
-                                                               datetime(2026, 10, 8, 12, 30, tzinfo=timezone.utc), ("trade_open",)))
-    ok = reconcile_covers(status, last, ctx.now) == "covered"
-    return Result(OBSERVED if ok else WAITING, "A1 趨勢策略出現加碼的交易：請到 Google 表確認進場價與數量是整筆加權值（機器只能確認對帳一致）。",
-                  [f"加碼交易：{', '.join(added)}", f"對帳：{status.get('value')}"], needs_human=True, key=",".join(added))
-
-
 V11_HEARTBEAT_MAX_AGE = timedelta(hours=26)      # 每日單元一天跑一次（00:10 UTC）；超過 26 小時沒有新的心跳＝這一天沒跑成
 
 
@@ -1336,7 +1319,6 @@ def check_registry_drift(ctx: Context) -> Result:
 CHECKS: tuple[Check, ...] = (
     Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
-    Check("trend-addon", "A1 趨勢策略加碼交易", ("e-5",), check_trend_addon),
     Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
     Check("dev-v11-cycle", "開發機 V11（競賽策略・流星版）在測試網完整跑一個日循環", ("phase-v10-p3",), check_dev_v11_cycle),
     Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
