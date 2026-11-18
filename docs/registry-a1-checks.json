@@ -163,24 +163,6 @@
     "rule:MYC.VERIFIED_CLOSE_REPAIR_RECURRING:emits_event|mycrypto": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-14 台北）：operations 2ee102c 於台北約 17:27（A1 日誌 JST 約 18:27）部署（AI-for-column5/my-crypto-bot#77、#79，審閱各 2 輪 PASS）；/opt 的 repair_bot.py（blob 1f0ac6a）、fleet_events.py（32518b7）、mexc_futures_bot.py（c0b7906）、deploy 的修復機器人 service（6b9aacd）／timer（8037944）與 install_systemd.sh（39eb924）的 blob 與該 commit 同檔相同；venv 的 trade-alerts 0.30.7，其修復執行器模組檔（repair_runner，blob 2599ad3）、少記成交處理模組檔（unrecorded_fill，0df1b63）、錯誤清單（77d2503）都與 tag v0.30.7 同檔。部署前後加密策略單元清單逐項相同（修復機器人計時器是部署後手動啟用的）、0 個失敗單元；部署後手動一輪修復機器人：exchange.env 是 mexc，修復略過、匯出檔刷新成功、少記成交處理 0 筆；維運通知手動一輪加密 5 個檢查項目都 OK。"
     },
-    "rule:SEY.EXCHANGE_TARGET_UNSAFE:behaviour|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419、tests/test_safe_halt_model_migration.py:304。"
-    },
-    "rule:SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE:behaviour|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/safe_halt_resume.py（13273b9）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這兩個檔案在 sources 的 489bbcd 也是同一份。守門測試：tests/test_graceful_stop.py:419、tests/test_safe_halt_model_migration.py:304。"
-    },
-    "rule:SEY.FUNDING_SHEET_WRITE_FAILED:behaviour|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，project=趨勢策略 row=7 total=-0.38607562）。"
-    },
-    "rule:SEY.FUNDING_SHEET_WRITE_FAILED:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證）：2026-10-09 台北 11:37–11:41（A1 日誌 JST 12:37–12:41）部署，operations 960792e，0 個失敗單元、部署前後 enabled 單元清單相同；手動跑一輪資金費同步成功（funding_sync_sheet_write_done，趨勢）。"
-    },
-    "rule:SEY.POSITION_ADOPTED_AFTER_INTERRUPTION:behaviour|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/fleet_events.py（1896da8）、scripts/repair_bot.py（a397ec7）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 489bbcd 也是同一份。驗證：開發機 DEMO 強制終止實測（2026-10-02 開 XRP 小部位後 SIGKILL，30 秒內自動重啟、接管部位、帳本單一 trade_id、補掛停損）。"
-    },
-    "rule:SEY.POSITION_ADOPTED_AFTER_INTERRUPTION:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-15 台北）：2026-10-04 台北 17:18–17:22 隨 A1 正式機（新）部署（operations ed50b1d）；/opt 的 src/seykota_bot/bot.py（blob bcfcdad）、src/seykota_bot/fleet_events.py（1896da8）、scripts/repair_bot.py（a397ec7）與 A1 現行 operations 9e487c0 同檔相同（A1 hash-object 比對），這幾個檔案在 sources 的 489bbcd 也是同一份。"
-    },
     "cap:ledger.trade_correction|mycrypto": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-16 台北）：operations 5461832（含 4af261a 之後的 my-crypto-bot #91、#92，A1 repo 乾淨）；portfolio_snapshot_adapter.py（f717397）、investor_snapshot.py（59dad47）、reconcile_compare.py（210b368）、google_reconcile.py（86a1fd4）、google_ledger_provenance.py（483492a）、google_projection_worker.py（0eff45c）、scripts/append_trade_correction.py（a3de42c）與該 commit 同檔相同；venv trade-alerts 0.30.7，其 ledger_reconcile 的 fold_ledger_trades（第 872 行）與 recorded_order_ids（第 276 行）套用更正；部署後以服務帳號跑工具 --help 與查無交易的預覽（中止、未寫帳本）正常；部署前後 my-crypto 單元清單相同、0 個失敗單元；A1 STRATEGY_MODE=OFFLINE、exchange.env 是 mexc。"
     },
@@ -208,9 +190,6 @@
     "cap:reconcile.funding_fee_sync|mycrypto": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-24 台北 11:24–11:33）：operations c185c1d（x8 拔除 MEXC，台北 11:23 部署；A1 ~/src 工作樹乾淨）；/opt/my-crypto-bot 的 sync_funding_fees_entry.py（ce20963）、exchange_choice.py（57a5379）與 /etc/systemd/system 的 funding-sync timer（afa7fe2）、service（743f275）和該 commit 同檔相同（A1 hash-object 與 git rev-parse 逐檔比對）；venv 的 binance-trading-toolkit 0.4.1、trade-alerts 0.30.19；timer enabled；exchange.env 是 binance；部署後手動一輪 exit 0，日誌 funding_sync_done exchange=binance mode=LIVE symbol=BTCUSDT new_records=0、Google 總表加密策略列寫入成功（row=5）。2026-10-17 至 10-18 的每四小時實跑紀錄（funding_fee 列來源 binance_income 共 3 筆）見前一版查證，程式的 Binance 分支行為在 x8 沒有改。"
     },
-    "rule:SEY.CORRECTION_BASE_MISMATCH:behaviour|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-19 台北 19:00 前後）：/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/google_projection_worker.py（blob c0fb2df）與 src/seykota_bot/google_ledger_provenance.py（blob afb46d1）與 operations 560aec0 同檔相同（兩檔在舊提交 ef0d809 也相同）；venv 的 trade-alerts 0.30.11（2026-10-19 台北 18:56 部署），其 projection_outbox 模組檔（blob 400c681）、google_ledger_client 模組檔（77d7e08）、trade_correction 模組檔（87bde42）都與 tag v0.30.11 同檔；seykota-google-projection.timer active、0 個失敗單元。趨勢帳本唯讀副本重建（部署前的 2026-10-19 查證）：2 筆 trade_correction 都是 CONFIRMED（receiver_row 3、4），舊庫 v0.30.8 重建摘要與佇列記錄吻合、v0.30.11 重建不同。"
-    },
     "cap:reconcile.unrecorded_fill_handling|mycrypto": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-19 台北 19:25–19:33）：my-crypto-bot operations a60e94f 於 2026-10-19 台北 19:25 部署（A1 日誌 JST 20:25）；A1 /opt/my-crypto-bot 的 53 個檔案（根目錄 *.py、deploy/*、pyproject.toml、requirements*）與 operations a60e94f 逐檔 blob 差異 0（A1 以 git hash-object 比對）；venv trade-alerts 0.30.9；主程式 active、LIVE_ONLINE、EXCHANGE=binance；真倉空單 0.001 BTC（進場 81639.9，台北 10/17 17:30）與交易所端停損單 2000001518956057（STOP_MARKET 85721.8，隨機 client id，舊程式掛的）部署前後不變；帳本 161 筆事件部署前後雜湊相同（23a84744c0cfd228）；對帳（帳本對交易所、帳本對 Google 表）RECONCILED、0 個失敗單元、單元啟用狀態部署前後相同；手動跑一輪對帳、Google 投影（sent=0）、修復機器人（無候選）正常，部署後完整一輪（JST 20:30）日誌乾淨。A1 沒有遇過 -2021、重複送單、漏記平倉、接手倉位，這些新路徑在 A1 沒有實際觸發過；開發機測試網 2026-10-18 實測：重複送單自動更正整條通過、-2021→reduce-only 市價平倉通過，2026-10-19 台北 19:14 持倉中重啟乾淨接手。A1 現有停損單是舊編號，新程式移動停損時才換成 mc-t- 編號，這條路徑沒有對應案例。"
     },
@@ -228,54 +207,6 @@
     },
     "rule:MYC.PROTECTION_REPLACE_FAILED:behaviour|mycrypto": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-19 台北 19:25–19:33）：my-crypto-bot operations a60e94f 於 2026-10-19 台北 19:25 部署（A1 日誌 JST 20:25）；A1 /opt/my-crypto-bot 的 53 個檔案（根目錄 *.py、deploy/*、pyproject.toml、requirements*）與 operations a60e94f 逐檔 blob 差異 0（A1 以 git hash-object 比對）；venv trade-alerts 0.30.9；主程式 active、LIVE_ONLINE、EXCHANGE=binance；真倉空單 0.001 BTC（進場 81639.9，台北 10/17 17:30）與交易所端停損單 2000001518956057（STOP_MARKET 85721.8，隨機 client id，舊程式掛的）部署前後不變；帳本 161 筆事件部署前後雜湊相同（23a84744c0cfd228）；對帳（帳本對交易所、帳本對 Google 表）RECONCILED、0 個失敗單元、單元啟用狀態部署前後相同；手動跑一輪對帳、Google 投影（sent=0）、修復機器人（無候選）正常，部署後完整一輪（JST 20:30）日誌乾淨。A1 沒有遇過 -2021、重複送單、漏記平倉、接手倉位，這些新路徑在 A1 沒有實際觸發過；開發機測試網 2026-10-18 實測：重複送單自動更正整條通過、-2021→reduce-only 市價平倉通過，2026-10-19 台北 19:14 持倉中重啟乾淨接手。A1 現有停損單是舊編號，新程式移動停損時才換成 mc-t- 編號，這條路徑沒有對應案例。"
-    },
-    "rule:SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.PROTECTION_UNVERIFIED:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.POSITION_AMBIGUOUS:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.RECONCILE_FAILED:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.EXCHANGE_TARGET_UNSAFE:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.RUNTIME_CYCLE_FAILED:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.PROTECTION_REPLACE_FAILED:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.PROTECTION_REPLACE_FAILED:behaviour|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.PROTECTION_CLOSE_CANCEL_FAILED:behaviour|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.PROTECTION_CLOSE_CANCEL_FAILED:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.CLOSE_FILL_PENDING:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.TRADE_EXIT:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.ENTRY_SKIPPED_MIN_CAPITAL:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
-    },
-    "rule:SEY.CORRECTION_BASE_MISMATCH:emits_event|seykota": {
-      "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-23 台北）：operations 1568826；/opt/ed-seykota-systematic-trend-following 的 src/seykota_bot/bot.py（ca73e8c）、src/seykota_bot/fleet_events.py（1896da8）、src/seykota_bot/google_projection_worker.py（c0d1de8）與該 commit 同檔相同；A1 audit/fleet_event_log.jsonl 至今只有 TRADE_EXIT（2026-10-22 台北 10:29）、UNRECORDED_FILL_UNRESOLVED、VERIFIED_CLOSE_REPAIR_BLOCKED 三種事件；seykota-bot.service 台北 20:15 重啟、NRestarts=0、0 個失敗單元（原始輸出見 trade-alerts 審閱歸檔 20261023-registry-f69-seykota）。"
     },
     "rule:FLEET.PROJECTION_ORPHAN_CLOSE_PARKED:emits_event|momentum": {
       "a1_check": "A1 正式機（新）執行環境（唯讀查證，2026-10-24 台北 11:33）：operations ba822c2（x8 拔除 MEXC，台北 11:23 部署）；/opt/mexc-4h-momentum-trailing-stop 的 src/google_projection_worker.py（79aa10e）、src/fleet_events.py（ac38de8）與該 commit 同檔相同（兩檔在前一版 03fef20 也相同）；venv trade-alerts 0.30.19，projection_outbox 模組檔 blob 583bc2e 與 tag v0.30.19 同檔，內有 ORPHAN_CLOSE_PARKED_EVENT（第 68 行）與 record_projection_park_event；mexc-momentum-bot active、NRestarts=0、mexc-momentum-google-projection.timer active、0 個失敗單元；A1 audit/fleet_event_log.jsonl 至今事件：VERIFIED_CLOSE_REPAIR_BLOCKED 1 筆、PROTECTION_UNVERIFIED 1 筆（沒有停放過平倉）。"

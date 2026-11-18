@@ -487,20 +487,20 @@ def test_a_strategy_without_the_runner_codes_is_refused_before_anything_runs(hos
     assert not Path(host.ops_export).exists()
 
 
-def test_seykota_runs_the_same_round(host):
-    """Pyramided entry, short side, seykota's own catalog codes."""
+def test_mycrypto_runs_the_same_round_for_a_pyramided_short(host):
+    """Pyramided entry, short side, the strategy's own catalog codes（舊趨勢 2026-11-18 退役，原本用 seykota 的案例改用加密策略）。"""
     entry = {**_open(side="short"), "volume": 27375.0}
     add = {**_open(side="short"), "event_id": "add-1", "volume": 1.0, "fee": 0.0,
            "event_epoch_ms": OPENED_MS + 60_000}
     _seed(host, entry, add)
     exchange = _Exchange(host.ledger, {"T1": [[_fill(side="buy", realized_pnl="23.81712")]]})
 
-    result = _round(exchange, host, project="seykota")
+    result = _round(exchange, host, project="mycrypto")
 
     assert [item["trade_id"] for item in result["repaired"]] == ["T1"]
-    assert _events(host)[0]["project"] == "seykota"
+    assert _events(host)[0]["project"] == "mycrypto"
     assert read_ledger(host.ledger)[-2]["entry_volume"] == 27376.0
-    assert _export(host)["project"] == "seykota"
+    assert _export(host)["project"] == "mycrypto"
 
 
 def test_the_runner_codes_are_catalogued_the_same_for_every_strategy_that_runs_it():
@@ -509,9 +509,9 @@ def test_the_runner_codes_are_catalogued_the_same_for_every_strategy_that_runs_i
     activity and hides the other's."""
     catalog = load_error_catalog()
     for code in RUNNER_CODES:
-        mom, sey, myc, met = (catalog_entry(catalog, project, code) for project in ("momentum", "seykota", "mycrypto", "trend-meteor"))
+        mom, myc, met = (catalog_entry(catalog, project, code) for project in ("momentum", "mycrypto", "trend-meteor"))
         for key in ("verdict", "risk_tier", "resume"):
-            assert mom[key] == sey[key] == myc[key] == met[key], (code, key)
+            assert mom[key] == myc[key] == met[key], (code, key)
     tiers = {code: catalog_entry(catalog, "momentum", code)["risk_tier"] for code in RUNNER_CODES}
     assert tiers == {REPAIRED: "R1", FAILED: "R2", BLOCKED: "R3", "VERIFIED_CLOSE_REPAIR_RECURRING": "R3"}
 
@@ -536,11 +536,11 @@ def test_catalog_sources_in_this_repo_point_at_the_call_that_emits_the_code():
                             if name.startswith("CODE_") and value == bare)
             assert f"code={constant}" in call, source
             cited += 1
-    # 4 runner codes x 3 strategies (momentum, seykota, mycrypto); FAILED is emitted from two call sites.
-    # g1: UNRECORDED_FILL_CORRECTED for 3 strategies (g1-6: mycrypto too, 4), UNRESOLVED for all 4.
+    # 4 runner codes x 2 strategies (momentum, mycrypto); FAILED is emitted from two call sites (10).  舊趨勢（seykota）2026-11-18 退役，條目已移出目錄。
+    # g1: UNRECORDED_FILL_CORRECTED for 3 strategies (momentum, mycrypto, competition), UNRESOLVED for those 3 (6).
     # f-30: the pending-expired notice is emitted from one call site.
     # v0.30.25: trend-meteor (V11) cites the same shared call sites: 4 runner codes (FAILED from two sites = 5) + CORRECTED + UNRESOLVED = 7.
-    assert cited == 15 + 8 + 1 + 7
+    assert cited == 10 + 6 + 1 + 7
 
 
 # --------------------------------------------------------------------------- #

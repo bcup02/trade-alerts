@@ -40,444 +40,6 @@
   "error_ids_issued": 108,
   "entries": [
     {
-      "error_id": "ERR-001",
-      "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
-      "title": "開倉後停損掛單失敗，緊急市價平倉成功",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:737",
-        "src/seykota_bot/bot.py:759"
-      ],
-      "current": {
-        "latch": "protective_stop_failed",
-        "notify": "PROTECTIVE_STOP_FAILED (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "MECHANICAL",
-      "risk_tier": "R1",
-      "auto_action": "部位已經平掉，交易所上沒有無保護曝險；自動清除 latch 並讓下一輪重新評估進場。",
-      "human_action": "無。事後在事件日誌看得到。",
-      "resume": "automatic",
-      "lands_in_phase": 4,
-      "rationale": "現行程式把緊急平倉成功與失敗兩種結果收斂成同一個 latch 原因碼。平倉成功時真倉沒有任何未保護部位，人來看也只會做同一件事（確認已平、放行），符合判準的「沒有第二個選項」。",
-      "operator_message": {
-        "what": "開倉後想掛停損單失敗，但系統立刻用市價把這筆倉位整個平掉，而且成功了。",
-        "direction": "不需要做任何決定：倉位已經平掉，交易所上沒有沒保護的部位。系統會自己解除暫停，下一輪照常評估進場。",
-        "steps": [
-          "不需要任何動作。",
-          "想了解發生原因，可以看事件日誌裡這筆的紀錄。"
-        ]
-      }
-    },
-    {
-      "error_id": "ERR-002",
-      "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
-      "title": "停損掛單失敗，且緊急平倉也失敗（交易所可能有無保護真倉部位）",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:752",
-        "src/seykota_bot/bot.py:767"
-      ],
-      "current": {
-        "latch": "protective_stop_failed",
-        "notify": "EMERGENCY_FLATTEN_FAILED (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R3",
-      "auto_action": "維持 latch，停止新增風險。不自動下任何單。",
-      "human_action": "立即到交易所核對部位與委託，手動平倉或補掛保護單後再解除 latch。",
-      "resume": "two_stage_fingerprint",
-      "lands_in_phase": 4,
-      "rationale": "真倉存在沒有停損保護的部位，而且程式自己的補救手段已經失敗過一次。這是全機隊風險最高的一類，任何自動動作都可能把情況弄得更糟。",
-      "operator_message": {
-        "what": "開倉後想掛停損單失敗，緊急用市價平倉也失敗——交易所上可能還留著完全沒有保護的真實倉位。",
-        "direction": "這是全機隊最嚴重的一種。系統已經停下來，不會自動下任何單。交易所上的實際部位是標準答案，要人立刻去處理。",
-        "steps": [
-          "立刻到交易所 App 查這個交易對有沒有倉位。",
-          "有倉位：手動平倉，或補掛一張停損單。",
-          "確認交易所上沒有沒保護的倉位。確認後解除暫停：在 A1 正式機（新）用服務帳號執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview` 取得確認碼，再執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume resume --confirm \"<確認碼>\" --exchange-verified`（不要用 root 或 ubuntu 直接跑，狀態檔擁有者會跑掉）。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次「停損掛單失敗、緊急市價平倉也失敗」的根本原因：讀 src/seykota_bot/bot.py 開倉後掛保護單與緊急平倉的流程，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是下單規則、API 權限、餘額還是網路問題，說明交易所上現在的部位狀態該怎麼確認，並提出治本修正。"
-      }
-    },
-    {
-      "error_id": "ERR-003",
-      "code": "SEY.PROTECTION_REPLACE_FAILED",
-      "title": "移動停損換單失敗，部位可能沒有交易所端保護",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:853",
-        "src/seykota_bot/bot.py:868"
-      ],
-      "current": {
-        "latch": "protective_stop_replace_failed",
-        "notify": "PROTECTIVE_STOP_FAILED (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R2",
-      "auto_action": "立刻以原停損價重掛一張保護單，最多連續嘗試 escalate_after 次；成功即清除 latch。全部失敗才升格：開請求、通知。",
-      "human_action": "收到升格通知時倉位仍沒有交易所端保護：到交易所補掛停損或平倉，再解除 latch。",
-      "resume": "two_stage_fingerprint",
-      "lands_in_phase": 8,
-      "rationale": "重掛保護單的動作內容是完全確定的（同一個部位、同一個停損價），加密策略對同一情境本來就是「下一輪自動重試而且不停機」。v2（2026-09-18）取消 v1 的逾時等待：動作內容完全確定，多等只是延長部位裸露的時間，所以立即重掛；連續 3 次都失敗代表不是暫時狀況，才交給人。",
-      "operator_message": {
-        "what": "要把移動停損換到新價位，但沒換成：舊單已經取消、新單沒掛上，或已送出取消舊單卻在 60 秒內查不到交易所狀態——這段時間倉位可能沒有保護。",
-        "direction": "系統會立刻用原本的停損價重掛一張保護單，最多試 3 次；3 次都失敗才通知你。收到通知代表倉位此刻仍沒有交易所端的停損保護，要盡快處理。",
-        "steps": [
-          "到交易所 App 確認這筆倉位目前有沒有停損單。",
-          "沒有的話，手動掛一張停損單（價格用訊息裡的停損價），或直接平倉。",
-          "確認後解除暫停：在 A1 正式機（新）用服務帳號執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview` 取得確認碼，再執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume resume --confirm \"<確認碼>\" --exchange-verified`（不要用 root 或 ubuntu 直接跑，狀態檔擁有者會跑掉）。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損換單失敗、且自動重掛也連續失敗的根本原因：讀 src/seykota_bot/bot.py 換單流程（取消舊單→掛新單）與重掛邏輯，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是價格／數量規則、API 錯誤還是網路問題，並提出治本修正。"
-      }
-    },
-    {
-      "error_id": "ERR-004",
-      "code": "SEY.PROTECTION_MOVE_DEFERRED",
-      "title": "移動停損時舊停損單取消不掉，保留舊停損、這輪不移動",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:848"
-      ],
-      "current": {
-        "latch": null,
-        "notify": "PROTECTIVE_STOP_MOVE_DEFERRED (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R2",
-      "auto_action": "保留舊停損（部位仍有保護，只是停損價還是舊的），不掛新單；每 10 分鐘自動再試移動（連續失敗次數記在狀態檔，重啟後不歸零；ed-seykota PR #74、#81）。每次失敗寫一筆事件日誌（R2，不通知）；連續第 3 次失敗（約 20～30 分鐘）寫一筆升格事件並由 ops_export 通知一次，之後繼續重試但不再重發。移動成功後清除計數。",
-      "human_action": "收到通知後，到交易所確認舊停損單還在；查明為什麼取消一直失敗（網路、交易所、API 權限），必要時手動把停損移到新價位。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "2026-09-24 h11 在 Binance 測試網查證：掛單清單沒有延遲，所以取消卡住只會是撤單或查詢請求一直失敗。舊單最後一次查到時還在（或根本沒送出取消），部位仍受舊停損保護，不必停機；Binance 也不允許同方向再掛第二張全部平倉停損（-4130），所以不能先掛新單再清舊單，只能等下一輪再試。 2026-10-01 f-14：改為每 10 分鐘重試（原本要等下一根 4 小時 K 棒），並在連續第 3 次失敗時通知一次；升格那一筆事件在趨勢策略端標為 R3（急迫顯示），目錄等級維持 R2（自動重試、連續失敗才通知），前兩次失敗不會通知。",
-      "operator_message": {
-        "what": "移動停損要先取消舊停損單，但 60 秒內取消不掉，舊單還掛在交易所上。",
-        "direction": "倉位仍受舊停損保護（停損價還是舊的），系統這一輪不移動，每 10 分鐘自動再試。連續第 3 次都取消不掉時會通知你一次（約 20～30 分鐘後），之後繼續重試但不再重發。",
-        "steps": [
-          "到交易所 App 的委託清單確認訊息裡那張舊停損單還在。",
-          "如果擔心舊停損價太遠，可以手動把停損改到訊息裡的新停損價。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查取消一直失敗的原因。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查移動停損時取消舊停損單一直失敗的原因：讀 src/seykota_bot/bot.py 的 _resolve_stop_cancel 與 _replace_protective_stop，對照該時段 seykota-bot 的 journal 與交易所錯誤回應，判斷是網路、交易所故障、限流還是 API 權限問題，並提出治本修正。"
-      }
-    },
-    {
-      "error_id": "ERR-005",
-      "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
-      "title": "平倉後停損單取消失敗，可能還掛在交易所",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:891"
-      ],
-      "current": {
-        "latch": null,
-        "notify": "PROTECTIVE_STOP_CANCEL_FAILED (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R2",
-      "auto_action": "取消前先確認該交易對在交易所已無部位，只取消系統自己記錄的那張保護單編號並自動重試，最多連續 escalate_after 次；條件不成立或全部失敗即升格：開請求、通知。",
-      "human_action": "到交易所手動取消殘留停損單，或確認它已自行失效。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "風險形狀是「自動取消一張以為沒用的停損單，判斷錯就是拿掉正在保護部位的單」，只是發生在平倉之後。部位已平時風險較低，但誤取消仍可能影響下一個部位的保護。 v2（2026-09-18）：自動重試只在確認交易所上已無部位時進行，且只取消系統自己記錄的那張保護單編號；條件不成立就直接升格。",
-      "operator_message": {
-        "what": "平倉後要收掉停損單卻收不掉，可能還掛著。",
-        "direction": "系統會先確認倉位真的已經平掉，再取消它自己記錄的那張停損單，最多試 3 次；條件不成立或都失敗才通知你。殘留的單通常不會成交，但留著可能在之後開新倉時造成誤判。",
-        "steps": [
-          "到交易所 App 的委託清單找訊息裡那張停損單編號。",
-          "還在的話手動取消；已經不在（自行失效）就不用處理。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查平倉後停損單取消失敗、且自動重試也失敗的原因：讀 src/seykota_bot/bot.py 平倉後清理保護單的流程，對照 journal 與交易所錯誤碼，並提出治本修正。"
-      }
-    },
-    {
-      "error_id": "ERR-006",
-      "code": "SEY.PROTECTION_UNVERIFIED",
-      "title": "交易所存在部位，但沒有可唯一確認的原生保護單",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:1011"
-      ],
-      "current": {
-        "latch": "exchange_position_protection_unverified",
-        "notify": "SAFE_HALT (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R3",
-      "auto_action": "維持 latch，不重建執行期狀態、不新增風險。",
-      "human_action": "到交易所核對部位與保護單，補掛或釐清後解除 latch。",
-      "resume": "two_stage_fingerprint",
-      "lands_in_phase": 4,
-      "rationale": "「找不到唯一保護單」可能是零張（部位裸露）也可能是多張（互相衝突），兩者的正確處置相反，程式無法自行判斷。與 MOM.PROTECTION_UNVERIFIED 是同一個條件的兩份實作。",
-      "operator_message": {
-        "what": "交易所上有倉位，但系統找不到能確定屬於這個倉位的停損單。",
-        "direction": "系統先停下來、不新增任何風險。交易所的實際委託是標準答案：要確認這個倉位有沒有、有幾張保護單。",
-        "steps": [
-          "到交易所 App 查這個交易對的倉位與委託清單。",
-          "沒有停損單：補掛一張；有多張：取消多餘的，只留一張。",
-          "確認後解除暫停：在 A1 正式機（新）用服務帳號執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview` 取得確認碼，再執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume resume --confirm \"<確認碼>\" --exchange-verified`（不要用 root 或 ubuntu 直接跑，狀態檔擁有者會跑掉）。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼系統無法唯一確認這個倉位的原生保護單：讀 src/seykota_bot/bot.py 的保護單核對邏輯（_verified_exchange_protective_stop 一帶），對照交易所目前的委託清單，判斷是保護單不存在、有多張、還是欄位對不上，並提出治本修正。"
-      }
-    },
-    {
-      "error_id": "ERR-007",
-      "code": "SEY.POSITION_AMBIGUOUS",
-      "title": "交易所部位資料無法唯一辨識",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:1163",
-        "src/seykota_bot/bot.py:695"
-      ],
-      "current": {
-        "latch": "exchange_position_ambiguous",
-        "notify": "SAFE_HALT (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R3",
-      "auto_action": "維持 latch。",
-      "human_action": "人工核對交易所部位後解除。",
-      "resume": "two_stage_fingerprint",
-      "lands_in_phase": 4,
-      "rationale": "策略對自己管的是哪一個部位失去把握，任何自動動作都可能作用在錯的部位上。",
-      "operator_message": {
-        "what": "策略對自己的部位失去把握：可能是一張市價單送出後 60 秒都在交易所查不到（不知道成交了沒），也可能是交易所回報的倉位資料認不出是哪一筆。",
-        "direction": "系統停下來，不再送任何單，等人確認交易所上的實際部位、以及那張單到底有沒有成交。交易所資料是標準答案。",
-        "steps": [
-          "在 A1 正式機（新）用服務帳號執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview` 看暫停證據：有 client_order_id／submitted_at 就是某張市價單送出後查不到。",
-          "到交易所 App 查這個交易對目前的倉位（方向、數量、進場價）；有 client id 就用它在訂單紀錄找那張單，確認有沒有成交、成交幾張。",
-          "如果有不該存在的倉位（例如手動開的、或重複成交多出來的），先處理掉。",
-          "確認後解除暫停：執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume resume --confirm \"<確認碼>\" --exchange-verified`（用服務帳號，不要用 root）。帳本若少記了成交，交易平倉後用帳本更正工具補上：先預覽 `sudo -u seykota bash -c 'cd /opt/ed-seykota-systematic-trend-following && set -a && . /etc/seykota/seykota.env && set +a && .venv/bin/python scripts/append_trade_correction.py --trade-id \"<交易編號>\" --reason-code UNRECORDED_FILL --reason \"<原因>\" --add-order-id \"<訂單編號>\"'`，核對 previous → corrected 無誤後，再執行套用指令 `sudo -u seykota bash -c 'cd /opt/ed-seykota-systematic-trend-following && set -a && . /etc/seykota/seykota.env && set +a && .venv/bin/python scripts/append_trade_correction.py --trade-id \"<交易編號>\" --reason-code UNRECORDED_FILL --reason \"<原因>\" --add-order-id \"<訂單編號>\" --apply --confirm \"<確認碼>\"'`（更正工具只接受已平倉的交易；流程見趨勢策略操作文件 docs/operations-modes.md「帳本更正」）。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查為什麼策略對自己的部位失去把握。先看暫停證據（seykota-resume preview）：若有 client_order_id／submitted_at，代表市價單送出後 60 秒在交易所查不到——讀 src/seykota_bot/bot.py 的 _resolve_market_order，用這個 client id 向交易所查單（GET /fapi/v1/order 帶 origClientOrderId）確認它到底有沒有成交、成交幾張，對照帳本與實際部位；否則是交易所回報的部位無法唯一辨識——讀 _exchange_position_details，對照交易所實際回傳的部位資料，判斷是出現多筆部位、進場價為 0 還是欄位格式變了。兩種情況都要提出治本修正。"
-      }
-    },
-    {
-      "error_id": "ERR-008",
-      "code": "SEY.RECONCILE_FAILED",
-      "title": "非暫時性的對帳失敗",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:1102"
-      ],
-      "current": {
-        "latch": "reconcile_error",
-        "notify": "SAFE_HALT (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R2",
-      "auto_action": "記事件、寫 DEGRADED heartbeat、下一輪重試；連續 escalate_after 次同類失敗才升格：latch 並通知。",
-      "human_action": "確認交易所連線與金鑰正常後解除 latch。",
-      "resume": "two_stage_fingerprint",
-      "lands_in_phase": 4,
-      "rationale": "Phase 1c 已把暫時性網路錯誤從這條路徑扣掉，但剩下的（解析失敗、交易所回傳非預期結構）在實務上仍多半是一次性的——2026-09-11 的 venv 競態事故就是從這裡 latch 的。單次失敗停掉整支真倉策略的代價，高於多等一輪的代價。2026-10-05 開發機的模擬倉交易所後端逾時（HTTP 408 / -1007，另有一次 -1000），連續 3 次讀取失敗讓空倉的趨勢策略鎖成這個暫停；現在 HTTP 408 與後端碼 -1000／-1001／-1006／-1007 一律算暫時性（ed-seykota #89，2026-10-05 台北 13:43（A1 時間 JST 14:43）已部署 A1 正式機（新））。",
-      "operator_message": {
-        "what": "跟交易所對帳反覆失敗，不是網路暫時斷線那種小問題。",
-        "direction": "系統每一輪會自動重試，連續 3 次都失敗才暫停策略並通知你。常見原因是交易所 API 故障或金鑰權限變動。",
-        "steps": [
-          "看訊息裡的錯誤原因。",
-          "確認交易所連線與 API 金鑰權限正常。",
-          "確認後解除暫停：在 A1 正式機（新）用服務帳號執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview` 取得確認碼，再執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume resume --confirm \"<確認碼>\" --exchange-verified`（不要用 root 或 ubuntu 直接跑，狀態檔擁有者會跑掉）。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查對帳連續失敗的根本原因：讀 src/seykota_bot/bot.py 的 _reconcile_online 與連續失敗計數邏輯，對照 seykota-bot 的 journal 找出每一次失敗的錯誤，判斷是交易所端、金鑰權限還是程式問題，並提出治本修正。"
-      }
-    },
-    {
-      "error_id": "ERR-009",
-      "code": "SEY.EXCHANGE_TARGET_UNSAFE",
-      "title": "執行模式與交易所連線目標不符（例：DEMO 指向 mainnet）",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:1663"
-      ],
-      "current": {
-        "latch": "exchange_target_unsafe",
-        "notify": "SAFE_HALT (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R3",
-      "auto_action": "維持 latch，拒絕所有策略操作。",
-      "human_action": "改設定檔／環境變數後重啟。",
-      "resume": "restart_after_config_fix",
-      "lands_in_phase": 4,
-      "rationale": "設定錯誤只有人能改，而且這個守衛擋的正是「把模擬單打到真倉」。自動放行等於把安全閥拆掉。",
-      "operator_message": {
-        "what": "系統本來設定要連模擬帳戶，卻接到了真實帳戶（或反過來）——設定跟目標不一致。",
-        "direction": "整支策略立刻安全暫停、拒絕任何操作。一定要先把設定改對，不能直接解除。",
-        "steps": [
-          "檢查趨勢策略的執行模式設定與交易所連線目標，改成一致。",
-          "改好後在 A1 正式機（新）重啟服務：`sudo systemctl restart seykota-bot.service`。",
-          "重啟後策略每一輪都會先把原本擋下的守門檢查再跑一次：通過就自動清掉安全暫停，並在帳本記一筆 safe_halt_cleared（方式 config_fixed_restart）；沒通過就維持暫停、下一輪再試。這一類暫停沒有、也不能用解除工具（解除工具會刻意拒絕），只靠改好設定＋重啟。",
-          "確認現在還有沒有暫停：在 A1 正式機（新）執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview`（只讀、不寫任何東西）。印出「REFUSED: refusing to resume: safe_halt is not active」＝暫停已經清掉；印出一份內容（含 code 與 resume_path）＝暫停還在，這一類不用解除，照下一步處理。",
-          "暫停還在：先確認服務有重啟成功、正在跑（`sudo systemctl status seykota-bot.service --no-pager`），再確認設定真的改對了，等下一輪（可能要等一陣子）再預覽一次；不要只因為還沒清掉就斷定設定沒改對。確認都沒問題卻一直清不掉：把下方「給 AI 的追查指令」整段貼給 Claude。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「執行模式與交易所目標不符」：先確認目前設定與交易所目標各是什麼、為什麼會不一致；改好設定並重啟後若暫停仍沒清掉，讀 src/seykota_bot/bot.py 的 _clear_config_halt_if_fixed（每輪先呼叫，會重跑 _exchange_target_problem，通過才清掉並在帳本記 safe_halt_cleared、method=config_fixed_restart），找出守門檢查為什麼還是沒通過。這一類暫停不能用 seykota-resume 解除（解除工具會拒絕），不要試。"
-      }
-    },
-    {
-      "error_id": "ERR-010",
-      "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
-      "title": "真倉固定訂單識別能力不足",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:1674"
-      ],
-      "current": {
-        "latch": "fixed_identifier_contract_unavailable",
-        "notify": "SAFE_HALT (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R3",
-      "auto_action": "維持 latch，拒絕所有 LIVE 策略操作。",
-      "human_action": "確認交易所帳號權限／API 契約後重啟。",
-      "resume": "restart_after_config_fix",
-      "lands_in_phase": 4,
-      "rationale": "沒有固定訂單識別就無法在事後把委託對回自己的部位，等於失去所有事後對帳能力。屬於憑證／權限層面，程式改不了。",
-      "operator_message": {
-        "what": "在真倉模式下，系統沒辦法精確辨識自己下的每一張單。",
-        "direction": "系統停下來，拒絕所有真倉操作。要先確認交易所帳號與 API 能力沒問題，不能直接解除。",
-        "steps": [
-          "確認交易所帳號權限與 API 設定（是否支援自訂訂單編號）。",
-          "確認沒問題後在 A1 正式機（新）重啟服務：`sudo systemctl restart seykota-bot.service`。",
-          "重啟後策略每一輪都會先把原本擋下的守門檢查再跑一次：通過就自動清掉安全暫停，並在帳本記一筆 safe_halt_cleared（方式 config_fixed_restart）；沒通過就維持暫停、下一輪再試。這一類暫停沒有、也不能用解除工具（解除工具會刻意拒絕），只靠改好設定＋重啟。",
-          "確認現在還有沒有暫停：在 A1 正式機（新）執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview`（只讀、不寫任何東西）。印出「REFUSED: refusing to resume: safe_halt is not active」＝暫停已經清掉；印出一份內容（含 code 與 resume_path）＝暫停還在，這一類不用解除，照下一步處理。",
-          "暫停還在：先確認服務有重啟成功、正在跑（`sudo systemctl status seykota-bot.service --no-pager`），再確認設定真的改對了，等下一輪（可能要等一陣子）再預覽一次；不要只因為還沒清掉就斷定設定沒改對。確認都沒問題卻一直清不掉：把下方「給 AI 的追查指令」整段貼給 Claude。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理「真倉固定訂單識別能力不足」：讀 src/seykota_bot/bot.py 的 _require_live_fixed_identifier_contract 看它檢查什麼、為什麼沒通過；改好設定並重啟後若暫停仍沒清掉，讀 _clear_config_halt_if_fixed（每輪先呼叫，會重跑同一個檢查，通過才清掉並在帳本記 safe_halt_cleared、method=config_fixed_restart），找出為什麼還是沒通過。這一類暫停不能用 seykota-resume 解除（解除工具會拒絕），不要試。"
-      }
-    },
-    {
-      "error_id": "ERR-011",
-      "code": "SEY.RUNTIME_CYCLE_FAILED",
-      "title": "未分類的執行期例外（run_forever catch-all）",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:1751"
-      ],
-      "current": {
-        "latch": "runtime_error",
-        "notify": "SAFE_HALT (critical, log-only)",
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R2",
-      "auto_action": "記事件、寫 DEGRADED heartbeat、下一輪重試；連續 escalate_after 次才升格：latch 並通知。latch 之後走跟其他原因碼一致的 resume 路徑。",
-      "human_action": "看事件日誌與 journal 找出例外原因，修好後解除 latch。",
-      "resume": "two_stage_fingerprint",
-      "lands_in_phase": 4,
-      "rationale": "這是本專案的核心工作項：一個桶子同時裝著純暫時性狀況與真正的災難，而且立刻 latch、沒有 resume 路徑。改成計數器後，暫時性抖動不再靜默停掉真倉策略，持續性故障仍然會停。其他七個原因碼在這兩處之前就已經各自 latch，不受計數器影響；SEY.RECONCILE_FAILED 額外套用同一套計數器邏輯（各自獨立計數，見該條目）。",
-      "operator_message": {
-        "what": "程式運作中出現一個沒被特別分類過的錯誤（各種意外狀況都算）。",
-        "direction": "系統每一輪會自動重試，連續 3 次都失敗才暫停策略並通知你。",
-        "steps": [
-          "看訊息裡的錯誤內容。",
-          "確認後解除暫停：在 A1 正式機（新）用服務帳號執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview` 取得確認碼，再執行 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume resume --confirm \"<確認碼>\" --exchange-verified`（不要用 root 或 ubuntu 直接跑，狀態檔擁有者會跑掉）。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這個未分類的執行期例外：從 seykota-bot 的 journal 找出連續失敗的例外訊息與堆疊，定位 src/seykota_bot/ 裡出錯的程式，說明原因並提出治本修正；若這是一種會重複出現的狀況，建議把它分類成錯誤目錄裡的獨立條目。"
-      }
-    },
-    {
-      "error_id": "ERR-012",
-      "code": "SEY.CLOSE_FILL_PENDING",
-      "title": "交易所部位已消失，等待平倉成交資料回填",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:1355"
-      ],
-      "current": {
-        "latch": null,
-        "notify": "CLOSE_FILL_PENDING (log-only)",
-        "unit_exit": null
-      },
-      "verdict": "MECHANICAL",
-      "risk_tier": "R0",
-      "auto_action": "本地標記為 FLAT，等下一輪把成交資料補回帳本。程式已經這樣做。",
-      "human_action": "無。",
-      "resume": "n/a",
-      "lands_in_phase": 3,
-      "rationale": "原生停損在兩次輪詢之間觸發是預期內的正常結束方式，程式自己就會收斂。標成 critical 純屬誤標，Phase 3 直接降級。",
-      "operator_message": {
-        "what": "交易所上的倉位已經消失（代表已經平倉了），只是成交細節還沒補進記錄。",
-        "direction": "系統已經把倉位標成已平倉，下一輪會自己把成交細節補進紀錄。",
-        "steps": [
-          "不需要任何動作。"
-        ]
-      }
-    },
-    {
-      "error_id": "ERR-013",
-      "code": "SEY.TRADE_EXIT",
-      "title": "原生停損觸發的正常平倉",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:1392",
-        "src/seykota_bot/bot.py:1579"
-      ],
-      "current": {
-        "latch": null,
-        "notify": "EXIT (log-only)",
-        "unit_exit": null
-      },
-      "verdict": "MECHANICAL",
-      "risk_tier": "R0",
-      "auto_action": "記錄成交並結算，程式已經這樣做。",
-      "human_action": "無。",
-      "resume": "n/a",
-      "lands_in_phase": 3,
-      "rationale": "這是策略成功運作的樣子，不是錯誤。同一支程式在 bot.py:1230 的另一個 EXIT 呼叫點就沒有標 critical，兩處不一致，Phase 3 對齊成非 critical。",
-      "operator_message": {
-        "what": "原生停損正常觸發，倉位正常平掉。",
-        "direction": "正常平倉，系統已經記錄並結算。",
-        "steps": [
-          "不需要任何動作。"
-        ]
-      }
-    },
-    {
-      "error_id": "ERR-014",
-      "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
-      "title": "權益低於最低下單資金，跳過本次進場",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:1471"
-      ],
-      "current": {
-        "latch": null,
-        "notify": "ENTRY_SKIPPED (log-only)",
-        "unit_exit": null
-      },
-      "verdict": "MECHANICAL",
-      "risk_tier": "R0",
-      "auto_action": "跳過本次進場，下次訊號再評估。程式已經這樣做。",
-      "human_action": "無。（要不要加碼本金是投資決策，不是錯誤處理。）",
-      "resume": "n/a",
-      "lands_in_phase": 3,
-      "rationale": "部位大小算出來是 0 張時不進場，是風險控制正常生效。Phase 3 降級。",
-      "operator_message": {
-        "what": "帳戶裡的資金不夠最低下單金額，這次先跳過不進場。",
-        "direction": "下一次訊號再評估。要不要加本金是投資決定，不是錯誤處理。",
-        "steps": [
-          "不需要任何動作。"
-        ]
-      }
-    },
-    {
       "error_id": "ERR-015",
       "code": "MOM.PROTECTION_UNVERIFIED",
       "title": "原生移動停損無法驗證",
@@ -1043,163 +605,6 @@
       }
     },
     {
-      "error_id": "ERR-033",
-      "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
-      "title": "無歧義的漏記平倉已自動補寫進帳本",
-      "project": "seykota",
-      "sources": [
-        "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:407"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": null
-      },
-      "verdict": "MECHANICAL",
-      "risk_tier": "R1",
-      "auto_action": "共用修復執行器（trade_alerts.repair_runner）判定能對應時：證據檔落地、以本策略自己的帳本寫入器 staging 後整批原子寫入 reconciliation_evidence_recorded／fill／trade_close／position_reconciled_closed、排 Google 投影、記事件日誌。本地算的毛損益與交易所已實現損益差超過 0.01 時以交易所數字寫入，reconciliation 區塊記 pnl_source=exchange_realized 與本地數字。一輪最多寫一筆，多筆漏記依序逐輪補。不通知。",
-      "human_action": "無需決定。證據檔與事件日誌留有完整紀錄。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "跟 MOM.VERIFIED_CLOSE_AUTO_REPAIRED 同一個條件、同一份共用修復執行器。趨勢策略在 v2 之前只有修復機器人（只抓錯並提出修復建議）（只抓錯並提出修復建議），沒有自動補寫這條路徑；v2-W4 改用共用修復執行器時才開始發這個事件。趨勢策略會做空，平倉方向依 trade_open 的方向判斷；加碼過的交易（同一 trade_id 多筆 trade_open）合併成一個部位再比對。",
-      "operator_message": {
-        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。修復機器人核對過交易所成交紀錄，已經自動把這筆平倉補寫進帳本。",
-        "direction": "不需要做任何決定，也不會通知你：帳本只是照交易所已經發生的成交補上紀錄。",
-        "steps": [
-          "不需要任何動作。",
-          "想核對：audit/fleet_event_log.jsonl 裡這筆事件記著交易編號、出場價和損益，可以跟交易所 App 比對。"
-        ]
-      }
-    },
-    {
-      "error_id": "ERR-034",
-      "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
-      "title": "漏記平倉自動補寫失敗（連續失敗才通知）",
-      "project": "seykota",
-      "sources": [
-        "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:440",
-        "trade-alerts/src/trade_alerts/repair_runner.py:454"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R2",
-      "auto_action": "共用修復執行器每輪重試：查交易所失敗（網路／API）或 assess_repair 判定結構對不上（平倉成交方向與開倉不符、成交早於開倉、缺 trade_id／incident_id、成交數量加總不等於開倉量、已有 trade_close）各記一次失敗事件、不通知；同一 trade_id 連續 escalate_after 次失敗才開請求、事件標 escalated、由 ops_export 通知一次（附 ai_prompt）。升格後每輪靜默重試，成功則請求 RESOLVED_AUTO；帳本出現這筆 trade_close（人工補好）則 WITHDRAWN。交易所仍有部位不算失敗。",
-      "human_action": "升格時：以交易所成交紀錄為準手動補寫讓三方對帳一致，並請 AI 追查為什麼無法自動對應。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "v2 取代 SEY.VERIFIED_CLOSE_PROPOSED：交易所是權威，能對應的一律照交易所補（損益差額也以交易所已實現損益為準），真正需要人的只剩結構上對不上或交易所一直查不到的情況，而那時該做的是追查根因。查交易所失敗也算一次失敗（2026-09-22 使用者拍板），否則 API 長期壞掉不會有人知道。",
-      "operator_message": {
-        "what": "趨勢策略有一筆交易在交易所已經平倉，但本地帳本漏記了。系統照交易所的成交紀錄自動補寫，連續 3 次都補不起來。",
-        "direction": "交易所的成交紀錄是標準答案。自動試了 3 次都不行，代表交易所查不到這筆資料，或查到的成交在結構上跟開倉對不起來（例如成交方向或時間不符），需要追查原因。系統會繼續自己重試，成功了會自動結案。",
-        "steps": [
-          "治標：到電腦前照ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」，以交易所成交紀錄為準手動補寫，讓帳本、交易所、Google 表三方一致。",
-          "治本：把下方「給 AI 的追查指令」整段貼給 Claude，追查根本原因並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這筆漏記平倉為什麼無法自動補寫：讀 audit/fleet_event_log.jsonl 裡這個 trade_id 的 VERIFIED_CLOSE_REPAIR_FAILED 事件（details.reasons 記著每次失敗的原因），用 scripts/fetch_verified_close_evidence.py 預覽模式抓這個 trade_id 的交易所證據，對照 audit/trading_ledger.jsonl 的 trade_open 與 trade_alerts.assess_repair 的判準，找出是哪一條對不上、為什麼會發生（包括策略當初為什麼漏記平倉），提出治本修正。"
-      }
-    },
-    {
-      "error_id": "ERR-035",
-      "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
-      "title": "自動修復停手：帳本已有修復痕跡或整批寫入失敗",
-      "project": "seykota",
-      "sources": [
-        "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:472"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R3",
-      "auto_action": "不寫、不重試。開請求、記事件日誌，由 ops_export 通知；此 trade_id 之後一律跳過，直到請求關閉（帳本出現這筆 trade_close 時自動 WITHDRAWN）。",
-      "human_action": "帳本裡這筆已有補到一半的紀錄（或這次寫入無法驗證），自動補完可能重複記帳。先讀清楚帳本現況，再以交易所成交紀錄為準讓帳本、交易所、Google 表三方一致，最後關閉請求。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "跟 MOM.VERIFIED_CLOSE_REPAIR_BLOCKED 同一個條件、同一份共用修復執行器（v2-W4 起）。帳本裡已有這筆交易的修復紀錄或這次寫入無法驗證，代表真實帳本已經不是「乾淨的孤兒開倉」，自動補完後半段等於猜，猜錯會重複或錯記真實損益。",
-      "operator_message": {
-        "what": "趨勢策略的修復機器人要把一筆漏記的平倉補進帳本，但發現帳本裡這筆已經有補到一半的紀錄（或這次寫入失敗），所以停手，之後不會再自動碰這筆。",
-        "direction": "交易所的成交紀錄是標準答案，目標是讓帳本、交易所、Google 表三方一致。停手的原因是帳本現況不乾淨，自動補完可能重複記帳，所以要先看清楚帳本裡這筆現在有什麼。",
-        "steps": [
-          "治標：把下方「給 AI 的追查指令」整段貼給 Claude，讓它列出這筆交易在帳本裡缺什麼、重複什麼，並產出讓三方一致的修正步驟給你確認。",
-          "確認修正步驟後照做（手動流程見ed-seykota 操作文件（docs/operations-modes.md）「手動三步驟（既有工具，Phase 5 之前唯一的做法）」）；下一輪對帳（約 15 分鐘內）變回正常即完成。",
-          "治本：同一段指令也會要求 Claude 找出為什麼帳本會留下半套紀錄。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）處理一筆修復停手的漏記平倉：讀 audit/trading_ledger.jsonl 裡這個 trade_id 的所有事件、audit/error_requests.jsonl 與 audit/fleet_event_log.jsonl 的相關紀錄，用 scripts/fetch_verified_close_evidence.py 預覽模式抓交易所成交，列出帳本缺少或重複的事件，提出讓帳本、交易所、Google 表三方一致的修正步驟（先給我確認再執行），並追查為什麼會留下半套紀錄。"
-      }
-    },
-    {
-      "error_id": "ERR-036",
-      "code": "SEY.UNRECORDED_FILL_CORRECTED",
-      "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
-      "project": "seykota",
-      "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:677"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R3",
-      "auto_action": "只在「多出來的單跟帳本已記的某張單自訂編號相同」（確定是自己重複送單）時自動處理：以交易所成交重述整筆已平倉的交易（build_trade_correction，數量不平就拒絕；同一筆交易一併納入的其他未記單必須逐張證明是策略自己下的——重複送單或帶策略自己的編號特徵——有任何一張查不出來源就整筆不寫），追加 trade_correction、把 Google 表更正排入投影佇列（只入隊；派送到 Google 與接收端確認由投影派送單元另外執行，入隊失敗帳本更正仍留著，結果記在事件的 details.post 的 google_intent_id／google_intent_error）、另發一則 LINE 查詢的公開事件（盡力而為，不保證送達，結果記在 details.post 的 line_query_published）。每輪最多寫一筆；寫完立刻通知，不開請求。",
-      "human_action": "帳本已經更正好，不用再動帳本；要做的是追出為什麼同一張單被送了兩次（重送 bug），並確認修正。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "2026-09-21 趨勢策略重複送單、帳本漏記，DIVERGED 三天沒人處理（h4 人工更正）。使用者 2026-09-25 定案（g1）：只有確定是自己重複送單才自動更正，因為這時更正的內容完全由交易所成交決定、沒有猜的空間；但重複送單本身是 bug，一律立刻通知人追根因，所以是 R3 而不是 R1。",
-      "operator_message": {
-        "what": "策略自己把同一張單送了兩次（交易所上兩張單的自訂編號一模一樣），帳本只記了一張。系統已照交易所成交把漏記的那筆交易整筆重述、追加一筆帳本更正（不改舊紀錄），本地帳本的數字已跟交易所成交一致；Google 表的更正只是排進了待派送佇列，派送到 Google 並經接收端確認之前，表上可能還是舊數字；LINE 查詢的事件只是盡力發送，不保證已送到。",
-        "direction": "本地帳本不用再處理。重複送單是程式的 bug，要追出原因，免得下次在部位還開著時又發生（那時會多持一倍的倉）。Google 表要等派送完成才會更新，排隊也可能失敗。",
-        "steps": [
-          "看訊息裡的訂單編號與更正前後的數字，到交易所 App 的訂單紀錄確認兩張單都在。",
-          "看事件的 details.post：有 google_intent_id 表示更正已排入佇列；有 google_intent_error 表示排隊失敗——帳本是對的，但 Google 表還沒更新，要請 Claude 重新排入並確認派送完成。 line_query_published 不是 true 表示 LINE 查詢的事件沒發出去。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查為什麼同一張單被送了兩次並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查這次重複送單：讀 audit/fleet_event_log.jsonl 這個事件的 details（duplicate_of、client_order_id、evidence_path），對照該時段策略的 journal 與送單程式（找出同一個自訂編號為什麼被送出兩次、Binance 為什麼兩張都成交），確認帳本更正與交易所一致，並提出治本修正與回歸測試。"
-      }
-    },
-    {
-      "error_id": "ERR-037",
-      "code": "SEY.UNRECORDED_FILL_UNRESOLVED",
-      "title": "交易所有成交、帳本沒記，無法自動更正",
-      "project": "seykota",
-      "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R3",
-      "auto_action": "不寫帳本、不下單。開一個請求（同一張單只開一次）、記事件日誌，由匯出檔通知；帳本之後記到這張單（有人更正了）時請求自動撤回。會走這條的情況：來源不明（例如 App 手動下單）、重複送單但部位還開著、同一筆交易還有其他查不出來源的未記單、交易所成交無法完整重述、查單持續失敗、或更正寫入失敗。",
-      "human_action": "先確認這張單是不是策略下的；是的話讓帳本以交易所為準補正，不是的話（手動下單）處理那筆部位並決定帳本怎麼記。部位還開著時，要不要減倉由人決定。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "使用者 2026-09-25 定案（g1）：不能確定是策略自己重複送單的成交，自動寫進帳本就是在猜——例如把你在 App 手動下的單當成策略的交易吞進帳本。所以一律交給人，但要立刻通知並附步驟，不再只讓對帳頁面默默顯示 DIVERGED。",
-      "operator_message": {
-        "what": "趨勢策略的帳戶在交易所有成交，但帳本沒有記到，系統沒辦法確定它是怎麼來的，所以沒有自動改帳本。",
-        "direction": "交易所的紀錄是標準答案。先確認這張單是誰下的，再讓帳本跟交易所一致；如果部位還開著，要不要減倉由你決定，系統不會自動下單。",
-        "steps": [
-          "看訊息裡的訂單編號、方向、數量、時間，到交易所 App 的訂單紀錄找到這張單。",
-          "如果是你自己在 App 下的單：處理那筆部位（需要的話平倉），並把下方指令貼給 Claude 決定帳本怎麼記。",
-          "如果是策略下的單：先看帳本裡這筆交易有沒有平倉（有 trade_close）。已平倉：到電腦前、在 A1 正式機（新）用帳本更正工具改成跟交易所一致——先預覽 `sudo -u seykota bash -c 'cd /opt/ed-seykota-systematic-trend-following && set -a && . /etc/seykota/seykota.env && set +a && .venv/bin/python scripts/append_trade_correction.py --trade-id \"<交易編號>\" --reason-code UNRECORDED_FILL --reason \"<原因>\" --add-order-id \"<訂單編號>\"'`（單號用訊息裡列的；若是同一張單被送了兩次，原因代碼改 DUPLICATE_ENTRY_UNRECORDED），核對無誤後再執行套用指令 `sudo -u seykota bash -c 'cd /opt/ed-seykota-systematic-trend-following && set -a && . /etc/seykota/seykota.env && set +a && .venv/bin/python scripts/append_trade_correction.py --trade-id \"<交易編號>\" --reason-code UNRECORDED_FILL --reason \"<原因>\" --add-order-id \"<訂單編號>\" --apply --confirm \"<確認碼>\"'`，完成後下一輪會自動撤回這個請求。部位還開著、或帳本根本沒有這筆交易的開倉紀錄：更正工具會拒絕（它只接受已平倉的交易），不要硬做——先到交易所處理部位（需要的話平倉），等平倉後再更正，或直接把下方「給 AI 的追查指令」貼給 Claude。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查帳本為什麼漏記。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 處理一筆帳本漏記的交易所成交：讀 audit/error_requests.jsonl 這個請求的 details（reason_code、order_ids、fills）與 audit/ledger_status.json 的 unmatched_exchange_fills，唯讀向交易所查這幾張單（下單時間、自訂編號、成交），判斷是策略下的還是手動下的；是策略下的就提出讓帳本以交易所為準的更正步驟（只追加，先給我確認再執行），並追查策略為什麼沒記到。"
-      }
-    },
-    {
       "error_id": "ERR-038",
       "code": "MOM.UNRECORDED_FILL_CORRECTED",
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
@@ -1652,38 +1057,6 @@
       }
     },
     {
-      "error_id": "ERR-051",
-      "code": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
-      "title": "重啟後接管了一個沒記完的部位，或補上了被中斷的停損",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/bot.py:1272"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R3",
-      "auto_action": "重啟後的對帳發現交易所有部位、本地狀態沒有（或停損沒了）時：用進場前記下的委託（固定 client id）找回原本的交易並沿用 trade_id、補寫 trade_open；若只有我們自己未完成的停損紀錄且交易所沒有任何停損，用原停損價重掛（同一個 client id）；找不到對應紀錄（手動單）就用新 id 接管並沿用它身上唯一的保護停損。三種都寫事件日誌。",
-      "human_action": "確認這個部位是不是預期的（上一次進場／換停損被中斷，還是有人在交易所手動操作）；對帳若顯示未記成交，照該通知處理。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "2026-10-01 f-12：趨勢被硬殺後重啟，原本會把部位當成「交易所接管」而 trade_id 分裂，或在移動停損撤舊掛新的空窗被殺後直接 PROTECTION_UNVERIFIED 暫停。f-12 趨勢 PR 讓程式自己接回並補齊，但「發生過一次被中斷」是人需要知道的事，所以發 R3 通知，不當作無事。",
-      "operator_message": {
-        "what": "趨勢策略重啟後，發現交易所上有一個部位或停損是上一次執行到一半留下的，已經自動接管或補上。",
-        "direction": "部位有停損保護，不需要立刻動作；請確認它是怎麼來的，並確認帳本與交易所一致。",
-        "steps": [
-          "看訊息裡的 symbol、trade_id、方向、數量、停損價，以及 kind：interrupted_entry＝上一次進場被中斷並已找回，stop_rearmed＝停損掛到一半被中斷、已用原價重掛，unknown_origin＝找不到任何對應紀錄（可能是手動單）。",
-          "到交易所 App 確認這個部位存在、且恰好有一張全部平倉的停損單。",
-          "kind 是 unknown_origin 時，確認是不是你自己手動下的單；不是的話把下方指令貼給 Claude 追查。",
-          "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查一次重啟後接管：讀 state/bot_state.json 的 pending_operations（entry_intent、protective_stop_replace）與 audit 事件（position_recovered_from_entry_intent、protective_stop_rearmed_after_interruption、exchange_position_adopted），audit/trading_ledger.jsonl 裡該 trade_id 的 trade_open，以及 journalctl 在那個時間點前後的 graceful_stop／position_adopted 紀錄，判斷是進場途中被中斷、換停損途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。"
-      }
-    },
-    {
       "error_id": "ERR-052",
       "code": "BTC.ORDER_RECOVERED_AFTER_INTERRUPTION",
       "title": "每日調整被中斷，重啟後發現其中一張單其實已成交、已照交易所補記",
@@ -1780,37 +1153,6 @@
       }
     },
     {
-      "error_id": "ERR-055",
-      "code": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
-      "title": "自動補寫漏記平倉一直在發生，請追查為什麼一直漏記",
-      "project": "seykota",
-      "sources": [
-        "scripts/repair_bot.py:186",
-        "trade-alerts/src/trade_alerts/repair_runner.py:283"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": null
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R3",
-      "auto_action": "不動帳本、不暫停。修復機器人每輪結束時數最近 7 天內這支策略的「VERIFIED_CLOSE_AUTO_REPAIRED」事件；達 2 次就寫一筆事件日誌並由 ops_export 通知一次（附次數與交易編號）。這則通知發出後 7 天內不再重發；7 天後若 7 天窗口內仍有 2 次以上，會再發一次。",
-      "human_action": "帳本已經被自動補對，不用再動帳本；要做的是追出為什麼平倉一直沒被記進帳本（有 bug 在持續漏記），並確認修正。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "2026-10-01 使用者核可（g2）：自動補寫（R1）本身不通知，但若某個 bug 持續造成漏記平倉，修復機器人會每次默默補好、對帳永遠一致，bug 永遠不會被發現。門檻 7 天內 2 次、通知後 7 天內不重發，是為了讓一次偶發事件不吵人、但同一個問題連續發生時一定被看見。因為發的是「請追根因」而不是「帳本壞了」，帳本已經對，所以是 R3 事件通知而不是請求（不開請求、不鎖機）。",
-      "operator_message": {
-        "what": "趨勢策略的修復機器人最近 7 天內已經自動把漏記的平倉補進帳本至少 2 次。每次都補對了，帳本現在跟交易所一致，但「一直需要補」代表有 bug 在持續漏記平倉。",
-        "direction": "帳本不用再處理。要追出平倉為什麼沒被記進帳本，免得哪天補不起來時才發現。",
-        "steps": [
-          "看訊息裡列出的交易編號，這些都是被自動補寫的交易。",
-          "把下方「給 AI 的追查指令」整段貼給 Claude，追查這些平倉為什麼沒被即時記進帳本並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following 追查平倉一直漏記的原因：讀 audit/fleet_event_log.jsonl 最近 7 天的 VERIFIED_CLOSE_AUTO_REPAIRED 事件（evidence 的 trade_id、details.evidence_path）與 audit/trading_ledger.jsonl 裡這些交易的紀錄，對照該時段策略的 journal，找出平倉時為什麼沒寫進帳本（被殺、寫入失敗、還是交易所路徑沒走到記帳），提出治本修正與回歸測試。"
-      }
-    },
-    {
       "error_id": "ERR-056",
       "code": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
       "title": "Google 表同步佇列停放了一筆找不到開倉列的平倉",
@@ -1840,38 +1182,6 @@
           "不需要任何動作。",
           "想讓對帳恢復一致：確認這筆交易真的存在，再補開倉列或列入忽略清單。"
         ]
-      }
-    },
-    {
-      "error_id": "ERR-057",
-      "code": "SEY.FUNDING_SHEET_WRITE_FAILED",
-      "title": "資金費同步寫不進 Google 表的「帳戶餘額總表」分頁",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/funding_sync.py:354"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": 3
-      },
-      "verdict": "JUDGEMENT",
-      "risk_tier": "R2",
-      "auto_action": "本機帳本先寫好，再把累計資金費寫進 Google 表「帳戶餘額總表」分頁這支策略那一列的 G 欄。接收端明確回「不」（例如找不到這個專案名）就不會自己好，立刻算失敗；連線逾時、網路錯誤、空回覆這類沒有答案的失敗，每次執行（每小時）都再試，連續 3 次都失敗才算失敗。算失敗時：寫一筆事件日誌（R2，標記已重試用盡）由匯出檔通知一次，服務以結束碼 3 結束（顯示失敗，維運通知背景服務軸另會通知）；失敗期間每次執行仍以結束碼 3 結束，但通知不重發，寫入成功後才重新計。不動帳本、不暫停交易。",
-      "human_action": "帳本是正本，交易不受影響；要做的是讓「帳戶餘額總表」分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致，不一致就改表上的文字或請 Claude 改程式設定；其他原因照給 AI 的追查指令查。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "2026-10-07 使用者把「帳戶餘額總表」分頁 B 欄改成策略中文名，三支資金費同步仍用英文專案名比對，接收端每次回 key_value not found，只記警告、結束碼照常 0，累計資金費約一天沒更新、沒人發現（f-26）。修復機器人沒辦法自己修：要看 B 欄實際文字與接收端設定，是人才有的資訊，所以是通知人附步驟與追查指令（R2：重試用盡才通知），不是自動處理。接收端明確拒絕時重試沒有意義，所以立刻算用盡；連線類失敗連續 3 次才算，避免 Google 偶發逾時吵人。",
-      "operator_message": {
-        "what": "趨勢策略的資金費同步寫不進 Google 表的「帳戶餘額總表」分頁：本機帳本已經記好，但這支策略那一列的累計資金費（G 欄）沒有更新。",
-        "direction": "帳本是正本、交易不受影響，不需要立刻動作。要讓分頁恢復更新：先確認 B 欄這支策略那一列的文字跟程式用的專案名一致；不一致就改表上的文字，或請 Claude 改程式設定。",
-        "steps": [
-          "看訊息裡的原因（reason）與專案名（project_name）：receiver_rejected 是接收端明確回絕，repeated 是連線類失敗連續 3 次。",
-          "到 Google 表的「帳戶餘額總表」分頁，看 B 欄這支策略那一列的實際文字，跟訊息裡的專案名逐字比對。",
-          "文字不同：把表上 B 欄改成跟程式一致，或請 Claude 改主機環境檔的 SHEETS_SUMMARY_PROJECT_NAME；修好後下一輪自動寫入，失敗次數歸零。",
-          "文字相同、或是連線類失敗：把下方「給 AI 的追查指令」整段貼給 Claude，追查原因並提出修正。"
-        ],
-        "ai_prompt": "請在 ed-seykota-systematic-trend-following（主機上的 /opt/ed-seykota-systematic-trend-following）追查資金費同步為什麼寫不進 Google 表的「帳戶餘額總表」分頁：先看事件日誌 audit/fleet_event_log.jsonl 裡這個事件的 evidence 與 details（reason、project_name、consecutive_failures、last_error），再看 seykota-funding-sync.service 最近幾次執行的 journal（程式在 src/seykota_bot/funding_sync.py 的 publish_total／publish_and_judge）。reason 是 receiver_rejected 且錯誤是 key_value not found：到 Google 表的「帳戶餘額總表」分頁，把 B 欄這支策略那一列的實際文字，跟 details.project_name（程式預設值，或主機環境檔 SHEETS_SUMMARY_PROJECT_NAME 的覆寫）逐字比對（全形半形、空白、括號都算）；其他被拒原因（unauthorized、找不到分頁、403）查接收端的部署身分與 secret、SHEETS_SYNC_URL、SHEETS_SUMMARY_TAB_NAME；reason 是 repeated（連線逾時、網路錯誤、空回覆連續發生）判斷是 Google 接收端不穩、網址失效還是主機網路，並算出本機帳本的累計資金費與表上 G 欄差多少。最後提出治本修正與回歸測試，修好後確認下一輪服務結束碼回到 0。"
       }
     },
     {
@@ -2157,42 +1467,6 @@
           "之後對帳若出現「交易所有成交、帳本沒記」的通知，照那則通知處理；這則通知不需要另外解除。"
         ],
         "ai_prompt": "請在 my-crypto-bot 追查一次重啟後接管部位：讀 audit/trading_ledger.jsonl 裡該 trade_id 的 order_attempt／position_recovered／trade_open，以及 journalctl 在那個時間點前後 my-crypto-bot.service 的 graceful_stop／接管紀錄，判斷是進場途中被中斷還是手動單，並確認帳本、狀態與交易所三方一致。"
-      }
-    },
-    {
-      "error_id": "ERR-068",
-      "code": "SEY.CORRECTION_BASE_MISMATCH",
-      "title": "趨勢兩筆舊單的第二次帳本更正會被 Google 表接收端拒收",
-      "project": "seykota",
-      "sources": [
-        "src/seykota_bot/google_ledger_provenance.py:141",
-        "src/seykota_bot/google_ledger_provenance.py:144",
-        "src/trade_alerts/google_ledger_client.py:36",
-        "src/trade_alerts/projection_outbox.py:307",
-        "src/trade_alerts/trade_correction.py:270"
-      ],
-      "current": {
-        "latch": null,
-        "notify": null,
-        "unit_exit": null
-      },
-      "verdict": "MECHANICAL",
-      "risk_tier": "R1",
-      "auto_action": "帳本更正投到 Google 表時，要帶「我取代的是哪一版」的摘要（上一次更正的投影摘要，內容含備註文字）。共用庫 v0.30.11 起備註改成一句中文，所以趨勢兩筆在 v0.30.11 之前做過第一次更正的舊單（BTCUSDT-1139592365588、BTCUSDT-1142206675339，Google 表第 3、4 列），改釘後重建出的第一次更正摘要，跟接收端 2026-09-24 記下的不一樣。之後如果對這兩筆做第二次更正，接收端回 correction_base_mismatch，這筆投影記成 REJECTED 停放（終態、不重試），排在它後面的紀錄照常送出，並在趨勢的事件日誌記一筆 R1 事件（只留稽核紀錄，不通知；8b）；帳本照常追加第二次更正，Google 表不會被寫錯，只是停在第一次更正的數字。已 CONFIRMED 的第一次更正不會被重送；沒有「v0.30.11 之前就更正過一次」這種跨版本更正鏈的交易，第一次與第二次更正兩邊都用同一套新格式，不受這條影響。不動帳本、不暫停。",
-      "human_action": "無需立刻處理，目前也沒有任何一筆在等。真的發生時，帳本是標準答案，Google 表不能自動追上：不要用 requeue_rejected_projection_intents 重新排入（同樣的摘要會再被拒收）。想讓 Google 表看起來一致，只能手動改那一列，而且要涵蓋整筆更正會寫的欄位——進場價、出場價、進場數量、進場手續費、出場手續費、毛損益、淨損益、報酬率、出場訂單編號與備註——逐欄對照帳本最新一筆 trade_correction 的 corrected，不是只改淨損益與數量。手動改儲存格不會更新接收端記的稽核摘要，所以不能當成恢復自動更正的方式：之後對同一筆交易再做更正，仍然會被拒收。audit/google-reconcile-ignore.json 只影響對帳的比較（讓對帳不再標出這筆差異），不修正任何資料，不能代替手動修正。這套手動步驟尚未實際演練過。",
-      "resume": "n/a",
-      "lands_in_phase": 8,
-      "rationale": "2026-10-19 f-57 改釘共用庫 v0.30.11（備註改中文）時，用 A1 趨勢帳本的唯讀副本重建這兩筆舊更正：舊庫 v0.30.8 的摘要與送出佇列記錄完全吻合（3892bf5e12ff7cea、837a206dc7f474e9），新庫不同（cea030adda0b458e、bb51454eb8144ce6），原因只有備註文字，因為更正鏈的 in_force 摘要（google_ledger_provenance.py:144）把第一次更正的整個投影連備註都算進去。影響被限制在這兩筆 2026-09 已平倉的舊單，再更正的機率很低；接收端是拒收（fail-closed），不會寫錯資料；停放沒有第二個選項，所以是 R1。使用者 2026-10-19 決定接受這個後果並登記，不在共用庫另補舊格式相容。這條在 A1 已經生效：A1 趨勢已於 2026-10-19 台北 18:56 部署共用庫 v0.30.11（改釘 PR ed-seykota #129），那兩筆舊單再更正就會被拒收；截至這次同步，沒有人對它們做第二次更正。",
-      "operator_message": {
-        "what": "趨勢有兩筆 2026-09 的舊單（Google 表第 3、4 列，交易編號 BTCUSDT-1139592365588、BTCUSDT-1142206675339）已經做過一次帳本更正。如果又對其中一筆做第二次更正，Google 表接收端會拒收，那筆更正會被停放，表上那列停在第一次更正的數字。",
-        "direction": "不需要做決定：帳本是標準答案，第二次更正已經在帳本裡。Google 表不會自動追上；想讓它一致只能手動改，而且手動改不是正式的恢復，之後再更正同一筆仍會被拒收。",
-        "steps": [
-          "不需要任何動作。",
-          "不要用重新排入（requeue）：同樣的內容會再被拒收。",
-          "想讓 Google 表看起來一致：打開帳本最新一筆 trade_correction，把 corrected 裡的進場價、出場價、進場數量、進場手續費、出場手續費、毛損益、淨損益、報酬率、出場訂單編號逐欄對照，到 Google 表趨勢分頁找到該交易編號那一列，全部改成帳本的值，備註也照帳本改。只改淨損益與數量會留下對不上的欄位。",
-          "手動改儲存格不會更新接收端記的稽核摘要，不能讓之後的更正恢復運作；對同一筆交易再更正，仍然會被拒收，到時要再手動處理。",
-          "對帳持續標出差異（ERR-044）：確認那一列已逐欄改好，仍標出時才把該交易列入 audit/google-reconcile-ignore.json。忽略清單只讓對帳不再標出這筆，不會修正資料，不能代替上面的手動修正。這套步驟尚未實際演練過。"
-        ]
       }
     },
     {
@@ -3475,6 +2749,144 @@
       "code": "FLEET.GOOGLE_DIVERGED_UNIT_EXIT",
       "retired_in": "fleet-error-catalog/v2",
       "reason": "Same as FLEET.LEDGER_DIVERGED_UNIT_EXIT for the ledger<->Google sheet reconcile (was exit 3). All four google_reconcile mains exit 0 since Phase 4b; ops-notify's google axis reports divergence from google_reconcile_status.json. Entry removed 2026-09-30; the code stays here so it is never reused."
+    },
+    {
+      "code": "SEY.PROTECTION_PLACEMENT_FAILED_FLATTENED",
+      "error_id": "ERR-001",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.PROTECTION_PLACEMENT_FAILED_EXPOSED",
+      "error_id": "ERR-002",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.PROTECTION_REPLACE_FAILED",
+      "error_id": "ERR-003",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.PROTECTION_MOVE_DEFERRED",
+      "error_id": "ERR-004",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.PROTECTION_CLOSE_CANCEL_FAILED",
+      "error_id": "ERR-005",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.PROTECTION_UNVERIFIED",
+      "error_id": "ERR-006",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.POSITION_AMBIGUOUS",
+      "error_id": "ERR-007",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.RECONCILE_FAILED",
+      "error_id": "ERR-008",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.EXCHANGE_TARGET_UNSAFE",
+      "error_id": "ERR-009",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.FIXED_IDENTIFIER_CONTRACT_UNAVAILABLE",
+      "error_id": "ERR-010",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.RUNTIME_CYCLE_FAILED",
+      "error_id": "ERR-011",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.CLOSE_FILL_PENDING",
+      "error_id": "ERR-012",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.TRADE_EXIT",
+      "error_id": "ERR-013",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.ENTRY_SKIPPED_MIN_CAPITAL",
+      "error_id": "ERR-014",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "error_id": "ERR-033",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_REPAIR_FAILED",
+      "error_id": "ERR-034",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "error_id": "ERR-035",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.UNRECORDED_FILL_CORRECTED",
+      "error_id": "ERR-036",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.UNRECORDED_FILL_UNRESOLVED",
+      "error_id": "ERR-037",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.POSITION_ADOPTED_AFTER_INTERRUPTION",
+      "error_id": "ERR-051",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "error_id": "ERR-055",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.FUNDING_SHEET_WRITE_FAILED",
+      "error_id": "ERR-057",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
+    },
+    {
+      "code": "SEY.CORRECTION_BASE_MISMATCH",
+      "error_id": "ERR-068",
+      "retired_in": "fleet-error-catalog/v2",
+      "reason": "舊趨勢策略（ed-seykota V1.1）2026-11-18 在正式機 A1 下線（進度頁 4.1：維運通知目標關閉、6 組輔助計時器停用、帳本與狀態打包存檔）；兩台主機的主程式早在 2026-10-29 停用，不再發出這個代碼。條目移出現役目錄、編號保留在這裡永不重用；歷史事件與帳本仍留在主機存檔。程式碼留在 operations 分支與 tag seykota-v1.1-final。"
     }
   ]
 }
