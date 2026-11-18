@@ -582,7 +582,8 @@ _HEALTH_PANEL_JS = r"""
   function cell(row){
     var c = el("td","hc");
     if(!row){ c.appendChild(el("span","hv hv-none","—")); c.title = "這個對象沒有這個軸"; return c; }
-    var chip = el("span","hv hv-" + row.display, row.value);
+    var shown = (row.value === "RECONCILED" || row.value === "HEALTHY") ? "OK" : row.value;
+    var chip = el("span","hv hv-" + row.display, shown);
     chip.title = "狀態 " + row.value + "｜嚴重度 " + row.severity + "｜" + (row.noTime ? "沒有讀取時間" : "讀取 " + P.formatTaipei(Date.parse(row.checkedAt)));
     c.appendChild(chip);
     var age = row.noTime ? "無讀取時間" : (row.display === "stale" ? "過期｜" : "") + P.formatAge(row.ageMs);
