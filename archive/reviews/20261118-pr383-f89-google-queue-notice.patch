@@ -1,0 +1,238 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index 89c15b4..79eb2e8 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.43"
++version = "0.30.44"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 4998e3f..98919e2 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -351,4 +351,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.43"
++__version__ = "0.30.44"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index 7e83c90..a256995 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -1142,7 +1142,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "seykota",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:677"
+       ],
+       "current": {
+         "latch": null,
+@@ -1173,7 +1173,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "seykota",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
+       ],
+       "current": {
+         "latch": null,
+@@ -1205,7 +1205,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "momentum",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:677"
+       ],
+       "current": {
+         "latch": null,
+@@ -1236,7 +1236,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "momentum",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
+       ],
+       "current": {
+         "latch": null,
+@@ -1268,7 +1268,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "btc-competition",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:707"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:722"
+       ],
+       "current": {
+         "latch": null,
+@@ -1299,7 +1299,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "btc-competition",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
+       ],
+       "current": {
+         "latch": null,
+@@ -1331,7 +1331,7 @@
+       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
+       "project": "mycrypto",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:677"
+       ],
+       "current": {
+         "latch": null,
+@@ -1362,7 +1362,7 @@
+       "title": "交易所有成交、帳本沒記，無法自動更正",
+       "project": "mycrypto",
+       "sources": [
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
+       ],
+       "current": {
+         "latch": null,
+@@ -2426,7 +2426,7 @@
+       "project": "trend-meteor",
+       "sources": [
+         "src/trend_meteor/unrecorded_fill_adapter.py:85",
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:677"
+       ],
+       "current": {
+         "latch": null,
+@@ -2458,7 +2458,7 @@
+       "project": "trend-meteor",
+       "sources": [
+         "src/trend_meteor/unrecorded_fill_adapter.py:85",
+-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
++        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
+       ],
+       "current": {
+         "latch": null,
+diff --git a/src/trade_alerts/unrecorded_fill.py b/src/trade_alerts/unrecorded_fill.py
+index 2726d08..bd1cff5 100644
+--- a/src/trade_alerts/unrecorded_fill.py
++++ b/src/trade_alerts/unrecorded_fill.py
+@@ -292,6 +292,19 @@ def _first_seen(path: str, directory: str, moment_ms: int) -> tuple[int, str | N
+     return moment_ms, None
+ 
+ 
++def _google_queue_failed(result: Mapping[str, Any]) -> bool:
++    """Whether the strategy's follow-up (queueing the Google correction) reported a failure.
++
++    The strategies disagree on how: the hook returns ``google_intent_error`` (momentum, crypto, competition, the
++    old trend strategy) or raises, which ``_correct_trade`` stores as ``error`` (the meteor strategy).  Either key
++    with a non-empty value is a failure.  The error text is not copied into the notice (it is outside text; it
++    stays in the event's ``post`` / ``written`` details)."""
++    return any(isinstance(result.get(key), str) and bool(result[key].strip()) for key in ("google_intent_error", "error"))
++
++
++GOOGLE_QUEUE_FAILED_LINE = "注意：Google 表的更正沒有排進待派送佇列，帳本已正確，但表上可能還是舊數字，請檢查 Google 表對帳並重新排入。"
++
++
+ def _request_notice(request: Mapping[str, Any]) -> str:
+     """The unresolved-order notice rebuilt from the request alone."""
+     details = request.get("details") if isinstance(request.get("details"), Mapping) else {}
+@@ -659,6 +672,7 @@ class _Round:
+             f"一併重述的訂單: {', '.join(group_ids)}",
+             f"數量 {previous['exit_volume']} → {corrected['exit_volume']}；淨損益 {previous['net_pnl']} → {corrected['net_pnl']}",
+             f"帳本更正事件: {event_id}",
++            *([GOOGLE_QUEUE_FAILED_LINE] if _google_queue_failed(post) else []),
+         ])
+         event = append_fleet_event(
+             self.paths.fleet_event_log, project=self.project, code=CODE_CORRECTED, risk_tier=self.tiers[CODE_CORRECTED],
+@@ -703,6 +717,7 @@ class _Round:
+             "策略自己重複送單，帳本漏記的現貨成交已照交易所自動補記（只追加）。",
+             f"symbol: {order['symbol']}  重複的訂單: {oid}（與帳本已記的 {match['order_id']} 同一個自訂編號 {match['client_order_id']}）",
+             f"補記事件: {', '.join(map(str, written.get('event_ids') or []))}",
++            *([GOOGLE_QUEUE_FAILED_LINE] if _google_queue_failed(written) else []),
+         ])
+         event = append_fleet_event(
+             self.paths.fleet_event_log, project=self.project, code=CODE_CORRECTED, risk_tier=self.tiers[CODE_CORRECTED],
+diff --git a/tests/test_unrecorded_fill.py b/tests/test_unrecorded_fill.py
+index 1fa5722..8b6f7e5 100644
+--- a/tests/test_unrecorded_fill.py
++++ b/tests/test_unrecorded_fill.py
+@@ -7,6 +7,7 @@ it by hand; here the handler must reach the same correction on its own.
+ """
+ from __future__ import annotations
+ 
++import dataclasses
+ import json
+ from datetime import datetime, timezone
+ from pathlib import Path
+@@ -137,6 +138,68 @@ def test_a_certain_duplicate_send_is_corrected_like_the_manual_h4_fix(tmp_path):
+     assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "SEY." + CODE_CORRECTED
+ 
+ 
++def _with_hook(adapter, hook):
++    return dataclasses.replace(adapter, after_trade_correction=hook)
++
++
++def _notice_after(hook, tmp_path):
++    paths = _setup(tmp_path)
++    adapter = _with_hook(_trade_adapter(paths, Exchange(_client_ids())), hook)
++    _round(adapter, paths)
++    [event] = read_fleet_events(paths.fleet_event_log)
++    return event
++
++
++GOOGLE_LINE = "Google 表的更正沒有排進待派送佇列"
++
++
++@pytest.mark.parametrize("hook_result", [{"google_intent_error": "ConnectionError: boom"}, {"error": "RuntimeError: boom"}])
++def test_f89_a_failed_google_queue_is_said_in_the_notice(tmp_path, hook_result):
++    event = _notice_after(lambda fields, event_id: dict(hook_result), tmp_path)
++    notice = event["details"]["notice_text"]
++    assert GOOGLE_LINE in notice and "帳本已正確" in notice
++    assert "boom" not in notice                                # outside text is not copied into the notice
++    assert event["details"]["post"] == hook_result              # ...but it stays in the event for the person who investigates
++
++
++def test_f89_a_hook_that_raises_is_said_in_the_notice_too(tmp_path):
++    def hook(fields, event_id):
++        raise RuntimeError("queue down")
++    event = _notice_after(hook, tmp_path)
++    assert GOOGLE_LINE in event["details"]["notice_text"]
++    assert event["details"]["post"] == {"error": "RuntimeError: queue down"}
++    assert "queue down" not in event["details"]["notice_text"]
++
++
++@pytest.mark.parametrize("hook_result", [{"google_intent_id": "intent-1"}, {"google_queued": 1}, {}, {"google_intent_error": ""}, {"google_intent_error": None}])
++def test_f89_a_queued_or_unreported_google_follow_up_adds_no_line(tmp_path, hook_result):
++    event = _notice_after(lambda fields, event_id: dict(hook_result), tmp_path)
++    assert GOOGLE_LINE not in event["details"]["notice_text"]
++
++
++def test_f89_a_spot_notice_says_a_failed_google_queue(tmp_path):
++    paths, state = _spot_setup(tmp_path)
++    client = {"501": "btc-a", "502": "btc-a"}
++
++    def append_spot_fills(symbol, order_id, fills):
++        with open(paths.ledger, "a", encoding="utf-8") as fh:
++            for f in fills:
++                fh.write(json.dumps({"event_type": "spot_fill", "event_id": f"x{order_id}", "order_id": order_id,
++                                     "symbol": symbol, "quantity": f["quantity"]}) + "\n")
++        return {"event_ids": [f"x{order_id}"], "google_intent_error": "ConnectionError: boom"}
++
++    adapter = UnrecordedFillAdapter(
++        project="btc-competition", style="spot", client_ids=True, evidence_source="fixture",
++        client_order_id=lambda _s, oid: client.get(oid),
++        fetch_fills=lambda _s, ids: [f for f in state["fills"] if str(f["order_id"]) in ids],
++        append_spot_fills=append_spot_fills,
++    )
++    run_unrecorded_fill_round(adapter, paths, catalog=CATALOG, now=NOW)
++    [event] = read_fleet_events(paths.fleet_event_log)
++    assert GOOGLE_LINE in event["details"]["notice_text"] and "boom" not in event["details"]["notice_text"]
++    assert event["details"]["written"]["google_intent_error"] == "ConnectionError: boom"
++
++
+ def test_the_next_round_finds_nothing_left_to_do(tmp_path):
+     paths = _setup(tmp_path)
+     adapter = _trade_adapter(paths, Exchange(_client_ids()))
