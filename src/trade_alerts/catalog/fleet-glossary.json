@@ -266,7 +266,7 @@
         "scripts/repair_bot_shadow.py",
         "*-repair-shadow.service"
       ],
-      "definition": "定時檢查「交易所已經平倉、本地帳本卻漏記」的情況，並提出或直接補寫修復。動能策略、趨勢策略各有一支。",
+      "definition": "定時檢查「交易所已經平倉、本地帳本卻漏記」的情況，並提出或直接補寫修復。動能策略、加密策略各有一支（已在正式機 A1 上跑）；競賽策略・流星版已建置、尚未上正式機；競賽策略（現貨再平衡）不適用。",
       "retired": [
         "修復 bot",
         "影子版",
@@ -325,7 +325,7 @@
         "trade_alerts.verified_close_backfill",
         "v2-W2"
       ],
-      "definition": "動能策略、趨勢策略共用的同一份修復程式（trade_alerts.repair_runner）；兩支各自的修復機器人只負責接上自己的帳本與交易所。已在正式機 A1 上跑。",
+      "definition": "各策略共用的同一份修復程式（trade_alerts.repair_runner）；各策略自己的修復機器人只負責接上自己的帳本與交易所。動能策略、加密策略已在正式機 A1 上跑；競賽策略・流星版已建置、尚未上正式機。",
       "retired": [
         "共用執行器"
       ]
@@ -726,7 +726,7 @@
       "en": [
         "atr_trailing_stop"
       ],
-      "definition": "價格跌破 ATR 移動停損線，策略自己判斷出場、主動平倉（趨勢策略）。Google 表「出場原因」欄。",
+      "definition": "價格跌破 ATR 移動停損線，策略自己判斷出場、主動平倉（舊趨勢策略，已停用）。Google 表「出場原因」欄。",
       "note": "",
       "retired": []
     },
@@ -759,7 +759,7 @@
       "en": [
         "native_stop"
       ],
-      "definition": "交易所端的停損單觸發平倉，機器人當場看到（趨勢策略開發機）。",
+      "definition": "交易所端的停損單觸發平倉，機器人當場看到（舊趨勢策略，已停用）。",
       "note": "",
       "retired": []
     },
@@ -980,7 +980,7 @@
       "en": [
         "exchange_fill"
       ],
-      "definition": "依成交明細記下的開倉（趨勢、動能策略）。",
+      "definition": "依成交明細記下的開倉（舊趨勢策略、動能策略）。",
       "note": "",
       "retired": []
     },
@@ -991,7 +991,7 @@
       "en": [
         "add"
       ],
-      "definition": "趨勢策略的加碼。",
+      "definition": "舊趨勢策略的加碼（已停用）。",
       "note": "",
       "retired": []
     },
@@ -1013,7 +1013,7 @@
       "en": [
         "exchange_position_sync"
       ],
-      "definition": "依交易所現有部位接手紀錄（趨勢、動能策略）。",
+      "definition": "依交易所現有部位接手紀錄（舊趨勢策略、動能策略）。",
       "note": "",
       "retired": []
     },
