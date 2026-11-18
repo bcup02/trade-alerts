@@ -1,0 +1,105 @@
+diff --git a/docs/observation-watch.md b/docs/observation-watch.md
+index 020aac3..1f8f13d 100644
+--- a/docs/observation-watch.md
++++ b/docs/observation-watch.md
+@@ -26,7 +26,7 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項
+   **第二則的成功維運通知不記錄**（只記失敗），所以永遠不宣稱它送達，一律問人。
+ - 維運通知狀態檔的 `delivered` 不一定是真的送出：它第一次看到某個策略時，會把當時已存在的通知全標成 `delivered` 但**不發送**。所以事件早於該策略的 `baseline_at` 時，送出紀錄不算證據，結果會明寫「無法證明有送出」並請你確認有沒有收到。
+ - Google 對帳的 `RECONCILED` 只有在**對帳時間晚於那筆新交易的 61 分鐘寬限之後**才算數（新交易 60 分鐘內本來就可以還沒上表）；之前的 RECONCILED、寬限內的 RECONCILED、過期（超過 90 分鐘）的都不算，只會繼續等待。
+-- 已 `ack` 的結果不會重發：檢查在 `observed` 與 `waiting` 之間來回時（例如四支策略的分頁名檢查，每有一筆新交易進入對帳寬限就退回 `waiting`），「已通知」記錄會清掉，但 `ack` 記錄保留；回到 `observed` 時結果的 `key` 若和 `ack` 的一樣就不再發。要再通知，`key` 必須不同（例如競賽成交筆數變了）。只靜音 `observed`，`failed` 回來一律再發。
++- 已 `ack` 的結果不會重發：檢查在 `observed` 與 `waiting` 之間來回時（例如三支策略的分頁名檢查，每有一筆新交易進入對帳寬限就退回 `waiting`），「已通知」記錄會清掉，但 `ack` 記錄保留；回到 `observed` 時結果的 `key` 若和 `ack` 的一樣就不再發。要再通知，`key` 必須不同（例如競賽成交筆數變了）。只靜音 `observed`，`failed` 回來一律再發。
+ - 通知結尾不約定「下次開工」：Claude 在對話中讀到就當場查證、結案、`ack`；`ack` 之前報告會一直顯示該項。
+ - 已知限制：Telegram 送出但狀態檔存不進去時，下一輪可能重複發送（會印出錯誤並以結束碼 1 結束）；同時只會有一個在跑（檔案鎖）。
+ - 受控測試事件靠 `details.test`／`evidence.test` 排除；維運通知日誌本身分不出測試與真實，所以狀態告警那一項一律要人確認。
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index 9684c15..5235168 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -359,7 +359,7 @@ def check_sheet_tab_names(ctx: Context) -> Result:
+     remembered = (ctx.previous or {}).get("covered")
+     remembered = remembered if isinstance(remembered, dict) else {}             # a damaged memory is no memory
+     covered_now: dict[str, dict[str, str]] = {}
+-    for key in REPOS:
++    for key in _ACTIVE_A1_STRATEGIES:                     # 舊趨勢策略 2026-11-18 在 A1 下線：不再有新交易，不看它（進度頁 f-96）
+         status = load_json(ctx.remote, "a1", audit(key, "google_reconcile_status.json"))
+         trades = _trades_after(jsonl(ctx.remote.read("a1", audit(key, "trading_ledger.jsonl"))), _F26_BASELINE)
+         name = LABELS[key]
+@@ -398,7 +398,7 @@ def check_sheet_tab_names(ctx: Context) -> Result:
+     if bad:
+         return Result(FAILED, "新分頁名有策略不符合預期：" + "、".join(bad), evidence, key="bad:" + ",".join(bad), extra={"covered": covered_now})
+     if not waiting and not carried:
+-        return Result(OBSERVED, "四支策略的新交易都走新分頁名，帳本對 Google 表一致。", evidence, closable=True, key="all",
++        return Result(OBSERVED, "三支策略的新交易都走新分頁名，帳本對 Google 表一致。", evidence, closable=True, key="all",
+                       extra={"covered": covered_now})
+     confirmed = [*ok, *(f"{name}（{'本輪讀不到 Google 表' if reason == 'unknown' else '新交易在對帳寬限內'}，沿用 {taipei(since)} 的確認）"
+                         for name, reason, since in carried)]
+@@ -1050,7 +1050,8 @@ def check_reminders(ctx: Context) -> Result:
+ 
+ 
+ def _a1_event_logs() -> list[tuple[str, str]]:
+-    return [(key, audit(key, "fleet_event_log.jsonl")) for key in ("seykota", "momentum", "btc-competition")]
++    # 舊趨勢策略已在 A1 下線（4.1）：歷史事件檔留在主機不刪，但不再當作觀察對象，免得它的舊事件因送達證據被清掉而誤報（進度頁 f-97）
++    return [(key, audit(key, "fleet_event_log.jsonl")) for key in ("momentum", "btc-competition")]
+ 
+ 
+ def _real_events(ctx: Context, after: datetime, *, codes: set[str] | None = None, not_codes: set[str] = frozenset(),
+@@ -1321,7 +1322,7 @@ def check_registry_drift(ctx: Context) -> Result:
+ 
+ 
+ CHECKS: tuple[Check, ...] = (
+-    Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
++    Check("sheet-tab-names", "三支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
+     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
+     Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
+     Check("dev-v11-cycle", "開發機 V11（競賽策略・流星版）在測試網完整跑一個日循環", ("phase-v10-p3",), check_dev_v11_cycle),
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index 205d3db..fc408e6 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -1362,7 +1362,7 @@ def test_tabs_a_google_read_that_failed_keeps_a_confirmed_strategy_listed_with_t
+     r = _tabs_with_momentum(status=_status(5, "UNKNOWN"))
+     out = ow.check_sheet_tab_names(ctx(r, _covered_before()))
+     assert out.state == ow.WAITING and not out.closable
+-    assert "動能策略（本輪讀不到 Google 表，沿用" in out.summary and "還在等新交易：趨勢策略" in out.summary
++    assert "動能策略（本輪讀不到 Google 表，沿用" in out.summary and "趨勢策略" not in out.summary          # 舊趨勢策略已下線，不再列為「還在等」
+     assert any(line.startswith("動能策略：這一輪對帳讀不到 Google 表（UNKNOWN）") for line in out.evidence)
+     assert out.extra["covered"]["momentum"]["at"] == iso(NOW - timedelta(hours=1))                    # the bound does not slide
+ 
+@@ -2341,3 +2341,37 @@ def test_the_retired_old_trend_strategy_is_not_a_required_ops_reading():
+     """舊趨勢策略 2026-11-18 在 A1 下線、維運通知的 seykota 目標關掉：穩定檢查不能再要求它的讀數，否則整個檢查壞掉。"""
+     assert not any(k.startswith("seykota:") for k in ow.REQUIRED_READINGS)
+     assert "seykota" not in ow._STABLE_TARGETS and "seykota" in ow.REPOS     # REPOS 仍留著它（登記冊 sources 與部署複本比對用）
++
++
++# --- 舊趨勢策略下線後的尾巴（進度頁 f-96／f-97／f-98） ------------------------------------------------------------------
++def test_tabs_ignores_the_retired_old_trend_strategy_even_with_a_wrong_tab_name_or_a_missing_file():
++    """f-96：舊趨勢策略在 A1 下線，它的分頁名或對帳檔再怎麼樣都不影響分頁名檢查。"""
++    t = NOW - timedelta(hours=3)
++    good = {"momentum": _status(30), "mycrypto": _status(30, name="加密策略"), "btc-competition": _status(30, name="競賽策略"),
++            "seykota": _status(30, name="舊趨勢策略")}                                  # 已改名的舊分頁：以前會判「分頁名不符」
++    r = tabs_remote(trades={k: [{"event_type": "trade_close", "event_time": iso(t)}] for k in ow.REPOS}, status=good)
++    result = ow.check_sheet_tab_names(ctx(r))
++    assert result.closable and "趨勢策略" not in result.summary and "舊趨勢策略" not in "".join(result.evidence)
++    assert "seykota" not in ow._ACTIVE_A1_STRATEGIES
++
++
++def test_event_log_checks_do_not_read_the_retired_old_trend_strategys_history():
++    """f-97：舊趨勢策略的歷史事件（送達證據早被清掉）不能讓事件類檢查誤報。"""
++    assert [key for key, _ in ow._a1_event_logs()] == ["momentum", "btc-competition"]
++    stale = events_remote(seykota=[event("PROTECTION_UNVERIFIED", event_id="OLD1")])      # 沒有送達證據、不在 delivered 裡
++    assert ow.check_momentum_halt_notice(ctx(stale)).state == ow.WAITING
++
++
++def test_a1_stable_ignores_stale_leftover_readings_of_the_retired_old_trend_strategy():
++    """f-98：維運通知狀態檔裡殘留過期、不正常的 seykota 讀數，不影響穩定檢查。"""
++    old = iso(B2_NOW - timedelta(days=30))
++    leftovers = {f"seykota:{axis}": {"severity": "critical", "value": "STALE", "checked_at": old}
++                 for axis in ("runtime", "ledger", "google", "export", "units")}
++    clean = ow.check_a1_stable(b2_ctx(ops_remote(), {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}))
++    r = ops_remote()
++    state = json.loads(r.files[("a1", OPS_STATE)])
++    state.update(leftovers)
++    r.files[("a1", OPS_STATE)] = json.dumps(state)
++    with_leftovers = ow.check_a1_stable(b2_ctx(r, {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}))
++    assert (with_leftovers.state, with_leftovers.summary, with_leftovers.key) == (clean.state, clean.summary, clean.key)
++
