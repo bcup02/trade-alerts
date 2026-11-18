@@ -442,25 +442,6 @@ def check_trend_addon(ctx: Context) -> Result:
                   [f"加碼交易：{', '.join(added)}", f"對帳：{status.get('value')}"], needs_human=True, key=",".join(added))
 
 
-def check_dev_trend_entry(ctx: Context) -> Result:
-    """f-7: the dev host's trend strategy really places a testnet entry on a signal (not a manual test) and records it."""
-    events = list(jsonl(ctx.remote.read("dev", audit("seykota", "trading_ledger.jsonl"))))
-    entries = [e for e in events if e.get("event_type") == "trade_open" and e.get("source") == "entry_signal"
-               and (parse_time(e.get("event_time")) or datetime.min.replace(tzinfo=timezone.utc)) > datetime(2026, 10, 3, 8, 0, tzinfo=timezone.utc)]
-    if not entries:
-        return Result(WAITING, "開發機趨勢策略還沒有因進場訊號而下的測試網單。")
-    status = load_json(ctx.remote, "dev", audit("seykota", "google_reconcile_status.json"))
-    last = max(parse_time(e["event_time"]) for e in entries)
-    verdict = reconcile_covers(status, last, ctx.now)
-    if verdict == "covered":
-        return Result(OBSERVED, "開發機趨勢策略依進場訊號在測試網下單，進場後的帳本對 Google 表對帳一致。",
-                      [f"{len(entries)} 筆進場；最近 {taipei(last)}（台北）；對帳（{taipei(parse_time(status['checked_at']))}）：{status.get('note')}"],
-                      closable=True, key=str(len(entries)))
-    if verdict == "diverged":
-        return Result(FAILED, "開發機趨勢策略有進場，過了寬限之後 Google 表對帳仍對不上。", [f"對帳：{status.get('note')}"])
-    return Result(WAITING, "開發機趨勢策略有進場，等進場寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {taipei_text(status.get('checked_at'))}"])
-
-
 V11_HEARTBEAT_MAX_AGE = timedelta(hours=26)      # 每日單元一天跑一次（00:10 UTC）；超過 26 小時沒有新的心跳＝這一天沒跑成
 
 
@@ -624,25 +605,6 @@ HEALTH_PUBLISH_FRESH_MINUTES = 25         # the publisher runs every 10 minutes
 #: detector runs every 30 minutes).  A run that could not read, an unreadable file or a detector that was down in between
 #: all leave a longer gap -- ``run_checks`` keeps a failed run's ``extra``, so the gap is what ends the streak (review of #304).
 STREAK_MAX_GAP = timedelta(minutes=45)
-
-
-def check_dev_trend_reconcile(ctx: Context) -> Result:
-    """f-7 (second half): the dev host's trend ledger-vs-exchange reconcile is back to RECONCILED.
-
-    Twenty hand-made test orders (2026-10-17..20) left 25 exchange fills the ledger never recorded; the reconcile only looks at
-    the last 168 hours, so the verdict should flip by itself once the last of them slides out (2026-10-27 17:00 Taipei).  The
-    first half of f-7 (a real entry on a signal) is ``dev-trend-entry``.  A stale or unreadable status is never "recovered"."""
-    status = load_json(ctx.remote, "dev", audit("seykota", "ledger_status.json"))
-    checked = parse_time(status.get("checked_at"))
-    if not _fresh(checked, ctx.now, 90):
-        raise RemoteError(f"開發機趨勢的對帳狀態太舊，判斷不了是否恢復（檢查時間 {taipei_text(status.get('checked_at'))}）")
-    value = status.get("value")
-    if value == "RECONCILED":
-        return Result(OBSERVED, "開發機趨勢策略的帳本對交易所對帳已回到 RECONCILED（那批手動測試單已滑出 168 小時窗口）。",
-                      [f"對帳：{status.get('note')}（{taipei(checked)} 台北）",
-                       "這只是 f-7 的對帳那一半；進場那一半由 dev-trend-entry 看。那串 UNRESOLVED 請求是否自動撤回，這支檢查沒有讀。"],
-                      key="reconciled")
-    return Result(WAITING, f"開發機趨勢策略的帳本對交易所對帳還是 {value}。", [f"對帳：{status.get('note')}（{taipei(checked)} 台北）"])
 
 
 def _health_publish(ctx: Context, host: str) -> tuple[bool, str, int]:
@@ -1375,9 +1337,7 @@ CHECKS: tuple[Check, ...] = (
     Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
     Check("trend-addon", "A1 趨勢策略加碼交易", ("e-5",), check_trend_addon),
-    Check("dev-trend-entry", "開發機趨勢策略依訊號進場", ("f-7",), check_dev_trend_entry),
     Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
-    Check("dev-trend-reconcile", "開發機趨勢策略對帳回到 RECONCILED（f-7 後半）", ("f-7",), check_dev_trend_reconcile),
     Check("dev-v11-cycle", "開發機 V11（競賽策略・流星版）在測試網完整跑一個日循環", ("phase-v10-p3",), check_dev_v11_cycle),
     Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
     Check("dust-convert", "競賽策略第一次真實粉塵轉換", ("f-66",), check_dust_convert),

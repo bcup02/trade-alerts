@@ -148,7 +148,7 @@ def test_tabs_demo_trades_are_not_real_trades():
     assert ow.check_sheet_tab_names(ctx(r)).state == ow.WAITING
 
 
-# --- competition fill (e-2), trend add-on (e-5), dev entry (f-7) ----------------------------------------------------------
+# --- competition fill (e-2), trend add-on (e-5) ----------------------------------------------------------
 
 def test_competition_fill_waits_then_closes_when_the_sheet_agrees():
     r = tabs_remote()
@@ -170,16 +170,6 @@ def test_trend_without_an_add_keeps_waiting():
     r = tabs_remote()
     put(r, "a1", "seykota", "trading_ledger.jsonl", [trade(9, "trade_open", trade_id="T1")], jsonl=True)
     assert ow.check_trend_addon(ctx(r)).state == ow.WAITING
-
-
-def test_dev_entry_must_come_from_a_signal_not_a_manual_test():
-    r = FakeRemote()
-    put(r, "dev", "seykota", "google_reconcile_status.json", {"value": "RECONCILED", "note": "ok", "checked_at": iso(NOW - timedelta(minutes=10))})
-    put(r, "dev", "seykota", "trading_ledger.jsonl", [trade(6, "trade_open", source="add", trade_id="T")], jsonl=True)
-    assert ow.check_dev_trend_entry(ctx(r)).state == ow.WAITING
-    put(r, "dev", "seykota", "trading_ledger.jsonl", [trade(6, "trade_open", source="entry_signal", trade_id="T")], jsonl=True)
-    result = ow.check_dev_trend_entry(ctx(r))
-    assert result.state == ow.OBSERVED and result.closable
 
 
 # --- status alerts (f-23 / f-40 / f-41) and reminders (f-39) --------------------------------------------------------
@@ -438,30 +428,10 @@ def demo_check(monkeypatch):
     return check
 
 
-# --- f-70 batch 1: dev trend reconcile, health publishers, dust convert --------------------------------------------------
+# --- f-70 batch 1: health publishers, dust convert --------------------------------------------------
 
 def _status_file(value, minutes_ago=10, note="n"):
     return {"value": value, "checked_at": iso(NOW - timedelta(minutes=minutes_ago)), "note": note}
-
-
-def test_dev_trend_reconcile_waits_while_diverged_and_tells_once_it_is_reconciled():
-    r = FakeRemote()
-    put(r, "dev", "seykota", "ledger_status.json", _status_file("DIVERGED", note="18 exchange fill(s) not recorded in the ledger"))
-    waiting = ow.check_dev_trend_reconcile(ctx(r))
-    assert waiting.state == ow.WAITING and "DIVERGED" in waiting.summary
-    put(r, "dev", "seykota", "ledger_status.json", _status_file("RECONCILED"))
-    done = ow.check_dev_trend_reconcile(ctx(r))
-    assert done.state == ow.OBSERVED and not done.needs_human and not done.closable and done.key == "reconciled"
-    assert "dev-trend-entry" in " ".join(done.evidence)
-
-
-def test_dev_trend_reconcile_raises_on_a_stale_or_missing_status():
-    r = FakeRemote()
-    put(r, "dev", "seykota", "ledger_status.json", _status_file("RECONCILED", minutes_ago=200))
-    with pytest.raises(ow.RemoteError):
-        ow.check_dev_trend_reconcile(ctx(r))
-    with pytest.raises(ow.RemoteError):
-        ow.check_dev_trend_reconcile(ctx(FakeRemote()))
 
 
 def _publish_remote(a1=None, dev=None):
@@ -644,7 +614,7 @@ def test_dust_convert_tells_when_paxg_was_among_the_converted_coins():
 
 def test_f70_batch1_checks_are_registered_and_read_only_whitelisted():
     ids = {c.id: c for c in ow.CHECKS}
-    assert ids["dev-trend-reconcile"].covers == ("f-7",) and ids["health-publish"].covers == ("f-45",) and ids["dust-convert"].covers == ("f-66",)
+    assert ids["health-publish"].covers == ("f-45",) and ids["dust-convert"].covers == ("f-66",)
     assert ow.HEALTH_PUBLISH_STATE in ow.ALLOWED_PATHS and ow.DUST_ATTEMPT_PATH in ow.ALLOWED_PATHS
     assert ow.audit("seykota", "ledger_status.json") in ow.ALLOWED_PATHS and ow.audit("btc-competition", "ledger_status.json") in ow.ALLOWED_PATHS
 
@@ -682,7 +652,7 @@ def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
     assert len(ids) == len(set(ids))
     assert all(c.covers and c.title for c in ow.CHECKS)
     covered = {i for c in ow.CHECKS for i in c.covers}
-    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "f-7", "phase-g2", "phase-x5b", "phase-r033-p4"} <= covered
+    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "phase-g2", "phase-x5b", "phase-r033-p4"} <= covered
 
 
 # --- deployment files ----------------------------------------------------------------------------------------------
@@ -752,15 +722,11 @@ def test_tabs_closes_only_after_a_reconcile_that_ran_past_the_grace_of_the_newes
     assert ow.reconcile_covers(_status(30), NOW - timedelta(minutes=50), NOW) == "pending"      # trade still inside its grace
 
 
-def test_competition_and_dev_entry_also_wait_for_a_reconcile_after_the_grace():
+def test_competition_fill_also_waits_for_a_reconcile_after_the_grace():
     r = tabs_remote()
     put(r, "a1", "btc-competition", "trading_ledger.jsonl", [trade(0, "spot_fill", execution_mode="LIVE")], jsonl=True)
     put(r, "a1", "btc-competition", "google_reconcile_status.json", _status(5, name="競賽策略"))
     assert ow.check_competition_fill(ctx(r)).state == ow.WAITING                                # RECONCILED, but older than the grace
-    d = FakeRemote()
-    put(d, "dev", "seykota", "trading_ledger.jsonl", [trade(0, "trade_open", source="entry_signal", trade_id="T")], jsonl=True)
-    put(d, "dev", "seykota", "google_reconcile_status.json", _status(5, name="趨勢策略"))
-    assert ow.check_dev_trend_entry(ctx(d)).state == ow.WAITING
 
 
 # --- one run at a time; a message that was sent but not remembered (review of #183) -----------------------------------------
