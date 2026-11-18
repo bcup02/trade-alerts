@@ -266,7 +266,7 @@
         "scripts/repair_bot_shadow.py",
         "*-repair-shadow.service"
       ],
-      "definition": "定時檢查「交易所已經平倉、本地帳本卻漏記」的情況，並提出或直接補寫修復。各現役策略各有一支。",
+      "definition": "定時檢查「交易所已經平倉、本地帳本卻漏記」的情況，並提出或直接補寫修復。動能策略、加密策略各有一支（已在正式機 A1 上跑）；競賽策略・流星版已建置、尚未上正式機；競賽策略（現貨再平衡）不適用。",
       "retired": [
         "修復 bot",
         "影子版",
@@ -325,7 +325,7 @@
         "trade_alerts.verified_close_backfill",
         "v2-W2"
       ],
-      "definition": "各現役策略共用的同一份修復程式（trade_alerts.repair_runner）；各策略自己的修復機器人只負責接上自己的帳本與交易所。已在正式機 A1 上跑。",
+      "definition": "各策略共用的同一份修復程式（trade_alerts.repair_runner）；各策略自己的修復機器人只負責接上自己的帳本與交易所。動能策略、加密策略已在正式機 A1 上跑；競賽策略・流星版已建置、尚未上正式機。",
       "retired": [
         "共用執行器"
       ]
