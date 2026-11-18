@@ -2628,7 +2628,7 @@
           "state": "done",
           "evidence": "src/btc_competition/runner.py:879 讀不到 PAXG 收盤價（或當天沒有收盤價）時，PAXG 指標當成關閉、熊市只持 USDT，BTC 與勝者主策略照常；:843 起按連續 UTC 日計數（同日重跑不重算、中間有空窗重新起算）。",
           "verified_at": "2026-11-18",
-          "limit": "A1 沒有真的發生過讀不到行情；行為只由測試驗證（tests/test_runner_paxg.py:350 起）。"
+          "limit": "A1 沒有真的發生過，只由測試驗證（tests/test_runner_paxg.py:350 起）；只管收盤價來源，持有 PAXG 卻取不到成交價時本次執行會中止（runner.py:831）。"
         }
       },
       "emits_event": {
@@ -2653,7 +2653,7 @@
       "emits_event": {
         "btc-competition": {
           "state": "done",
-          "evidence": "src/btc_competition/runner.py:577 第一次發現就寫 R2 事件 PAXG_RULE_MISSING（標 escalated）；規則回來才結束這一輪、下一輪會再通知；寫失敗下一輪補寫。tests/test_runner_paxg.py:602 驗證只通知一次。",
+          "evidence": "src/btc_competition/runner.py:577 第一次發現就寫 R2 事件 PAXG_RULE_MISSING（標 escalated）；持續缺規則不重複通知；缺規則條件不再成立（規則恢復，或 PAXG 已不再持有，tests :616 起）就清旗標，之後再成立會重新通知；寫失敗下一輪補寫。tests/test_runner_paxg.py:602 驗證只通知一次。",
           "verified_at": "2026-11-18",
           "limit": "A1 沒發生過；事件寫進日誌後 LINE 是否送達沒有實測。"
         }
