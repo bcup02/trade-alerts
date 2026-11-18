@@ -7,6 +7,7 @@ it by hand; here the handler must reach the same correction on its own.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -135,6 +136,68 @@ def test_a_certain_duplicate_send_is_corrected_like_the_manual_h4_fix(tmp_path):
     assert event["details"]["post"] == {"queued": "corr-1"}
     assert outstanding_error_requests(paths.request_queue) == []
     assert json.loads(Path(paths.ops_export).read_text())["notices"][0]["code"] == "SEY." + CODE_CORRECTED
+
+
+def _with_hook(adapter, hook):
+    return dataclasses.replace(adapter, after_trade_correction=hook)
+
+
+def _notice_after(hook, tmp_path):
+    paths = _setup(tmp_path)
+    adapter = _with_hook(_trade_adapter(paths, Exchange(_client_ids())), hook)
+    _round(adapter, paths)
+    [event] = read_fleet_events(paths.fleet_event_log)
+    return event
+
+
+GOOGLE_LINE = "Google 表的更正沒有排進待派送佇列"
+
+
+@pytest.mark.parametrize("hook_result", [{"google_intent_error": "ConnectionError: boom"}, {"error": "RuntimeError: boom"}])
+def test_f89_a_failed_google_queue_is_said_in_the_notice(tmp_path, hook_result):
+    event = _notice_after(lambda fields, event_id: dict(hook_result), tmp_path)
+    notice = event["details"]["notice_text"]
+    assert GOOGLE_LINE in notice and "帳本已正確" in notice
+    assert "boom" not in notice                                # outside text is not copied into the notice
+    assert event["details"]["post"] == hook_result              # ...but it stays in the event for the person who investigates
+
+
+def test_f89_a_hook_that_raises_is_said_in_the_notice_too(tmp_path):
+    def hook(fields, event_id):
+        raise RuntimeError("queue down")
+    event = _notice_after(hook, tmp_path)
+    assert GOOGLE_LINE in event["details"]["notice_text"]
+    assert event["details"]["post"] == {"error": "RuntimeError: queue down"}
+    assert "queue down" not in event["details"]["notice_text"]
+
+
+@pytest.mark.parametrize("hook_result", [{"google_intent_id": "intent-1"}, {"google_queued": 1}, {}, {"google_intent_error": ""}, {"google_intent_error": None}])
+def test_f89_a_queued_or_unreported_google_follow_up_adds_no_line(tmp_path, hook_result):
+    event = _notice_after(lambda fields, event_id: dict(hook_result), tmp_path)
+    assert GOOGLE_LINE not in event["details"]["notice_text"]
+
+
+def test_f89_a_spot_notice_says_a_failed_google_queue(tmp_path):
+    paths, state = _spot_setup(tmp_path)
+    client = {"501": "btc-a", "502": "btc-a"}
+
+    def append_spot_fills(symbol, order_id, fills):
+        with open(paths.ledger, "a", encoding="utf-8") as fh:
+            for f in fills:
+                fh.write(json.dumps({"event_type": "spot_fill", "event_id": f"x{order_id}", "order_id": order_id,
+                                     "symbol": symbol, "quantity": f["quantity"]}) + "\n")
+        return {"event_ids": [f"x{order_id}"], "google_intent_error": "ConnectionError: boom"}
+
+    adapter = UnrecordedFillAdapter(
+        project="btc-competition", style="spot", client_ids=True, evidence_source="fixture",
+        client_order_id=lambda _s, oid: client.get(oid),
+        fetch_fills=lambda _s, ids: [f for f in state["fills"] if str(f["order_id"]) in ids],
+        append_spot_fills=append_spot_fills,
+    )
+    run_unrecorded_fill_round(adapter, paths, catalog=CATALOG, now=NOW)
+    [event] = read_fleet_events(paths.fleet_event_log)
+    assert GOOGLE_LINE in event["details"]["notice_text"] and "boom" not in event["details"]["notice_text"]
+    assert event["details"]["written"]["google_intent_error"] == "ConnectionError: boom"
 
 
 def test_the_next_round_finds_nothing_left_to_do(tmp_path):

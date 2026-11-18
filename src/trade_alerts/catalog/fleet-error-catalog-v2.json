@@ -1142,7 +1142,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "seykota",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:677"
       ],
       "current": {
         "latch": null,
@@ -1173,7 +1173,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "seykota",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
       ],
       "current": {
         "latch": null,
@@ -1205,7 +1205,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:677"
       ],
       "current": {
         "latch": null,
@@ -1236,7 +1236,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "momentum",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
       ],
       "current": {
         "latch": null,
@@ -1268,7 +1268,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "btc-competition",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:707"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:722"
       ],
       "current": {
         "latch": null,
@@ -1299,7 +1299,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "btc-competition",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
       ],
       "current": {
         "latch": null,
@@ -1331,7 +1331,7 @@
       "title": "策略重複送單造成帳本漏記，已照交易所自動更正",
       "project": "mycrypto",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:677"
       ],
       "current": {
         "latch": null,
@@ -1362,7 +1362,7 @@
       "title": "交易所有成交、帳本沒記，無法自動更正",
       "project": "mycrypto",
       "sources": [
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
       ],
       "current": {
         "latch": null,
@@ -2426,7 +2426,7 @@
       "project": "trend-meteor",
       "sources": [
         "src/trend_meteor/unrecorded_fill_adapter.py:85",
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:663"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:677"
       ],
       "current": {
         "latch": null,
@@ -2458,7 +2458,7 @@
       "project": "trend-meteor",
       "sources": [
         "src/trend_meteor/unrecorded_fill_adapter.py:85",
-        "trade-alerts/src/trade_alerts/unrecorded_fill.py:737"
+        "trade-alerts/src/trade_alerts/unrecorded_fill.py:752"
       ],
       "current": {
         "latch": null,
