@@ -724,17 +724,21 @@ def check_competition_paxg(ctx: Context) -> Result:
 CRYPTO_REOPENED = datetime(2026, 10, 23, 8, 22, tzinfo=timezone.utc)
 OPS_READING_FRESH_MINUTES = 90            # ops-notify polls every 10 minutes; the slowest reading (export, google) is a few polls old
 _HEALTHY_VALUES = frozenset({"OK", "RECONCILED", "HEALTHY"})
-_STABLE_TARGETS = tuple(REPOS) + ("host",)
+#: 舊趨勢策略 2026-11-18 在 A1 下線（進度頁 4.1）：維運通知的 seykota 目標關掉（OPS_NOTIFY_SEYKOTA_AUDIT=off），不再有讀數。
+#: 穩定檢查只看還在運作的三支策略與主機；seykota 留在 REPOS 是因為登記冊 sources 與部署複本比對仍用它的名稱。
+_RETIRED_A1_STRATEGIES = frozenset({"seykota"})
+_ACTIVE_A1_STRATEGIES = tuple(k for k in REPOS if k not in _RETIRED_A1_STRATEGIES)
+_STABLE_TARGETS = _ACTIVE_A1_STRATEGIES + ("host",)
 _STRATEGY_AXES = ("runtime", "ledger", "google", "export", "units")
-#: Every reading the stability check needs: five axes per strategy and the host clock (21 in all).
-REQUIRED_READINGS = tuple(f"{t}:{a}" for t in REPOS for a in _STRATEGY_AXES) + ("host:clock",)
+#: Every reading the stability check needs: five axes per running strategy and the host clock (16 in all).
+REQUIRED_READINGS = tuple(f"{t}:{a}" for t in _ACTIVE_A1_STRATEGIES for a in _STRATEGY_AXES) + ("host:clock",)
 #: The only axis that has no ``checked_at`` by design (ops-notify's units axis is a systemctl look at the moment of the poll).
 #: Every other required reading must carry a parseable, fresh ``checked_at``; this one is judged by the others being fresh.
 _NO_TIMESTAMP_AXES = frozenset({"units"})
 
 
 def _ops_readings(ctx: Context) -> dict[str, Mapping[str, Any]]:
-    """The 21 ``REQUIRED_READINGS`` from ops-notify's state file on A1.  A missing reading, a reading that is not an object, a
+    """The 16 ``REQUIRED_READINGS`` from ops-notify's state file on A1.  A missing reading, a reading that is not an object, a
     missing / unparseable / stale ``checked_at`` (except on the units axis) is an error: ops-notify itself is then not looking,
     and an unobservable state is never a quiet pass (review of #306)."""
     state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
@@ -753,7 +757,7 @@ def _ops_readings(ctx: Context) -> dict[str, Mapping[str, Any]]:
 def check_a1_stable(ctx: Context) -> Result:
     """x8 / f-63 / x5 (third part): A1 has had no unhealthy reading for ``STABLE_STREAK``.
 
-    Reads the readings ops-notify keeps for all four strategies and the host (runtime HEALTHY, ledger and Google RECONCILED,
+    Reads the readings ops-notify keeps for the three running strategies and the host (runtime HEALTHY, ledger and Google RECONCILED,
     export / units / clock OK, each with ``severity`` ok).  The streak is ``_streak``'s: it restarts on any unhealthy reading and
     after any stretch no run could see.  This is only what ops-notify watches: that the funding-fee sync exits 0 every 4 hours
     and that no stop price or stop order changed are NOT read here -- say so when closing the items."""
@@ -764,12 +768,12 @@ def check_a1_stable(ctx: Context) -> Result:
                     if k.endswith(":runtime") and v.get("value") == "PAUSED" and v.get("severity") == "ok")
     bad = sorted(k for k, v in readings.items()
                  if v.get("severity") != "ok" or (v.get("value") not in _HEALTHY_VALUES and k not in paused))
-    evidence = [f"{len(readings)} 個必要讀數（四支策略各 5 項＋主機時鐘）全部讀到且新鮮"]
+    evidence = [f"{len(readings)} 個必要讀數（三支策略各 5 項＋主機時鐘）全部讀到且新鮮"]
     paused_names = "、".join(k.partition(":")[0] for k in paused)
     if paused:
         evidence.append(f"暫停中的策略（運行狀態 PAUSED，不算穩定證據）：{paused_names}")
     # Who the wording below speaks for: with a strategy paused on purpose, only the running ones are vouched for.
-    scope = f"A1 運行中的策略與主機（不含暫停中的 {paused_names}）" if paused else "A1 四支策略與主機"
+    scope = f"A1 運行中的策略與主機（不含暫停中的 {paused_names}）" if paused else "A1 三支策略與主機"
     scope_note = f"；暫停中的 {paused_names} 沒有被驗證，結案只對運行中的策略有效" if paused else ""
     if bad:
         return Result(WAITING, "A1 現在有讀數不正常，穩定時間重新算：" + "、".join(f"{k}={readings[k].get('value')}" for k in bad[:5]) + "。", evidence)
@@ -1324,7 +1328,7 @@ CHECKS: tuple[Check, ...] = (
     Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
     Check("dust-convert", "競賽策略第一次真實粉塵轉換", ("f-66",), check_dust_convert),
     Check("competition-paxg", "A1 競賽策略第一批 PAXG 成交：帳本、Google 表對帳，請人工看表與幣安 App", ("phase-r033-p4",), check_competition_paxg),
-    Check("a1-stable", "A1 四支策略與主機讀數連續正常（x8、f-63、x5 的穩定天數）", ("phase-x8", "f-63", "phase-x5"), check_a1_stable),
+    Check("a1-stable", "A1 三支策略與主機讀數連續正常（x8、f-63、x5 的穩定天數）", ("phase-x8", "f-63", "phase-x5"), check_a1_stable),
     Check("crypto-one-entry-a-day", "A1 加密策略同一個 UTC 日只進場一次", ("f-63",), check_crypto_one_entry_a_day),
     Check("crypto-stop", "A1 加密策略停損觸發與移動停損", ("phase-x5",), check_crypto_stop),
     Check("momentum-halt-notice", "A1 動能策略真實安全暫停通知在預期時間內送出", ("f-38",), check_momentum_halt_notice),
