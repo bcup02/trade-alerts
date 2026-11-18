@@ -916,7 +916,7 @@ def test_trend_meteor_has_its_column_and_the_pending_mechanism_still_guards_the_
 def test_trend_meteor_has_no_done_cell_until_it_runs_on_the_live_branch(registry):
     """『已做』只算正式機分支（operations）上的；V11 還沒上線，所有格子只能是未做、已完成未上線或不適用，不能有已做。有一格寫已做就要先確認 sources 的 commit 真的含 V11 程式。"""
     rows = project_rows(registry, "trend-meteor")
-    assert len(rows) == 35 + 2 * (9 + 37)                                                     # 35 項能力＋（9 條 FLEET＋36 條 MET）×（行為、事件）
+    assert len(rows) == 36 + 2 * (9 + 37)                                                     # 36 項能力＋（9 條 FLEET＋36 條 MET）×（行為、事件）
     assert {r["state"] for r in rows.values()} <= {"built", "pending", "n/a"}, [k for k, r in rows.items() if r["state"] == "done"]
 
 
