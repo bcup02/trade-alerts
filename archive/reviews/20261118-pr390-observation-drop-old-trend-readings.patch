@@ -1,0 +1,181 @@
+diff --git a/docs/observation-watch.md b/docs/observation-watch.md
+index fe0bc3c..020aac3 100644
+--- a/docs/observation-watch.md
++++ b/docs/observation-watch.md
+@@ -69,7 +69,7 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項
+ ## f-70 第二批：A1 穩定天數、f-63、x5、f-38（`a1-stable`、`crypto-one-entry-a-day`、`crypto-stop`、`momentum-halt-notice`）
+ 沒有新增可讀路徑（只讀已在清單內的 `/var/lib/ops-notify/state.json`、加密的 `trading_ledger.jsonl`／`ledger_status.json`／`state/state.json`、動能的 `fleet_event_log.jsonl`）。
+ 
+-- **`a1-stable`（x8、f-63、x5 第三項）**：讀維運通知的讀數檔裡四支策略各 5 個軸（運行狀態＝HEALTHY、帳本與 Google 表＝RECONCILED、匯出檔與服務單元＝OK）＋主機時鐘，全部 `severity` 為 ok 且值正常才算正常。穩定時間沿用第一批的 `_streak`（72 小時、前一個正常輪次超過 45 分鐘就重算），有任何一個讀數不正常也重算。必要讀數共 21 個（四支策略各 5 軸＋`host:clock`），缺任何一個、不是物件、或 `checked_at` 缺少／讀不懂／超過 90 分鐘都是 `error`（維運通知自己沒在看，不能當通過）；唯一設計上沒有 `checked_at` 的是服務單元軸（`units`），那一軸有時間戳時仍要新鮮（審閱 #306 BLOCK-306-01／02）。**只涵蓋維運通知看的項目**：資金費同步每 4 小時 exit 0、停損價與停損單不變，程式沒讀，結案前我另外到主機查（通知文字會寫明）。
++- **`a1-stable`（x8、f-63、x5 第三項）**：讀維運通知的讀數檔裡三支策略（動能、加密、競賽；舊趨勢策略 2026-11-18 下線後不再看）各 5 個軸（運行狀態＝HEALTHY、帳本與 Google 表＝RECONCILED、匯出檔與服務單元＝OK）＋主機時鐘，全部 `severity` 為 ok 且值正常才算正常。穩定時間沿用第一批的 `_streak`（72 小時、前一個正常輪次超過 45 分鐘就重算），有任何一個讀數不正常也重算。必要讀數共 16 個（三支策略各 5 軸＋`host:clock`），缺任何一個、不是物件、或 `checked_at` 缺少／讀不懂／超過 90 分鐘都是 `error`（維運通知自己沒在看，不能當通過）；唯一設計上沒有 `checked_at` 的是服務單元軸（`units`），那一軸有時間戳時仍要新鮮（審閱 #306 BLOCK-306-01／02）。**只涵蓋維運通知看的項目**：資金費同步每 4 小時 exit 0、停損價與停損單不變，程式沒讀，結案前我另外到主機查（通知文字會寫明）。
+ - **`crypto-one-entry-a-day`（f-63）**：A1 加密帳本 2026-10-23 台北 16:22（重開）之後 `source=entry_signal`、LIVE 的 `trade_open`，按 UTC 日分組；同一個 UTC 日有兩個不同 `trade_id` 的進場立刻 `failed`（同一筆交易的加碼不算）。可結案的條件：重開後有進場，且那一天（UTC）已結束、當天只進場一次——代表策略帶著修法活過一次 UTC 午夜。證據行會寫那幾天有沒有出場；「出場後同一天再進場」這個真正出過事的情形沒測到時會明說。
+ - **`crypto-stop`（x5 前兩項）**：停損觸發＝重開後 LIVE 的 `trade_close` 且 `source` 以 `native_stop` 開頭，要等其後（超過寬限）的帳本對交易所對帳 `RECONCILED` 才算看到，`DIVERGED` 是 `failed`；移動停損沿用開發機 x5b 的判斷（`_follow_stop`，從 x5b 檢查抽出，行為不變）：同一筆交易兩輪之間停損單號換新且價格收緊（空單往下、多單往上）。**永遠不可結案（`needs_human`）**：撤舊再掛「沒有空窗」從這些檔案看不出來，結案時我到交易所查。兩輪（30 分鐘）之間移動又平倉會看漏。
+ - **`momentum-halt-notice`（f-38）**：A1 動能的真實（非測試）R3 事件，量 `recorded_at` 到維運通知的 `delivered` 時間（上限 15 分鐘＝匯出計時器 1 分鐘＋輪詢 10 分鐘＋餘裕），並看動能的匯出檔軸是 OK（讀數缺少或沒有 severity 是 `error`，不是 OK 就是 `failed`，都不會可結案）（刷新計時器壞掉會讓它變過期）；超過時間、第二則欠送超過 70 分鐘、匯出檔軸不正常都是 `failed`。匯出檔本身的修改時間沒有讀，用送達延遲推定「約一分鐘內更新」，證據行會寫明。與 `safe-halt-notice`（f-35／f-37）看同一類事件，同一則動能 R3 事件可能各傳一則通知（涵蓋的項目不同）。
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index 26dc072..9684c15 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -724,17 +724,21 @@ def check_competition_paxg(ctx: Context) -> Result:
+ CRYPTO_REOPENED = datetime(2026, 10, 23, 8, 22, tzinfo=timezone.utc)
+ OPS_READING_FRESH_MINUTES = 90            # ops-notify polls every 10 minutes; the slowest reading (export, google) is a few polls old
+ _HEALTHY_VALUES = frozenset({"OK", "RECONCILED", "HEALTHY"})
+-_STABLE_TARGETS = tuple(REPOS) + ("host",)
++#: 舊趨勢策略 2026-11-18 在 A1 下線（進度頁 4.1）：維運通知的 seykota 目標關掉（OPS_NOTIFY_SEYKOTA_AUDIT=off），不再有讀數。
++#: 穩定檢查只看還在運作的三支策略與主機；seykota 留在 REPOS 是因為登記冊 sources 與部署複本比對仍用它的名稱。
++_RETIRED_A1_STRATEGIES = frozenset({"seykota"})
++_ACTIVE_A1_STRATEGIES = tuple(k for k in REPOS if k not in _RETIRED_A1_STRATEGIES)
++_STABLE_TARGETS = _ACTIVE_A1_STRATEGIES + ("host",)
+ _STRATEGY_AXES = ("runtime", "ledger", "google", "export", "units")
+-#: Every reading the stability check needs: five axes per strategy and the host clock (21 in all).
+-REQUIRED_READINGS = tuple(f"{t}:{a}" for t in REPOS for a in _STRATEGY_AXES) + ("host:clock",)
++#: Every reading the stability check needs: five axes per running strategy and the host clock (16 in all).
++REQUIRED_READINGS = tuple(f"{t}:{a}" for t in _ACTIVE_A1_STRATEGIES for a in _STRATEGY_AXES) + ("host:clock",)
+ #: The only axis that has no ``checked_at`` by design (ops-notify's units axis is a systemctl look at the moment of the poll).
+ #: Every other required reading must carry a parseable, fresh ``checked_at``; this one is judged by the others being fresh.
+ _NO_TIMESTAMP_AXES = frozenset({"units"})
+ 
+ 
+ def _ops_readings(ctx: Context) -> dict[str, Mapping[str, Any]]:
+-    """The 21 ``REQUIRED_READINGS`` from ops-notify's state file on A1.  A missing reading, a reading that is not an object, a
++    """The 16 ``REQUIRED_READINGS`` from ops-notify's state file on A1.  A missing reading, a reading that is not an object, a
+     missing / unparseable / stale ``checked_at`` (except on the units axis) is an error: ops-notify itself is then not looking,
+     and an unobservable state is never a quiet pass (review of #306)."""
+     state = load_json(ctx.remote, "a1", "/var/lib/ops-notify/state.json")
+@@ -753,7 +757,7 @@ def _ops_readings(ctx: Context) -> dict[str, Mapping[str, Any]]:
+ def check_a1_stable(ctx: Context) -> Result:
+     """x8 / f-63 / x5 (third part): A1 has had no unhealthy reading for ``STABLE_STREAK``.
+ 
+-    Reads the readings ops-notify keeps for all four strategies and the host (runtime HEALTHY, ledger and Google RECONCILED,
++    Reads the readings ops-notify keeps for the three running strategies and the host (runtime HEALTHY, ledger and Google RECONCILED,
+     export / units / clock OK, each with ``severity`` ok).  The streak is ``_streak``'s: it restarts on any unhealthy reading and
+     after any stretch no run could see.  This is only what ops-notify watches: that the funding-fee sync exits 0 every 4 hours
+     and that no stop price or stop order changed are NOT read here -- say so when closing the items."""
+@@ -764,12 +768,12 @@ def check_a1_stable(ctx: Context) -> Result:
+                     if k.endswith(":runtime") and v.get("value") == "PAUSED" and v.get("severity") == "ok")
+     bad = sorted(k for k, v in readings.items()
+                  if v.get("severity") != "ok" or (v.get("value") not in _HEALTHY_VALUES and k not in paused))
+-    evidence = [f"{len(readings)} 個必要讀數（四支策略各 5 項＋主機時鐘）全部讀到且新鮮"]
++    evidence = [f"{len(readings)} 個必要讀數（三支策略各 5 項＋主機時鐘）全部讀到且新鮮"]
+     paused_names = "、".join(k.partition(":")[0] for k in paused)
+     if paused:
+         evidence.append(f"暫停中的策略（運行狀態 PAUSED，不算穩定證據）：{paused_names}")
+     # Who the wording below speaks for: with a strategy paused on purpose, only the running ones are vouched for.
+-    scope = f"A1 運行中的策略與主機（不含暫停中的 {paused_names}）" if paused else "A1 四支策略與主機"
++    scope = f"A1 運行中的策略與主機（不含暫停中的 {paused_names}）" if paused else "A1 三支策略與主機"
+     scope_note = f"；暫停中的 {paused_names} 沒有被驗證，結案只對運行中的策略有效" if paused else ""
+     if bad:
+         return Result(WAITING, "A1 現在有讀數不正常，穩定時間重新算：" + "、".join(f"{k}={readings[k].get('value')}" for k in bad[:5]) + "。", evidence)
+@@ -1324,7 +1328,7 @@ CHECKS: tuple[Check, ...] = (
+     Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
+     Check("dust-convert", "競賽策略第一次真實粉塵轉換", ("f-66",), check_dust_convert),
+     Check("competition-paxg", "A1 競賽策略第一批 PAXG 成交：帳本、Google 表對帳，請人工看表與幣安 App", ("phase-r033-p4",), check_competition_paxg),
+-    Check("a1-stable", "A1 四支策略與主機讀數連續正常（x8、f-63、x5 的穩定天數）", ("phase-x8", "f-63", "phase-x5"), check_a1_stable),
++    Check("a1-stable", "A1 三支策略與主機讀數連續正常（x8、f-63、x5 的穩定天數）", ("phase-x8", "f-63", "phase-x5"), check_a1_stable),
+     Check("crypto-one-entry-a-day", "A1 加密策略同一個 UTC 日只進場一次", ("f-63",), check_crypto_one_entry_a_day),
+     Check("crypto-stop", "A1 加密策略停損觸發與移動停損", ("phase-x5",), check_crypto_stop),
+     Check("momentum-halt-notice", "A1 動能策略真實安全暫停通知在預期時間內送出", ("f-38",), check_momentum_halt_notice),
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index bea1a86..205d3db 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -1828,9 +1828,9 @@ _AXIS_VALUES = {"runtime": "HEALTHY", "ledger": "RECONCILED", "google": "RECONCI
+ 
+ 
+ def ops_readings(now=B2_NOW, **overrides):
+-    """ops-notify's per-axis readings for the four strategies and the host clock; ``overrides`` maps ``target:axis`` to a dict."""
++    """ops-notify's per-axis readings for the three running strategies and the host clock; ``overrides`` maps ``target:axis`` to a dict."""
+     state = {}
+-    for target in (*ow.REPOS, "host"):
++    for target in (*ow._ACTIVE_A1_STRATEGIES, "host"):
+         for axis, value in (_AXIS_VALUES.items() if target != "host" else [("clock", "OK")]):
+             state[f"{target}:{axis}"] = {"severity": "ok", "value": value,
+                                          "checked_at": None if axis == "units" else iso(now - timedelta(minutes=5))}
+@@ -1859,7 +1859,7 @@ def test_a1_stable_starts_a_streak_and_announces_after_72_hours_only():
+ @pytest.mark.parametrize("override", [
+     {"mycrypto__runtime": {"severity": "critical", "value": "STALE"}},
+     {"momentum__ledger": {"severity": "warn", "value": "DIVERGED"}},
+-    {"seykota__units": {"severity": "critical", "value": "FAILED"}},
++    {"momentum__units": {"severity": "critical", "value": "FAILED"}},
+     {"host__clock": {"value": "UNSYNCED"}},                                                # severity ok but not a healthy value
+ ])
+ def test_a1_stable_any_unhealthy_reading_restarts_the_streak(override):
+@@ -1870,31 +1870,31 @@ def test_a1_stable_any_unhealthy_reading_restarts_the_streak(override):
+ 
+ def test_a1_stable_a_paused_strategy_does_not_restart_the_streak_but_is_named():
+     prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
+-    result = ow.check_a1_stable(b2_ctx(ops_remote(seykota__runtime={"severity": "ok", "value": "PAUSED"}), prev))
++    result = ow.check_a1_stable(b2_ctx(ops_remote(momentum__runtime={"severity": "ok", "value": "PAUSED"}), prev))
+     assert result.state == ow.OBSERVED and result.closable and result.extra["healthy_since"] == prev["healthy_since"]
+-    assert any("暫停中" in line and "seykota" in line and "不算穩定證據" in line for line in result.evidence)
++    assert any("暫停中" in line and "momentum" in line and "不算穩定證據" in line for line in result.evidence)
+     # the headline must not claim four strategies: it names who it speaks for and who it does not
+-    assert "四支策略" not in result.summary and "不含暫停中的 seykota" in result.summary and "沒有被驗證" in result.summary
++    assert "四支策略" not in result.summary and "不含暫停中的 momentum" in result.summary and "沒有被驗證" in result.summary
+     assert "A1 四支策略與主機的讀數已連續正常" not in result.summary
+ 
+ 
+ def test_a1_stable_a_paused_strategy_under_72_hours_is_also_worded_honestly():
+     prev = {"healthy_since": iso(B2_NOW - timedelta(hours=10)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
+-    result = ow.check_a1_stable(b2_ctx(ops_remote(seykota__runtime={"severity": "ok", "value": "PAUSED"}), prev))
++    result = ow.check_a1_stable(b2_ctx(ops_remote(momentum__runtime={"severity": "ok", "value": "PAUSED"}), prev))
+     assert result.state == ow.WAITING and not result.closable
+-    assert "不含暫停中的 seykota" in result.summary and "A1 讀數全部正常" not in result.summary
++    assert "不含暫停中的 momentum" in result.summary and "A1 讀數全部正常" not in result.summary
+ 
+ 
+ def test_a1_stable_without_a_pause_keeps_the_original_wording():
+     prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
+     done = ow.check_a1_stable(b2_ctx(ops_remote(), prev))
+-    assert done.summary.startswith("A1 四支策略與主機的讀數已連續正常 100 小時。") and "暫停" not in done.summary
++    assert done.summary.startswith("A1 三支策略與主機的讀數已連續正常 100 小時。") and "暫停" not in done.summary
+ 
+ 
+ @pytest.mark.parametrize("override", [
+-    {"seykota__runtime": {"severity": "warn", "value": "PAUSED"}},          # PAUSED is only fine at severity ok
+-    {"seykota__ledger": {"severity": "ok", "value": "PAUSED"}},             # and only on the runtime axis
+-    {"seykota__runtime": {"severity": "ok", "value": "STALE"}},
++    {"momentum__runtime": {"severity": "warn", "value": "PAUSED"}},          # PAUSED is only fine at severity ok
++    {"momentum__ledger": {"severity": "ok", "value": "PAUSED"}},             # and only on the runtime axis
++    {"momentum__runtime": {"severity": "ok", "value": "STALE"}},
+ ])
+ def test_a1_stable_paused_is_accepted_only_as_runtime_with_severity_ok(override):
+     prev = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
+@@ -2148,8 +2148,8 @@ def test_batch2_checks_are_registered_with_their_items():
+ LONG_STREAK = {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}
+ 
+ 
+-def test_the_stability_check_needs_exactly_the_21_required_readings():
+-    assert len(ow.REQUIRED_READINGS) == 21 and len(set(ow.REQUIRED_READINGS)) == 21
++def test_the_stability_check_needs_exactly_the_16_required_readings():
++    assert len(ow.REQUIRED_READINGS) == 16 and len(set(ow.REQUIRED_READINGS)) == 16
+     assert set(ow.REQUIRED_READINGS) == set(ops_readings())
+ 
+ 
+@@ -2176,7 +2176,7 @@ def test_a1_stable_five_runtime_readings_alone_cannot_close():
+     {"checked_at": None}, {"checked_at": ""}, {"checked_at": "garbage"}, {"checked_at": iso(B2_NOW - timedelta(hours=3))},
+     {"checked_at": iso(B2_NOW + timedelta(hours=3))}, "not an object", None,
+ ])
+-@pytest.mark.parametrize("axis", ["mycrypto__runtime", "momentum__ledger", "seykota__google", "btc-competition__export", "host__clock"])
++@pytest.mark.parametrize("axis", ["mycrypto__runtime", "momentum__ledger", "momentum__google", "btc-competition__export", "host__clock"])
+ def test_a1_stable_a_timestamped_axis_without_a_usable_checked_at_is_an_error(axis, reading):
+     """BLOCK-306-02: only the units axis may lack ``checked_at``; every other one must have a parseable fresh time."""
+     state = ops_readings()
+@@ -2195,7 +2195,7 @@ def test_a1_stable_only_the_units_axis_may_lack_a_timestamp_and_a_bad_one_there_
+     for bad in ("garbage", iso(B2_NOW - timedelta(hours=3))):
+         with pytest.raises(ow.RemoteError):
+             ow.check_a1_stable(b2_ctx(ops_remote(**{"momentum__units": {"checked_at": bad}}), LONG_STREAK))
+-    assert ops_readings()["seykota:units"]["checked_at"] is None                        # the fixture really models the by-design gap
++    assert ops_readings()["momentum:units"]["checked_at"] is None                        # the fixture really models the by-design gap
+ 
+ 
+ @pytest.mark.parametrize("reading", [None, {}, {"value": "OK"}, {"severity": None, "value": "OK"}, {"severity": 1}, "ok"])
+@@ -2335,3 +2335,9 @@ def test_v11_a_missing_reconcile_status_right_after_the_first_fill_is_waiting_bu
+     remote.files[("dev", ow.V11_LEDGER_STATUS)] = "{not json"
+     with pytest.raises(ow.RemoteError, match="not JSON"):
+         ow.check_dev_v11_cycle(ctx(remote))
++
++
++def test_the_retired_old_trend_strategy_is_not_a_required_ops_reading():
++    """舊趨勢策略 2026-11-18 在 A1 下線、維運通知的 seykota 目標關掉：穩定檢查不能再要求它的讀數，否則整個檢查壞掉。"""
++    assert not any(k.startswith("seykota:") for k in ow.REQUIRED_READINGS)
++    assert "seykota" not in ow._STABLE_TARGETS and "seykota" in ow.REPOS     # REPOS 仍留著它（登記冊 sources 與部署複本比對用）
