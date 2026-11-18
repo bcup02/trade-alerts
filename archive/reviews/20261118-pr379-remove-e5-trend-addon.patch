@@ -1,0 +1,102 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index 17f1b1e..76dcc37 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.41"
++version = "0.30.42"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index a050cc3..26dc072 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -425,23 +425,6 @@ def check_competition_fill(ctx: Context) -> Result:
+     return Result(WAITING, "競賽策略有新成交，等成交寬限期過後的 Google 表對帳。", [f"對帳={status.get('value')}，檢查時間 {taipei_text(status.get('checked_at'))}"])
+ 
+ 
+-def check_trend_addon(ctx: Context) -> Result:
+-    """e-5: a trade with a pyramid add on A1 shows the whole-trade entry price and size on the sheet."""
+-    events = jsonl(ctx.remote.read("a1", audit("seykota", "trading_ledger.jsonl")))
+-    opens: dict[str, int] = {}
+-    for event in _trades_after(events, datetime(2026, 10, 8, 12, 30, tzinfo=timezone.utc), ("trade_open",)):
+-        opens[str(event.get("trade_id"))] = opens.get(str(event.get("trade_id")), 0) + 1
+-    added = sorted(t for t, n in opens.items() if n >= 2)
+-    if not added:
+-        return Result(WAITING, "A1 趨勢策略還沒有加碼的交易。")
+-    status = load_json(ctx.remote, "a1", audit("seykota", "google_reconcile_status.json"))
+-    last = max(parse_time(e["event_time"]) for e in _trades_after(jsonl(ctx.remote.read("a1", audit("seykota", "trading_ledger.jsonl"))),
+-                                                               datetime(2026, 10, 8, 12, 30, tzinfo=timezone.utc), ("trade_open",)))
+-    ok = reconcile_covers(status, last, ctx.now) == "covered"
+-    return Result(OBSERVED if ok else WAITING, "A1 趨勢策略出現加碼的交易：請到 Google 表確認進場價與數量是整筆加權值（機器只能確認對帳一致）。",
+-                  [f"加碼交易：{', '.join(added)}", f"對帳：{status.get('value')}"], needs_human=True, key=",".join(added))
+-
+-
+ V11_HEARTBEAT_MAX_AGE = timedelta(hours=26)      # 每日單元一天跑一次（00:10 UTC）；超過 26 小時沒有新的心跳＝這一天沒跑成
+ 
+ 
+@@ -1336,7 +1319,6 @@ def check_registry_drift(ctx: Context) -> Result:
+ CHECKS: tuple[Check, ...] = (
+     Check("sheet-tab-names", "四支策略的新交易走新分頁名", ("f-26",), check_sheet_tab_names),
+     Check("competition-fill", "競賽策略現貨成交送上表", ("e-2",), check_competition_fill),
+-    Check("trend-addon", "A1 趨勢策略加碼交易", ("e-5",), check_trend_addon),
+     Check("dev-crypto-x5b", "開發機加密策略依訊號進場、移動停損、停損觸發（x5b）", ("phase-x5b",), check_dev_crypto_x5b),
+     Check("dev-v11-cycle", "開發機 V11（競賽策略・流星版）在測試網完整跑一個日循環", ("phase-v10-p3",), check_dev_v11_cycle),
+     Check("health-publish", "維運讀數發布單元兩台連續正常", ("f-45",), check_health_publish),
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index ce679a8..bad2144 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -351,4 +351,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.41"
++__version__ = "0.30.42"
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index f98c368..bea1a86 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -148,7 +148,7 @@ def test_tabs_demo_trades_are_not_real_trades():
+     assert ow.check_sheet_tab_names(ctx(r)).state == ow.WAITING
+ 
+ 
+-# --- competition fill (e-2), trend add-on (e-5) ----------------------------------------------------------
++# --- competition fill (e-2) ----------------------------------------------------------
+ 
+ def test_competition_fill_waits_then_closes_when_the_sheet_agrees():
+     r = tabs_remote()
+@@ -158,20 +158,6 @@ def test_competition_fill_waits_then_closes_when_the_sheet_agrees():
+     assert result.state == ow.OBSERVED and result.closable
+ 
+ 
+-def test_trend_addon_needs_a_human_to_look_at_the_sheet():
+-    r = tabs_remote()
+-    put(r, "a1", "seykota", "trading_ledger.jsonl",
+-        [trade(9, "trade_open", trade_id="T1"), trade(5, "trade_open", trade_id="T1"), trade(4, "trade_open", trade_id="T2")], jsonl=True)
+-    result = ow.check_trend_addon(ctx(r))
+-    assert result.state == ow.OBSERVED and result.needs_human and not result.closable and "T1" in result.evidence[0]
+-
+-
+-def test_trend_without_an_add_keeps_waiting():
+-    r = tabs_remote()
+-    put(r, "a1", "seykota", "trading_ledger.jsonl", [trade(9, "trade_open", trade_id="T1")], jsonl=True)
+-    assert ow.check_trend_addon(ctx(r)).state == ow.WAITING
+-
+-
+ # --- status alerts (f-23 / f-40 / f-41) and reminders (f-39) --------------------------------------------------------
+ 
+ def line(notices, attempted, sent, failures=0, stamp="Oct 14 03:10:01"):
+@@ -652,7 +638,7 @@ def test_every_check_has_a_unique_id_and_names_the_items_it_covers():
+     assert len(ids) == len(set(ids))
+     assert all(c.covers and c.title for c in ow.CHECKS)
+     covered = {i for c in ow.CHECKS for i in c.covers}
+-    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "e-5", "phase-g2", "phase-x5b", "phase-r033-p4"} <= covered
++    assert {"phase-sync1", "phase-sync4", "f-23", "f-26", "f-30", "f-35", "f-37", "f-39", "f-40", "f-41", "e-2", "phase-g2", "phase-x5b", "phase-r033-p4"} <= covered
+ 
+ 
+ # --- deployment files ----------------------------------------------------------------------------------------------
