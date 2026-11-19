@@ -144,6 +144,51 @@ def test_catalog_version_mismatch_is_caught(registry, catalog):
     assert any("catalog is" in p for p in problems)
 
 
+# --- lifecycle: a stopped strategy is registry data, not code ------------------------------------------------------------
+
+
+def test_retired_projects_come_from_the_registry_lifecycle(registry):
+    from trade_alerts.rollout_registry import retired_projects
+
+    assert retired_projects(registry) == ("seykota",) == RETIRED_PROJECTS
+    assert ACTIVE_PROJECTS == ("momentum", "mycrypto", "btc-competition", "trend-meteor")
+    assert retired_projects({}) == () and retired_projects({"lifecycle": "bogus"}) == ()
+    assert retired_projects({"lifecycle": {"momentum": {"state": "retired"}, "nope": {"state": "retired"}}}) == ("momentum",)
+
+
+def test_retiring_a_strategy_is_one_registry_edit(registry, catalog):
+    """The next stopped strategy (e.g. the momentum strategy once a new one replaces it) needs only a lifecycle entry: its cells become optional."""
+    def retire(r):
+        r["lifecycle"]["momentum"] = {"state": "retired", "since": "2026-12-01", "reason": "被新動能策略取代"}
+        for capability in r["capabilities"]:
+            capability["status"].pop("momentum", None)
+        for row in r["catalog"]:
+            for key in ("behaviour", "emits_event"):
+                if len(row[key]) > 1:
+                    row[key].pop("momentum", None)
+    problems = _problems_after(registry, catalog, retire)
+    assert not [p for p in problems if "momentum" in p and "must list" in p], problems
+    # without the lifecycle entry the same removal is an error
+    def drop_cells_only(r):
+        for capability in r["capabilities"]:
+            capability["status"].pop("momentum", None)
+    assert any("must list every active strategy" in p for p in _problems_after(registry, catalog, drop_cells_only))
+
+
+@pytest.mark.parametrize("mutate, expected", [
+    (lambda r: r["lifecycle"].update({"nope": {"state": "retired", "since": "2026-11-18", "reason": "r"}}), "not a known strategy"),
+    (lambda r: r["lifecycle"]["seykota"].update(state="paused"), "state must be one of"),
+    (lambda r: r["lifecycle"]["seykota"].update(since="18/11/2026"), "since must be a YYYY-MM-DD date"),
+    (lambda r: r["lifecycle"]["seykota"].update(since="2026-02-30"), "since must be a YYYY-MM-DD date"),
+    (lambda r: r["lifecycle"]["seykota"].update(reason=" "), "reason must say why"),
+    (lambda r: r["lifecycle"]["seykota"].update(reason="x" * 451), "reason is 451 characters"),
+    (lambda r: r.update(lifecycle=["seykota"]), "lifecycle must be an object"),
+    (lambda r: r["lifecycle"].update({p: dict(r["lifecycle"]["seykota"]) for p in STRATEGY_PROJECTS}), "at least one strategy must stay active"),
+])
+def test_a_broken_lifecycle_is_caught(registry, catalog, mutate, expected):
+    assert any(expected in p for p in _problems_after(registry, catalog, mutate))
+
+
 def test_missing_project_is_caught(registry, catalog):
     problems = _problems_after(registry, catalog, lambda r: r["projects"].pop("mycrypto"))
     assert any(p.startswith("projects must be exactly") for p in problems)

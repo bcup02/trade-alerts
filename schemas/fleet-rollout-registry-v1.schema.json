@@ -207,6 +207,37 @@
         }
       }
     },
+    "lifecycle": {
+      "type": "object",
+      "description": "A stopped strategy (retired): its cells stay as history, the register page shows no column for it, and the observation watch no longer compares its files with A1.  Absent = every strategy is active.",
+      "additionalProperties": false,
+      "patternProperties": {
+        ".*": {
+          "type": "object",
+          "required": [
+            "state",
+            "since",
+            "reason"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "enum": [
+                "retired"
+              ]
+            },
+            "since": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
     "phases": {
       "type": "object",
       "minProperties": 1,
