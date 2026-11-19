@@ -970,6 +970,7 @@ def sheet_ledger_compare(
     ignore: Mapping[str, str] | None = None,
     ignore_problem: str | None = None,
     projection_grace_seconds: int = DEFAULT_SHEET_PROJECTION_GRACE_SECONDS,
+    ledger_readable: bool = False,
 ) -> dict[str, Any]:
     """Pure verdict function for the ledger-vs-sheet layer.  Returns a
     ``google_reconcile_status.json`` document (``RECONCILED`` / ``DIVERGED`` /
@@ -981,6 +982,12 @@ def sheet_ledger_compare(
     one under ``ignored`` and counts them in ``summary['ignored']``.
     ``ignore_problem`` (a list file that could not be used) is carried into the
     document as ``ignore_list_problem`` so it is visible rather than hidden.
+
+    ``ledger_readable``: the caller's statement that it actually read an EXISTING ledger file successfully.  ``read_ledger`` turns
+    a missing or unreadable file into ``[]``, so an empty ``trades`` dict alone cannot tell "never traded" from "ledger lost".  With
+    no real local trades the verdict is therefore ``UNKNOWN`` unless the caller passes ``ledger_readable=True`` (default ``False``:
+    every caller written before this flag keeps the old conservative answer).  With the flag, no trades and no trade rows on the
+    sheet is ``RECONCILED``; a trade row on the sheet that the ledger does not know is still ``DIVERGED``.
 
     ``projection_grace_seconds``: a trade whose open (``SHEET_MISSING_ROW``) or close
     (``SHEET_MISSING_CLOSE``) is younger than this is only *awaiting* the Google
@@ -1020,10 +1027,14 @@ def sheet_ledger_compare(
         return {**base, "value": "UNKNOWN", "discrepancies": [],
                 "note": f"could not read the Google sheet: {fetch_error or 'no rows'}",
                 "summary": {}}
-    # No real local trades is NOT "unknown": the sheet was read fine, so there is a definite answer.  With no data rows on
-    # the sheet either, the two sides agree (a strategy that has never traded, or is paused flat).  Any trade row on the
-    # sheet that the ledger does not know still falls through to the loop below and is reported as LEDGER_MISSING_ROW
-    # (DIVERGED), so an empty ledger can never hide a sheet row.
+    # No real local trades: only the caller knows whether the ledger file was really read (``read_ledger`` returns [] for a
+    # missing or unreadable file too), so without ``ledger_readable`` this stays UNKNOWN -- a lost ledger must never look like
+    # "agrees with an empty sheet".  With it, the sheet was read fine and the ledger was read fine: no data rows on the sheet
+    # either means the two sides agree (a strategy that has never traded, or is paused flat); any trade row on the sheet that
+    # the ledger does not know falls through to the loop below and is reported as LEDGER_MISSING_ROW (DIVERGED).
+    if not trades and not ledger_readable:
+        return {**base, "value": "UNKNOWN", "discrepancies": [],
+                "note": "no real local ledger trades yet", "summary": {}}
 
     def _in_scope(rec: dict[str, Any]) -> bool:
         if since_ms is None:
