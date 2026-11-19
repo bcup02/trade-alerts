@@ -323,12 +323,36 @@ def _trade(tid, *, opened=True, closed=False, close_event=None, open_oid="o1",
     }}
 
 
-def test_sheet_compare_unknown_when_fetch_failed_or_no_trades():
+def test_sheet_compare_unknown_when_fetch_failed():
     a = sheet_ledger_compare({}, None, sheet_name="S", norm_symbol=norm_symbol_plain,
                              fetch_error="boom", now=NOW)
     assert a["value"] == "UNKNOWN"
-    b = sheet_ledger_compare({}, [], sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
+    # no rows list and no error is still "could not read", never a silent agreement
+    b = sheet_ledger_compare({}, None, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
     assert b["value"] == "UNKNOWN"
+
+
+def test_sheet_compare_no_trades_and_no_sheet_rows_is_reconciled():
+    doc = sheet_ledger_compare({}, [], sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
+    assert doc["value"] == "RECONCILED"
+    assert doc["last_reconciled_at"] == doc["checked_at"]
+    assert doc["summary"]["local_trades"] == 0 and doc["summary"]["sheet_rows"] == 0
+    assert doc["summary"]["actionable"] == 0
+    assert "no real local ledger trades" in doc["note"]
+
+
+def test_sheet_compare_no_trades_but_sheet_has_trade_row_is_diverged():
+    # an empty ledger must never hide a trade row that is on the sheet
+    rows = [_row(2, trade_id="t-stray")]
+    doc = sheet_ledger_compare({}, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
+    assert doc["value"] == "DIVERGED"
+    assert [d["kind"] for d in doc["discrepancies"]] == ["LEDGER_MISSING_ROW"]
+
+
+def test_sheet_compare_no_trades_ignores_paper_sheet_rows():
+    rows = [_row(2, trade_id="t-paper", execution_mode="DRY_RUN")]
+    doc = sheet_ledger_compare({}, rows, sheet_name="S", norm_symbol=norm_symbol_plain, now=NOW)
+    assert doc["value"] == "RECONCILED"
 
 
 def test_sheet_compare_reconciled():

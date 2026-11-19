@@ -1020,9 +1020,10 @@ def sheet_ledger_compare(
         return {**base, "value": "UNKNOWN", "discrepancies": [],
                 "note": f"could not read the Google sheet: {fetch_error or 'no rows'}",
                 "summary": {}}
-    if not trades:
-        return {**base, "value": "UNKNOWN", "discrepancies": [],
-                "note": "no real local ledger trades yet", "summary": {}}
+    # No real local trades is NOT "unknown": the sheet was read fine, so there is a definite answer.  With no data rows on
+    # the sheet either, the two sides agree (a strategy that has never traded, or is paused flat).  Any trade row on the
+    # sheet that the ledger does not know still falls through to the loop below and is reported as LEDGER_MISSING_ROW
+    # (DIVERGED), so an empty ledger can never hide a sheet row.
 
     def _in_scope(rec: dict[str, Any]) -> bool:
         if since_ms is None:
@@ -1172,8 +1173,12 @@ def sheet_ledger_compare(
                 "note": f"{len(actionable)} sheet row(s) disagree with the local ledger" + ignored_note,
                 "discrepancies": discrepancies, "summary": summary, **extra}
     info = [f"{by_kind[k]}x {k}" for k in SHEET_INFO_KINDS if by_kind.get(k)]
+    if not trades:
+        agree_note = "no real local ledger trades and no trade rows on the Google sheet"
+    else:
+        agree_note = "every real ledger trade agrees with its Google sheet row"
     return {**base, "value": "RECONCILED", "last_reconciled_at": checked_at,
-            "note": "every real ledger trade agrees with its Google sheet row"
+            "note": agree_note
                     + (f" ({', '.join(info)} -- informational)" if info else "") + ignored_note,
             "discrepancies": discrepancies, "summary": summary, **extra}
 
