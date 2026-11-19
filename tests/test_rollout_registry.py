@@ -960,11 +960,27 @@ def test_trend_meteor_has_its_column_and_the_pending_mechanism_still_guards_the_
     assert any("no registry column yet" in p for p in registry_problems(registry, catalog))
 
 
-def test_trend_meteor_has_no_done_cell_until_it_runs_on_the_live_branch(registry):
-    """『已做』只算正式機分支（operations）上的；V11 還沒上線，所有格子只能是未做、已完成未上線或不適用，不能有已做。有一格寫已做就要先確認 sources 的 commit 真的含 V11 程式。"""
+def test_trend_meteor_done_cells_are_only_what_runs_on_a1_while_the_daily_timer_is_off(registry):
+    """2026-11-19：流星版裝上 A1 但每日計時器停用。『已做』只給 A1 上已啟用的單元（對帳、快照、修復、資金費、Google 派送、維運通知）涵蓋的格子；
+    要靠每日流程（下單、暫停規則、連續失敗計數、中斷復原）才跑得到的格子留『已完成、尚未上線』，等解除暫停後第一輪實跑再改。"""
     rows = project_rows(registry, "trend-meteor")
     assert len(rows) == 36 + 2 * (9 + 37)                                                     # 36 項能力＋（9 條 FLEET＋36 條 MET）×（行為、事件）
-    assert {r["state"] for r in rows.values()} <= {"built", "pending", "n/a"}, [k for k, r in rows.items() if r["state"] == "done"]
+    by_state = {}
+    for key, row in rows.items():
+        by_state.setdefault(row["state"], []).append(key)
+    assert set(by_state) == {"done", "built", "pending", "n/a"}
+    # the pause rules and the order paths need the daily loop, which is off: none of them may be done yet
+    met_codes = ("STATE_FILE_CORRUPT", "MISSED_DAYS", "HEDGE_MODE", "NOT_ISOLATED", "LEVERAGE_NOT_1", "UNEXPECTED_POSITION", "BAD_EXCHANGE_DATA",
+                 "ORDER_OUTCOME_UNKNOWN", "ORDER_NOT_TERMINAL", "PENDING_UNRESOLVED", "STEP_OUTCOME_UNKNOWN", "STOP_OUTCOME_UNKNOWN", "PROTECTION_UNVERIFIED",
+                 "STALE_STOP_CANCEL_FAILED", "STOP_STATE_UNKNOWN", "STOP_STATUS_UNRECOGNIZED", "POSITION_GONE_STOP_NOT_TRIGGERED", "STOP_TRIGGERED_UNREPORTED",
+                 "MARGIN_BELOW_FLOOR", "RECOVERY_LOOKUP_FAILED", "RECOVERY_STOP_STATE", "UNKNOWN_STEP", "EXECUTION_FAILED", "DATA_UNAVAILABLE",
+                 "RUNTIME_CYCLE_FAILED", "LEDGER_ITEM_DROPPED", "STOP_FILL_UNKNOWN", "WINNER_NO_PERP", "LEDGER_WRITE_STUCK")
+    cap_ids = ("latch.unified_model", "latch.resume_tool", "latch.consecutive_failure_counter", "orders.single_send",
+               "orders.step_rounding_decimal", "recovery.interrupted_order", "stop.graceful")
+    daily_loop = [k for k in rows if any(k.startswith(f"MET.{c}:") for c in met_codes) or any(k == f"capability:{i}" for i in cap_ids)]
+    assert daily_loop and all(rows[k]["state"] == "built" for k in daily_loop), [k for k in daily_loop if rows[k]["state"] != "built"]
+    assert all(rows[k]["phase"] == "meteor-unpause" for k in by_state["built"] + by_state["pending"])
+    assert all(rows[k]["verified_at"] == "2026-11-19" for k in by_state["done"])
 
 
 V11_TIERS = {
@@ -1097,10 +1113,8 @@ def test_a_pending_cell_that_says_the_code_is_on_development_names_what_is_still
 
 
 V11_STILL_PENDING = {
-    # 2026-11-10（進度頁 1.10）：P3 前能做的都做完（Google 對帳單元與通知軸 2 格、重新排入、名詞表掃描、連續失敗、帳本積壓通知 2 格）改成已完成、尚未上線（Google 的事件日誌格是不適用）；
-    # 剩下這 4 項依登記冊的理由要等開發機演練（P3）：要看過實際暫停、要測試網實測、時鐘軸是主機設定。
+    # 2026-11-19：流星版上 A1 後，時鐘軸確認是主機層級（改不適用）；剩這 2 項：要看過實際暫停才能判斷能不能自動清除、要一筆真實的強平成交才能驗對帳。
     "cap latch.restart_only_clear", "cap reconcile.adopted_fills",
-    "FLEET.OPS_CLOCK_DEGRADED behaviour", "FLEET.OPS_CLOCK_DEGRADED emits_event",
 }
 
 
@@ -1195,7 +1209,7 @@ def test_the_ledger_write_stuck_entry_notifies_once_and_never_halts(catalog, reg
 def test_v11_google_status_rule_notifies_through_the_status_file_not_the_event_log(registry):
     """PR #359 審閱 BLOCK-359-01：維運通知直接讀狀態檔，所以 emits_event 與其他四支一樣是不適用，不是已完成。"""
     row = next(r for r in registry["catalog"] if r["code"] == "FLEET.OPS_GOOGLE_DIVERGED")
-    assert row["behaviour"]["trend-meteor"]["state"] == "built"
+    assert row["behaviour"]["trend-meteor"]["state"] == "done"
     assert row["emits_event"]["trend-meteor"] == {"state": "n/a", "reason": "維運通知直接讀狀態檔，不經事件日誌。"}
     assert {c["state"] for p, c in row["emits_event"].items() if p != "trend-meteor"} == {"n/a"}
 
