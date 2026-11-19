@@ -1181,15 +1181,59 @@ def _refresh(repo: Path) -> bool | None:
     return _git(repo, "fetch", "-q", "origin").returncode == 0
 
 
+_LIFECYCLE_STATES = ("retired",)
+_LIFECYCLE_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_LIFECYCLE_REASON_MAX = 450
+
+
+def _lifecycle_entry_problem(project: str, entry: Any) -> str | None:
+    """Why one ``lifecycle`` entry is not a valid stop declaration (None = valid).  Mirrors ``trade_alerts.rollout_registry._lifecycle_problems``
+    -- this script runs alone on A1-dev and cannot import the package, and a stop declaration is what switches monitoring OFF for a strategy,
+    so an incomplete one must never count (review of #400)."""
+    if project not in REGISTRY_REPOS:
+        return f"lifecycle / {project}: 不是已知的策略"
+    if not isinstance(entry, Mapping):
+        return f"lifecycle / {project}: 不是物件"
+    if entry.get("state") not in _LIFECYCLE_STATES:
+        return f"lifecycle / {project}: state 要是 {list(_LIFECYCLE_STATES)} 之一，現在是 {entry.get('state')!r}"
+    since = entry.get("since")
+    try:
+        valid_date = isinstance(since, str) and bool(_LIFECYCLE_DATE.fullmatch(since)) and bool(datetime.strptime(since, "%Y-%m-%d"))
+    except ValueError:
+        valid_date = False
+    if not valid_date:
+        return f"lifecycle / {project}: since 要是 YYYY-MM-DD 的真實日期，現在是 {since!r}"
+    reason = entry.get("reason")
+    if not (isinstance(reason, str) and reason.strip()):
+        return f"lifecycle / {project}: 缺 reason（為什麼停、誰接手）"
+    if len(reason) > _LIFECYCLE_REASON_MAX:
+        return f"lifecycle / {project}: reason 有 {len(reason)} 字，上限 {_LIFECYCLE_REASON_MAX}"
+    return None
+
+
+def lifecycle_problems(registry: Mapping[str, Any]) -> list[str]:
+    """Every way the registry's ``lifecycle`` is not usable as a stop declaration; empty = absent or fully valid."""
+    lifecycle = registry.get("lifecycle")
+    if lifecycle is None:
+        return []
+    if not isinstance(lifecycle, Mapping):
+        return ["lifecycle 要是物件 {專案: {state, since, reason}}"]
+    problems = [problem for project, entry in lifecycle.items() if (problem := _lifecycle_entry_problem(project, entry))]
+    if not problems and len(lifecycle) >= len(REGISTRY_REPOS):
+        problems.append("lifecycle: 至少要有一支策略維持運作")
+    return problems
+
+
 def retired_projects(registry: Mapping[str, Any]) -> frozenset[str]:
-    """Strategies the registry marks ``lifecycle.<project>.state == "retired"`` (stopped; their code may be gone from A1).  The registry
+    """Strategies the registry validly marks ``lifecycle.<project>.state == "retired"`` (stopped; their code may be gone from A1).  The registry
     checks skip them: a retired strategy's cells stay as history, but there is nothing on A1 to compare them with.  Stopping a strategy or
-    replacing it with a new one is a registry edit (``lifecycle``), never a change to this script.  Mirrors
-    ``trade_alerts.rollout_registry.retired_projects`` -- this script runs alone on A1-dev and cannot import the package."""
+    replacing it with a new one is a registry edit (``lifecycle``), never a change to this script.  An INCOMPLETE entry (no ``since`` /
+    ``reason``, unknown state or project) is not a stop declaration and never counts here; ``_load_registry`` additionally refuses a registry whose
+    lifecycle is not fully valid, so a malformed entry cannot silence a running strategy.  Mirrors ``trade_alerts.rollout_registry.retired_projects``."""
     lifecycle = registry.get("lifecycle")
     if not isinstance(lifecycle, Mapping):
         return frozenset()
-    return frozenset(project for project, entry in lifecycle.items() if isinstance(entry, Mapping) and entry.get("state") == "retired")
+    return frozenset(project for project, entry in lifecycle.items() if _lifecycle_entry_problem(project, entry) is None)
 
 
 def awaiting_cells(registry: Mapping[str, Any]) -> list[tuple[str, str, str]]:
@@ -1218,9 +1262,12 @@ def check_registry_awaits(ctx: Context) -> Result:
     # check is for (review of #193): a registry that cannot be refreshed is an error (see _load_registry).
     registry = _load_registry(root)
     retired = retired_projects(registry)
-    cells = [cell for cell in awaiting_cells(registry) if cell[1] not in retired]
+    all_cells = awaiting_cells(registry)
+    cells = [cell for cell in all_cells if cell[1] not in retired]
+    skipped = sorted({cell[1] for cell in all_cells if cell[1] in retired})
+    skipped_note = f"（已停用、不比對：{'、'.join(skipped)}）" if skipped else ""
     if not cells:
-        return Result(WAITING, "登記冊沒有帶『等哪個提交』的未做格子，沒有東西要比對。")
+        return Result(WAITING, "登記冊沒有帶『等哪個提交』的未做格子，沒有東西要比對。" + skipped_note)
     heads: dict[str, str] = {}
     due, open_ = [], []
     for label, project, commit in cells:
@@ -1236,9 +1283,9 @@ def check_registry_awaits(ctx: Context) -> Result:
             raise RemoteError(f"{label}: merge-base 出錯：{deployed.stderr.strip()[:120]}")
         (due if deployed.returncode == 0 else open_).append(f"{label}：等 {commit[:7]}，A1 現在 {heads[project][:7]}")
     if due:
-        return Result(OBSERVED, f"登記冊有 {len(due)} 格還寫未做，但它們在等的提交已經在 A1 上跑了：該改已做（並重發登記冊）。",
+        return Result(OBSERVED, f"登記冊有 {len(due)} 格還寫未做，但它們在等的提交已經在 A1 上跑了：該改已做（並重發登記冊）。" + skipped_note,
                       due + [f"（仍在等）{o}" for o in open_], needs_human=True, key=",".join(sorted(d.split("：")[0] for d in due)))
-    return Result(WAITING, f"登記冊有 {len(open_)} 格在等部署，等的提交都還沒上 A1。", open_)
+    return Result(WAITING, f"登記冊有 {len(open_)} 格在等部署，等的提交都還沒上 A1。" + skipped_note, open_)
 
 
 # --- files the registry cites that changed on A1 since the registry's sources commit (phase-sync4) ------------------
@@ -1276,7 +1323,12 @@ def _load_registry(root: Path) -> dict[str, Any]:
     shown = _git(ta, "show", f"{os.environ.get('OBSERVATION_WATCH_REGISTRY_REF', 'origin/main')}:{REGISTRY_RELATIVE}")
     if shown.returncode != 0:
         raise RemoteError(f"cannot read the registry from {ta}: {shown.stderr.strip()[:120]}")
-    return json.loads(shown.stdout)
+    registry = json.loads(shown.stdout)
+    if isinstance(registry, Mapping):
+        problems = lifecycle_problems(registry)
+        if problems:       # fail closed: a stop declaration switches monitoring off, so a broken one is an error, never a quiet skip
+            raise RemoteError("登記冊的 lifecycle 不能當停用聲明（監控不會因它略過任何策略）：" + "；".join(problems[:3]))
+    return registry
 
 
 def _blobs_at(repo: Path, commit: str, paths: list[str]) -> dict[str, str]:

@@ -1089,6 +1089,61 @@ def test_registry_awaits_skips_a_retired_strategys_cells(repos):
     _publish_registry(repos, reg)
     result = ow.check_registry_awaits(ctx(GitHeads({"seykota": s2})))
     assert result.state == ow.WAITING and "沒有帶" in result.summary
+    assert "已停用、不比對：seykota" in result.summary                    # skipped on purpose, and said so (not "there was nothing to compare")
+
+
+def test_registry_awaits_says_what_it_skipped_on_every_return_path(repos):
+    myc, sey = repos / ow.REPOS["mycrypto"], repos / ow.REPOS["seykota"]
+    c1, c2 = _commit(myc, "a"), _commit(myc, "b")
+    s1, s2 = _commit(sey, "s"), _commit(sey, "t")
+    retired = {"seykota": {"state": "retired", "since": "2026-11-18", "reason": "下線"}}
+
+    def registry(my_awaits):
+        reg = _registry({"mycrypto": my_awaits})
+        reg["lifecycle"] = retired
+        reg["capabilities"][0]["status"]["seykota"] = {"state": "pending", "phase": "p", "reason": "r", "awaits_commit": s2}
+        return reg
+    _publish_registry(repos, registry(c2))
+    waiting = ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1, "seykota": s1})))        # mycrypto still waits; seykota skipped
+    assert waiting.state == ow.WAITING and "已停用、不比對：seykota" in waiting.summary
+    due = ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c2, "seykota": s1})))            # mycrypto's awaited commit is on A1
+    assert due.state == ow.OBSERVED and "已停用、不比對：seykota" in due.summary
+    # nothing is skipped when no retired strategy has a waiting cell: no note
+    _publish_registry(repos, _registry({"mycrypto": c2}) | {"lifecycle": retired})
+    assert "已停用" not in ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1}))).summary
+
+
+@pytest.mark.parametrize("lifecycle", [
+    {"momentum": {"state": "retired"}},                                                              # a running strategy, no since / reason
+    {"momentum": {"state": "retired", "since": "2026-11-18"}},                                       # no reason
+    {"momentum": {"state": "retired", "reason": "x"}},                                               # no since
+    {"momentum": {"state": "retired", "since": "2026-13-45", "reason": "x"}},                        # not a real date
+    {"momentum": {"state": "retired", "since": "2026-11-18", "reason": "  "}},                       # blank reason
+    {"momentum": {"state": "paused", "since": "2026-11-18", "reason": "x"}},                         # unknown state
+    {"nope": {"state": "retired", "since": "2026-11-18", "reason": "x"}},                            # unknown strategy
+    {"momentum": "retired"},                                                                          # not an object
+    ["momentum"],                                                                                     # lifecycle itself not an object
+])
+def test_an_incomplete_lifecycle_never_silences_a_running_strategy(repos, lifecycle):
+    """review of #400: a stop declaration switches monitoring off, so a malformed one is an error (fail closed), never a quiet skip."""
+    assert ow.retired_projects({"lifecycle": lifecycle}) == frozenset()                           # it does not even count as a declaration
+    assert ow.lifecycle_problems({"lifecycle": lifecycle})
+    myc = repos / ow.REPOS["mycrypto"]
+    c1 = _write(myc, {"src/a.py": "one", "src/b.py": "stable"})
+    reg = _drift_registry(c1, ["src/a.py"]) | {"lifecycle": lifecycle}
+    reg["sources"]["momentum"] = {"commit": c1}
+    _publish_registry(repos, reg)
+    with pytest.raises(ow.RemoteError, match="lifecycle"):
+        ow.check_registry_drift(ctx(Blobs({})))
+    with pytest.raises(ow.RemoteError, match="lifecycle"):
+        ow.check_registry_awaits(ctx(GitHeads({})))
+
+
+def test_every_strategy_retired_is_refused_and_a_valid_lifecycle_passes():
+    valid = {"state": "retired", "since": "2026-11-18", "reason": "下線"}
+    assert ow.lifecycle_problems({}) == [] and ow.lifecycle_problems({"lifecycle": {}}) == []
+    assert ow.lifecycle_problems({"lifecycle": {"seykota": valid}}) == []
+    assert ow.lifecycle_problems({"lifecycle": {k: valid for k in ow.REGISTRY_REPOS}}) == ["lifecycle: 至少要有一支策略維持運作"]
 
 
 def test_the_retired_strategies_the_stability_check_skips_follow_the_registry():
