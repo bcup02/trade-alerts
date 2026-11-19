@@ -1229,3 +1229,11 @@ def test_ledger_write_stuck_texts_do_not_promise_delivery_or_exactly_once(regist
     for text in (behaviour, emits, cap, entry):                                          # 舊的過度承諾不得再出現
         for banned in ("不漏通知", "寧可重複不漏", "由匯出檔通知一次", "第一次啟用時既有事件不補發"):
             assert banned not in text, banned
+
+
+def test_every_ops_notify_status_rule_is_not_applicable_for_emits_event_in_every_strategy(registry):
+    """PR #402 審閱 BLOCK-402-01：FLEET.OPS_* 是維運通知直接讀狀態檔，不經事件日誌；狀態被讀到（RECONCILED／OK）不是事件日誌寫入的證據，所以每支策略的 emits_event 都是不適用。"""
+    rows = [r for r in registry["catalog"] if r["code"].startswith("FLEET.OPS_")]
+    assert len(rows) == 7
+    for row in rows:
+        assert {p: c["state"] for p, c in row["emits_event"].items()} == {p: "n/a" for p in row["emits_event"]}, row["code"]

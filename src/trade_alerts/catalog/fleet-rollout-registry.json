@@ -1618,10 +1618,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "done",
-          "evidence": "維運通知讀流星版的帳本對帳狀態（src/trend_meteor/reconcile_compare.py，對帳單元 reconcile-compare，PR #213／#215，ops-notify trend-meteor 目標 bcup02/ops-notify PR #68）；A1 帳本軸讀回 RECONCILED。",
-          "verified_at": "2026-11-19",
-          "limit": "A1 流星版帳本目前沒有真倉交易，沒有遇過 DIVERGED，告警路徑只有測試與開發機驗證。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -1718,10 +1716,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "done",
-          "evidence": "維運通知讀流星版的運行狀態（src/trend_meteor/portfolio_snapshot.py、deploy/trend-meteor-portfolio-snapshot.service；ops-notify runtime 軸 PR #68）；A1 讀得到，目前是 PAUSED。",
-          "verified_at": "2026-11-19",
-          "limit": "A1 只讀過 PAUSED，ERROR 與安全暫停的告警路徑沒被觸發過，只有測試與開發機驗證。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -1770,10 +1766,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "done",
-          "evidence": "維運通知盯流星版的背景服務（修復單元與計時器，deploy/trend-meteor-bot.service 等 trend-meteor-* 單元，PR #215；OPS_NOTIFY_TREND_METEOR_UNITS 已設）；A1 服務單元軸讀回 OK。",
-          "verified_at": "2026-11-19",
-          "limit": "A1 這些單元沒有失敗過，告警路徑只有測試與開發機驗證。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -1822,10 +1816,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "done",
-          "evidence": "維運通知讀流星版的匯出檔，匯出檔由修復單元（deploy/trend-meteor-repair.service，PR #215）每一輪寫出；A1 匯出檔軸讀回 OK（OPS_EXPORT 已打開）。",
-          "verified_at": "2026-11-19",
-          "limit": "A1 匯出檔沒有讀不到過，告警路徑只有測試與開發機驗證。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -1873,10 +1865,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "done",
-          "evidence": "維運通知判斷流星版的狀態檔過期；狀態檔與寫出週期已定（對帳每 15 分鐘、快照每 5 分鐘，deploy/trend-meteor-portfolio-snapshot.timer，PR #215）；A1 讀數都是新的。",
-          "verified_at": "2026-11-19",
-          "limit": "A1 的狀態檔沒有過期過，告警路徑只有測試與開發機驗證。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
