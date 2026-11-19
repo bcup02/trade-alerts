@@ -42,12 +42,13 @@ REGISTRY_PENDING_PROJECTS: tuple[str, ...] = ()
 #: The four strategies; ``fleet`` is a catalog prefix for cross-repo
 #: conditions, not a strategy that can have a capability.
 STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet" and project not in REGISTRY_PENDING_PROJECTS)
-#: Strategies that are stopped and waiting to be archived (舊趨勢, 2026-11-10: V11 took the name 趨勢策略; 2026-11-15: V11 became 競賽策略・流星版).  Their existing cells and
-#: ``SEY.*`` rows stay as evidence (nothing is deleted until the old trend is taken off A1 and its repo archived), but the rollout
-#: register page shows no column for them and a new capability or ``FLEET.*`` row need not fill their cell.
-RETIRED_PROJECTS: tuple[str, ...] = ("seykota",)
-#: The columns the rollout register page shows and new features must fill.
-ACTIVE_PROJECTS = tuple(project for project in STRATEGY_PROJECTS if project not in RETIRED_PROJECTS)
+#: A strategy's lifecycle lives in the registry DATA (``lifecycle``, one entry per stopped strategy), not in code: stopping a strategy
+#: (舊趨勢, 2026-11-18) or replacing it with a new one (the momentum strategy is expected to become a "new momentum strategy") is a
+#: one-line registry edit, and every consumer follows -- ``retired_projects(registry)`` here, the rollout register page and
+#: ``scripts/observation_watch.py`` (phase-sync4 skips a retired project's files: its code is no longer on A1, so comparing them
+#: with ``sources`` would report drift for ever).  A retired strategy's existing cells and rules stay as evidence (nothing is deleted
+#: until its repo is archived), the register page shows no column for it, and a new capability or ``FLEET.*`` row need not fill its cell.
+LIFECYCLE_STATES = ("retired",)
 STATES = ("done", "built", "pending", "n/a")
 #: ``done`` means present where the live host deploys from -- not merely
 #: merged to development or running on the dev host.  ``built`` (已完成、尚未上線, 2026-11-10) is the honest middle: the code is written
@@ -89,6 +90,50 @@ def load_rollout_registry(path: str | Path | None = None) -> dict[str, Any]:
     if not isinstance(payload, dict) or payload.get("registry_version") != REGISTRY_VERSION:
         raise ValueError(f"not a {REGISTRY_VERSION} document")
     return payload
+
+
+def retired_projects(registry: Mapping[str, Any]) -> tuple[str, ...]:
+    """The strategies the registry marks ``lifecycle.<project>.state == "retired"`` (stopped; waiting to be archived or replaced)."""
+    lifecycle = registry.get("lifecycle")
+    if not isinstance(lifecycle, Mapping):
+        return ()
+    return tuple(project for project in STRATEGY_PROJECTS
+                 if isinstance(lifecycle.get(project), Mapping) and lifecycle[project].get("state") == "retired")
+
+
+#: The packaged registry's retired strategies and the columns the rollout register page shows and new features must fill.
+RETIRED_PROJECTS: tuple[str, ...] = retired_projects(load_rollout_registry())
+ACTIVE_PROJECTS = tuple(project for project in STRATEGY_PROJECTS if project not in RETIRED_PROJECTS)
+
+
+def _lifecycle_problems(registry: Mapping[str, Any]) -> list[str]:
+    lifecycle = registry.get("lifecycle")
+    if lifecycle is None:
+        return []
+    if not isinstance(lifecycle, Mapping):
+        return ["lifecycle must be an object {project: {state, since, reason}}"]
+    problems: list[str] = []
+    for project, entry in lifecycle.items():
+        where = f"lifecycle / {project}"
+        if project not in STRATEGY_PROJECTS:
+            problems.append(f"{where}: not a known strategy")
+            continue
+        if not isinstance(entry, Mapping):
+            problems.append(f"{where}: not an object")
+            continue
+        if entry.get("state") not in LIFECYCLE_STATES:
+            problems.append(f"{where}: state must be one of {list(LIFECYCLE_STATES)}, got {entry.get('state')!r}")
+        since = entry.get("since")
+        if not (isinstance(since, str) and _DATE.fullmatch(since) and _is_calendar_date(since)):
+            problems.append(f"{where}: since must be a YYYY-MM-DD date, got {since!r}")
+        reason = entry.get("reason")
+        if not (isinstance(reason, str) and reason.strip()):
+            problems.append(f"{where}: reason must say why it was stopped and what replaces it")
+        elif len(reason) > MAX_REASON_CHARS:
+            problems.append(f"{where}: reason is {len(reason)} characters (max {MAX_REASON_CHARS})")
+    if retired_projects(registry) and len(retired_projects(registry)) >= len(STRATEGY_PROJECTS):
+        problems.append("lifecycle: at least one strategy must stay active")
+    return problems
 
 
 def _status_problems(where: str, status: Any, phases: Mapping[str, Any]) -> list[str]:
@@ -164,7 +209,9 @@ def owners(code: str) -> tuple[str, ...]:
 
 def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -> list[str]:
     """Every way the registry fails its rule; empty means consistent."""
-    problems: list[str] = []
+    problems: list[str] = _lifecycle_problems(registry)
+    retired_here = retired_projects(registry)                       # the registry being checked, not the packaged one
+    active_here = tuple(project for project in STRATEGY_PROJECTS if project not in retired_here)
     if registry.get("registry_version") != REGISTRY_VERSION:
         problems.append(f"registry_version is not {REGISTRY_VERSION}")
     if registry.get("catalog_version") != catalog.get("catalog_version"):
@@ -197,9 +244,9 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
             if not (isinstance(capability.get(key), str) and capability[key].strip()):
                 problems.append(f"capability {cid}: missing {key}")
         status = capability.get("status") or {}
-        if not set(ACTIVE_PROJECTS) <= set(status) <= set(STRATEGY_PROJECTS):
-            problems.append(f"capability {cid}: must list every active strategy {sorted(ACTIVE_PROJECTS)} "
-                            f"(retired {sorted(RETIRED_PROJECTS)} optional), got {sorted(status)}")
+        if not set(active_here) <= set(status) <= set(STRATEGY_PROJECTS):
+            problems.append(f"capability {cid}: must list every active strategy {sorted(active_here)} "
+                            f"(retired {sorted(retired_here)} optional), got {sorted(status)}")
         for project, value in status.items():
             problems += _status_problems(f"capability {cid} / {project}", value, phases)
 
@@ -221,10 +268,10 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
         for key in ("behaviour", "emits_event"):
             status = row.get(key) or {}
             # A retired project's cell is optional on a cross-repo (FLEET.*) row; a single-owner row keeps its one cell.
-            required = expected - set(RETIRED_PROJECTS) if len(expected) > 1 else expected
+            required = expected - set(retired_here) if len(expected) > 1 else expected
             if not required <= set(status) <= expected:
                 problems.append(f"{code} {key}: must list exactly {sorted(required)}"
-                                f"{' (retired ' + str(sorted(RETIRED_PROJECTS)) + ' optional)' if required != expected else ''}, "
+                                f"{' (retired ' + str(sorted(retired_here)) + ' optional)' if required != expected else ''}, "
                                 f"got {sorted(status)}")
             for project, value in status.items():
                 problems += _status_problems(f"{code} {key} / {project}", value, phases)

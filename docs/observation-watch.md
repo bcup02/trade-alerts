@@ -53,6 +53,12 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項�
 - 處理：看那個檔案從 `sources` 到 A1 現行版改了什麼；行號位移就照 f-27／f-18 的流程把該策略的 `sources` 換到 A1 現行版（`verify_registry_evidence.py --relocate`，逐筆比對舊新行文字），並重新確認受影響格子的說法；換完偵測自己恢復 `waiting`。
 - 限制：只比對「引用到的檔案」，不看檔案改了什麼，所以改了無關的行也會點名（寧可多報）；A1 部署複本的 HEAD 是部署的代理（見上一節）；只讀「已做」格子的 `evidence` 欄，未做格子的 `reason` 不算。
 
+### 策略停用或被新策略取代：只改登記冊，不改偵測程式
+登記冊頂層的 `lifecycle` 記哪支策略已停用：`{"<專案>": {"state": "retired", "since": "YYYY-MM-DD", "reason": "為什麼停、誰接手"}}`（`registry_problems` 驗格式；schema 同步）。`registry-awaits` 與 `registry-drift` 都讀它，**略過 retired 的策略**：它的程式已不在 A1（或不再維護），拿 A1 部署複本去比 `sources` 只會永遠報漂移；摘要會寫「已停用、不比對：<專案>」。一致性登記冊頁面也據此不顯示它的欄、新能力不必填它的格子（`rollout_registry.retired_projects()`）。
+- 停用一支策略（或它被「新○○策略」取代）時：在登記冊 `lifecycle` 加一筆，讓舊策略的格子留作歷史；新策略用新的專案欄（`projects`／`sources`／`PROJECT_CODE_PREFIXES`）。
+- 兩個地方還是常數、要跟著改，測試會擋：`scripts/observation_watch.py` 的 `_RETIRED_A1_STRATEGIES`（`a1-stable` 看維運通知讀數、手上沒有登記冊；`test_the_retired_strategies_the_stability_check_skips_follow_the_registry` 鎖兩者一致）。
+- 共用同一個 repo 與 A1 部署複本的專案（流星版與舊趨勢）靠 `REGISTRY_REPOS` 對應；新專案共用或新增 repo 時要補。
+
 ## 新增一個檢查
 在 `scripts/observation_watch.py` 寫一個 `check_xxx(ctx) -> Result`，加進 `CHECKS`（`covers` 填進度頁項目編號），
 在 `tests/test_observation_watch.py` 用 `FakeRemote` 寫：等待、通過、失敗各一個測試。判斷不到的事（手機上看到的樣子）設 `needs_human=True`，不要假裝能自動驗證。

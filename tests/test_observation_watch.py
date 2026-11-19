@@ -1027,6 +1027,77 @@ def test_a_file_missing_on_a1_is_drift_and_a_file_missing_at_sources_is_not(repo
     assert gone.asked[0][2] == ["src/a.py"]                                  # and not even asked about
 
 
+def _retired_seykota_registry(commit, *, retired):
+    """A registry where a done seykota cell cites a file that A1 no longer has; ``retired`` says whether the registry marks seykota stopped."""
+    reg = _drift_registry(commit, ["src/a.py"])
+    reg["sources"]["seykota"] = {"commit": commit}
+    reg["capabilities"][0]["status"]["seykota"] = {"state": "done", "evidence": "deploy/seykota-bot.service:3 old"}
+    if retired:
+        reg["lifecycle"] = {"seykota": {"state": "retired", "since": "2026-11-18", "reason": "下線"}}
+    return reg
+
+
+def test_a_retired_strategys_files_are_not_compared_with_a1(repos):
+    """The registry's lifecycle -- data, not a constant in this script -- decides: a stopped strategy's cells stay as history."""
+    myc, sey = repos / ow.REPOS["mycrypto"], repos / ow.REPOS["seykota"]
+    c1 = _write(myc, {"src/a.py": "one", "src/b.py": "stable"})
+    s1 = _write(sey, {"deploy/seykota-bot.service": "old"})
+    a, b = _blob(myc, c1, "src/a.py"), _blob(myc, c1, "src/b.py")
+    # not retired: the file seykota no longer has on A1 is drift
+    _publish_registry(repos, _retired_seykota_registry(c1, retired=False) | {"sources": {"mycrypto": {"commit": c1}, "seykota": {"commit": s1}}})
+    open_ = Blobs({"src/a.py": a, "src/b.py": b})
+    assert ow.check_registry_drift(ctx(open_)).state == ow.OBSERVED
+    # retired in the registry: skipped, said so, and A1 is never even asked about it
+    _publish_registry(repos, _retired_seykota_registry(c1, retired=True) | {"sources": {"mycrypto": {"commit": c1}, "seykota": {"commit": s1}}})
+    skipped = Blobs({"src/a.py": a, "src/b.py": b})
+    result = ow.check_registry_drift(ctx(skipped))
+    assert result.state == ow.WAITING and "2 個檔案" in result.summary and "已停用、不比對：seykota" in result.summary
+    assert [key for _host, key, _paths in skipped.asked] == ["mycrypto"]
+
+
+def test_a_registry_with_only_retired_cited_files_is_not_an_error(repos):
+    sey = repos / ow.REPOS["seykota"]
+    s1 = _write(sey, {"deploy/seykota-bot.service": "old"})
+    reg = {"sources": {"seykota": {"commit": s1}}, "lifecycle": {"seykota": {"state": "retired", "since": "2026-11-18", "reason": "下線"}},
+           "capabilities": [{"id": "x.cap", "status": {"seykota": {"state": "done", "evidence": "deploy/seykota-bot.service:3 old"}}}], "catalog": []}
+    _publish_registry(repos, reg)
+    result = ow.check_registry_drift(ctx(Blobs({})))
+    assert result.state == ow.WAITING and "已停用、不比對：seykota" in result.summary
+
+
+def test_the_meteor_strategy_is_compared_through_the_shared_repo_and_a1_clone(repos):
+    """競賽策略・流星版 shares the repo and the A1 deploy clone with the retired 舊趨勢策略; its cells need a way to be compared."""
+    assert ow.REGISTRY_REPOS["trend-meteor"] == ow.REPOS["seykota"]
+    assert ow.A1_CLONES["trend-meteor"] == ow.A1_CLONES["seykota"]
+    assert "trend-meteor" not in ow.REPOS                         # the A1 audit/state readers still only know the strategies they read
+    sey = repos / ow.REPOS["seykota"]
+    s1 = _write(sey, {"src/trend_meteor/x.py": "one"})
+    reg = {"sources": {"trend-meteor": {"commit": s1}},
+           "capabilities": [{"id": "x.cap", "status": {"trend-meteor": {"state": "done", "evidence": "src/trend_meteor/x.py:1 y"}}}], "catalog": []}
+    _publish_registry(repos, reg)
+    blob = _blob(sey, s1, "src/trend_meteor/x.py")
+    ok = Blobs({"src/trend_meteor/x.py": blob})
+    assert ow.check_registry_drift(ctx(ok)).state == ow.WAITING and ok.asked[0][1] == "trend-meteor"
+    assert ow.check_registry_drift(ctx(Blobs({"src/trend_meteor/x.py": "f" * 40}))).state == ow.OBSERVED
+
+
+def test_registry_awaits_skips_a_retired_strategys_cells(repos):
+    sey = repos / ow.REPOS["seykota"]
+    s1, s2 = _commit(sey, "s"), _commit(sey, "t")
+    reg = {"sources": {}, "lifecycle": {"seykota": {"state": "retired", "since": "2026-11-18", "reason": "下線"}},
+           "capabilities": [{"id": "x.cap", "status": {"seykota": {"state": "pending", "phase": "p", "reason": "r", "awaits_commit": s2}}}], "catalog": []}
+    _publish_registry(repos, reg)
+    result = ow.check_registry_awaits(ctx(GitHeads({"seykota": s2})))
+    assert result.state == ow.WAITING and "沒有帶" in result.summary
+
+
+def test_the_retired_strategies_the_stability_check_skips_follow_the_registry():
+    """`_RETIRED_A1_STRATEGIES` is a module constant (the stability check reads ops-notify readings and has no registry at hand): this keeps it in lockstep with the registry's lifecycle."""
+    from trade_alerts.rollout_registry import RETIRED_PROJECTS
+
+    assert ow._RETIRED_A1_STRATEGIES == frozenset(RETIRED_PROJECTS) & frozenset(ow.REPOS)
+
+
 def test_the_drift_key_changes_when_a1_moves_again_so_it_is_announced_again(repos):
     myc = repos / ow.REPOS["mycrypto"]
     c1 = _write(myc, {"src/a.py": "one", "src/b.py": "b"})
