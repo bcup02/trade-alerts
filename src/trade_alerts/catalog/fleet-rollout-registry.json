@@ -45,9 +45,8 @@
     "f-64": "f-64：Google 表同步佇列不被編號衝突的開倉列或成交列卡死（共用庫 v0.30.19 停放；各策略改釘後才生效）",
     "f-65": "f-65：競賽帳本支援手動資金轉入／轉出，對帳納入（開發機已部署並實測；A1 部署要使用者明確授權）",
     "r033-paxg": "R033：競賽策略在 BTC 熊市持有 PAXG（歷史狀態：程式 2026-10-31 台北 16:23 部署 A1、開關同日台北 22:38 打開，見已做的 bear.paxg_asset；兩個 PAXG 錯誤規則（ERR-070、ERR-071）的四格 2026-11-18 查證為已做，這個階段已沒有未做的格子）",
-    "v11-p3": "V11 開發機測試網演練（進度頁 P3）：單元、安裝腳本、解除暫停工具與帳本鎖都已在趨勢 repo 開發分支完成（5d-1～5d-4，PR #209～#217），尚未在任何主機實跑；在開發機實跑驗證、打開 ops-notify 目標與觀察區檢查之後才上正式機（P5）",
-    "v11-google-reconcile": "V11 的帳本↔Google 表對帳單元（寫 google_reconcile_status.json）：使用者 2026-11-10 定沿用舊趨勢的 ed-seykota「趨勢策略」，5d 之後做；做之前要先核對開發機階段交易投影不會寫進正式表分頁",
-    "sheet-id-rollout": "Google 表分頁改用分頁編號登記（進度頁 f-93、f-95）：流星版開發機已完成；正式機的拆分頁要等舊趨勢策略下線（4.1）與流星版上線（P5）；動能、加密、競賽沒有改名計畫，列未做，等哪天要改分頁名稱時一起做"
+    "sheet-id-rollout": "Google 表分頁改用分頁編號登記（進度頁 f-93、f-95）：流星版正式機已完成（2026-11-19）；動能、加密、競賽沒有改名計畫，列未做，等哪天要改分頁名稱時一起做",
+    "meteor-unpause": "競賽策略・流星版在正式機 A1 解除暫停：每日計時器（trend-meteor-daily.timer）目前停用，每日流程與暫停規則要等解除暫停、第一輪實跑後才改已做；解除前還沒驗過的：12/1 月度重選、A↔B 切換、保護模式進出、主網下單路徑（只做過唯讀檢查）"
   },
   "sources": {
     "momentum": {
@@ -73,7 +72,7 @@
     "trend-meteor": {
       "repo": "AI-for-column5/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "156882632e2c31369db09e88e5891b0ea665d731"
+      "commit": "219f87d03caca99292935138f8d9e8a86471846b"
     }
   },
   "capabilities": [
@@ -100,8 +99,8 @@
         },
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 用共用庫的安全暫停格式（safe_halt_model）：規則在 src/trend_meteor/runner.py，每日單元、守護單元與解除暫停工具（src/trend_meteor/resume.py）都已在趨勢 repo 開發分支（5d-1～5d-3b）；尚未在任何主機實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "V11 用共用庫的安全暫停格式（safe_halt_model）：規則在 src/trend_meteor/runner.py，每日單元、守護單元與解除暫停工具（src/trend_meteor/resume.py）都已在趨勢 repo 正式機分支（5d-1～5d-3b）；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -128,8 +127,8 @@
         },
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的 trend-meteor-resume（PR #215）已在開發分支：兩段式確認碼、先寫帳本再清狀態、持有 state.lock；STATE_FILE_CORRUPT 解除前自己唯讀查交易所原始清單（持倉、條件單、一般委託都必須是空的）。尚未在主機實跑（src/trend_meteor/resume.py）。"
+          "phase": "meteor-unpause",
+          "evidence": "V11 的 trend-meteor-resume（PR #215）已在正式機分支：兩段式確認碼、先寫帳本再清狀態、持有 state.lock；STATE_FILE_CORRUPT 解除前自己唯讀查交易所原始清單（持倉、條件單、一般委託都必須是空的）。A1 每日計時器目前停用，等解除暫停後第一輪實跑（src/trend_meteor/resume.py）。"
         }
       }
     },
@@ -158,8 +157,8 @@
         },
         "trend-meteor": {
           "state": "pending",
-          "phase": "v11-p3",
-          "reason": "V11 的暫停全部要經解除工具才清（沒有『改好設定重啟就自動清除』的路徑；PR #215 的設計），哪些情況可以改成自動清除要等開發機演練（P3）看過實際暫停再判斷。"
+          "phase": "meteor-unpause",
+          "reason": "流星版的暫停全部要經解除工具才清（沒有『改好設定重啟就自動清除』的路徑；PR #215 的設計）；哪些情況可以改成自動清除，要等 A1 解除暫停後看過實際暫停再判斷。"
         }
       }
     },
@@ -187,8 +186,8 @@
         },
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的連續失敗分工（使用者 2026-11-10 定：只通知不暫停，保護類失敗不放寬）：輸入抓不到連續 3 個 UTC 日才安全暫停（src/trend_meteor/runner.py _data_unavailable）；待記帳積壓累計 3 個不同 UTC 日寫一筆 R2 已升格事件、不暫停（src/trend_meteor/runner.py _track_ledger_backlog，PR #224，目錄 ERR-108）；通知另有條件：要設定 OPS_NOTIFY_TREND_METEOR_AUDIT 建立 V11 目標、OPS_NOTIFY_TREND_METEOR_OPS_EXPORT=on 啟用匯出軸（預設關，P3 設定），事件仍在匯出視窗內（預設 7 天）；匯出軸每次第一次啟用或關掉後重新啟用，當下已存在的事件都視為已送達、不補發；未分類例外持續失敗靠每日單元非零結束，由維運通知服務單元軸通知（OPS_NOTIFY_TREND_METEOR_UNITS 要列入每日單元，P3）；保護類失敗仍一次就暫停。"
+          "phase": "meteor-unpause",
+          "evidence": "V11 的連續失敗分工（使用者 2026-11-10 定：只通知不暫停，保護類失敗不放寬）：輸入抓不到連續 3 個 UTC 日才安全暫停（src/trend_meteor/runner.py _data_unavailable）；待記帳積壓累計 3 個不同 UTC 日寫一筆 R2 已升格事件、不暫停（src/trend_meteor/runner.py _track_ledger_backlog，PR #224，目錄 ERR-108）；通知另有條件：A1 已設 OPS_NOTIFY_TREND_METEOR_AUDIT 與 OPS_NOTIFY_TREND_METEOR_OPS_EXPORT=on，事件仍在匯出視窗內（預設 7 天）；匯出軸每次第一次啟用或關掉後重新啟用，當下已存在的事件都視為已送達、不補發；未分類例外持續失敗靠每日單元非零結束，由維運通知服務單元軸通知（OPS_NOTIFY_TREND_METEOR_UNITS 在 A1 只列修復單元與計時器，不含每日單元）；保護類失敗仍一次就暫停。"
         }
       }
     },
@@ -214,9 +213,10 @@
           "evidence": "src/btc_competition/portfolio_snapshot_adapter.py strategy.runtime_status"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的心跳與投資人快照（src/trend_meteor/portfolio_snapshot.py）在開發分支；快照單元（trend-meteor-portfolio-snapshot，PR #215，心跳門檻 30 小時）與 ops-notify 的 runtime 軸（bcup02/ops-notify PR #68，預設不啟用）已完成；主機設定與實跑等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版的心跳與投資人快照（src/trend_meteor/portfolio_snapshot.py）由快照單元（deploy/trend-meteor-portfolio-snapshot.service、.timer）每 5 分鐘寫出；ops-notify 的 runtime 軸（bcup02/ops-notify PR #68）在 A1 讀得到。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 目前讀數是 PAUSED（每日計時器停用）；HEALTHY 要等解除暫停後每日流程寫出心跳。"
         }
       }
     },
@@ -242,9 +242,10 @@
           "evidence": "src/btc_competition/reconcile_compare.py"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的對帳抓取（src/trend_meteor/reconcile_fetch.py）與比對（src/trend_meteor/reconcile_compare.py，PR #213，帳本有任何資料品質問題就回 UNKNOWN）與單元（trend-meteor-reconcile-fetch，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版的對帳抓取（src/trend_meteor/reconcile_fetch.py）與比對（src/trend_meteor/reconcile_compare.py，帳本有任何資料品質問題就回 UNKNOWN）由對帳單元（deploy/trend-meteor-reconcile-fetch.service）每 15 分鐘執行；A1 的 audit/ledger_status.json 讀回 RECONCILED。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 流星版帳本目前沒有真倉交易，對帳只驗過空帳本；有交易之後的比對只有測試與開發機驗證。"
         }
       }
     },
@@ -270,9 +271,10 @@
           "evidence": "src/btc_competition/reconcile_google.py"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的帳本對 Google 表對帳單元已在趨勢 repo 開發分支（PR #221）：`trend-meteor google-reconcile`（src/trend_meteor/google_reconcile.py）讀帳本與共用表「趨勢策略」分頁（只比 TM- 開頭的列、本機的交易取自 google_projection.plan()），寫 audit/google_reconcile_status.json；帳本有品質問題或有交易投影被擋／孤兒／無法歸屬時不宣告已一致；讀表錯誤只輸出固定摘要。接進 deploy/trend-meteor-reconcile-fetch.service 第四步。尚未在主機實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版帳本對 Google 表對帳（src/trend_meteor/google_reconcile.py，PR #221）接在對帳單元第四步（deploy/trend-meteor-reconcile-fetch.service），只比 TM- 開頭的列，帳本有品質問題或有交易投影被擋時不宣告一致；A1 讀正式表「競賽策略・流星版」分頁回 RECONCILED。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 流星版帳本目前沒有真倉交易，一致是「沒交易＝一致」（共用庫 v0.30.48）；有交易之後的比對只有測試與開發機驗證。"
         }
       }
     },
@@ -300,9 +302,10 @@
           "reason": "現貨再平衡策略，沒有開倉／平倉配對，不會有漏記平倉。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 修復機器人（src/trend_meteor/repair_bot.py，PR #197）與單元入口（trend-meteor repair，PR #209／#215）已在開發分支，整輪持有 state.lock（PR #217）；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版修復機器人（src/trend_meteor/repair_bot.py，PR #197）由修復單元（deploy/trend-meteor-repair.service，入口 src/trend_meteor/cli.py）每 15 分鐘執行，整輪持有 state.lock（PR #217）；A1 已安裝並啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -334,9 +337,10 @@
           "reason": "現貨再平衡策略，沒有開倉／平倉配對，不會有漏記平倉。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 補寫平倉（來源 verified_close）與單元入口已在開發分支（PR #197、#209、#217）；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py）。"
+          "state": "done",
+          "evidence": "補寫平倉（來源 verified_close，src/trend_meteor/repair_bot.py）由同一個修復單元執行（src/trend_meteor/cli.py）；A1 已安裝並啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -364,9 +368,10 @@
           "reason": "沒有修復機器人（見「修復機器人：抓錯並提出修復建議」）。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "停用開關 TREND_METEOR_REPAIR_PAUSED 在 V11 單元入口 src/trend_meteor/cli.py 讀取（未記帳處理器的檢查也在入口），修復單元拿不到鎖時仍刷新 ops_export（deploy/trend-meteor-repair.service），已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "停用開關 TREND_METEOR_REPAIR_PAUSED 在單元入口 src/trend_meteor/cli.py 讀取（未記帳處理器的檢查也在入口），修復單元拿不到鎖時仍刷新匯出檔（deploy/trend-meteor-repair.service）；A1 單元已啟用、開關未設。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 沒有按過這個停用開關，只有測試與開發機驗證。"
         }
       }
     },
@@ -394,9 +399,9 @@
           "limit": "A1 的競賽沒有自己偵測到過這些暫停；2026-10-11 台北的受控測試（見 notify.line_first_notice）用人工寫的測試事件驗過匯出檔→維運通知→手機這條路。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "匯出檔由共用庫寫；V11 的修復單元（trend-meteor-repair，PR #215）每一輪（含停用、含拿不到鎖）都刷新，已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "匯出檔由共用庫寫；修復單元（deploy/trend-meteor-repair.service，入口 src/trend_meteor/cli.py）每一輪（含停用、含拿不到鎖）都刷新；A1 的 audit/ops_export.json 每 15 分鐘更新。",
+          "verified_at": "2026-11-19"
         }
       }
     },
@@ -423,9 +428,10 @@
           "evidence": "src/btc_competition/unrecorded_fill.py:219 寫出的匯出檔由維運通知轉送：正式機 /etc/ops-notify/ops-notify.env 於 2026-09-26 設 OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on，首輪匯出軸 OK、零誤發；開發機 2026-09-25 同樣開啟，DEMO 實測的 R3 通知已送達 Telegram。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "ops-notify 的 trend-meteor 目標已加（bcup02/ops-notify PR #68，預設不啟用，OPS_EXPORT 與 UNITS 都是 opt-in）；主機環境檔在開發機演練（P3）時打開（src/trend_meteor/cli.py）。"
+          "state": "done",
+          "evidence": "ops-notify 的 trend-meteor 目標（bcup02/ops-notify PR #68）在 A1 已設 AUDIT、OPS_EXPORT=on、UNITS、MAIN_UNITS 四項；A1 維運通知每 10 分鐘讀到匯出檔軸正常（匯出檔由 src/trend_meteor/cli.py 的修復單元寫）。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 流星版還沒有送出過通知，LINE 第一則真實通知另列一格。"
         }
       }
     },
@@ -455,8 +461,8 @@
         },
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "通知經維運通知送到 LINE；V11 的單元已在開發分支、ops-notify 目標已加（預設不啟用）；第一則真實通知等開發機演練（P3）（src/trend_meteor/cli.py）。"
+          "phase": "meteor-unpause",
+          "evidence": "通知經維運通知送到 LINE；V11 的單元已在正式機分支、ops-notify 目標已加（A1 已啟用）；第一則真實通知等開發機演練（P3）（src/trend_meteor/cli.py）。"
         }
       }
     },
@@ -509,9 +515,10 @@
           "evidence": "deploy/btc-competition-unrecorded-fill.service 與 deploy/btc-competition-unrecorded-fill.timer 列入正式機與開發機的 OPS_NOTIFY_BTC_COMPETITION_UNITS（2026-09-26／09-25），服務單元狀態 OK。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的 systemd 單元與計時器（trend-meteor-*，PR #215）已在開發分支，尚未裝到任何主機；ops-notify 的 UNITS 設定在開發機演練（P3）（src/trend_meteor/cli.py）。"
+          "state": "done",
+          "evidence": "流星版的 systemd 單元與計時器（trend-meteor-*，deploy/，src/trend_meteor/cli.py）已裝在 A1，維運通知的服務單元軸盯修復單元與計時器；A1 讀數正常。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 這些單元沒有失敗過，失敗告警路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -543,9 +550,10 @@
           "reason": "現貨再平衡策略，不是永續合約，沒有資金費結算這個概念。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 資金費同步與寫 Google 表（src/trend_meteor/funding_sync.py、src/trend_meteor/funding_sheet.py，PR #189）在開發分支；排程單元（trend-meteor-funding-sync，PR #215）整輪持有 state.lock、只有 LIVE＋mainnet 才寫表（PR #217）；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版資金費同步與寫 Google 表（src/trend_meteor/funding_sync.py、src/trend_meteor/funding_sheet.py，PR #189）由排程單元（deploy/trend-meteor-funding-sync.service）執行，整輪持有 state.lock，只有 LIVE＋mainnet 才寫表（PR #217）；A1 已在帳戶餘額總表第 7 列寫入（funding_sheet_write_done）。",
+          "verified_at": "2026-11-19",
+          "limit": "第一次同步補進了同帳戶舊趨勢策略的 14 筆歷史資金費（合計 −0.388 USDT）；之後的資金費要有持倉才會產生。"
         }
       }
     },
@@ -575,9 +583,10 @@
           "reason": "競賽有自己的 src/btc_competition/reconcile_google.py，不用共用的 sheet_ledger_compare，自己的 src/btc_competition/reconcile_google.py:49 _GRACE_SECONDS=3600 對尚未同步的現貨成交回 PENDING。留意：PENDING 在維運通知是 warn 級、經去抖後仍會通知，競賽有調倉時是否會短暫告警還沒查。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "共用庫的對帳比對已有『剛開剛平、還在等同步』的寬限；V11 的比對單元（PR #213／#215）已在開發分支，尚未實跑，等開發機演練（P3）（src/trend_meteor/google_projection.py、deploy/trend-meteor-google-projection.service）。"
+          "state": "done",
+          "evidence": "共用庫的對帳比對已有『剛開剛平、還在等同步』的寬限；流星版的對帳單元（src/trend_meteor/google_reconcile.py）與投影派送單元（deploy/trend-meteor-google-projection.service，src/trend_meteor/google_projection.py）在 A1 每 15 分鐘執行。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 還沒有交易，寬限路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -603,9 +612,9 @@
           "evidence": "AI-for-column5/btc-bull-market-competition#33（2026-09-19 squash 合併 a878166，外部審閱 PASS）：README、docs/branch-governance.md、docs/btc-competition-onboarding-plan.md、docs/execution-flow.md、docs/recon-strategy4.md 加 src/btc_competition/portfolio_snapshot_adapter.py 的 PROJECT_NAME 全部改用對照表統一叫法。過程中排除了兩處剛好包含子字串、但語意其實是買賣盤報價、跟交易模式無關的詞，也刻意不動 tests/test_portfolio_snapshot_adapter.py 的跨 repo digest 一致性 fixture（要跟 portfolio-query 同步才能改，留給 n6）。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的程式說明、文件與部署檔已逐條對照名詞對照表掃描，並把舊叫法改成名詞表的正式名稱（PR #222，涵蓋 src/trend_meteor、deploy、docs/trend_meteor_*.md；純文字，沒有改邏輯與識別字）。刻意保留三處：投資人快照的 project_name（src/trend_meteor/portfolio_snapshot.py，隨 P4 來源身分切換再改）、vendored 的 src/trend_meteor/portfolio_snapshot_contract.py 說明、帳本沒有進場列的平倉這個概念（程式裡叫 orphan_close；名詞表把它對到另一個意思的詞，不硬換）。"
+          "state": "done",
+          "evidence": "流星版的程式說明、文件與部署檔已逐條對照名詞對照表掃描，舊叫法改成名詞表的正式名稱（PR #222，涵蓋 src/trend_meteor、deploy、docs/trend_meteor_*.md；純文字，沒有改邏輯與識別字）。刻意保留：vendored 的 src/trend_meteor/portfolio_snapshot_contract.py 說明，以及帳本沒有進場列的平倉這個概念（程式裡叫 orphan_close；名詞表把它對到另一個意思的詞，不硬換）。",
+          "verified_at": "2026-11-19"
         }
       }
     },
@@ -632,8 +641,8 @@
         },
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 執行器送單結果不明時以自訂單號查單、不重送（src/trend_meteor/executor.py 的 order_by_client_id，PR 4f），在開發分支；尚未在測試網長期實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "V11 執行器送單結果不明時以自訂單號查單、不重送（src/trend_meteor/executor.py 的 order_by_client_id，PR 4f），在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -661,9 +670,10 @@
           "reason": "現貨再平衡策略的帳本是逐筆成交（spot_fill），沒有開倉／平倉配對，沒有「整筆交易」可以重述；漏記的現貨成交直接補那筆 spot_fill，歸在「帳本少記交易所成交時，升格通知並以交易所為準更正」那一列處理。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 帳本更正事件的投影（correct_close_v2，PR #195）與寫入（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）在開發分支；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版帳本更正事件的投影（correct_close_v2，PR #195）與寫入（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）由修復單元執行（deploy/trend-meteor-repair.service）；A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 還沒有需要更正的交易，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -692,9 +702,10 @@
           "limit": "自己送出、尚未被中斷復原結清的成交對帳視為收斂中（src/btc_competition/reconcile_compare.py:255），最多等 60 分鐘（:75）才算缺口，不再先發 ERR-043；其他來源不明成交超過 15 分鐘（:70）算缺口；2026-10-31 隨 A1 部署，A1 沒發生過。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 轉接（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）只重述恰好一筆整筆平倉列的交易；單元入口（PR #209／#215）已在開發分支，整輪持有 state.lock（PR #217）；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版轉接（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）只重述恰好一筆整筆平倉列的交易；單元入口（src/trend_meteor/cli.py）由修復單元每 15 分鐘執行，整輪持有 state.lock（PR #217）；A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -726,9 +737,10 @@
           "reason": "競賽是現貨再平衡，沒有開倉／平倉配對，也沒有漏記平倉的修復機器人（見能力『修復機器人：抓錯並提出修復建議』等三格，競賽都是不適用），所以沒有『自動補寫』可以重複發生。競賽帳本少記成交走另一條路：每次補記都立刻發 R3 通知（BTC.UNRECORDED_FILL_CORRECTED，ERR-040），不是 R1 靜默補寫。2026-10-15 使用者決定列不適用。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "共用庫的修復執行器已有；V11 的 VERIFIED_CLOSE_REPAIR_RECURRING 條目已補（ERR-075），單元入口已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "共用庫的修復執行器已有；流星版的 VERIFIED_CLOSE_REPAIR_RECURRING 條目已補（ERR-075），由 src/trend_meteor/cli.py 與 deploy/trend-meteor-repair.service 的修復單元執行；A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -760,8 +772,8 @@
         },
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "通知附錯誤編號由共用庫的匯出檔組；V11 的錯誤條目已補（ERR-072 起），匯出檔由 deploy/trend-meteor-repair.service 每輪寫出，已在開發分支；通知路徑尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "通知附錯誤編號由共用庫的匯出檔組；V11 的錯誤條目已補（ERR-072 起），匯出檔由 deploy/trend-meteor-repair.service 每輪寫出，已在正式機分支；通知路徑A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -789,8 +801,8 @@
         },
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 收到停止訊號只設旗標、當輪做完（src/trend_meteor/graceful_stop.py，PR 5a；cli 的 SIGTERM／SIGINT 接線在 PR #213）在開發分支；各單元的 TimeoutStopSec 已設（PR #215，由程式常數推導預算，PR #217），實際收尾行為等開發機演練（P3）驗證。"
+          "phase": "meteor-unpause",
+          "evidence": "V11 收到停止訊號只設旗標、當輪做完（src/trend_meteor/graceful_stop.py，PR 5a；cli 的 SIGTERM／SIGINT 接線在 PR #213）在正式機分支；各單元的 TimeoutStopSec 已設（PR #215，由程式常數推導預算，PR #217），實際收尾行為等 A1 解除暫停後第一輪實跑驗證。"
         }
       }
     },
@@ -819,8 +831,8 @@
         },
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 重啟後以待處理意圖（book.pending）查單結清中斷單（Executor.recover，PR 4f）在開發分支；尚未在測試網實跑，等開發機演練（P3）（src/trend_meteor/cli.py）。"
+          "phase": "meteor-unpause",
+          "evidence": "V11 重啟後以待處理意圖（book.pending）查單結清中斷單（Executor.recover，PR 4f）在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑（src/trend_meteor/cli.py）。"
         }
       }
     },
@@ -851,8 +863,8 @@
         },
         "trend-meteor": {
           "state": "pending",
-          "phase": "v11-p3",
-          "reason": "V11 的盤中強平成交以 stop:<單號> 記帳（src/trend_meteor/ledger_sink.py）；共用庫對帳比對認不認得，要在開發機演練（P3）用測試網實測驗證（比對單元已在開發分支，PR #213）。"
+          "phase": "meteor-unpause",
+          "reason": "流星版的盤中強平成交以 stop:<單號> 記帳（src/trend_meteor/ledger_sink.py）；共用庫對帳比對認不認得，要用一筆真實的強平成交驗證，A1 目前空手、每日計時器停用，還沒有可驗的成交。"
         }
       }
     },
@@ -882,9 +894,10 @@
           "reason": "競賽是現貨，只送成交（append_fill_v2），沒有帳本更正（trade_correction）這種投影，所以不會有卡在平倉後面的更正；70630a1 的 src 內沒有任何 correct_close 或 trade_correction 的引用（2026-10-10 git grep 查證）。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的投影排隊與派送用共用庫的佇列（src/trend_meteor/google_projection.py），更正排在整筆平倉之後；派送單元（PR #215）已在開發分支；真實 Google 接收端（開發機接收端）的整合驗證在開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版的投影排隊與派送用共用庫的佇列（src/trend_meteor/google_projection.py），更正排在整筆平倉之後；派送單元（deploy/trend-meteor-google-projection.service）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 的 Google 表派送單元每 15 分鐘正常跑完，但佇列是空的（還沒有交易），這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -916,9 +929,10 @@
           "limit": "競賽的指令稿只在測試驗證，沒有在任何主機實際執行過；通用重排只是複製原本的綁定，不是把舊投影搬到新動作的 migration 工具。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "重新排入停放投影的工具已在趨勢 repo 開發分支（PR #222）：`trend-meteor-requeue-projection --trade-id <TM-…>`（src/trend_meteor/requeue_projection.py），把一筆交易停放（REJECTED）的 Google 投影項目放回佇列、維持原順序，只動本機佇列檔，不連 Google。尚未在主機實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "重新排入停放投影的工具 `trend-meteor-requeue-projection --trade-id <TM-…>`（src/trend_meteor/requeue_projection.py，PR #222），把一筆交易停放（REJECTED）的投影項目放回佇列、維持原順序，只動本機佇列檔；A1 已安裝。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 沒有停放的項目，工具沒用過，只有測試與開發機驗證。"
         }
       }
     },
@@ -948,9 +962,10 @@
           "reason": "競賽是現貨，每筆成交一列，沒有平倉投影，也就沒有進場價與數量被平倉覆蓋的問題。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 平倉投影用整筆交易的進場價與數量（src/trend_meteor/google_projection.py 的 _close_projection，PR #187），在開發分支；真實接收端驗證在開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版平倉投影用整筆交易的進場價與數量（src/trend_meteor/google_projection.py 的 _close_projection，PR #187）；派送單元 A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 還沒有平倉，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -1042,8 +1057,8 @@
         },
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 釘的工具庫是 0.4.1（requirements.lock，commit b5858cb），守門測試 tests/test_toolkit_round_to_step.py 擋退版；V11 自己的下單量取整是 src/trend_meteor/execution.py:59 的 floor_step（整數單位加微小容差），已在開發分支；實跑等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "V11 釘的工具庫是 0.4.1（requirements.lock，commit b5858cb），守門測試 tests/test_toolkit_round_to_step.py 擋退版；V11 自己的下單量取整是 src/trend_meteor/execution.py:60 的 floor_step（整數單位加微小容差），已在正式機分支；實跑等開發機演練（P3）。"
         }
       }
     },
@@ -1159,9 +1174,9 @@
           "reason": "這支還用分頁名稱登記（接收端 GOOGLE_LEDGER_V2_SOURCES 的 sheet_name）；改名機率低，等哪天真的要改分頁名稱、或正式機一起拆分頁時再改成分頁編號（sheet_id）登記，同一輪要改接收端登記與對帳讀表的呼叫。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "sheet-id-rollout",
-          "evidence": "開發機已完成（2026-11-18）：對帳用 project_id 讀自己的分頁（src/trend_meteor/google_reconcile.py:152 fetch(project_id=…)，ed-seykota PR #248，共用庫 v0.30.40），接收端 v0.30.39 以 sheet_id 登記「競賽策略・流星版」分頁；正式機要等舊趨勢策略下線（4.1）、流星版上線（P5）同一輪拆分頁並改登記，現在改名會讓舊趨勢策略寫不進去。"
+          "state": "done",
+          "evidence": "流星版對帳用 project_id 讀自己的分頁（src/trend_meteor/google_reconcile.py:157 fetch(project_id=GP.PROJECT_ID)，共用庫 v0.30.40）；正式機接收端 v0.30.47 以分頁編號登記「競賽策略・流星版」分頁（2026-11-19），A1 對帳讀它回 RECONCILED。",
+          "verified_at": "2026-11-19"
         }
       }
     }
@@ -1579,9 +1594,10 @@
           "evidence": "src/btc_competition/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；帳本軸預設四支都盯（維運通知的預設設定）。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "維運通知讀 V11 的帳本對帳狀態；V11 的對帳單元（reconcile-compare，PR #213／#215）已在開發分支、ops-notify 的 trend-meteor 目標已加（預設不啟用）；尚未實跑，等開發機演練（P3）（src/trend_meteor/reconcile_compare.py）。"
+          "state": "done",
+          "evidence": "維運通知讀流星版的帳本對帳狀態（src/trend_meteor/reconcile_compare.py，對帳單元 reconcile-compare，PR #213／#215，ops-notify trend-meteor 目標 bcup02/ops-notify PR #68）；A1 帳本軸讀回 RECONCILED。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 流星版帳本目前沒有真倉交易，沒有遇過 DIVERGED，告警路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -1602,9 +1618,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "維運通知讀 V11 的帳本對帳狀態；V11 的對帳單元（reconcile-compare，PR #213／#215）已在開發分支、ops-notify 的 trend-meteor 目標已加（預設不啟用）；尚未實跑，等開發機演練（P3）（src/trend_meteor/reconcile_compare.py）。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -1628,9 +1643,10 @@
           "evidence": "src/btc_competition/reconcile_google.py 寫出的狀態檔由正式機維運通知讀取；Google 表軸預設四支都盯。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "Google 表對帳狀態由 V11 的 google-reconcile 單元寫（src/trend_meteor/google_reconcile.py，PR #221；audit/google_reconcile_status.json），維運通知的 trend-meteor 目標已加上 google 軸（bcup02/ops-notify PR #70，預設不啟用）；啟用目標與主機設定在開發機演練（P3）。"
+          "state": "done",
+          "evidence": "Google 表對帳狀態由流星版的 google-reconcile 單元寫（src/trend_meteor/google_reconcile.py，PR #221；audit/google_reconcile_status.json），維運通知的 trend-meteor 目標有 google 軸（bcup02/ops-notify PR #70）；A1 讀回 RECONCILED。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 還沒有交易，沒有遇過 DIVERGED，告警路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -1676,9 +1692,10 @@
           "evidence": "src/btc_competition/portfolio_snapshot_adapter.py 寫出的狀態檔由正式機維運通知讀取；運行狀態軸預設四支都盯，安全暫停不等去抖。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "維運通知讀 V11 的運行狀態；V11 的心跳在開發分支，快照單元（PR #215）與 ops-notify 的 runtime 軸（PR #68）已完成；主機設定與實跑等開發機演練（P3）（src/trend_meteor/portfolio_snapshot.py、deploy/trend-meteor-portfolio-snapshot.service）。"
+          "state": "done",
+          "evidence": "維運通知讀流星版的運行狀態（src/trend_meteor/portfolio_snapshot.py、deploy/trend-meteor-portfolio-snapshot.service；ops-notify runtime 軸 PR #68）；A1 讀得到，目前是 PAUSED。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 只讀過 PAUSED，ERROR 與安全暫停的告警路徑沒被觸發過，只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -1699,9 +1716,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "維運通知讀 V11 的運行狀態；V11 的心跳在開發分支，快照單元（PR #215）與 ops-notify 的 runtime 軸（PR #68）已完成；主機設定與實跑等開發機演練（P3）（src/trend_meteor/portfolio_snapshot.py、deploy/trend-meteor-portfolio-snapshot.service）。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -1726,9 +1742,10 @@
           "evidence": "deploy/btc-competition-unrecorded-fill.service 列入正式機 OPS_NOTIFY_BTC_COMPETITION_UNITS，由維運通知服務單元軸盯。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "維運通知盯 V11 的背景服務；V11 的 systemd 單元（trend-meteor-*，PR #215）已在開發分支，尚未裝到任何主機；ops-notify 的 UNITS 設定在開發機演練（P3）（deploy/trend-meteor-bot.service）。"
+          "state": "done",
+          "evidence": "維運通知盯流星版的背景服務（修復單元與計時器，deploy/trend-meteor-bot.service 等 trend-meteor-* 單元，PR #215；OPS_NOTIFY_TREND_METEOR_UNITS 已設）；A1 服務單元軸讀回 OK。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 這些單元沒有失敗過，告警路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -1749,9 +1766,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "維運通知盯 V11 的背景服務；V11 的 systemd 單元（trend-meteor-*，PR #215）已在開發分支，尚未裝到任何主機；ops-notify 的 UNITS 設定在開發機演練（P3）（deploy/trend-meteor-bot.service）。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -1776,9 +1792,10 @@
           "evidence": "src/btc_competition/unrecorded_fill.py:219 每輪寫 audit/ops_export.json，正式機維運通知匯出檔軸盯（OPS_NOTIFY_BTC_COMPETITION_OPS_EXPORT=on）。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "維運通知讀 V11 的匯出檔；匯出檔由修復單元（trend-meteor-repair，PR #215）每一輪寫出，已在開發分支；ops-notify 的 OPS_EXPORT 設定在開發機演練（P3）（deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "維運通知讀流星版的匯出檔，匯出檔由修復單元（deploy/trend-meteor-repair.service，PR #215）每一輪寫出；A1 匯出檔軸讀回 OK（OPS_EXPORT 已打開）。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 匯出檔沒有讀不到過，告警路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -1799,9 +1816,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "維運通知讀 V11 的匯出檔；匯出檔由修復單元（trend-meteor-repair，PR #215）每一輪寫出，已在開發分支；ops-notify 的 OPS_EXPORT 設定在開發機演練（P3）（deploy/trend-meteor-repair.service）。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -1825,9 +1841,10 @@
           "evidence": "src/btc_competition/reconcile_compare.py 寫出的狀態檔由正式機維運通知讀取；狀態檔不見或太舊時帳本／Google 表／運行狀態軸都會回報 UNAVAILABLE／STALE。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "維運通知判斷 V11 的狀態檔過期；V11 的狀態檔與寫出週期已定（對帳每 15 分鐘、快照每 5 分鐘，PR #215）；ops-notify 目標已加；實跑等開發機演練（P3）（deploy/trend-meteor-portfolio-snapshot.timer）。"
+          "state": "done",
+          "evidence": "維運通知判斷流星版的狀態檔過期；狀態檔與寫出週期已定（對帳每 15 分鐘、快照每 5 分鐘，deploy/trend-meteor-portfolio-snapshot.timer，PR #215）；A1 讀數都是新的。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 的狀態檔沒有過期過，告警路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -1848,9 +1865,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "維運通知判斷 V11 的狀態檔過期；V11 的狀態檔與寫出週期已定（對帳每 15 分鐘、快照每 5 分鐘，PR #215）；ops-notify 目標已加；實跑等開發機演練（P3）（deploy/trend-meteor-portfolio-snapshot.timer）。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -1874,9 +1890,8 @@
           "reason": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略。"
         },
         "trend-meteor": {
-          "state": "pending",
-          "phase": "v11-p3",
-          "reason": "時鐘軸是主機層級，V11 的主機設定在開發機演練（P3）。"
+          "state": "n/a",
+          "reason": "主機層級：維運通知另外讀每台主機 clock-health 寫的狀態檔，不屬於單一策略（A1 時鐘軸讀回正常）。"
         }
       },
       "emits_event": {
@@ -1897,9 +1912,8 @@
           "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         },
         "trend-meteor": {
-          "state": "pending",
-          "phase": "v11-p3",
-          "reason": "時鐘軸是主機層級，V11 的主機設定在開發機演練（P3）。"
+          "state": "n/a",
+          "reason": "維運通知直接讀狀態檔，不經事件日誌。"
         }
       }
     },
@@ -2001,9 +2015,10 @@
           "reason": "競賽是現貨，Google 表只收成交（append_fill_v2，見能力『現貨成交用專屬的寫入動作』），沒有平倉投影，所以不會有找不到開倉列的平倉；同類的『帳本更正卡在被停放的平倉後面』那一格也已列不適用（src/btc_competition/google_projection_worker.py:132 只轉送共用庫的送出函式）。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的投影派送用共用庫的佇列，停放找不到進場的平倉時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/google_projection.py、deploy/trend-meteor-google-projection.service）。"
+          "state": "done",
+          "evidence": "流星版的投影派送用共用庫的佇列，停放找不到進場的平倉時共用庫會寫事件；派送單元（deploy/trend-meteor-google-projection.service，src/trend_meteor/google_projection.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 的 Google 表派送單元每 15 分鐘正常跑完，但佇列是空的（還沒有交易），這條路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -2030,9 +2045,10 @@
           "reason": "競賽是現貨，Google 表只收成交（append_fill_v2，見能力『現貨成交用專屬的寫入動作』），沒有平倉投影，所以不會有找不到開倉列的平倉；同類的『帳本更正卡在被停放的平倉後面』那一格也已列不適用（src/btc_competition/google_projection_worker.py:132 只轉送共用庫的送出函式）。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的投影派送用共用庫的佇列，停放找不到進場的平倉時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/google_projection.py、deploy/trend-meteor-google-projection.service）。"
+          "state": "done",
+          "evidence": "流星版的投影派送用共用庫的佇列，停放找不到進場的平倉時共用庫會寫事件；派送單元（deploy/trend-meteor-google-projection.service，src/trend_meteor/google_projection.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 的 Google 表派送單元每 15 分鐘正常跑完，但佇列是空的（還沒有交易），這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -2064,9 +2080,10 @@
           "limit": "A1 沒遇過編號衝突，只在共用庫與策略端測試、開發機（台北 12:03 實際停放 3 筆舊成交）驗證。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的投影派送用共用庫的佇列，停放編號衝突時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/google_projection.py、deploy/trend-meteor-google-projection.service）。"
+          "state": "done",
+          "evidence": "流星版的投影派送用共用庫的佇列，停放編號衝突時共用庫會寫事件；派送單元（deploy/trend-meteor-google-projection.service，src/trend_meteor/google_projection.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 的 Google 表派送單元每 15 分鐘正常跑完，但佇列是空的（還沒有交易），這條路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -2095,9 +2112,10 @@
           "limit": "A1 沒有實際停放過，事件只在測試與開發機看過（開發機台北 12:03 寫過 3 筆）。"
         },
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 的投影派送用共用庫的佇列，停放編號衝突時共用庫會寫事件；V11 的派送單元（trend-meteor-google-projection，PR #215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/google_projection.py、deploy/trend-meteor-google-projection.service）。"
+          "state": "done",
+          "evidence": "流星版的投影派送用共用庫的佇列，停放編號衝突時共用庫會寫事件；派送單元（deploy/trend-meteor-google-projection.service，src/trend_meteor/google_projection.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 的 Google 表派送單元每 15 分鐘正常跑完，但佇列是空的（還沒有交易），這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -2310,16 +2328,18 @@
       "code": "MET.VERIFIED_CLOSE_AUTO_REPAIRED",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 補寫孤兒進場的平倉（src/trend_meteor/repair_bot.py，PR #197）在開發分支；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版補寫孤兒進場的平倉（src/trend_meteor/repair_bot.py，PR #197）由修復單元（deploy/trend-meteor-repair.service，src/trend_meteor/cli.py）每 15 分鐘執行；A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "流星版補寫孤兒進場的平倉（src/trend_meteor/repair_bot.py，PR #197）由修復單元（deploy/trend-meteor-repair.service，src/trend_meteor/cli.py）每 15 分鐘執行；A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -2327,16 +2347,18 @@
       "code": "MET.VERIFIED_CLOSE_REPAIR_FAILED",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 轉接拒絕缺欄位或讀不懂的成交與持倉（src/trend_meteor/repair_bot.py），失敗由共用庫計次升格；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版轉接拒絕缺欄位或讀不懂的成交與持倉（src/trend_meteor/repair_bot.py），失敗由共用庫計次升格；修復單元（deploy/trend-meteor-repair.service，src/trend_meteor/cli.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "流星版轉接拒絕缺欄位或讀不懂的成交與持倉（src/trend_meteor/repair_bot.py），失敗由共用庫計次升格；修復單元（deploy/trend-meteor-repair.service，src/trend_meteor/cli.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -2344,16 +2366,18 @@
       "code": "MET.VERIFIED_CLOSE_REPAIR_BLOCKED",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "帳本已有修復痕跡時停手由共用庫判定；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "帳本已有修復痕跡時停手由共用庫判定；修復單元（deploy/trend-meteor-repair.service，src/trend_meteor/cli.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "帳本已有修復痕跡時停手由共用庫判定；修復單元（deploy/trend-meteor-repair.service，src/trend_meteor/cli.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -2361,16 +2385,18 @@
       "code": "MET.VERIFIED_CLOSE_REPAIR_RECURRING",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "7 天內自動補寫 2 次以上的升格由共用庫判定；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "7 天內自動補寫 2 次以上的升格由共用庫判定；修復單元（deploy/trend-meteor-repair.service，src/trend_meteor/cli.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由共用庫的修復執行器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "7 天內自動補寫 2 次以上的升格由共用庫判定；修復單元（deploy/trend-meteor-repair.service，src/trend_meteor/cli.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -2378,16 +2404,18 @@
       "code": "MET.UNRECORDED_FILL_CORRECTED",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 轉接（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）只重述恰好一筆整筆平倉列的交易；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版轉接（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）只重述恰好一筆整筆平倉列的交易；單元入口（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由共用庫的未記帳處理器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "流星版轉接（src/trend_meteor/unrecorded_fill_adapter.py，PR #199）只重述恰好一筆整筆平倉列的交易；單元入口（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -2395,16 +2423,18 @@
       "code": "MET.UNRECORDED_FILL_UNRESOLVED",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "不確定來源或不能重述的成交一律不寫帳本、開請求，由共用庫的未記帳處理器執行；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "不確定來源或不能重述的成交一律不寫帳本、開請求，由共用庫的未記帳處理器執行；修復單元（deploy/trend-meteor-repair.service，src/trend_meteor/cli.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由共用庫的未記帳處理器寫；V11 的單元入口（trend-meteor-repair，PR #209／#215）已在開發分支；尚未實跑，等開發機演練（P3）（src/trend_meteor/cli.py、deploy/trend-meteor-repair.service）。"
+          "state": "done",
+          "evidence": "不確定來源或不能重述的成交一律不寫帳本、開請求，由共用庫的未記帳處理器執行；修復單元（deploy/trend-meteor-repair.service，src/trend_meteor/cli.py）A1 已啟用。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 修復單元每 15 分鐘正常跑完，但還沒遇過漏記平倉或未記帳成交，這條路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -2412,16 +2442,18 @@
       "code": "MET.LEDGER_DATA_QUALITY",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 帳本稽核（src/trend_meteor/ledger_audit.py）在開發分支，同一組問題只通知一次，偵測七類（含重複成交與逐筆進出場平衡），事件記成 R3，與目錄一致；呼叫它的入口（trend-meteor ledger-audit，PR #213）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版帳本稽核（src/trend_meteor/ledger_audit.py）偵測七類問題（含重複成交與逐筆進出場平衡），同一組問題只通知一次，事件記成 R3；入口 trend-meteor ledger-audit 接在對帳單元第三步（deploy/trend-meteor-reconcile-fetch.service），A1 每 15 分鐘執行。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 帳本沒有資料品質問題，通知路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由 V11 的帳本稽核寫（src/trend_meteor/ledger_audit.py）；呼叫它的入口（trend-meteor ledger-audit，PR #213）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "流星版帳本稽核（src/trend_meteor/ledger_audit.py）偵測七類問題（含重複成交與逐筆進出場平衡），同一組問題只通知一次，事件記成 R3；入口 trend-meteor ledger-audit 接在對帳單元第三步（deploy/trend-meteor-reconcile-fetch.service），A1 每 15 分鐘執行。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 帳本沒有資料品質問題，通知路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -2430,15 +2462,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2447,15 +2479,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2464,15 +2496,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2481,15 +2513,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2498,15 +2530,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2515,15 +2547,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2532,15 +2564,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2549,15 +2581,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2566,15 +2598,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2583,15 +2615,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2600,15 +2632,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2617,15 +2649,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2634,15 +2666,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2651,15 +2683,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2668,15 +2700,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2685,15 +2717,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2702,15 +2734,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2719,15 +2751,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2736,15 +2768,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2753,15 +2785,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2770,15 +2802,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2787,15 +2819,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2804,15 +2836,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2821,15 +2853,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "暫停規則在開發分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "暫停規則在正式機分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由每日流程的暫停處理寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2838,15 +2870,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "行為在開發分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
+          "phase": "meteor-unpause",
+          "evidence": "行為在正式機分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，A1 已啟用）已在 A1 設好。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2855,15 +2887,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "行為在開發分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
+          "phase": "meteor-unpause",
+          "evidence": "行為在正式機分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，A1 已啟用）已在 A1 設好。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2872,15 +2904,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "行為在開發分支（src/trend_meteor/ledger_sink.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
+          "phase": "meteor-unpause",
+          "evidence": "行為在正式機分支（src/trend_meteor/ledger_sink.py）；單元入口（PR #209）已在正式機分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，A1 已啟用）已在 A1 設好。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由 V11 程式寫（src/trend_meteor/ledger_sink.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由 V11 程式寫（src/trend_meteor/ledger_sink.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2889,15 +2921,15 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "行為在開發分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
+          "phase": "meteor-unpause",
+          "evidence": "行為在正式機分支（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，A1 已啟用）已在 A1 設好。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由 V11 程式寫（src/trend_meteor/runner.py）；單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     },
@@ -2905,16 +2937,18 @@
       "code": "MET.FUNDING_SHEET_WRITE_FAILED",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "行為在開發分支（src/trend_meteor/funding_sheet.py）；單元入口（PR #209）已在開發分支；通知設定（ops-notify 的 trend-meteor 目標，bcup02/ops-notify PR #68，預設不啟用）在開發機演練（P3）時打開。"
+          "state": "done",
+          "evidence": "資金費寫 Google 表失敗時記事件（src/trend_meteor/funding_sheet.py）；資金費同步單元（deploy/trend-meteor-funding-sync.service）A1 已啟用，目前寫表成功。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 資金費寫表沒有失敗過，失敗路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由 V11 程式寫（src/trend_meteor/funding_sheet.py）；單元入口（PR #209）已在開發分支；尚未實跑，等開發機演練（P3）。"
+          "state": "done",
+          "evidence": "資金費寫 Google 表失敗時記事件（src/trend_meteor/funding_sheet.py）；資金費同步單元（deploy/trend-meteor-funding-sync.service）A1 已啟用，目前寫表成功。",
+          "verified_at": "2026-11-19",
+          "limit": "A1 資金費寫表沒有失敗過，失敗路徑只有測試與開發機驗證。"
         }
       }
     },
@@ -2923,69 +2957,416 @@
       "behaviour": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "V11 每日單元走完整輪後待記帳清單仍非空就算積壓的一天，累計 3 個不同 UTC 日寫一筆 R2 已升格事件、清空歸零、不暫停（src/trend_meteor/runner.py _track_ledger_backlog；狀態欄位在 src/trend_meteor/state.py）；正常路徑每段積壓記一次，事件寫進事件日誌之後、狀態存檔之前程序中斷（或存檔失敗），下一輪會再記一筆（寧可重複記錄事件，避免因存檔失敗而漏記事件；不是通知保證）。趨勢 repo 開發分支 PR #224，改釘 trade-alerts v0.30.32。尚未在主機實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "V11 每日單元走完整輪後待記帳清單仍非空就算積壓的一天，累計 3 個不同 UTC 日寫一筆 R2 已升格事件、清空歸零、不暫停（src/trend_meteor/runner.py _track_ledger_backlog；狀態欄位在 src/trend_meteor/state.py）；正常路徑每段積壓記一次，事件寫進事件日誌之後、狀態存檔之前程序中斷（或存檔失敗），下一輪會再記一筆（寧可重複記錄事件，避免因存檔失敗而漏記事件；不是通知保證）。趨勢 repo 正式機分支 PR #224，改釘 trade-alerts v0.30.32。A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       },
       "emits_event": {
         "trend-meteor": {
           "state": "built",
-          "phase": "v11-p3",
-          "evidence": "事件由 V11 程式寫進事件日誌：code LEDGER_WRITE_STUCK、risk_tier R2、details.escalated True（src/trend_meteor/runner.py _track_ledger_backlog，PR #224）；事件寫入成功才設已記錄旗標，寫失敗下一個走完整輪的日子再記。寫進事件日誌不等於通知送達。通知另有條件：要設定 OPS_NOTIFY_TREND_METEOR_AUDIT 建立 V11 目標、OPS_NOTIFY_TREND_METEOR_OPS_EXPORT=on 啟用匯出軸（預設關，P3 設定），事件仍在匯出視窗內（預設 7 天）；匯出軸每次第一次啟用或關掉後重新啟用，當下已存在的事件都視為已送達、不補發。目錄守門測試（tests/test_trend_meteor_catalog_guard.py）強制與目錄一致。尚未實跑，等開發機演練（P3）。"
+          "phase": "meteor-unpause",
+          "evidence": "事件由 V11 程式寫進事件日誌：code LEDGER_WRITE_STUCK、risk_tier R2、details.escalated True（src/trend_meteor/runner.py _track_ledger_backlog，PR #224）；事件寫入成功才設已記錄旗標，寫失敗下一個走完整輪的日子再記。寫進事件日誌不等於通知送達。通知另有條件：A1 已設 OPS_NOTIFY_TREND_METEOR_AUDIT 與 OPS_NOTIFY_TREND_METEOR_OPS_EXPORT=on，事件仍在匯出視窗內（預設 7 天）；匯出軸每次第一次啟用或關掉後重新啟用，當下已存在的事件都視為已送達、不補發。目錄守門測試（tests/test_trend_meteor_catalog_guard.py）強制與目錄一致。A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
         }
       }
     }
   ],
   "recent_changes": [
     {
-      "kind": "rule",
-      "id": "BTC.PAXG_DATA_UNAVAILABLE",
-      "project": "btc-competition",
-      "aspect": "behaviour",
+      "kind": "cap",
+      "id": "runtime.status_snapshot",
+      "project": "trend-meteor",
       "type": "completed",
-      "note": "2026-11-18 逐格讀正式機分支 32331cb 的程式與測試（A1 檔案雜湊相同），test_runner_paxg 43 個測試通過；由未做改已做（進度頁 f-82）。"
-    },
-    {
-      "kind": "rule",
-      "id": "BTC.PAXG_DATA_UNAVAILABLE",
-      "project": "btc-competition",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-18 逐格讀正式機分支 32331cb 的程式與測試（A1 檔案雜湊相同），test_runner_paxg 43 個測試通過；由未做改已做（進度頁 f-82）。"
-    },
-    {
-      "kind": "rule",
-      "id": "BTC.PAXG_RULE_MISSING",
-      "project": "btc-competition",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-18 逐格讀正式機分支 32331cb 的程式與測試（A1 檔案雜湊相同），test_runner_paxg 43 個測試通過；由未做改已做（進度頁 f-82）。"
-    },
-    {
-      "kind": "rule",
-      "id": "BTC.PAXG_RULE_MISSING",
-      "project": "btc-competition",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-18 逐格讀正式機分支 32331cb 的程式與測試（A1 檔案雜湊相同），test_runner_paxg 43 個測試通過；由未做改已做（進度頁 f-82）。"
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
     },
     {
       "kind": "cap",
-      "id": "google.sheet_id_registration",
-      "type": "added",
-      "note": "2026-11-18 新增：Google 表分頁改用分頁編號登記；流星版開發機已完成，動能、加密、競賽列未做（進度頁 f-95）。"
+      "id": "reconcile.ledger_status",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
     },
     {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "type": "updated",
-      "note": "2026-11-18 動能、加密、競賽在 A1 換共用庫 v0.30.44（進度頁 f-89）：佇列模組檔 blob 仍是 583bc2e，證據裡的釘版行號與版本同步更新。"
+      "kind": "cap",
+      "id": "reconcile.google_status",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.detect_propose",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.verified_close",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.pause_brake",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "ops_export.writer",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "ops_notify.export_relay_enabled",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "ops_notify.units_axis",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.funding_fee_sync",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
     },
     {
       "kind": "cap",
       "id": "reconcile.google_projection_grace",
-      "type": "updated",
-      "note": "2026-11-18 加密策略證據的 A1 共用庫版本改 v0.30.44（寬限預設 3600 秒沒變）；證據版本 sources 換到 A1 現行 operations commit。"
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "docs.glossary_adopted",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "ledger.trade_correction",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "reconcile.unrecorded_fill_handling",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "repair_bot.recurrence_escalation",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "projection.park_unconfirmed_correction",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "projection.requeue_parked",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "google.close_whole_trade_entry",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "cap",
+      "id": "google.sheet_id_registration",
+      "project": "trend-meteor",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_LEDGER_DIVERGED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_LEDGER_DIVERGED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_GOOGLE_DIVERGED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_RUNTIME_ALERT",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_RUNTIME_ALERT",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_UNIT_FAILED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_UNIT_FAILED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_STATUS_STALE",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_STATUS_STALE",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_CLOCK_DEGRADED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.OPS_CLOCK_DEGRADED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.VERIFIED_CLOSE_AUTO_REPAIRED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.VERIFIED_CLOSE_REPAIR_FAILED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.VERIFIED_CLOSE_REPAIR_FAILED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.VERIFIED_CLOSE_REPAIR_BLOCKED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.VERIFIED_CLOSE_REPAIR_RECURRING",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.UNRECORDED_FILL_CORRECTED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.UNRECORDED_FILL_CORRECTED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.UNRECORDED_FILL_UNRESOLVED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.UNRECORDED_FILL_UNRESOLVED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.LEDGER_DATA_QUALITY",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.LEDGER_DATA_QUALITY",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.FUNDING_SHEET_WRITE_FAILED",
+      "project": "trend-meteor",
+      "aspect": "behaviour",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+    },
+    {
+      "kind": "rule",
+      "id": "MET.FUNDING_SHEET_WRITE_FAILED",
+      "project": "trend-meteor",
+      "aspect": "emits_event",
+      "type": "completed",
+      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
     }
   ]
 }
