@@ -1,0 +1,626 @@
+diff --git a/docs/guides/fleet-risk-register.html b/docs/guides/fleet-risk-register.html
+index b178987..150a419 100644
+--- a/docs/guides/fleet-risk-register.html
++++ b/docs/guides/fleet-risk-register.html
+@@ -1,5 +1,5 @@
+ <title>機隊風險登記冊</title>
+-<!-- fleet-guide-digest: 0423d3c600a54270 -->
++<!-- fleet-guide-digest: cad7e2448d3bf358 -->
+ <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+ <style>
+   :root{
+@@ -148,9 +148,9 @@
+   <div id="filters"></div>
+   <div id="register"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-11-18 盤點）。
++    資料來源：trade-alerts <code>fleet-error-catalog/v2</code>（錯誤分類）與 <code>fleet-rollout-registry/v1</code>（各策略實際進度，2026-11-19 盤點）。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。另見同目錄的「機隊一致性登記冊」。
+-    頁面版本碼 <code>0423d3c600a54270</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
++    頁面版本碼 <code>cad7e2448d3bf358</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
+   </div>
+ </div>
+ <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>
+diff --git a/docs/guides/fleet-rollout-register.html b/docs/guides/fleet-rollout-register.html
+index d637311..3fee986 100644
+--- a/docs/guides/fleet-rollout-register.html
++++ b/docs/guides/fleet-rollout-register.html
+@@ -1,5 +1,5 @@
+ <title>機隊一致性登記冊</title>
+-<!-- fleet-guide-digest: 5ef1363a187fceeb -->
++<!-- fleet-guide-digest: b2b558292a13353b -->
+ <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+ <style>
+   :root{
+@@ -261,10 +261,10 @@
+   <p class="group-sub">整個專案給人看的文字一律用這裡的中文名；「不要再用」的舊叫法，自動檢查會擋。英文代號照現況列出，方便對照程式與設定檔。</p>
+   <div id="glossaryHost"></div>
+   <div class="foot">
+-    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-11-18 對各策略 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
++    資料來源：trade-alerts <code>fleet-rollout-registry/v1</code>（2026-11-19 對各策略 repo 逐項盤點）、<code>fleet-error-catalog/v2</code> 與 <code>fleet-glossary/v1</code>。
+     「檔案:行號」證據對應的版本：動能策略 <code>AI-for-column5/mexc-4h-momentum-trailing-stop@operations c53f6d1</code>；加密策略 <code>AI-for-column5/my-crypto-bot@operations 93039e5</code>；競賽策略 <code>AI-for-column5/btc-bull-market-competition@operations a78c775</code>；競賽策略・流星版 <code>AI-for-column5/ed-seykota-systematic-trend-following@operations 1568826</code>。各格的「A1 查證」長文（檔案雜湊、部署時間）放在 repo 的 <code>docs/registry-a1-checks.json</code>。
+     本頁由 <code>scripts/render_guides.py</code> 產生，請勿手改；手改會讓 CI 失敗。
+-    頁面版本碼 <code>5ef1363a187fceeb</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
++    頁面版本碼 <code>b2b558292a13353b</code>（重發前用 <code>render_guides.py --check-published</code> 比對）。
+   </div>
+ </div>
+ <button type="button" id="totop" aria-label="回到最上方" title="回到最上方">↑</button>
+diff --git a/docs/observation-watch.md b/docs/observation-watch.md
+index 1f8f13d..fa00e70 100644
+--- a/docs/observation-watch.md
++++ b/docs/observation-watch.md
+@@ -53,6 +53,12 @@ python3 /opt/observation-watch/observation_watch.py ack <check-id>  # 這一項
+ - 處理：看那個檔案從 `sources` 到 A1 現行版改了什麼；行號位移就照 f-27／f-18 的流程把該策略的 `sources` 換到 A1 現行版（`verify_registry_evidence.py --relocate`，逐筆比對舊新行文字），並重新確認受影響格子的說法；換完偵測自己恢復 `waiting`。
+ - 限制：只比對「引用到的檔案」，不看檔案改了什麼，所以改了無關的行也會點名（寧可多報）；A1 部署複本的 HEAD 是部署的代理（見上一節）；只讀「已做」格子的 `evidence` 欄，未做格子的 `reason` 不算。
+ 
++### 策略停用或被新策略取代：只改登記冊，不改偵測程式
++登記冊頂層的 `lifecycle` 記哪支策略已停用：`{"<專案>": {"state": "retired", "since": "YYYY-MM-DD", "reason": "為什麼停、誰接手"}}`（`registry_problems` 驗格式；schema 同步）。`registry-awaits` 與 `registry-drift` 都讀它，**略過 retired 的策略**：它的程式已不在 A1（或不再維護），拿 A1 部署複本去比 `sources` 只會永遠報漂移；摘要會寫「已停用、不比對：<專案>」。一致性登記冊頁面也據此不顯示它的欄、新能力不必填它的格子（`rollout_registry.retired_projects()`）。
++- 停用一支策略（或它被「新○○策略」取代）時：在登記冊 `lifecycle` 加一筆，讓舊策略的格子留作歷史；新策略用新的專案欄（`projects`／`sources`／`PROJECT_CODE_PREFIXES`）。
++- 兩個地方還是常數、要跟著改，測試會擋：`scripts/observation_watch.py` 的 `_RETIRED_A1_STRATEGIES`（`a1-stable` 看維運通知讀數、手上沒有登記冊；`test_the_retired_strategies_the_stability_check_skips_follow_the_registry` 鎖兩者一致）。
++- 共用同一個 repo 與 A1 部署複本的專案（流星版與舊趨勢）靠 `REGISTRY_REPOS` 對應；新專案共用或新增 repo 時要補。
++
+ ## 新增一個檢查
+ 在 `scripts/observation_watch.py` 寫一個 `check_xxx(ctx) -> Result`，加進 `CHECKS`（`covers` 填進度頁項目編號），
+ 在 `tests/test_observation_watch.py` 用 `FakeRemote` 寫：等待、通過、失敗各一個測試。判斷不到的事（手機上看到的樣子）設 `needs_human=True`，不要假裝能自動驗證。
+diff --git a/pyproject.toml b/pyproject.toml
+index f9281ef..e30aec2 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.48"
++version = "0.30.49"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/schemas/fleet-rollout-registry-v1.schema.json b/schemas/fleet-rollout-registry-v1.schema.json
+index 97c16e1..2086135 100644
+--- a/schemas/fleet-rollout-registry-v1.schema.json
++++ b/schemas/fleet-rollout-registry-v1.schema.json
+@@ -207,6 +207,37 @@
+         }
+       }
+     },
++    "lifecycle": {
++      "type": "object",
++      "description": "A stopped strategy (retired): its cells stay as history, the register page shows no column for it, and the observation watch no longer compares its files with A1.  Absent = every strategy is active.",
++      "additionalProperties": false,
++      "patternProperties": {
++        ".*": {
++          "type": "object",
++          "required": [
++            "state",
++            "since",
++            "reason"
++          ],
++          "additionalProperties": false,
++          "properties": {
++            "state": {
++              "enum": [
++                "retired"
++              ]
++            },
++            "since": {
++              "type": "string",
++              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
++            },
++            "reason": {
++              "type": "string",
++              "minLength": 1
++            }
++          }
++        }
++      }
++    },
+     "phases": {
+       "type": "object",
+       "minProperties": 1,
+diff --git a/scripts/observation_watch.py b/scripts/observation_watch.py
+index 5235168..3afa99f 100644
+--- a/scripts/observation_watch.py
++++ b/scripts/observation_watch.py
+@@ -109,7 +109,11 @@ def _allowed_paths() -> frozenset[str]:
+ ALLOWED_PATHS = _allowed_paths()
+ #: A1 deploys by pulling ``operations`` in these clones and running the repo's installer, so a clone's HEAD is the
+ #: commit that was deployed.  Exactly these directories, and only ``rev-parse HEAD``, may be asked.
+-A1_CLONES = {key: f"/home/ubuntu/src/{name}" for key, name in REPOS.items()}
++#: Registry projects whose files the registry checks compare with A1: ``REPOS`` plus 競賽策略・流星版 (``trend-meteor``), which lives in the
++#: same repo -- and the same A1 deploy clone -- as the retired 舊趨勢策略.  ``REPOS`` itself stays the strategies whose A1 audit/state
++#: files other checks read.
++REGISTRY_REPOS = {**REPOS, "trend-meteor": REPOS["seykota"]}
++A1_CLONES = {key: f"/home/ubuntu/src/{name}" for key, name in REGISTRY_REPOS.items()}
+ _SHA40 = re.compile(r"[0-9a-f]{40}")
+ _SAFE_PATH = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*")
+ _LS_TREE_LINE = re.compile(r"^\d{6} blob ([0-9a-f]{40})\t(.+)$")
+@@ -1177,6 +1181,61 @@ def _refresh(repo: Path) -> bool | None:
+     return _git(repo, "fetch", "-q", "origin").returncode == 0
+ 
+ 
++_LIFECYCLE_STATES = ("retired",)
++_LIFECYCLE_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
++_LIFECYCLE_REASON_MAX = 450
++
++
++def _lifecycle_entry_problem(project: str, entry: Any) -> str | None:
++    """Why one ``lifecycle`` entry is not a valid stop declaration (None = valid).  Mirrors ``trade_alerts.rollout_registry._lifecycle_problems``
++    -- this script runs alone on A1-dev and cannot import the package, and a stop declaration is what switches monitoring OFF for a strategy,
++    so an incomplete one must never count (review of #400)."""
++    if project not in REGISTRY_REPOS:
++        return f"lifecycle / {project}: 不是已知的策略"
++    if not isinstance(entry, Mapping):
++        return f"lifecycle / {project}: 不是物件"
++    if entry.get("state") not in _LIFECYCLE_STATES:
++        return f"lifecycle / {project}: state 要是 {list(_LIFECYCLE_STATES)} 之一，現在是 {entry.get('state')!r}"
++    since = entry.get("since")
++    try:
++        valid_date = isinstance(since, str) and bool(_LIFECYCLE_DATE.fullmatch(since)) and bool(datetime.strptime(since, "%Y-%m-%d"))
++    except ValueError:
++        valid_date = False
++    if not valid_date:
++        return f"lifecycle / {project}: since 要是 YYYY-MM-DD 的真實日期，現在是 {since!r}"
++    reason = entry.get("reason")
++    if not (isinstance(reason, str) and reason.strip()):
++        return f"lifecycle / {project}: 缺 reason（為什麼停、誰接手）"
++    if len(reason) > _LIFECYCLE_REASON_MAX:
++        return f"lifecycle / {project}: reason 有 {len(reason)} 字，上限 {_LIFECYCLE_REASON_MAX}"
++    return None
++
++
++def lifecycle_problems(registry: Mapping[str, Any]) -> list[str]:
++    """Every way the registry's ``lifecycle`` is not usable as a stop declaration; empty = absent or fully valid."""
++    lifecycle = registry.get("lifecycle")
++    if lifecycle is None:
++        return []
++    if not isinstance(lifecycle, Mapping):
++        return ["lifecycle 要是物件 {專案: {state, since, reason}}"]
++    problems = [problem for project, entry in lifecycle.items() if (problem := _lifecycle_entry_problem(project, entry))]
++    if not problems and len(lifecycle) >= len(REGISTRY_REPOS):
++        problems.append("lifecycle: 至少要有一支策略維持運作")
++    return problems
++
++
++def retired_projects(registry: Mapping[str, Any]) -> frozenset[str]:
++    """Strategies the registry validly marks ``lifecycle.<project>.state == "retired"`` (stopped; their code may be gone from A1).  The registry
++    checks skip them: a retired strategy's cells stay as history, but there is nothing on A1 to compare them with.  Stopping a strategy or
++    replacing it with a new one is a registry edit (``lifecycle``), never a change to this script.  An INCOMPLETE entry (no ``since`` /
++    ``reason``, unknown state or project) is not a stop declaration and never counts here; ``_load_registry`` additionally refuses a registry whose
++    lifecycle is not fully valid, so a malformed entry cannot silence a running strategy.  Mirrors ``trade_alerts.rollout_registry.retired_projects``."""
++    lifecycle = registry.get("lifecycle")
++    if not isinstance(lifecycle, Mapping):
++        return frozenset()
++    return frozenset(project for project, entry in lifecycle.items() if _lifecycle_entry_problem(project, entry) is None)
++
++
+ def awaiting_cells(registry: Mapping[str, Any]) -> list[tuple[str, str, str]]:
+     """``(cell label, strategy key, commit)`` for every pending or built (done on development, not live) cell that names the commit it waits for."""
+     cells = []
+@@ -1202,13 +1261,17 @@ def check_registry_awaits(ctx: Context) -> Result:
+     # Reading an old origin/main here would answer "nothing to compare" about a registry that may already hold the cells this
+     # check is for (review of #193): a registry that cannot be refreshed is an error (see _load_registry).
+     registry = _load_registry(root)
+-    cells = awaiting_cells(registry)
++    retired = retired_projects(registry)
++    all_cells = awaiting_cells(registry)
++    cells = [cell for cell in all_cells if cell[1] not in retired]
++    skipped = sorted({cell[1] for cell in all_cells if cell[1] in retired})
++    skipped_note = f"（已停用、不比對：{'、'.join(skipped)}）" if skipped else ""
+     if not cells:
+-        return Result(WAITING, "登記冊沒有帶『等哪個提交』的未做格子，沒有東西要比對。")
++        return Result(WAITING, "登記冊沒有帶『等哪個提交』的未做格子，沒有東西要比對。" + skipped_note)
+     heads: dict[str, str] = {}
+     due, open_ = [], []
+     for label, project, commit in cells:
+-        repo = root / REPOS[project]
++        repo = root / REGISTRY_REPOS[project]
+         if project not in heads:
+             heads[project] = ctx.remote.git_head("a1", project)
+             _refresh(repo)
+@@ -1220,9 +1283,9 @@ def check_registry_awaits(ctx: Context) -> Result:
+             raise RemoteError(f"{label}: merge-base 出錯：{deployed.stderr.strip()[:120]}")
+         (due if deployed.returncode == 0 else open_).append(f"{label}：等 {commit[:7]}，A1 現在 {heads[project][:7]}")
+     if due:
+-        return Result(OBSERVED, f"登記冊有 {len(due)} 格還寫未做，但它們在等的提交已經在 A1 上跑了：該改已做（並重發登記冊）。",
++        return Result(OBSERVED, f"登記冊有 {len(due)} 格還寫未做，但它們在等的提交已經在 A1 上跑了：該改已做（並重發登記冊）。" + skipped_note,
+                       due + [f"（仍在等）{o}" for o in open_], needs_human=True, key=",".join(sorted(d.split("：")[0] for d in due)))
+-    return Result(WAITING, f"登記冊有 {len(open_)} 格在等部署，等的提交都還沒上 A1。", open_)
++    return Result(WAITING, f"登記冊有 {len(open_)} 格在等部署，等的提交都還沒上 A1。" + skipped_note, open_)
+ 
+ 
+ # --- files the registry cites that changed on A1 since the registry's sources commit (phase-sync4) ------------------
+@@ -1260,7 +1323,12 @@ def _load_registry(root: Path) -> dict[str, Any]:
+     shown = _git(ta, "show", f"{os.environ.get('OBSERVATION_WATCH_REGISTRY_REF', 'origin/main')}:{REGISTRY_RELATIVE}")
+     if shown.returncode != 0:
+         raise RemoteError(f"cannot read the registry from {ta}: {shown.stderr.strip()[:120]}")
+-    return json.loads(shown.stdout)
++    registry = json.loads(shown.stdout)
++    if isinstance(registry, Mapping):
++        problems = lifecycle_problems(registry)
++        if problems:       # fail closed: a stop declaration switches monitoring off, so a broken one is an error, never a quiet skip
++            raise RemoteError("登記冊的 lifecycle 不能當停用聲明（監控不會因它略過任何策略）：" + "；".join(problems[:3]))
++    return registry
+ 
+ 
+ def _blobs_at(repo: Path, commit: str, paths: list[str]) -> dict[str, str]:
+@@ -1285,12 +1353,16 @@ def check_registry_drift(ctx: Context) -> Result:
+     registry = _load_registry(root)
+     drifted: list[tuple[str, str, str, str, list[str]]] = []
+     checked = 0
++    retired = retired_projects(registry)
++    skipped = sorted(p for p in cited_files(registry) if p in retired)
+     for project, files in sorted(cited_files(registry).items()):
++        if project in retired:
++            continue                           # stopped strategy: its code is not (or no longer) on A1, nothing to compare
+         source = (registry.get("sources") or {}).get(project) or {}
+         commit = source.get("commit")
+         if not commit:
+             raise RemoteError(f"{project}: the registry has no sources commit")
+-        repo = root / REPOS[project]
++        repo = root / REGISTRY_REPOS[project]
+         _refresh(repo)
+         if _git(repo, "cat-file", "-e", f"{commit}^{{commit}}").returncode != 0:
+             raise RemoteError(f"{project}: sources commit {commit[:7]} not found in {repo}")
+@@ -1308,16 +1380,17 @@ def check_registry_drift(ctx: Context) -> Result:
+             if on_a1.get(path) != at_sources[path]:
+                 a1_blob = on_a1.get(path)
+                 drifted.append((project, path, a1_blob[:7] if a1_blob else "（A1 上沒有這個檔案）", at_sources[path][:7], files[path]))
+-    if checked == 0 and cited_files(registry):
++    skipped_note = f"（已停用、不比對：{'、'.join(skipped)}）" if skipped else ""
++    if checked == 0 and any(p not in retired for p in cited_files(registry)):
+         # every cited file is missing at the sources commit: that is a wrong sources commit or an unreadable tree, not "no drift"
+         raise RemoteError("登記冊引用了檔案，但在 sources 提交上一個都找不到：sources 提交或引用寫法有問題，沒辦法比對")
+     if not drifted:
+-        return Result(WAITING, f"登記冊引用的 {checked} 個檔案，在 A1 部署複本上都和 sources 提交是同一份。")
++        return Result(WAITING, f"登記冊引用的 {checked} 個檔案，在 A1 部署複本上都和 sources 提交是同一份。{skipped_note}")
+     cells = {label for *_, labels in drifted for label in labels}
+     evidence = [f"{project}／{path}：A1 {a1}，sources {src}；影響 {len(labels)} 格：" + "；".join(labels[:3]) + ("…" if len(labels) > 3 else "")
+                 for project, path, a1, src, labels in drifted]
+     return Result(OBSERVED, f"登記冊引用的 {checked} 個檔案裡，{len(drifted)} 個在 A1 上和 sources 提交不一樣，影響 {len(cells)} 格："
+-                  "行號可能位移、說法可能不再成立，要重驗並把 sources 換到 A1 現行版。",
++                  "行號可能位移、說法可能不再成立，要重驗並把 sources 換到 A1 現行版。" + skipped_note,
+                   evidence, needs_human=True, key=",".join(f"{p}:{path}:{a1}" for p, path, a1, _, _ in drifted))
+ 
+ 
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 6928462..ae78382 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -351,4 +351,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.48"
++__version__ = "0.30.49"
+diff --git a/src/trade_alerts/catalog/fleet-rollout-registry.json b/src/trade_alerts/catalog/fleet-rollout-registry.json
+index 78d9996..c8e4422 100644
+--- a/src/trade_alerts/catalog/fleet-rollout-registry.json
++++ b/src/trade_alerts/catalog/fleet-rollout-registry.json
+@@ -1,7 +1,7 @@
+ {
+   "registry_version": "fleet-rollout-registry/v1",
+   "catalog_version": "fleet-error-catalog/v2",
+-  "updated_at": "2026-11-18",
++  "updated_at": "2026-11-19",
+   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json. Retired projects (trade_alerts.rollout_registry.RETIRED_PROJECTS: the old trend strategy, 舊趨勢策略（已停用、待封存）) keep their existing cells and SEY.* rows as evidence but get no column on the rollout register page, and a new capability or FLEET.* row need not fill their cell.",
+   "projects": {
+     "momentum": "動能策略",
+@@ -10,6 +10,13 @@
+     "btc-competition": "競賽策略",
+     "trend-meteor": "競賽策略・流星版"
+   },
++  "lifecycle": {
++    "seykota": {
++      "state": "retired",
++      "since": "2026-11-18",
++      "reason": "舊趨勢策略 2026-11-18 在 A1 下線、程式已從 operations 移除，等 repo 封存；由競賽策略・流星版接手。證據留作歷史，觀察區不再拿 A1 部署複本比對它的檔案。"
++    }
++  },
+   "phases": {
+     "v2-W2": "分級 v2：共用修復執行器（trade-alerts）",
+     "v2-W3": "分級 v2：動能策略改用共用修復執行器、拿掉過渡開關",
+diff --git a/src/trade_alerts/rollout_registry.py b/src/trade_alerts/rollout_registry.py
+index 455c29b..887d078 100644
+--- a/src/trade_alerts/rollout_registry.py
++++ b/src/trade_alerts/rollout_registry.py
+@@ -42,12 +42,13 @@ REGISTRY_PENDING_PROJECTS: tuple[str, ...] = ()
+ #: The four strategies; ``fleet`` is a catalog prefix for cross-repo
+ #: conditions, not a strategy that can have a capability.
+ STRATEGY_PROJECTS = tuple(project for project in PROJECT_CODE_PREFIXES if project != "fleet" and project not in REGISTRY_PENDING_PROJECTS)
+-#: Strategies that are stopped and waiting to be archived (舊趨勢, 2026-11-10: V11 took the name 趨勢策略; 2026-11-15: V11 became 競賽策略・流星版).  Their existing cells and
+-#: ``SEY.*`` rows stay as evidence (nothing is deleted until the old trend is taken off A1 and its repo archived), but the rollout
+-#: register page shows no column for them and a new capability or ``FLEET.*`` row need not fill their cell.
+-RETIRED_PROJECTS: tuple[str, ...] = ("seykota",)
+-#: The columns the rollout register page shows and new features must fill.
+-ACTIVE_PROJECTS = tuple(project for project in STRATEGY_PROJECTS if project not in RETIRED_PROJECTS)
++#: A strategy's lifecycle lives in the registry DATA (``lifecycle``, one entry per stopped strategy), not in code: stopping a strategy
++#: (舊趨勢, 2026-11-18) or replacing it with a new one (the momentum strategy is expected to become a "new momentum strategy") is a
++#: one-line registry edit, and every consumer follows -- ``retired_projects(registry)`` here, the rollout register page and
++#: ``scripts/observation_watch.py`` (phase-sync4 skips a retired project's files: its code is no longer on A1, so comparing them
++#: with ``sources`` would report drift for ever).  A retired strategy's existing cells and rules stay as evidence (nothing is deleted
++#: until its repo is archived), the register page shows no column for it, and a new capability or ``FLEET.*`` row need not fill its cell.
++LIFECYCLE_STATES = ("retired",)
+ STATES = ("done", "built", "pending", "n/a")
+ #: ``done`` means present where the live host deploys from -- not merely
+ #: merged to development or running on the dev host.  ``built`` (已完成、尚未上線, 2026-11-10) is the honest middle: the code is written
+@@ -91,6 +92,50 @@ def load_rollout_registry(path: str | Path | None = None) -> dict[str, Any]:
+     return payload
+ 
+ 
++def retired_projects(registry: Mapping[str, Any]) -> tuple[str, ...]:
++    """The strategies the registry marks ``lifecycle.<project>.state == "retired"`` (stopped; waiting to be archived or replaced)."""
++    lifecycle = registry.get("lifecycle")
++    if not isinstance(lifecycle, Mapping):
++        return ()
++    return tuple(project for project in STRATEGY_PROJECTS
++                 if isinstance(lifecycle.get(project), Mapping) and lifecycle[project].get("state") == "retired")
++
++
++#: The packaged registry's retired strategies and the columns the rollout register page shows and new features must fill.
++RETIRED_PROJECTS: tuple[str, ...] = retired_projects(load_rollout_registry())
++ACTIVE_PROJECTS = tuple(project for project in STRATEGY_PROJECTS if project not in RETIRED_PROJECTS)
++
++
++def _lifecycle_problems(registry: Mapping[str, Any]) -> list[str]:
++    lifecycle = registry.get("lifecycle")
++    if lifecycle is None:
++        return []
++    if not isinstance(lifecycle, Mapping):
++        return ["lifecycle must be an object {project: {state, since, reason}}"]
++    problems: list[str] = []
++    for project, entry in lifecycle.items():
++        where = f"lifecycle / {project}"
++        if project not in STRATEGY_PROJECTS:
++            problems.append(f"{where}: not a known strategy")
++            continue
++        if not isinstance(entry, Mapping):
++            problems.append(f"{where}: not an object")
++            continue
++        if entry.get("state") not in LIFECYCLE_STATES:
++            problems.append(f"{where}: state must be one of {list(LIFECYCLE_STATES)}, got {entry.get('state')!r}")
++        since = entry.get("since")
++        if not (isinstance(since, str) and _DATE.fullmatch(since) and _is_calendar_date(since)):
++            problems.append(f"{where}: since must be a YYYY-MM-DD date, got {since!r}")
++        reason = entry.get("reason")
++        if not (isinstance(reason, str) and reason.strip()):
++            problems.append(f"{where}: reason must say why it was stopped and what replaces it")
++        elif len(reason) > MAX_REASON_CHARS:
++            problems.append(f"{where}: reason is {len(reason)} characters (max {MAX_REASON_CHARS})")
++    if retired_projects(registry) and len(retired_projects(registry)) >= len(STRATEGY_PROJECTS):
++        problems.append("lifecycle: at least one strategy must stay active")
++    return problems
++
++
+ def _status_problems(where: str, status: Any, phases: Mapping[str, Any]) -> list[str]:
+     if not isinstance(status, Mapping):
+         return [f"{where}: status is not an object"]
+@@ -164,7 +209,9 @@ def owners(code: str) -> tuple[str, ...]:
+ 
+ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -> list[str]:
+     """Every way the registry fails its rule; empty means consistent."""
+-    problems: list[str] = []
++    problems: list[str] = _lifecycle_problems(registry)
++    retired_here = retired_projects(registry)                       # the registry being checked, not the packaged one
++    active_here = tuple(project for project in STRATEGY_PROJECTS if project not in retired_here)
+     if registry.get("registry_version") != REGISTRY_VERSION:
+         problems.append(f"registry_version is not {REGISTRY_VERSION}")
+     if registry.get("catalog_version") != catalog.get("catalog_version"):
+@@ -197,9 +244,9 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
+             if not (isinstance(capability.get(key), str) and capability[key].strip()):
+                 problems.append(f"capability {cid}: missing {key}")
+         status = capability.get("status") or {}
+-        if not set(ACTIVE_PROJECTS) <= set(status) <= set(STRATEGY_PROJECTS):
+-            problems.append(f"capability {cid}: must list every active strategy {sorted(ACTIVE_PROJECTS)} "
+-                            f"(retired {sorted(RETIRED_PROJECTS)} optional), got {sorted(status)}")
++        if not set(active_here) <= set(status) <= set(STRATEGY_PROJECTS):
++            problems.append(f"capability {cid}: must list every active strategy {sorted(active_here)} "
++                            f"(retired {sorted(retired_here)} optional), got {sorted(status)}")
+         for project, value in status.items():
+             problems += _status_problems(f"capability {cid} / {project}", value, phases)
+ 
+@@ -221,10 +268,10 @@ def registry_problems(registry: Mapping[str, Any], catalog: Mapping[str, Any]) -
+         for key in ("behaviour", "emits_event"):
+             status = row.get(key) or {}
+             # A retired project's cell is optional on a cross-repo (FLEET.*) row; a single-owner row keeps its one cell.
+-            required = expected - set(RETIRED_PROJECTS) if len(expected) > 1 else expected
++            required = expected - set(retired_here) if len(expected) > 1 else expected
+             if not required <= set(status) <= expected:
+                 problems.append(f"{code} {key}: must list exactly {sorted(required)}"
+-                                f"{' (retired ' + str(sorted(RETIRED_PROJECTS)) + ' optional)' if required != expected else ''}, "
++                                f"{' (retired ' + str(sorted(retired_here)) + ' optional)' if required != expected else ''}, "
+                                 f"got {sorted(status)}")
+             for project, value in status.items():
+                 problems += _status_problems(f"{code} {key} / {project}", value, phases)
+diff --git a/tests/test_observation_watch.py b/tests/test_observation_watch.py
+index fc408e6..7e5845a 100644
+--- a/tests/test_observation_watch.py
++++ b/tests/test_observation_watch.py
+@@ -1027,6 +1027,132 @@ def test_a_file_missing_on_a1_is_drift_and_a_file_missing_at_sources_is_not(repo
+     assert gone.asked[0][2] == ["src/a.py"]                                  # and not even asked about
+ 
+ 
++def _retired_seykota_registry(commit, *, retired):
++    """A registry where a done seykota cell cites a file that A1 no longer has; ``retired`` says whether the registry marks seykota stopped."""
++    reg = _drift_registry(commit, ["src/a.py"])
++    reg["sources"]["seykota"] = {"commit": commit}
++    reg["capabilities"][0]["status"]["seykota"] = {"state": "done", "evidence": "deploy/seykota-bot.service:3 old"}
++    if retired:
++        reg["lifecycle"] = {"seykota": {"state": "retired", "since": "2026-11-18", "reason": "下線"}}
++    return reg
++
++
++def test_a_retired_strategys_files_are_not_compared_with_a1(repos):
++    """The registry's lifecycle -- data, not a constant in this script -- decides: a stopped strategy's cells stay as history."""
++    myc, sey = repos / ow.REPOS["mycrypto"], repos / ow.REPOS["seykota"]
++    c1 = _write(myc, {"src/a.py": "one", "src/b.py": "stable"})
++    s1 = _write(sey, {"deploy/seykota-bot.service": "old"})
++    a, b = _blob(myc, c1, "src/a.py"), _blob(myc, c1, "src/b.py")
++    # not retired: the file seykota no longer has on A1 is drift
++    _publish_registry(repos, _retired_seykota_registry(c1, retired=False) | {"sources": {"mycrypto": {"commit": c1}, "seykota": {"commit": s1}}})
++    open_ = Blobs({"src/a.py": a, "src/b.py": b})
++    assert ow.check_registry_drift(ctx(open_)).state == ow.OBSERVED
++    # retired in the registry: skipped, said so, and A1 is never even asked about it
++    _publish_registry(repos, _retired_seykota_registry(c1, retired=True) | {"sources": {"mycrypto": {"commit": c1}, "seykota": {"commit": s1}}})
++    skipped = Blobs({"src/a.py": a, "src/b.py": b})
++    result = ow.check_registry_drift(ctx(skipped))
++    assert result.state == ow.WAITING and "2 個檔案" in result.summary and "已停用、不比對：seykota" in result.summary
++    assert [key for _host, key, _paths in skipped.asked] == ["mycrypto"]
++
++
++def test_a_registry_with_only_retired_cited_files_is_not_an_error(repos):
++    sey = repos / ow.REPOS["seykota"]
++    s1 = _write(sey, {"deploy/seykota-bot.service": "old"})
++    reg = {"sources": {"seykota": {"commit": s1}}, "lifecycle": {"seykota": {"state": "retired", "since": "2026-11-18", "reason": "下線"}},
++           "capabilities": [{"id": "x.cap", "status": {"seykota": {"state": "done", "evidence": "deploy/seykota-bot.service:3 old"}}}], "catalog": []}
++    _publish_registry(repos, reg)
++    result = ow.check_registry_drift(ctx(Blobs({})))
++    assert result.state == ow.WAITING and "已停用、不比對：seykota" in result.summary
++
++
++def test_the_meteor_strategy_is_compared_through_the_shared_repo_and_a1_clone(repos):
++    """競賽策略・流星版 shares the repo and the A1 deploy clone with the retired 舊趨勢策略; its cells need a way to be compared."""
++    assert ow.REGISTRY_REPOS["trend-meteor"] == ow.REPOS["seykota"]
++    assert ow.A1_CLONES["trend-meteor"] == ow.A1_CLONES["seykota"]
++    assert "trend-meteor" not in ow.REPOS                         # the A1 audit/state readers still only know the strategies they read
++    sey = repos / ow.REPOS["seykota"]
++    s1 = _write(sey, {"src/trend_meteor/x.py": "one"})
++    reg = {"sources": {"trend-meteor": {"commit": s1}},
++           "capabilities": [{"id": "x.cap", "status": {"trend-meteor": {"state": "done", "evidence": "src/trend_meteor/x.py:1 y"}}}], "catalog": []}
++    _publish_registry(repos, reg)
++    blob = _blob(sey, s1, "src/trend_meteor/x.py")
++    ok = Blobs({"src/trend_meteor/x.py": blob})
++    assert ow.check_registry_drift(ctx(ok)).state == ow.WAITING and ok.asked[0][1] == "trend-meteor"
++    assert ow.check_registry_drift(ctx(Blobs({"src/trend_meteor/x.py": "f" * 40}))).state == ow.OBSERVED
++
++
++def test_registry_awaits_skips_a_retired_strategys_cells(repos):
++    sey = repos / ow.REPOS["seykota"]
++    s1, s2 = _commit(sey, "s"), _commit(sey, "t")
++    reg = {"sources": {}, "lifecycle": {"seykota": {"state": "retired", "since": "2026-11-18", "reason": "下線"}},
++           "capabilities": [{"id": "x.cap", "status": {"seykota": {"state": "pending", "phase": "p", "reason": "r", "awaits_commit": s2}}}], "catalog": []}
++    _publish_registry(repos, reg)
++    result = ow.check_registry_awaits(ctx(GitHeads({"seykota": s2})))
++    assert result.state == ow.WAITING and "沒有帶" in result.summary
++    assert "已停用、不比對：seykota" in result.summary                    # skipped on purpose, and said so (not "there was nothing to compare")
++
++
++def test_registry_awaits_says_what_it_skipped_on_every_return_path(repos):
++    myc, sey = repos / ow.REPOS["mycrypto"], repos / ow.REPOS["seykota"]
++    c1, c2 = _commit(myc, "a"), _commit(myc, "b")
++    s1, s2 = _commit(sey, "s"), _commit(sey, "t")
++    retired = {"seykota": {"state": "retired", "since": "2026-11-18", "reason": "下線"}}
++
++    def registry(my_awaits):
++        reg = _registry({"mycrypto": my_awaits})
++        reg["lifecycle"] = retired
++        reg["capabilities"][0]["status"]["seykota"] = {"state": "pending", "phase": "p", "reason": "r", "awaits_commit": s2}
++        return reg
++    _publish_registry(repos, registry(c2))
++    waiting = ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1, "seykota": s1})))        # mycrypto still waits; seykota skipped
++    assert waiting.state == ow.WAITING and "已停用、不比對：seykota" in waiting.summary
++    due = ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c2, "seykota": s1})))            # mycrypto's awaited commit is on A1
++    assert due.state == ow.OBSERVED and "已停用、不比對：seykota" in due.summary
++    # nothing is skipped when no retired strategy has a waiting cell: no note
++    _publish_registry(repos, _registry({"mycrypto": c2}) | {"lifecycle": retired})
++    assert "已停用" not in ow.check_registry_awaits(ctx(GitHeads({"mycrypto": c1}))).summary
++
++
++@pytest.mark.parametrize("lifecycle", [
++    {"momentum": {"state": "retired"}},                                                              # a running strategy, no since / reason
++    {"momentum": {"state": "retired", "since": "2026-11-18"}},                                       # no reason
++    {"momentum": {"state": "retired", "reason": "x"}},                                               # no since
++    {"momentum": {"state": "retired", "since": "2026-13-45", "reason": "x"}},                        # not a real date
++    {"momentum": {"state": "retired", "since": "2026-11-18", "reason": "  "}},                       # blank reason
++    {"momentum": {"state": "paused", "since": "2026-11-18", "reason": "x"}},                         # unknown state
++    {"nope": {"state": "retired", "since": "2026-11-18", "reason": "x"}},                            # unknown strategy
++    {"momentum": "retired"},                                                                          # not an object
++    ["momentum"],                                                                                     # lifecycle itself not an object
++])
++def test_an_incomplete_lifecycle_never_silences_a_running_strategy(repos, lifecycle):
++    """review of #400: a stop declaration switches monitoring off, so a malformed one is an error (fail closed), never a quiet skip."""
++    assert ow.retired_projects({"lifecycle": lifecycle}) == frozenset()                           # it does not even count as a declaration
++    assert ow.lifecycle_problems({"lifecycle": lifecycle})
++    myc = repos / ow.REPOS["mycrypto"]
++    c1 = _write(myc, {"src/a.py": "one", "src/b.py": "stable"})
++    reg = _drift_registry(c1, ["src/a.py"]) | {"lifecycle": lifecycle}
++    reg["sources"]["momentum"] = {"commit": c1}
++    _publish_registry(repos, reg)
++    with pytest.raises(ow.RemoteError, match="lifecycle"):
++        ow.check_registry_drift(ctx(Blobs({})))
++    with pytest.raises(ow.RemoteError, match="lifecycle"):
++        ow.check_registry_awaits(ctx(GitHeads({})))
++
++
++def test_every_strategy_retired_is_refused_and_a_valid_lifecycle_passes():
++    valid = {"state": "retired", "since": "2026-11-18", "reason": "下線"}
++    assert ow.lifecycle_problems({}) == [] and ow.lifecycle_problems({"lifecycle": {}}) == []
++    assert ow.lifecycle_problems({"lifecycle": {"seykota": valid}}) == []
++    assert ow.lifecycle_problems({"lifecycle": {k: valid for k in ow.REGISTRY_REPOS}}) == ["lifecycle: 至少要有一支策略維持運作"]
++
++
++def test_the_retired_strategies_the_stability_check_skips_follow_the_registry():
++    """`_RETIRED_A1_STRATEGIES` is a module constant (the stability check reads ops-notify readings and has no registry at hand): this keeps it in lockstep with the registry's lifecycle."""
++    from trade_alerts.rollout_registry import RETIRED_PROJECTS
++
++    assert ow._RETIRED_A1_STRATEGIES == frozenset(RETIRED_PROJECTS) & frozenset(ow.REPOS)
++
++
+ def test_the_drift_key_changes_when_a1_moves_again_so_it_is_announced_again(repos):
+     myc = repos / ow.REPOS["mycrypto"]
+     c1 = _write(myc, {"src/a.py": "one", "src/b.py": "b"})
+diff --git a/tests/test_rollout_registry.py b/tests/test_rollout_registry.py
+index 5c51072..8115091 100644
+--- a/tests/test_rollout_registry.py
++++ b/tests/test_rollout_registry.py
+@@ -144,6 +144,51 @@ def test_catalog_version_mismatch_is_caught(registry, catalog):
+     assert any("catalog is" in p for p in problems)
+ 
+ 
++# --- lifecycle: a stopped strategy is registry data, not code ------------------------------------------------------------
++
++
++def test_retired_projects_come_from_the_registry_lifecycle(registry):
++    from trade_alerts.rollout_registry import retired_projects
++
++    assert retired_projects(registry) == ("seykota",) == RETIRED_PROJECTS
++    assert ACTIVE_PROJECTS == ("momentum", "mycrypto", "btc-competition", "trend-meteor")
++    assert retired_projects({}) == () and retired_projects({"lifecycle": "bogus"}) == ()
++    assert retired_projects({"lifecycle": {"momentum": {"state": "retired"}, "nope": {"state": "retired"}}}) == ("momentum",)
++
++
++def test_retiring_a_strategy_is_one_registry_edit(registry, catalog):
++    """The next stopped strategy (e.g. the momentum strategy once a new one replaces it) needs only a lifecycle entry: its cells become optional."""
++    def retire(r):
++        r["lifecycle"]["momentum"] = {"state": "retired", "since": "2026-12-01", "reason": "被新動能策略取代"}
++        for capability in r["capabilities"]:
++            capability["status"].pop("momentum", None)
++        for row in r["catalog"]:
++            for key in ("behaviour", "emits_event"):
++                if len(row[key]) > 1:
++                    row[key].pop("momentum", None)
++    problems = _problems_after(registry, catalog, retire)
++    assert not [p for p in problems if "momentum" in p and "must list" in p], problems
++    # without the lifecycle entry the same removal is an error
++    def drop_cells_only(r):
++        for capability in r["capabilities"]:
++            capability["status"].pop("momentum", None)
++    assert any("must list every active strategy" in p for p in _problems_after(registry, catalog, drop_cells_only))
++
++
++@pytest.mark.parametrize("mutate, expected", [
++    (lambda r: r["lifecycle"].update({"nope": {"state": "retired", "since": "2026-11-18", "reason": "r"}}), "not a known strategy"),
++    (lambda r: r["lifecycle"]["seykota"].update(state="paused"), "state must be one of"),
++    (lambda r: r["lifecycle"]["seykota"].update(since="18/11/2026"), "since must be a YYYY-MM-DD date"),
++    (lambda r: r["lifecycle"]["seykota"].update(since="2026-02-30"), "since must be a YYYY-MM-DD date"),
++    (lambda r: r["lifecycle"]["seykota"].update(reason=" "), "reason must say why"),
++    (lambda r: r["lifecycle"]["seykota"].update(reason="x" * 451), "reason is 451 characters"),
++    (lambda r: r.update(lifecycle=["seykota"]), "lifecycle must be an object"),
++    (lambda r: r["lifecycle"].update({p: dict(r["lifecycle"]["seykota"]) for p in STRATEGY_PROJECTS}), "at least one strategy must stay active"),
++])
++def test_a_broken_lifecycle_is_caught(registry, catalog, mutate, expected):
++    assert any(expected in p for p in _problems_after(registry, catalog, mutate))
++
++
+ def test_missing_project_is_caught(registry, catalog):
+     problems = _problems_after(registry, catalog, lambda r: r["projects"].pop("mycrypto"))
+     assert any(p.startswith("projects must be exactly") for p in problems)
