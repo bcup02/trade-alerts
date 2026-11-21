@@ -1,4 +1,4 @@
-"""f-26b: the tab name of a source is shown to people, so it may be Chinese (趨勢策略 …)."""
+"""f-26b: the tab name of a source is shown to people, so it may be Chinese (舊趨勢策略、競賽策略・流星版 …)."""
 from __future__ import annotations
 
 import hashlib
@@ -17,7 +17,7 @@ from trade_alerts.ledger_integrity import (
     verify_signed_request,
 )
 
-CHINESE_TABS = ["趨勢策略", "動能策略", "加密策略", "競賽策略"]
+CHINESE_TABS = ["舊趨勢策略", "動能策略", "加密策略", "競賽策略", "競賽策略・流星版"]
 ASCII_TABS = ["ed-seykota", "mexc-4h-momentum-trailing-stop", "my-crypto-bot", "btc-competition"]
 BAD_TABS = [
     "", " ", "趨勢 策略", "趨勢策略 ", "\n趨勢策略", "趨勢策略\n", "../趨勢策略", "趨/勢", "趨'勢", '趨"勢', "趨\\勢",
