@@ -696,7 +696,7 @@ def test_tabs_the_example_from_the_review_does_not_close():
 
 def test_tabs_closes_only_after_a_reconcile_that_ran_past_the_grace_of_the_newest_trade():
     t = NOW - timedelta(hours=3)
-    good = {"momentum": _status(30), "seykota": _status(30, name="趨勢策略"), "mycrypto": _status(30, name="加密策略"),
+    good = {"momentum": _status(30), "seykota": _status(30, name="舊趨勢策略"), "mycrypto": _status(30, name="加密策略"),
             "btc-competition": _status(30, name="競賽策略")}
     r = tabs_remote(trades={k: [{"event_type": "trade_close", "event_time": iso(t)}] for k in ow.REPOS}, status=good)
     assert ow.check_sheet_tab_names(ctx(r)).closable
@@ -1478,7 +1478,7 @@ def _covered_before(key="momentum", hours_ago_=1, last_trade_hours_ago=5):
 
 
 def _tabs_with_momentum(*, status, trade_ago_minutes=300):
-    st = {"momentum": status, "seykota": _status(30, name="趨勢策略"), "mycrypto": _status(30, name="加密策略"), "btc-competition": _status(30, name="競賽策略")}
+    st = {"momentum": status, "seykota": _status(30, name="舊趨勢策略"), "mycrypto": _status(30, name="加密策略"), "btc-competition": _status(30, name="競賽策略")}
     trades = {"momentum": [{"event_type": "trade_close", "event_time": iso(NOW - timedelta(minutes=trade_ago_minutes))}],
               "mycrypto": [trade(5)], "btc-competition": [trade(5)]}
     return tabs_remote(trades=trades, status=st)
@@ -1527,7 +1527,7 @@ def test_tabs_a_diverged_answer_after_the_grace_or_a_wrong_tab_still_fails_at_on
 
 def test_tabs_a_carried_strategy_never_lets_the_item_close_and_a_fresh_cover_restarts_the_clock():
     allfour = {k: [trade(5)] for k in ow.REPOS}
-    good = {"momentum": _status(5, "UNKNOWN"), "seykota": _status(30, name="趨勢策略"), "mycrypto": _status(30, name="加密策略"), "btc-competition": _status(30, name="競賽策略")}
+    good = {"momentum": _status(5, "UNKNOWN"), "seykota": _status(30, name="舊趨勢策略"), "mycrypto": _status(30, name="加密策略"), "btc-competition": _status(30, name="競賽策略")}
     carried = ow.check_sheet_tab_names(ctx(tabs_remote(trades=allfour, status=good), _covered_before()))
     assert carried.state == ow.WAITING and not carried.closable and "沿用的確認要等下一輪對帳重新確認後才能結案" in carried.summary
     fresh = {**good, "momentum": _status(30)}
@@ -2396,7 +2396,7 @@ def test_v11_healthy_cycle_without_any_fill_yet_keeps_waiting():
 def test_v11_full_cycle_is_observed_but_always_needs_a_human_and_is_never_closable():
     r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE, {**TRADE, "event_type": "trade_close"}],
                                         status={"value": "RECONCILED", "checked_at": _iso(10), "note": "ok"})))
-    assert r.state == ow.OBSERVED and r.needs_human is True and r.closable is False and r.key == "2"
+    assert r.state == ow.OBSERVED and r.needs_human is True and r.closable is False and r.key == "cycle-ok"
     assert any("Google 表" in line and "幣安測試網" in line for line in r.evidence)
 
 
@@ -2501,3 +2501,37 @@ def test_a1_stable_ignores_stale_leftover_readings_of_the_retired_old_trend_stra
     with_leftovers = ow.check_a1_stable(b2_ctx(r, {"healthy_since": iso(B2_NOW - timedelta(hours=100)), "last_seen": iso(B2_NOW - timedelta(minutes=30))}))
     assert (with_leftovers.state, with_leftovers.summary, with_leftovers.key) == (clean.state, clean.summary, clean.key)
 
+
+
+def test_v11_cycle_key_does_not_change_when_more_trades_are_added_so_an_acked_milestone_stays_quiet():
+    """2026-11-21：結案標記原本綁成交列筆數（6→10→23 筆各重發一次）；固定 key 後，筆數再增加不重發。"""
+    def result(n):
+        return ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE] * n,
+                                               status={"value": "RECONCILED", "checked_at": _iso(10), "note": "ok"})))
+    first, later = result(6), result(23)
+    assert first.key == later.key == "cycle-ok" and "23 筆成交列" in "".join(later.evidence)
+
+
+def test_v11_cycle_text_names_the_real_google_tab_and_no_tab_called_trend_strategy():
+    r = ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE],
+                                        status={"value": "RECONCILED", "checked_at": _iso(10), "note": "ok"})))
+    text = "".join(r.evidence)
+    assert "『競賽策略・流星版』分頁" in text and "『趨勢策略』" not in text
+    assert ow.SHEET_NAMES["seykota"] == "舊趨勢策略" and "趨勢策略" not in {v for k, v in ow.SHEET_NAMES.items() if k != "seykota"}
+
+
+def test_v11_cycle_acked_milestone_stays_quiet_through_the_full_state_machine_when_trades_grow_or_waiting_returns(tmp_path):
+    """審閱 BLOCK-404-01 的處理：走 run_checks → notify → ack 的真實狀態機。成交列 6→10→（暫時 WAITING）→23 筆：
+    ack 之前只通知一次（筆數變不重發）、ack 之後不再通知（沿用 f-71：已 ack 的同一結果從 WAITING 回來也不通知）；整個里程碑生命週期只通知到 ack 為止。"""
+    def cycle(n):
+        return ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE] * n,
+                                               status={"value": "RECONCILED", "checked_at": _iso(10), "note": "ok"})))
+    seq = [cycle(6), cycle(10), ow.Result(ow.WAITING, "w"), cycle(23), cycle(23)]
+    assert len(_round_trip(tmp_path, seq, ack_after=1)) == 1                                  # 第 1 輪通知一次並 ack；其後筆數變、WAITING 回來都安靜
+
+
+def test_v11_cycle_without_an_ack_is_not_repeated_while_the_trade_count_grows(tmp_path):
+    def cycle(n):
+        return ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE] * n,
+                                               status={"value": "RECONCILED", "checked_at": _iso(10), "note": "ok"})))
+    assert len(_round_trip(tmp_path, [cycle(6), cycle(10), cycle(23)], ack_after=99)) == 1       # 沒 ack 也只通知一次：筆數增加不是新事件
