@@ -2518,3 +2518,20 @@ def test_v11_cycle_text_names_the_real_google_tab_and_no_tab_called_trend_strate
     text = "".join(r.evidence)
     assert "『競賽策略・流星版』分頁" in text and "『趨勢策略』" not in text
     assert ow.SHEET_NAMES["seykota"] == "舊趨勢策略" and "趨勢策略" not in {v for k, v in ow.SHEET_NAMES.items() if k != "seykota"}
+
+
+def test_v11_cycle_acked_milestone_stays_quiet_through_the_full_state_machine_when_trades_grow_or_waiting_returns(tmp_path):
+    """審閱 BLOCK-404-01 的處理：走 run_checks → notify → ack 的真實狀態機。成交列 6→10→（暫時 WAITING）→23 筆：
+    ack 之前只通知一次（筆數變不重發）、ack 之後不再通知（沿用 f-71：已 ack 的同一結果從 WAITING 回來也不通知）；整個里程碑生命週期只通知到 ack 為止。"""
+    def cycle(n):
+        return ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE] * n,
+                                               status={"value": "RECONCILED", "checked_at": _iso(10), "note": "ok"})))
+    seq = [cycle(6), cycle(10), ow.Result(ow.WAITING, "w"), cycle(23), cycle(23)]
+    assert len(_round_trip(tmp_path, seq, ack_after=1)) == 1                                  # 第 1 輪通知一次並 ack；其後筆數變、WAITING 回來都安靜
+
+
+def test_v11_cycle_without_an_ack_is_not_repeated_while_the_trade_count_grows(tmp_path):
+    def cycle(n):
+        return ow.check_dev_v11_cycle(ctx(_v11(FakeRemote(), state=GOOD_STATE, heartbeat=GOOD_BEAT, ledger=[TRADE] * n,
+                                               status={"value": "RECONCILED", "checked_at": _iso(10), "note": "ok"})))
+    assert len(_round_trip(tmp_path, [cycle(6), cycle(10), cycle(23)], ack_after=99)) == 1       # 沒 ack 也只通知一次：筆數增加不是新事件

@@ -478,7 +478,7 @@ def check_dev_v11_cycle(ctx: Context) -> Result:
     return Result(OBSERVED, "開發機 V11 在測試網完整走完一個日循環：每日單元正常、有成交、帳本對交易所對帳一致、沒有安全暫停。",
                   [f"{len(trades)} 筆成交列；每日單元心跳 {taipei(beat_at)}（台北）；對帳（{taipei(checked)} 台北）：{status.get('note')}",
                    "機械的部分到此為止；請人看：Google 表『競賽策略・流星版』分頁（開發機接收端）、幣安測試網介面的持倉與條件單、勝者有測試網永續時是否真的開過空單。"],
-                  needs_human=True, key="cycle-ok")   # 固定值：成交列再增加（演練、真實訊號）不該讓已結案的里程碑重新通知；條件消失再回來才會是新的事件
+                  needs_human=True, key="cycle-ok")   # 固定值：成交列再增加（演練、真實訊號）不該讓已結案的里程碑重新通知；沿用 f-71：ack 過的同一結果從 WAITING 回來也不再通知（這個里程碑整個生命週期只通知到 ack 為止）
 
 
 _X5B_BASELINE = datetime(2026, 10, 18, 8, 0, tzinfo=timezone.utc)   # 台北 16:00: after the hand-made duplicate-send tests of that day
