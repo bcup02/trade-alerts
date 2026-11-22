@@ -1,0 +1,49 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index 06cae1b..cc255cd 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "trade-alerts"
+-version = "0.30.50"
++version = "0.30.51"
+ description = "Reusable LINE Messaging API and Telegram alerting library for automated systems"
+ readme = "README.md"
+ requires-python = ">=3.10"
+diff --git a/src/trade_alerts/__init__.py b/src/trade_alerts/__init__.py
+index 836d055..ca20586 100644
+--- a/src/trade_alerts/__init__.py
++++ b/src/trade_alerts/__init__.py
+@@ -351,4 +351,4 @@ __all__ = [
+     "utc_now_iso",
+ ]
+ 
+-__version__ = "0.30.50"
++__version__ = "0.30.51"
+diff --git a/src/trade_alerts/catalog/fleet-error-catalog-v2.json b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+index f49cb77..9696104 100644
+--- a/src/trade_alerts/catalog/fleet-error-catalog-v2.json
++++ b/src/trade_alerts/catalog/fleet-error-catalog-v2.json
+@@ -868,9 +868,9 @@
+       "project": "fleet",
+       "sources": [
+         "ops-notify/src/ops_notify/config.py:28",
+-        "ops-notify/src/ops_notify/watch.py:47",
+-        "ops-notify/src/ops_notify/watch.py:48",
+-        "ops-notify/src/ops_notify/watch.py:176"
++        "ops-notify/src/ops_notify/watch.py:50",
++        "ops-notify/src/ops_notify/watch.py:51",
++        "ops-notify/src/ops_notify/watch.py:362"
+       ],
+       "current": {
+         "latch": null,
+@@ -886,7 +886,7 @@
+       "rationale": "安全暫停代表策略自己停下來等人，出錯代表策略連續跑不動，兩者都要人判斷。",
+       "operator_message": {
+         "what": "某支策略回報自己出錯（ERROR）或已安全暫停（SAFE_HALT）。",
+-        "direction": "策略已經停下或跑不動，不會自己恢復交易。先看策略自己的暫停原因，照那條錯誤的處理步驟做。",
++        "direction": "策略已經停下或跑不動，不會自己恢復交易。先看策略自己的暫停原因，照那條錯誤的處理步驟做。（剛啟用每日計時器、第一輪還沒跑時，維運通知讀作「等待第一輪」，不會發這則；超過 26 小時還沒跑、或第一輪失敗沒寫心跳，仍會照常警示。）",
+         "steps": [
+           "看訊息裡是哪支策略；在 A1 正式機（新）用服務帳號預覽暫停原因與證據：趨勢 `cd /opt/ed-seykota-systematic-trend-following && sudo -u seykota .venv/bin/seykota-resume preview`；動能 `cd /opt/mexc-4h-momentum-trailing-stop && sudo -u mexc-momentum .venv/bin/python src/safe_halt_resume.py --state state/state.json --ledger audit/trading_ledger.jsonl`；競賽 `cd /opt/btc-bull-market-competition && sudo -u btc-competition .venv/bin/btc-competition-resume preview`。",
+           "照風險登記冊裡那個原因的處理步驟處理。",
