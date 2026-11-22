@@ -1,7 +1,7 @@
 {
   "registry_version": "fleet-rollout-registry/v1",
   "catalog_version": "fleet-error-catalog/v2",
-  "updated_at": "2026-11-19",
+  "updated_at": "2026-11-22",
   "note": "Which fleet capability each strategy actually has. A capability or catalog behaviour that a strategy does not have yet must be listed here as pending (with the phase it lands in and why) or n/a (with why) -- CI fails otherwise. Seeded 2026-09-18 from a read of all four repos. 'done' means present on the branch the live host deploys from (sources: operations), not merely merged to development or running on the dev host; file:line evidence refers to the commit recorded in sources. The human page docs/guides/fleet-rollout-register.html is generated from this file. A pending cell that waits for a deployment names the commit it waits for (awaits_commit); the observation watch flags it once A1 runs that commit (docs/observation-watch.md). A done cell's evidence is what the code does with its file:line citations (max 700 characters); verified_at is the date of the last check against A1, limit is one sentence on what the claim does not show; the long A1 verification text lives in docs/registry-a1-checks.json. Retired projects (trade_alerts.rollout_registry.RETIRED_PROJECTS: the old trend strategy, 舊趨勢策略（已停用、待封存）) keep their existing cells and SEY.* rows as evidence but get no column on the rollout register page, and a new capability or FLEET.* row need not fill their cell.",
   "projects": {
     "momentum": "動能策略",
@@ -72,7 +72,7 @@
     "trend-meteor": {
       "repo": "AI-for-column5/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "219f87d03caca99292935138f8d9e8a86471846b"
+      "commit": "a2bf98661941e18280bb555e4a5dfc8679816dca"
     }
   },
   "capabilities": [
@@ -2461,9 +2461,10 @@
       "code": "MET.STATE_FILE_CORRUPT",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "meteor-unpause",
-          "evidence": "暫停規則在正式機分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
+          "state": "done",
+          "evidence": "每日流程先讀狀態檔並檢查是否可讀（src/trend_meteor/runner.py:162 load_state_checked），讀不出來就走安全暫停；2026-11-22 台北 08:10 A1 每日計時器第一次實際執行（LIVE、無單、結果 ok、處理 2026-11-22 一個收盤日，約 83 秒），這一步已走過且沒有觸發暫停。解除工具（PR #215）與單元入口（PR #209）已在正式機分支。",
+          "verified_at": "2026-11-22",
+          "limit": "狀態檔讀不出來的暫停路徑（寫暫停心跳、留證）沒有在 A1 發生過，只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -2478,9 +2479,10 @@
       "code": "MET.MISSED_DAYS",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "meteor-unpause",
-          "evidence": "暫停規則在正式機分支（src/trend_meteor/runner.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
+          "state": "done",
+          "evidence": "每日流程每輪都核對上次處理日與今天收盤日的差距，超過 3 個收盤日就暫停（src/trend_meteor/runner.py:219）；2026-11-22 台北 08:10 A1 每日計時器第一次實際執行（LIVE、無單、結果 ok、處理 2026-11-22 一個收盤日，約 83 秒），這一步已走過且沒有觸發暫停。解除工具（PR #215）與單元入口（PR #209）已在正式機分支。",
+          "verified_at": "2026-11-22",
+          "limit": "A1 沒有漏過收盤日，暫停路徑只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -2495,9 +2497,10 @@
       "code": "MET.HEDGE_MODE",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "meteor-unpause",
-          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
+          "state": "done",
+          "evidence": "每日流程在動作前先向交易所確認是單向持倉（src/trend_meteor/executor.py:283 verify_ready，雙向就暫停）；2026-11-22 台北 08:10 A1 每日計時器第一次實際執行（LIVE、無單、結果 ok、處理 2026-11-22 一個收盤日，約 83 秒），這一步已走過且沒有觸發暫停。解除工具（PR #215）與單元入口（PR #209）已在正式機分支。",
+          "verified_at": "2026-11-22",
+          "limit": "帳戶是雙向持倉的暫停路徑沒有在 A1 發生過，只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -2563,9 +2566,10 @@
       "code": "MET.BAD_EXCHANGE_DATA",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "meteor-unpause",
-          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
+          "state": "done",
+          "evidence": "每日流程每輪讀交易所的單向持倉設定與 USDT 餘額（src/trend_meteor/binance_gateway.py:57、src/trend_meteor/binance_gateway.py:63），欄位缺漏或餘額列數不對就暫停；2026-11-22 台北 08:10 A1 每日計時器第一次實際執行（LIVE、無單、結果 ok、處理 2026-11-22 一個收盤日，約 83 秒），這一步已走過且沒有觸發暫停。解除工具（PR #215）與單元入口（PR #209）已在正式機分支。",
+          "verified_at": "2026-11-22",
+          "limit": "只走過「空倉、無持倉」的讀取：持倉欄位（數量、均價、標記價、逐倉錢包）的非有限值檢查沒有資料可驗；暫停路徑沒有在 A1 發生過。"
         }
       },
       "emits_event": {
@@ -2614,9 +2618,10 @@
       "code": "MET.PENDING_UNRESOLVED",
       "behaviour": {
         "trend-meteor": {
-          "state": "built",
-          "phase": "meteor-unpause",
-          "evidence": "暫停規則在正式機分支（src/trend_meteor/executor.py）：記事件、寫暫停心跳、之後每輪只報告暫停；解除工具（PR #215）與單元入口（PR #209）已在正式機分支；A1 每日計時器目前停用，等解除暫停後第一輪實跑。"
+          "state": "done",
+          "evidence": "每日流程送單前檢查腿簿有沒有未結清的送單，有就暫停（src/trend_meteor/executor.py:487 run_rebalance）；2026-11-22 台北 08:10 A1 每日計時器第一次實際執行（LIVE、無單、結果 ok、處理 2026-11-22 一個收盤日，約 83 秒），這一步已走過且沒有觸發暫停。解除工具（PR #215）與單元入口（PR #209）已在正式機分支。",
+          "verified_at": "2026-11-22",
+          "limit": "腿簿目前沒有未結清的送單，暫停路徑沒有在 A1 發生過，只有測試與開發機驗證。"
         }
       },
       "emits_event": {
@@ -2972,401 +2977,44 @@
   ],
   "recent_changes": [
     {
-      "kind": "cap",
-      "id": "runtime.status_snapshot",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.ledger_status",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.google_status",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.detect_propose",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.verified_close",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.pause_brake",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_export.writer",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.export_relay_enabled",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ops_notify.units_axis",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.funding_fee_sync",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.google_projection_grace",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "docs.glossary_adopted",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "ledger.trade_correction",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "reconcile.unrecorded_fill_handling",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "repair_bot.recurrence_escalation",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.park_unconfirmed_correction",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "projection.requeue_parked",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.close_whole_trade_entry",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "cap",
-      "id": "google.sheet_id_registration",
-      "project": "trend-meteor",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
       "kind": "rule",
-      "id": "FLEET.OPS_LEDGER_DIVERGED",
+      "id": "MET.STATE_FILE_CORRUPT",
       "project": "trend-meteor",
       "aspect": "behaviour",
       "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+      "note": "2026-11-22 流星版 A1 每日計時器第一次實際執行（無單）：只改這次執行實際走過的檢查，由已完成、尚未上線改已做；事件欄位與要靠真實交易才走得到的格子仍是已完成、尚未上線。"
     },
     {
       "kind": "rule",
-      "id": "FLEET.OPS_LEDGER_DIVERGED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_GOOGLE_DIVERGED",
+      "id": "MET.MISSED_DAYS",
       "project": "trend-meteor",
       "aspect": "behaviour",
       "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+      "note": "2026-11-22 流星版 A1 每日計時器第一次實際執行（無單）：只改這次執行實際走過的檢查，由已完成、尚未上線改已做；事件欄位與要靠真實交易才走得到的格子仍是已完成、尚未上線。"
     },
     {
       "kind": "rule",
-      "id": "FLEET.OPS_RUNTIME_ALERT",
+      "id": "MET.HEDGE_MODE",
       "project": "trend-meteor",
       "aspect": "behaviour",
       "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+      "note": "2026-11-22 流星版 A1 每日計時器第一次實際執行（無單）：只改這次執行實際走過的檢查，由已完成、尚未上線改已做；事件欄位與要靠真實交易才走得到的格子仍是已完成、尚未上線。"
     },
     {
       "kind": "rule",
-      "id": "FLEET.OPS_RUNTIME_ALERT",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_UNIT_FAILED",
+      "id": "MET.BAD_EXCHANGE_DATA",
       "project": "trend-meteor",
       "aspect": "behaviour",
       "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+      "note": "2026-11-22 流星版 A1 每日計時器第一次實際執行（無單）：只改這次執行實際走過的檢查，由已完成、尚未上線改已做；事件欄位與要靠真實交易才走得到的格子仍是已完成、尚未上線。"
     },
     {
       "kind": "rule",
-      "id": "FLEET.OPS_UNIT_FAILED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
+      "id": "MET.PENDING_UNRESOLVED",
       "project": "trend-meteor",
       "aspect": "behaviour",
       "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_EXPORT_UNAVAILABLE",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_STATUS_STALE",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_STATUS_STALE",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_CLOCK_DEGRADED",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.OPS_CLOCK_DEGRADED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_ORPHAN_CLOSE_PARKED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "FLEET.PROJECTION_TRADE_ID_CONFLICT_PARKED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_AUTO_REPAIRED",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_AUTO_REPAIRED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_FAILED",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_FAILED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_BLOCKED",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_BLOCKED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_RECURRING",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.VERIFIED_CLOSE_REPAIR_RECURRING",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.UNRECORDED_FILL_CORRECTED",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.UNRECORDED_FILL_CORRECTED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.UNRECORDED_FILL_UNRESOLVED",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.UNRECORDED_FILL_UNRESOLVED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.LEDGER_DATA_QUALITY",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.LEDGER_DATA_QUALITY",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.FUNDING_SHEET_WRITE_FAILED",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.FUNDING_SHEET_WRITE_FAILED",
-      "project": "trend-meteor",
-      "aspect": "emits_event",
-      "type": "completed",
-      "note": "2026-11-19 流星版在 A1 上線（每日計時器仍停用）：逐格對照 A1 實際執行的單元與讀數，由已完成、尚未上線改已做（進度頁 f-100）。"
+      "note": "2026-11-22 流星版 A1 每日計時器第一次實際執行（無單）：只改這次執行實際走過的檢查，由已完成、尚未上線改已做；事件欄位與要靠真實交易才走得到的格子仍是已完成、尚未上線。"
     }
   ]
 }
