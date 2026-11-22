@@ -517,7 +517,7 @@ def test_rollout_items_recolors_the_dot_for_a_type_completed_change(registry, ca
 def _other_aspect_pending(registry, entry) -> bool:
     row = next(r for r in registry["catalog"] if r["code"] == entry["id"])
     other = "emits_event" if entry["aspect"] == "behaviour" else "behaviour"
-    return row[other][entry["project"]]["state"] == "pending"
+    return row[other][entry["project"]]["state"] in ("pending", "built")
 
 
 def test_a_rule_whose_other_aspect_is_still_pending_is_still_flagged_recent(registry, catalog):
@@ -583,7 +583,8 @@ def test_rollout_page_highlights_recent_changes_and_lists_them(registry, catalog
                 # The named aspect is done, the other one is not: the strategy
                 # still has work left, so its dot stays pending -- only the
                 # badge says this row is what changed.
-                assert item["dots"][entry["project"]] == "pending"
+                # (2026-11-22: 'built' counts the same way -- the real dot is kept, only the badge marks the change)
+                assert item["dots"][entry["project"]] in ("pending", "built")
             else:
                 assert item["dots"][entry["project"]] == "recent"
     if monkeypatched:
@@ -960,9 +961,11 @@ def test_trend_meteor_has_its_column_and_the_pending_mechanism_still_guards_the_
     assert any("no registry column yet" in p for p in registry_problems(registry, catalog))
 
 
-def test_trend_meteor_done_cells_are_only_what_runs_on_a1_while_the_daily_timer_is_off(registry):
+def test_trend_meteor_done_cells_are_only_what_a1_has_actually_run(registry):
     """2026-11-19：流星版裝上 A1 但每日計時器停用。『已做』只給 A1 上已啟用的單元（對帳、快照、修復、資金費、Google 派送、維運通知）涵蓋的格子；
-    要靠每日流程（下單、暫停規則、連續失敗計數、中斷復原）才跑得到的格子留『已完成、尚未上線』，等解除暫停後第一輪實跑再改。"""
+    要靠每日流程（下單、暫停規則、連續失敗計數、中斷復原）才跑得到的格子留『已完成、尚未上線』，等解除暫停後第一輪實跑再改。
+    2026-11-22：每日計時器第一次實際執行（無單、結果 ok）。只有那一輪實際走過的 5 條暫停規則的行為欄位改已做（verified_at 2026-11-22）；
+    事件欄位、下單／停損／中斷復原／例外處理器等沒走過的格子仍留已完成、尚未上線。"""
     rows = project_rows(registry, "trend-meteor")
     assert len(rows) == 36 + 2 * (9 + 37)                                                     # 36 項能力＋（9 條 FLEET＋36 條 MET）×（行為、事件）
     by_state = {}
@@ -970,6 +973,7 @@ def test_trend_meteor_done_cells_are_only_what_runs_on_a1_while_the_daily_timer_
         by_state.setdefault(row["state"], []).append(key)
     assert set(by_state) == {"done", "built", "pending", "n/a"}
     # the pause rules and the order paths need the daily loop, which is off: none of them may be done yet
+    first_run_codes = {"STATE_FILE_CORRUPT", "MISSED_DAYS", "HEDGE_MODE", "BAD_EXCHANGE_DATA", "PENDING_UNRESOLVED"}   # 11/22 那一輪實際走過的檢查（只有行為欄位）
     met_codes = ("STATE_FILE_CORRUPT", "MISSED_DAYS", "HEDGE_MODE", "NOT_ISOLATED", "LEVERAGE_NOT_1", "UNEXPECTED_POSITION", "BAD_EXCHANGE_DATA",
                  "ORDER_OUTCOME_UNKNOWN", "ORDER_NOT_TERMINAL", "PENDING_UNRESOLVED", "STEP_OUTCOME_UNKNOWN", "STOP_OUTCOME_UNKNOWN", "PROTECTION_UNVERIFIED",
                  "STALE_STOP_CANCEL_FAILED", "STOP_STATE_UNKNOWN", "STOP_STATUS_UNRECOGNIZED", "POSITION_GONE_STOP_NOT_TRIGGERED", "STOP_TRIGGERED_UNREPORTED",
@@ -978,9 +982,13 @@ def test_trend_meteor_done_cells_are_only_what_runs_on_a1_while_the_daily_timer_
     cap_ids = ("latch.unified_model", "latch.resume_tool", "latch.consecutive_failure_counter", "orders.single_send",
                "orders.step_rounding_decimal", "recovery.interrupted_order", "stop.graceful")
     daily_loop = [k for k in rows if any(k.startswith(f"MET.{c}:") for c in met_codes) or any(k == f"capability:{i}" for i in cap_ids)]
-    assert daily_loop and all(rows[k]["state"] == "built" for k in daily_loop), [k for k in daily_loop if rows[k]["state"] != "built"]
+    first_run = [k for k in daily_loop if any(k == f"MET.{c}:behaviour" for c in first_run_codes)]
+    assert len(first_run) == len(first_run_codes)
+    assert all(rows[k]["state"] == "done" and rows[k]["verified_at"] == "2026-11-22" for k in first_run)
+    rest = [k for k in daily_loop if k not in first_run]
+    assert rest and all(rows[k]["state"] == "built" for k in rest), [k for k in rest if rows[k]["state"] != "built"]
     assert all(rows[k]["phase"] == "meteor-unpause" for k in by_state["built"] + by_state["pending"])
-    assert all(rows[k]["verified_at"] == "2026-11-19" for k in by_state["done"])
+    assert all(rows[k]["verified_at"] == ("2026-11-22" if k in first_run else "2026-11-19") for k in by_state["done"])
 
 
 V11_TIERS = {
