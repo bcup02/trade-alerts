@@ -72,7 +72,7 @@
     "trend-meteor": {
       "repo": "AI-for-column5/ed-seykota-systematic-trend-following",
       "branch": "operations",
-      "commit": "a2bf98661941e18280bb555e4a5dfc8679816dca"
+      "commit": "9aa600442b47fba9ce8f89cc00af75f4be27c79f"
     }
   },
   "capabilities": [
@@ -2462,7 +2462,7 @@
       "behaviour": {
         "trend-meteor": {
           "state": "done",
-          "evidence": "每日流程先讀狀態檔並檢查是否可讀（src/trend_meteor/runner.py:162 load_state_checked），讀不出來就走安全暫停；2026-11-22 台北 08:10 A1 每日計時器第一次實際執行（LIVE、無單、結果 ok、處理 2026-11-22 一個收盤日，約 83 秒），這一步已走過且沒有觸發暫停。解除工具（PR #215）與單元入口（PR #209）已在正式機分支。",
+          "evidence": "每日流程先讀狀態檔並檢查是否可讀（src/trend_meteor/runner.py:165 load_state_checked），讀不出來就走安全暫停；2026-11-22 台北 08:10 A1 每日計時器第一次實際執行（LIVE、無單、結果 ok、處理 2026-11-22 一個收盤日，約 83 秒），這一步已走過且沒有觸發暫停。解除工具（PR #215）與單元入口（PR #209）已在正式機分支。",
           "verified_at": "2026-11-22",
           "limit": "狀態檔讀不出來的暫停路徑（寫暫停心跳、留證）沒有在 A1 發生過，只有測試與開發機驗證。"
         }
@@ -2480,7 +2480,7 @@
       "behaviour": {
         "trend-meteor": {
           "state": "done",
-          "evidence": "每日流程每輪都核對上次處理日與今天收盤日的差距，超過 3 個收盤日就暫停（src/trend_meteor/runner.py:219）；2026-11-22 台北 08:10 A1 每日計時器第一次實際執行（LIVE、無單、結果 ok、處理 2026-11-22 一個收盤日，約 83 秒），這一步已走過且沒有觸發暫停。解除工具（PR #215）與單元入口（PR #209）已在正式機分支。",
+          "evidence": "每日流程每輪都核對上次處理日與今天收盤日的差距，超過 3 個收盤日就暫停（src/trend_meteor/runner.py:222）；2026-11-22 台北 08:10 A1 每日計時器第一次實際執行（LIVE、無單、結果 ok、處理 2026-11-22 一個收盤日，約 83 秒），這一步已走過且沒有觸發暫停。解除工具（PR #215）與單元入口（PR #209）已在正式機分支。",
           "verified_at": "2026-11-22",
           "limit": "A1 沒有漏過收盤日，暫停路徑只有測試與開發機驗證。"
         }
@@ -2975,46 +2975,5 @@
       }
     }
   ],
-  "recent_changes": [
-    {
-      "kind": "rule",
-      "id": "MET.STATE_FILE_CORRUPT",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-22 流星版 A1 每日計時器第一次實際執行（無單）：只改這次執行實際走過的檢查，由已完成、尚未上線改已做；事件欄位與要靠真實交易才走得到的格子仍是已完成、尚未上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.MISSED_DAYS",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-22 流星版 A1 每日計時器第一次實際執行（無單）：只改這次執行實際走過的檢查，由已完成、尚未上線改已做；事件欄位與要靠真實交易才走得到的格子仍是已完成、尚未上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.HEDGE_MODE",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-22 流星版 A1 每日計時器第一次實際執行（無單）：只改這次執行實際走過的檢查，由已完成、尚未上線改已做；事件欄位與要靠真實交易才走得到的格子仍是已完成、尚未上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.BAD_EXCHANGE_DATA",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-22 流星版 A1 每日計時器第一次實際執行（無單）：只改這次執行實際走過的檢查，由已完成、尚未上線改已做；事件欄位與要靠真實交易才走得到的格子仍是已完成、尚未上線。"
-    },
-    {
-      "kind": "rule",
-      "id": "MET.PENDING_UNRESOLVED",
-      "project": "trend-meteor",
-      "aspect": "behaviour",
-      "type": "completed",
-      "note": "2026-11-22 流星版 A1 每日計時器第一次實際執行（無單）：只改這次執行實際走過的檢查，由已完成、尚未上線改已做；事件欄位與要靠真實交易才走得到的格子仍是已完成、尚未上線。"
-    }
-  ]
+  "recent_changes": []
 }
